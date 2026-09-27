@@ -4,7 +4,9 @@
  */
 
 import type { DamageDice } from '../../../../shared/constants/damage.ts';
+import type { HitLocation } from '../../../../shared/constants/hitLocations.ts';
 import type { ManaLevel } from '../../../../shared/constants/magic.ts';
+import type { ResolvedRangedRange } from '../../../../shared/domain/rangedRange.ts';
 import type { RuleContext } from '../../../../shared/domain/skillProcedures.ts';
 import type { SkillAction, SkillModifierRule } from '../../../../shared/schemas/skillProcedures.ts';
 
@@ -21,6 +23,14 @@ export interface DamageRollSpec {
   readonly armorDivisor: string | null;
 }
 
+export interface AttackRollSpec {
+  readonly ranged: boolean;
+  readonly range: ResolvedRangedRange | null;
+  readonly accuracy: number;
+  readonly canTargetVitals: boolean;
+  readonly defaultLocation?: HitLocation;
+}
+
 export interface RollRequest {
   /** Defense rolls may continue a failed check into the incoming-damage dialog. */
   readonly onIncomingDamage?: () => void;
@@ -33,6 +43,7 @@ export interface RollRequest {
   /** Ignored when `damage` is present. */
   readonly baseTarget: number;
   readonly presets?: readonly RollPreset[];
+  readonly attack?: AttackRollSpec;
   /** Present => the sheet rolls damage dice instead of 3d6-vs-target. */
   readonly damage?: DamageRollSpec;
 }

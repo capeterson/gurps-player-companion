@@ -1058,7 +1058,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(12);
+    expect(yaml.version).toBe(13);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],

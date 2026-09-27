@@ -338,7 +338,8 @@ describe('MCP canonical schema conversion', () => {
         total + JSON.stringify(tool.inputSchema).length + JSON.stringify(tool.outputSchema).length,
       0,
     );
-    expect(outputBytes).toBeLessThan(250_000);
+    // Structured weapon Range adds a small typed value to item reads.
+    expect(outputBytes).toBeLessThan(255_000);
     // Calculator inputs plus source/modifier metadata are bounded, first-class
     // portable fields; reserve a measured 550 KB for the complete catalog while
     // still guarding against accidental schema duplication or unbounded growth.

@@ -113,31 +113,31 @@ const ZONES = [
   },
 ] as const;
 
-export function ArmorLocationMap({
-  map,
-  type,
-  divisor,
-  known,
-  protectNaturalDr = false,
+/** The shared silhouette and callouts; callers supply either DR or attack
+ * penalty semantics without duplicating the location interaction. */
+export function HitLocationMap({
   selected,
   onSelect,
+  valueFor,
+  ariaFor,
+  title,
+  className = '',
+  disabled = () => false,
+  hatch = () => false,
 }: {
-  map: DrByLocationMap;
-  type: string;
-  divisor: string;
-  known: boolean;
-  protectNaturalDr?: boolean;
   selected: string;
   onSelect: (location: string) => void;
+  valueFor: (location: string) => string;
+  ariaFor: (location: string) => string;
+  title: string;
+  className?: string;
+  disabled?: (location: string) => boolean;
+  hatch?: (location: string) => boolean;
 }) {
   const id = useId();
   const [hovered, setHovered] = useState<string | null>(null);
-  const dr = (location: string) =>
-    effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
-  const label = (location: string) =>
-    `${locationLabel(location)}, ${known ? `DR ${dr(location)}` : 'DR unavailable'}`;
   return (
-    <div className="armor-map-container">
+    <div className={`armor-map-container ${className}`}>
       <div className="armor-orientation">
         <span>Character’s right</span>
         <span>Front view</span>
@@ -146,7 +146,7 @@ export function ArmorLocationMap({
       <div className="armor-map">
         {/* biome-ignore lint/a11y/useSemanticElements: interactive SVG paths cannot be grouped with an HTML fieldset inside SVG. */}
         <svg viewBox="0 20 560 610" role="group" aria-labelledby={`${id}-title`}>
-          <title id={`${id}-title`}>Armor locations — select a zone or its label</title>
+          <title id={`${id}-title`}>{title}</title>
           <defs>
             <pattern
               id={`${id}-open`}
@@ -173,14 +173,17 @@ export function ArmorLocationMap({
               d={zone.d}
               data-location={zone.id}
               className={`armor-zone ${selected === zone.id ? 'is-selected' : ''} ${hovered === zone.id ? 'is-hovered' : ''}`}
-              style={known && dr(zone.id) === 0 ? { fill: `url(#${id}-open)` } : undefined}
+              style={hatch(zone.id) ? { fill: `url(#${id}-open)` } : undefined}
               role="button"
-              tabIndex={0}
-              aria-label={label(zone.id)}
+              tabIndex={disabled(zone.id) ? -1 : 0}
+              aria-label={ariaFor(zone.id)}
               aria-pressed={selected === zone.id}
-              onClick={() => onSelect(zone.id)}
+              aria-disabled={disabled(zone.id)}
+              onClick={() => {
+                if (!disabled(zone.id)) onSelect(zone.id);
+              }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
+                if (!disabled(zone.id) && (event.key === 'Enter' || event.key === ' ')) {
                   event.preventDefault();
                   onSelect(zone.id);
                 }
@@ -196,17 +199,51 @@ export function ArmorLocationMap({
             type="button"
             className={`armor-callout ${zone.side} ${hovered === zone.id ? 'is-hovered' : ''}`}
             style={{ top: `${((zone.y - 20) / 610) * 100}%` }}
-            aria-label={label(zone.id)}
+            aria-label={ariaFor(zone.id)}
             aria-pressed={selected === zone.id}
+            disabled={disabled(zone.id)}
             onClick={() => onSelect(zone.id)}
             onPointerEnter={() => setHovered(zone.id)}
             onPointerLeave={() => setHovered(null)}
           >
             <span>{locationLabel(zone.id)}</span>
-            <b>{known ? dr(zone.id) : '—'}</b>
+            <b>{valueFor(zone.id)}</b>
           </button>
         ))}
       </div>
     </div>
+  );
+}
+
+export function ArmorLocationMap({
+  map,
+  type,
+  divisor,
+  known,
+  protectNaturalDr = false,
+  selected,
+  onSelect,
+}: {
+  map: DrByLocationMap;
+  type: string;
+  divisor: string;
+  known: boolean;
+  protectNaturalDr?: boolean;
+  selected: string;
+  onSelect: (location: string) => void;
+}) {
+  const dr = (location: string) =>
+    effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
+  return (
+    <HitLocationMap
+      selected={selected}
+      onSelect={onSelect}
+      title="Armor locations — select a zone or its label"
+      valueFor={(location) => (known ? String(dr(location)) : '—')}
+      ariaFor={(location) =>
+        `${locationLabel(location)}, ${known ? `DR ${dr(location)}` : 'DR unavailable'}`
+      }
+      hatch={(location) => known && dr(location) === 0}
+    />
   );
 }

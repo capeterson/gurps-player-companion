@@ -395,3 +395,12 @@ All owner-only library writes and member reads retain the standard handler,
 scope, audit and sync guards. New operations must satisfy the existing raw-API
 parity and delegated OAuth release gates; no private importer-only write path is
 introduced. See [library-calculation-rules.md](library-calculation-rules.md).
+
+## Structured weapon Range parity
+
+Inventory and campaign-library item `weaponData` use the shared `rangedRange`
+schema at REST, sync, MCP and YAML v13 boundaries. Each attack mode may carry
+a fixed-yard Max and optional 1/2D/minimum, or an ST multiplier with an explicit
+wielder/weapon strength source. Legacy notation is retained for repair after
+migration; the roll path does not parse it. MCP tool schemas and the checked-in catalog are generated from the
+same route schemas; old free-text Range writes are rejected.

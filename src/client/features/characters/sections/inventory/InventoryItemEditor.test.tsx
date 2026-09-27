@@ -284,7 +284,7 @@ describe('inline inventory editing', () => {
         damage: 'sw+1 cut',
         db: 0,
         wieldedSide: 'left',
-        ranged: { acc: 0, range: '100/150' },
+        ranged: { acc: 0, range: { kind: 'fixed', halfDamageYards: 100, maxYards: 150 } },
         alternateModes: [{ name: 'Thrust', damage: 'thr imp', reach: '1' }],
       }),
     });
@@ -292,7 +292,9 @@ describe('inline inventory editing', () => {
     expect(screen.getByRole('textbox', { name: 'Shield defense bonus' })).toHaveValue('0');
     expect(screen.getByRole('combobox', { name: 'Shield side' })).toHaveValue('left');
     expect(screen.getByRole('textbox', { name: 'Accuracy' })).toHaveValue('0');
-    expect(screen.getByRole('textbox', { name: 'Range' })).toHaveValue('100/150');
+    expect(screen.getAllByRole('combobox', { name: 'Range' })[0]).toHaveValue('fixed');
+    expect(screen.getAllByRole('spinbutton', { name: '1/2D (yd)' })[0]).toHaveValue(100);
+    expect(screen.getAllByRole('spinbutton', { name: 'Max (yd)' })[0]).toHaveValue(150);
     expect(screen.getByRole('textbox', { name: 'Mode reach' })).toHaveValue('1');
     await change('Governing skill', 'Broadsword');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Shield side' }), 'right');
@@ -304,6 +306,65 @@ describe('inline inventory editing', () => {
       ranged: { acc: 0 },
       alternateModes: [{ name: 'Thrust' }],
     });
+  });
+
+  it('saves and visibly rolls back structured Range edits', async () => {
+    const user = await setup({
+      weaponData: weaponData.parse({
+        damage: '1d pi',
+        ranged: { acc: 2, range: { kind: 'fixed', halfDamageYards: 100, maxYards: 150 } },
+      }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
+    await change('Max (yd)', '180');
+    await waitFor(async () =>
+      expect((await stored()).weaponData?.ranged?.range).toMatchObject({ maxYards: 180 }),
+    );
+    vi.spyOn(getLocalDb().outbox, 'add').mockRejectedValueOnce(new Error('storage unavailable'));
+    await change('Max (yd)', '190');
+    await screen.findByText(/Couldn't save Coat: Range — storage unavailable/);
+    await waitFor(() =>
+      expect(screen.getByRole('spinbutton', { name: 'Max (yd)' })).toHaveValue(180),
+    );
+    expect(
+      screen.getByRole('spinbutton', { name: 'Max (yd)' }).closest('.field-rollback-flash'),
+    ).toHaveAttribute('data-flashing', 'true');
+  });
+
+  it('queues a follow-up Range edit and preserves a different weapon field during a slow save', async () => {
+    const user = await setup({
+      weaponData: weaponData.parse({
+        damage: '1d pi',
+        ranged: { acc: 2, range: { kind: 'fixed', halfDamageYards: 100, maxYards: 150 } },
+      }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
+    let release = () => {};
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = mutations.writeItemPath;
+    vi.spyOn(mutations, 'writeItemPath').mockImplementationOnce(async (...args) => {
+      await original(...args);
+      await barrier;
+    });
+    await change('Max (yd)', '180');
+    await waitFor(async () =>
+      expect((await stored()).weaponData?.ranged?.range).toMatchObject({ maxYards: 180 }),
+    );
+    await change('Max (yd)', '200');
+    await change('Accuracy', '3');
+    await waitFor(async () =>
+      expect((await stored()).weaponData?.ranged).toMatchObject({
+        acc: 3,
+        range: { maxYards: 200 },
+      }),
+    );
+    await act(async () => release());
+    await waitFor(() =>
+      expect(screen.getByRole('spinbutton', { name: 'Max (yd)' })).toHaveValue(200),
+    );
+    expect(screen.getByRole('textbox', { name: 'Accuracy' })).toHaveValue('3');
   });
 
   it('retains existing enchantments and exposes their populated optional fields', async () => {

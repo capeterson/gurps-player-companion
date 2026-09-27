@@ -49,7 +49,7 @@ test('roll history moves from Combat into the History tab and survives reload lo
 
   await page.getByRole('button', { name: /^Dodge \d+$/ }).click();
   const rollDialog = page.getByRole('dialog', { name: 'Roll Dodge' });
-  await rollDialog.getByRole('button', { name: 'Roll 3d6' }).click();
+  await rollDialog.getByRole('button', { name: /Roll vs \d+/ }).click();
   await rollDialog.getByRole('button', { name: 'Close' }).last().click();
 
   await selectCharacterSection(page, 'History');

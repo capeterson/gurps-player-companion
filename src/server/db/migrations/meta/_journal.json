@@ -407,6 +407,13 @@
       "when": 1800012000000,
       "tag": "0057_log_point_awards",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1800013000000,
+      "tag": "0058_structured_weapon_range",
+      "breakpoints": true
     }
   ]
 }

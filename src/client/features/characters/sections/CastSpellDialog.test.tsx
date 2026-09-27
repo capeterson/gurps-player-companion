@@ -51,7 +51,7 @@ describe('very high mana spending', () => {
     function AfterCommit({ changed }: { changed: boolean }) {
       useLayoutEffect(() => {
         if (changed)
-          expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+          expect(screen.queryByRole('button', { name: /Roll vs \d+/ })).not.toBeInTheDocument();
       }, [changed]);
       return null;
     }
@@ -70,7 +70,7 @@ describe('very high mana spending', () => {
     );
     const view = render(panel(false));
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
-    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Roll vs \d+/ })).toBeInTheDocument();
     view.rerender(panel(true));
     expect(screen.getByRole('button', { name: 'Roll Light' })).toBeInTheDocument();
   });
@@ -88,13 +88,13 @@ describe('very high mana spending', () => {
     );
     const view = render(panel('normal'));
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
-    expect(screen.getByRole('button', { name: 'Roll 3d6' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Roll vs \d+/ })).toBeInTheDocument();
     view.rerender(panel('normal', false));
-    expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Roll vs \d+/ })).not.toBeInTheDocument();
     view.rerender(panel('very_high'));
-    expect(screen.queryByRole('button', { name: 'Roll 3d6' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Roll vs \d+/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll vs \d+/ }));
     expect(screen.getByText('Critical failure')).toBeInTheDocument();
   });
   it('holds spell rolls until campaign mana is known, then applies its real failure rule', () => {
@@ -125,7 +125,7 @@ describe('very high mana spending', () => {
       </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll vs \d+/ }));
     expect(screen.getByText('Critical failure')).toBeInTheDocument();
   });
   it('carries campaign mana from the spell table into the actual roll result', () => {
@@ -137,7 +137,7 @@ describe('very high mana spending', () => {
       </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Roll 3d6' }));
+    fireEvent.click(screen.getByRole('button', { name: /Roll vs \d+/ }));
     expect(screen.getByText('Critical failure')).toBeInTheDocument();
     expect(screen.getByText(/turns this failure into a critical failure/)).toBeInTheDocument();
   });

@@ -2697,6 +2697,116 @@
         },
         "additionalProperties": false
       },
+      "RangedRange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "fixed"
+                ]
+              },
+              "halfDamageYards": {
+                "type": "integer",
+                "nullable": true,
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000000
+              },
+              "maxYards": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000000
+              },
+              "minimumYards": {
+                "type": "integer",
+                "nullable": true,
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000000
+              }
+            },
+            "required": [
+              "kind",
+              "halfDamageYards",
+              "maxYards"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "st_multiplier"
+                ]
+              },
+              "halfDamageFactor": {
+                "type": "number",
+                "nullable": true,
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000
+              },
+              "maxFactor": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000
+              },
+              "strengthSource": {
+                "type": "string",
+                "enum": [
+                  "wielder",
+                  "weapon"
+                ]
+              },
+              "minimumYards": {
+                "type": "integer",
+                "nullable": true,
+                "minimum": 0,
+                "exclusiveMinimum": true,
+                "maximum": 1000000000
+              }
+            },
+            "required": [
+              "kind",
+              "halfDamageFactor",
+              "maxFactor",
+              "strengthSource"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "legacy"
+                ]
+              },
+              "notation": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              }
+            },
+            "required": [
+              "kind",
+              "notation"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "nullable": true
+          }
+        ]
+      },
       "CapabilityEffect": {
         "type": "object",
         "properties": {
@@ -12837,9 +12947,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -12955,9 +13063,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -13021,9 +13127,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -19382,9 +19486,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -19500,9 +19602,7 @@
                             "maximum": 20
                           },
                           "range": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 40
+                            "$ref": "#/components/schemas/RangedRange"
                           },
                           "rof": {
                             "type": "string",
@@ -19566,9 +19666,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -20178,9 +20276,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -20296,9 +20392,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -20362,9 +20456,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -21089,9 +21181,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -21207,9 +21297,7 @@
                             "maximum": 20
                           },
                           "range": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 40
+                            "$ref": "#/components/schemas/RangedRange"
                           },
                           "rof": {
                             "type": "string",
@@ -21273,9 +21361,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -21882,9 +21968,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -22000,9 +22084,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -22066,9 +22148,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -32812,9 +32892,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -32929,9 +33007,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -32995,9 +33071,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -33518,9 +33592,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -33636,9 +33708,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -33702,9 +33772,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -36447,9 +36515,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -36564,9 +36630,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -36630,9 +36694,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -37153,9 +37215,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -37271,9 +37331,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -37337,9 +37395,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -40353,9 +40409,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -40470,9 +40524,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -40536,9 +40588,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -41059,9 +41109,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -41177,9 +41225,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -41243,9 +41289,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -44067,9 +44111,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -44184,9 +44226,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -44250,9 +44290,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -44773,9 +44811,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -44891,9 +44927,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -44957,9 +44991,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -48627,9 +48659,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -48744,9 +48774,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -48810,9 +48838,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -49333,9 +49359,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -49451,9 +49475,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -49517,9 +49539,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -53208,9 +53228,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -53325,9 +53343,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -53391,9 +53407,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -53914,9 +53928,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -54032,9 +54044,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -54098,9 +54108,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -56865,9 +56873,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -56982,9 +56988,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -57048,9 +57052,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -57571,9 +57573,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -57689,9 +57689,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -57755,9 +57753,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -61052,9 +61048,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -61169,9 +61163,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -61235,9 +61227,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -61758,9 +61748,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -61876,9 +61864,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -61942,9 +61928,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -65259,9 +65243,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -65376,9 +65358,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -65442,9 +65422,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -65965,9 +65943,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -66083,9 +66059,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -66149,9 +66123,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -68916,9 +68888,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -69033,9 +69003,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -69099,9 +69067,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -69622,9 +69588,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -69740,9 +69704,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -69806,9 +69768,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -72739,9 +72699,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -72856,9 +72814,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -72922,9 +72878,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -73445,9 +73399,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -73563,9 +73515,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -73629,9 +73579,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -76584,9 +76532,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -76701,9 +76647,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -76767,9 +76711,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -77290,9 +77232,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -77408,9 +77348,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -77474,9 +77412,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -80241,9 +80177,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -80358,9 +80292,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -80424,9 +80356,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -80947,9 +80877,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -81065,9 +80993,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -81131,9 +81057,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -84009,9 +83933,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -84126,9 +84048,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -84192,9 +84112,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -84715,9 +84633,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -84833,9 +84749,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -84899,9 +84813,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -87799,9 +87711,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -87916,9 +87826,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -87982,9 +87890,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -88505,9 +88411,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -88623,9 +88527,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -88689,9 +88591,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -91456,9 +91356,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -91573,9 +91471,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -91639,9 +91535,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -92162,9 +92056,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -92280,9 +92172,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -92346,9 +92236,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -95243,9 +95131,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -95360,9 +95246,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -95426,9 +95310,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -95949,9 +95831,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -96067,9 +95947,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -96133,9 +96011,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -99051,9 +98927,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -99168,9 +99042,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -99234,9 +99106,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -99757,9 +99627,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -99875,9 +99743,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -99941,9 +99807,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -102708,9 +102572,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -102825,9 +102687,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -102891,9 +102751,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -103414,9 +103272,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -103532,9 +103388,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -103598,9 +103452,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -104377,9 +104229,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -104495,9 +104345,7 @@
                             "maximum": 20
                           },
                           "range": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 40
+                            "$ref": "#/components/schemas/RangedRange"
                           },
                           "rof": {
                             "type": "string",
@@ -104561,9 +104409,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -105165,9 +105011,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -105282,9 +105126,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -105348,9 +105190,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -105871,9 +105711,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -105989,9 +105827,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -106055,9 +105891,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -108424,9 +108258,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -108541,9 +108373,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -108607,9 +108437,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -109130,9 +108958,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -109248,9 +109074,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -109314,9 +109138,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -110118,9 +109940,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -110236,9 +110056,7 @@
                             "maximum": 20
                           },
                           "range": {
-                            "type": "string",
-                            "nullable": true,
-                            "maxLength": 40
+                            "$ref": "#/components/schemas/RangedRange"
                           },
                           "rof": {
                             "type": "string",
@@ -110302,9 +110120,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -110903,9 +110719,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -111020,9 +110834,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -111086,9 +110898,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -111609,9 +111419,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -111727,9 +111535,7 @@
                                   "maximum": 20
                                 },
                                 "range": {
-                                  "type": "string",
-                                  "nullable": true,
-                                  "maxLength": 40
+                                  "$ref": "#/components/schemas/RangedRange"
                                 },
                                 "rof": {
                                   "type": "string",
@@ -111793,9 +111599,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -114162,9 +113966,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -114279,9 +114081,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -114345,9 +114145,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -114868,9 +114666,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -114986,9 +114782,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -115052,9 +114846,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -117819,9 +117611,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -117936,9 +117726,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -118002,9 +117790,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -118525,9 +118311,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -118643,9 +118427,7 @@
                                     "maximum": 20
                                   },
                                   "range": {
-                                    "type": "string",
-                                    "nullable": true,
-                                    "maxLength": 40
+                                    "$ref": "#/components/schemas/RangedRange"
                                   },
                                   "rof": {
                                     "type": "string",
@@ -118709,9 +118491,7 @@
                                           "maximum": 20
                                         },
                                         "range": {
-                                          "type": "string",
-                                          "nullable": true,
-                                          "maxLength": 40
+                                          "$ref": "#/components/schemas/RangedRange"
                                         },
                                         "rof": {
                                           "type": "string",
@@ -121567,9 +121347,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -121684,9 +121462,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -121750,9 +121526,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -122273,9 +122047,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -122391,9 +122163,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -122457,9 +122227,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -125227,9 +124995,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -125344,9 +125110,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -125410,9 +125174,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -125933,9 +125695,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -126051,9 +125811,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -126117,9 +125875,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -128885,9 +128641,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -129002,9 +128756,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -129068,9 +128820,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -129591,9 +129341,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",
@@ -129709,9 +129457,7 @@
                                         "maximum": 20
                                       },
                                       "range": {
-                                        "type": "string",
-                                        "nullable": true,
-                                        "maxLength": 40
+                                        "$ref": "#/components/schemas/RangedRange"
                                       },
                                       "rof": {
                                         "type": "string",
@@ -129775,9 +129521,7 @@
                                               "maximum": 20
                                             },
                                             "range": {
-                                              "type": "string",
-                                              "nullable": true,
-                                              "maxLength": 40
+                                              "$ref": "#/components/schemas/RangedRange"
                                             },
                                             "rof": {
                                               "type": "string",

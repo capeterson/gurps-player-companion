@@ -102,9 +102,14 @@
 .armor-callout.is-hovered {
   border-color: var(--color-primary);
 }
+.armor-callout:disabled,
+.armor-zone[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 @container (max-width: 390px) {
-  .armor-callout,
-  .armor-leaders {
+  .armor-map-container:not(.roll-hit-map) .armor-callout,
+  .armor-map-container:not(.roll-hit-map) .armor-leaders {
     display: none;
   }
   .armor-map {
@@ -133,14 +138,46 @@
     min-height: 44px;
   }
   @container (max-width: 480px) {
-    .armor-callout,
-    .armor-leaders {
+    .armor-map-container:not(.roll-hit-map) .armor-callout,
+    .armor-map-container:not(.roll-hit-map) .armor-leaders {
       display: none;
     }
   }
 }
+.roll-hit-map .armor-map {
+  max-width: 420px;
+}
+.roll-hit-map .armor-callout {
+  min-height: 30px;
+  padding: 3px 4px;
+  font-size: 10px;
+}
 @media (prefers-reduced-motion: reduce) {
   .armor-zone {
     transition: none;
+  }
+}
+@container (max-width: 480px) {
+  .roll-hit-map .armor-map {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    aspect-ratio: auto;
+  }
+  .roll-hit-map .armor-map svg {
+    grid-column: 1 / -1;
+    width: min(100%, 250px);
+    height: auto;
+    justify-self: center;
+  }
+  .roll-hit-map .armor-leaders {
+    display: none;
+  }
+  .roll-hit-map .armor-callout {
+    position: static;
+    transform: none;
+    width: 100%;
+    min-height: 44px;
+    font-size: 10px;
   }
 }

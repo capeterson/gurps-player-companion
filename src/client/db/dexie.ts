@@ -35,6 +35,7 @@ import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/
  */
 
 import Dexie, { type Table } from 'dexie';
+import { upgradeLegacyWeaponRanges } from '../../shared/domain/rangedRange.ts';
 import type {
   LibraryEnchantmentOut,
   LibraryItemOut,
@@ -727,6 +728,44 @@ class LocalDb extends Dexie {
       campaignLibraryEnchantments: 'id, campaignId, revision',
       campaignLibraryActiveEffects: 'id, campaignId, revision',
     });
+    // v13 converts cached weapon ranges and pending inventory/library intents
+    // before the new structured schema is used offline or sent to sync.
+    this.version(13)
+      .stores({ characterInventory: 'id, characterId, parentId, updatedAt, revision' })
+      .upgrade(async (tx) => {
+        for (const tableName of ['characterInventory', 'campaignLibraryItems']) {
+          await tx
+            .table(tableName)
+            .toCollection()
+            .modify((row: Record<string, unknown>) => {
+              if (row.weaponData != null)
+                row.weaponData = upgradeLegacyWeaponRanges(row.weaponData);
+            });
+        }
+        function upgradeBody(value: unknown, direct: boolean): unknown {
+          if (direct) return upgradeLegacyWeaponRanges(value);
+          if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+          const body = structuredClone(value) as Record<string, unknown>;
+          if (body.weaponData != null) body.weaponData = upgradeLegacyWeaponRanges(body.weaponData);
+          return body;
+        }
+        await tx
+          .table('outbox')
+          .toCollection()
+          .modify((op: OutboxEntry) => {
+            if (['character_inventory', 'campaign_library_item'].includes(op.entityClass)) {
+              const direct = op.fieldPath === 'weaponData';
+              op.attemptedValue = upgradeBody(op.attemptedValue, direct);
+              if (op.prevValue !== undefined) op.prevValue = upgradeBody(op.prevValue, direct);
+            }
+            if (op.localCampaignTransferUndo)
+              op.localCampaignTransferUndo = op.localCampaignTransferUndo.map((undo) => ({
+                ...undo,
+                before: upgradeBody(undo.before, false) as Record<string, unknown>,
+                after: upgradeBody(undo.after, false) as Record<string, unknown>,
+              }));
+          });
+      });
   }
 }
 

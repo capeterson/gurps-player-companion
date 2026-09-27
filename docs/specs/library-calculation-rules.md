@@ -1,7 +1,7 @@
 # Library calculation rules and source editions
 
 This subsystem represents user-supplied material without supplying book content or
-extracting PDFs. YAML v12, REST, MCP and local-first authoring share the same
+extracting PDFs. YAML v13, REST, MCP and local-first authoring share the same
 schemas. Extraction, OCR and classification remain external responsibilities.
 
 ## Identity, sources and completeness
@@ -152,7 +152,7 @@ Migrations 0054–0056 add common metadata, sources/modifiers, typed JSON rules 
 snapshots, edition-qualified indexes, history/revision/tombstone triggers and
 compatibility backfills. Character paid values are not recalculated.
 
-YAML parsers accept v1–v12; exporters emit only canonical v12. Sources and
+YAML parsers accept v1–v13; exporters emit only canonical v13. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
 modifiers are optional sections: omission preserves them even in replace mode;
 explicit empty arrays prune them. Merge/replace uses canonical edition identity.
 The final graph includes retained existing rows. It is validated under the
@@ -163,7 +163,7 @@ Sources/modifiers use owner-only CRUD under
 `/api/v1/campaigns/{id}/library/{sources|modifiers}`; members read them through
 the aggregate library and section filters. REST and sync call shared handlers;
 OpenAPI and MCP expose the same fields and permissions. Both classes have Dexie
-v12 stores, outbox operations, campaign-parent checks, cursor/tombstone delivery,
+v13 stores, outbox operations, campaign-parent checks, cursor/tombstone delivery,
 logout purge and human-readable campaign history.
 
 Implementation: `shared/schemas/{calculation,libraryMetadata}.ts`,

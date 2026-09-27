@@ -50,14 +50,80 @@ export const armorData = z
 
 /**
  * Ranged stat block (GURPS 4e weapon table columns, B268-271).
- * Numeric where math consumes the value (`acc` feeds the Aim roll
- * preset, B364), free text where book notation is irregular
- * (`range` "100/150" or "x10/x15", `rof` "3~", `shots` "9+1(3)").
+ * Numeric where math consumes the value (`acc` and `range` feed attack
+ * rolls). RoF and shots retain book notation (`3~`, `9+1(3)`).
  */
+const rangeAmount = z.number().int().positive().max(1_000_000_000);
+const rangeFactor = z.number().positive().max(1_000_000);
+
+/** Fixed yards or a multiplier of wielder/weapon ST (B269). A legacy value
+ * only preserves an unrecognized pre-migration notation for explicit repair;
+ * attack rolls never try to parse that text. */
+export const rangedRange = z
+  .discriminatedUnion('kind', [
+    z
+      .object({
+        kind: z.literal('fixed'),
+        halfDamageYards: rangeAmount.nullable(),
+        maxYards: rangeAmount,
+        minimumYards: rangeAmount.nullable().optional(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('st_multiplier'),
+        halfDamageFactor: rangeFactor.nullable(),
+        maxFactor: rangeFactor,
+        strengthSource: z.enum(['wielder', 'weapon']),
+        minimumYards: rangeAmount.nullable().optional(),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal('legacy'),
+        notation: z.string().trim().min(1).max(40),
+      })
+      .strict(),
+  ])
+  .superRefine((range, ctx) => {
+    if (
+      range.kind === 'fixed' &&
+      range.halfDamageYards != null &&
+      range.halfDamageYards > range.maxYards
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['halfDamageYards'],
+        message: '1/2D must not exceed Max',
+      });
+    if (
+      range.kind === 'st_multiplier' &&
+      range.halfDamageFactor != null &&
+      range.halfDamageFactor > range.maxFactor
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['halfDamageFactor'],
+        message: '1/2D must not exceed Max',
+      });
+    if (
+      range.kind !== 'legacy' &&
+      range.minimumYards != null &&
+      range.kind === 'fixed' &&
+      range.minimumYards > range.maxYards
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['minimumYards'],
+        message: 'Minimum must not exceed Max',
+      });
+  })
+  .openapi('RangedRange');
+
 export const rangedData = z
   .object({
     acc: z.number().int().min(0).max(20).nullable().optional(),
-    range: z.string().max(40).nullable().optional(),
+    range: rangedRange.nullable().optional(),
     rof: z.string().max(20).nullable().optional(),
     shots: z.string().max(20).nullable().optional(),
     bulk: z.number().int().min(-12).max(0).nullable().optional(),
@@ -399,6 +465,7 @@ export type ArmorData = z.infer<typeof armorData>;
 export type WeaponData = z.infer<typeof weaponData>;
 export type WeaponMode = z.infer<typeof weaponMode>;
 export type RangedData = z.infer<typeof rangedData>;
+export type RangedRange = z.infer<typeof rangedRange>;
 export type PowerstoneData = z.infer<typeof powerstoneData>;
 export type MagicItemData = z.infer<typeof magicItemData>;
 export type MagicItemMode = z.infer<typeof magicItemMode>;

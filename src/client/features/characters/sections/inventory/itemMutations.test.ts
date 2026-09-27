@@ -119,9 +119,18 @@ describe('inline inventory local mutations', () => {
     await seed();
     await writeItemPath(ID, 'weaponData.ranged.acc', 0, 'Accuracy');
     expect((await read()).weaponData?.ranged?.acc).toBe(0);
-    await writeItemPath(ID, 'weaponData.ranged.range', '100/150', 'Range');
+    await writeItemPath(
+      ID,
+      'weaponData.ranged.range',
+      { kind: 'fixed', halfDamageYards: 100, maxYards: 150 },
+      'Range',
+    );
     await writeItemPath(ID, 'weaponData.ranged.acc', null, 'Accuracy');
-    expect((await read()).weaponData?.ranged?.range).toBe('100/150');
+    expect((await read()).weaponData?.ranged?.range).toEqual({
+      kind: 'fixed',
+      halfDamageYards: 100,
+      maxYards: 150,
+    });
     await writeItemPath(ID, 'weaponData.ranged.range', null, 'Range');
     expect((await read()).weaponData?.ranged).toBeNull();
     expect((await read()).weaponData?.alternateModes).toEqual([

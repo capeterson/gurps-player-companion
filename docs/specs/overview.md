@@ -249,7 +249,7 @@ shows the synced campaign name as a separate link to that campaign.
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v12. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, but the character sheet does not expose an active-effects editor. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v13. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -467,7 +467,7 @@ shows the synced campaign name as a separate link to that campaign.
   checked flags; blank/unchecked fields can hide again after focus leaves.
   The field stays mounted in place so promotion does not steal focus. This
   applies to armor typed DR, crushing DR, defense bonus, facing and notes;
-  weapon ST, shield DB, ranged stats, alternate modes and notes; powerstone and
+  weapon ST, shield DB, structured ranged range (fixed yards or ST multiplier), alternate modes and notes; powerstone and
   magic-item notes; enchantment details; and basic notes/external location.
   Armor retains every canonical and custom hit location. Weapons retain
   damage, reach, parry, governing skill, optional shield side, ranged stats,
@@ -480,7 +480,7 @@ shows the synced campaign name as a separate link to that campaign.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
   new item's category chips. Implementation lives under
-  `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, and
+  `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, `RangedRangeField`, and
   `itemMutations`), with regression tests for disclosure, local saves, rollback,
   category changes, and structured-data preservation.
   Encumbered Move
@@ -694,29 +694,24 @@ shows the synced campaign name as a separate link to that campaign.
     1-point floor from B378), reach, an ST-shortfall badge/caption
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
     RoF/Shots/Bulk/Recoil) when the weapon has one, and the resolved
-    skill as a compact roll button with hit-location preset chips (aim
-    penalties, B398-399) plus, for ranged weapons, an Aim(+Acc) preset
-    and the B550 speed/range-penalty presets. Vitals presets appear
-    only for impaling and piercing attacks, and the eye preset only for
-    impaling, piercing, and tight-beam burning attacks. A weapon with
-    **alternate attack modes** (swing/thrust/thrown, `weaponData.alternateModes`)
-    renders each mode as its own labelled table row in addition
-    to the primary line, with an alternate's reach inherited from the
-    weapon when unset; vitals/eye presets are offered only when at
-    least one mode across every damage line can target them. Attack-mode
-    bonuses apply once per matching primary or named alternate mode. Affected
-    rows expose expandable base/global/weapon/final modifier breakdowns;
-    unmatched and multi-match selectors are diagnosed visibly instead of
-    becoming global.
+    skill as a compact roll button. Attack rolls open separate range, Aim,
+    hit-location and Other controls. Fixed-yard and ST-multiplier ranges use a
+    structured weapon value, with the speed/range slider stopping at the
+    mode's resolved Max. Aim offers none, 1, 2 or 3+ seconds (Acc, Acc+1,
+    Acc+2, capped at twice base Acc); the defense section's body map supplies
+    hit-location penalties; compact screens place its location callouts in a
+    touch-sized grid below the silhouette. Vitals and eyes are disabled for the current attack mode when
+    its damage cannot target them. **Alternate attack modes** render as labelled
+    table rows and retain independent range and Accuracy. Attack-mode effects
+    apply to the matching mode; unmatched selectors are diagnosed visibly.
   - **Roll sheet** — an ephemeral bottom-sheet/dialog roller with two
-    variants sharing one shell. The default **check** variant: modifier
-    stepper (−25..+10 — deep enough that a 200 yd range preset, B550,
-    can still be topped up toward a deep hit-location penalty via the
-    stepper) plus single-select preset chips, a "Roll 3d6" button, and
-    a result panel (dice, total, success/margin, crit badge) built on
-    the shared `evaluateRoll`. Defense rows route through the same
-    success-roll evaluator as skills — GURPS defenses actually use a
-    different crit table, an accepted simplification for this pass.
+    variants sharing one shell. Check rolls show the effective target and a
+    `Roll vs N` action. Attack rolls combine range, Aim, hit location, rule
+    bonuses and an Other modifier; the controls remain independently adjustable.
+    The footer stays reachable while the content scrolls. Defense and skill
+    rolls retain the generic modifier stepper and optional presets. Defense
+    rows use the same success-roll evaluator as skills, an existing rules
+    simplification.
     The **damage** variant (triggered by a `RollRequest.damage` payload,
     e.g. from an Attacks card damage chip) rolls NdM+adds instead of
     3d6-vs-target: the stepper adjusts flat adds, presets are hidden,
@@ -823,7 +818,7 @@ there is no decorative cover slot or implied image-upload feature.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v12 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v13 retains them.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal starting at 0, e.g. 13) and **location** (free-form text, e.g. "The
@@ -1011,7 +1006,7 @@ src/
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
-                                      and transactional JSON-property mutations
+                                      structured Range inputs and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
                  LanguagesPanel and TechniquesPanel (the new P0 panels),
@@ -1081,6 +1076,7 @@ src/
                   A/H difficulty), encumbrance,
                   traitCost, modifierMath, poolBump, warnings, diceRoll (3d6 +
                    success-roll evaluation + NdM damage-dice rolling),
+                   rangedRange (typed Range resolution, migration and B550 bands),
                    damageParse (weapon damage-string parsing/resolution +
                    the cut/imp/piercing 1-point damage floor), defenseCalc
                    (Dodge/Parry/Block, explicit-or-fuzzy weapon-to-skill
@@ -1099,7 +1095,7 @@ src/
                    entries))
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties),
-                 rangePenalty (B550 speed/range roll presets), magic
+                 rangePenalty (B550 reference steps), magic
     yaml/        library.ts — round-trippable campaign-library YAML codec
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration and app-shell precache. It never
