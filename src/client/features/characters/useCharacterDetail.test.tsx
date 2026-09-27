@@ -435,7 +435,7 @@ describe('durable character mechanics', () => {
       await waitFor(() => expect(gm.result.current?.[0]?.libraryEffectsKnown).toBe(false));
       const character = gm.result.current?.[0];
       if (!character) throw new Error('Missing character');
-      render(<GmCharacterCard character={character} dense={false} lookup="Sword" />);
+      render(<GmCharacterCard character={character} lookup="Sword" />);
       expect(screen.getByRole('alert')).toHaveTextContent('Linked rules are unavailable');
       expect(screen.queryByText('Dodge')).not.toBeInTheDocument();
       expect(screen.queryByText('Sword')).not.toBeInTheDocument();

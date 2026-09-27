@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { type CampaignOut, campaignHouseRules } from '../../../shared/schemas/campaign.ts';
@@ -71,7 +71,8 @@ it('settles the GM party query without repeatedly rewriting its campaign mirror'
   );
   try {
     expect(await screen.findByRole('heading', { name: 'Kestrel Vale' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Dense' }));
+    expect(screen.getByRole('button', { name: 'Skill lookup' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Dense' })).not.toBeInTheDocument();
     await act(async () => {
       await db.campaigns.get(campaign.id);
     });
