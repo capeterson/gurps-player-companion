@@ -400,6 +400,13 @@
       "when": 1800011000000,
       "tag": "0056_exact_library_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1800012000000,
+      "tag": "0057_log_point_awards",
+      "breakpoints": true
     }
   ]
 }

@@ -103,7 +103,7 @@ tools. The current covered surface is:
 | Campaigns | List/detail/create/update/delete, member and role changes, ownership transfer; use existing role checks. |
 | Campaign library | Read and CRUD for every library type, plus YAML import/export with all existing options. Reads support section/name/limit/offset narrowing; preserve YAML export as a typed text payload. |
 | Invitations and notifications | All list, invite/cancel/accept/reject, mark-read/read-all, and deletion operations. |
-| Adventure log | All reads/writes, privacy, session/location fields, and XP award semantics. |
+| Adventure log | All reads/writes, privacy, session/location fields, optional points gained and recipient subsets, concrete XP award snapshots, character cap adjustments on create/edit/delete, and identical owner/own-character authorization. |
 | Encounters | List/detail/create/update, advance turn, combatant and effect CRUD; retain optimistic turn-concurrency checks and hidden-NPC/PC privacy. |
 | History | Character and campaign history, filters/pagination, existing privacy and role restrictions. |
 | Sync cursor/operations and WebSocket | Transport infrastructure excluded as tools; equivalent domain operations remain covered. MCP commits still propagate through the normal cursor/invalidation mechanisms. |

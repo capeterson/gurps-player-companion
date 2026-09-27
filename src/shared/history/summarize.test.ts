@@ -980,3 +980,17 @@ it('summarizes a named campaign house-rule set selection', () => {
     }).summary,
   ).toBe('House rule set changed to J Talisar');
 });
+
+it.each([
+  [0, 3],
+  [8, 3],
+  [3, 0],
+])('summarizes earned points %s to %s in character history', (before, after) => {
+  const event = summarizeEvent({
+    entityClass: 'character',
+    op: 'update',
+    oldRow: { earned_points: before },
+    newRow: { earned_points: after },
+  });
+  expect(event.summary).toBe(`Earned points ${before} → ${after}`);
+});

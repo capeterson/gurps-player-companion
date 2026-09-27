@@ -97,7 +97,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Client | React 19, React Router 7, TanStack Query 5 |
 | Local store | Dexie 4 package (IndexedDB), application schema version 10 |
 | PWA | vite-plugin-pwa + Workbox |
-| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Illuminated Manuscript, Heraldic Vellum — `src/client/styles/theme.css`) |
+| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Illuminated Manuscript, Heraldic Vellum, plus classic Arcane Purple in dark/light modes — `src/client/styles/theme.css`) |
 | Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys verified by `@simplewebauthn/server`; API keys |
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |
@@ -385,3 +385,9 @@ its existing outbox/history lifecycle; validated read/modify/write transactions
 retain concurrent local gestures. Skill procedures are JSONB on library skills and
 part of their owned mechanics snapshots. All calculation is shared pure TypeScript.
 See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).
+
+Adventure-log awards update the read-only `characters.earned_points` scalar in the log
+write’s audited transaction. Full cursor rows carry this value into Dexie; the shared
+detail builder adds it to the campaign starting target for cap, unspent points, and
+warnings. No new sync entity/store is needed. `adventureLogAwards.ts` handles roster
+snapshotting, authorization, delta updates, locks, and post-commit WS nudges.

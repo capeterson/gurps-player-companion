@@ -65,18 +65,41 @@ describe('/api/v1/auth/preferences', () => {
       lightTheme: 'heraldic-vellum',
     });
 
+    const arcaneDark = await patch(token, { darkTheme: 'arcane-dark' });
+    expect(arcaneDark.status).toBe(200);
+    expect(await arcaneDark.json()).toEqual({
+      darkTheme: 'arcane-dark',
+      lightTheme: 'heraldic-vellum',
+    });
+    const arcaneLight = await patch(token, { lightTheme: 'arcane-light' });
+    expect(arcaneLight.status).toBe(200);
+    expect(await arcaneLight.json()).toEqual({
+      darkTheme: 'arcane-dark',
+      lightTheme: 'arcane-light',
+    });
+    const restored = await app.request('/api/v1/auth/preferences', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(restored.status).toBe(200);
+    expect(await restored.json()).toEqual({
+      darkTheme: 'arcane-dark',
+      lightTheme: 'arcane-light',
+    });
+
     // Validation: a light palette in the dark slot, unknown names, unknown
     // keys, and an empty body are all rejected without changing the row.
     expect((await patch(token, { darkTheme: 'heraldic-vellum' })).status).toBe(422);
-    expect((await patch(token, { lightTheme: 'arcane-light' })).status).toBe(422);
+    expect((await patch(token, { lightTheme: 'unknown-palette' })).status).toBe(422);
+    expect((await patch(token, { darkTheme: 'arcane-light' })).status).toBe(422);
+    expect((await patch(token, { lightTheme: 'arcane-dark' })).status).toBe(422);
     expect((await patch(token, { mode: 'dark' })).status).toBe(422);
     expect((await patch(token, {})).status).toBe(422);
     const unchanged = await app.request('/api/v1/auth/preferences', {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(await unchanged.json()).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'heraldic-vellum',
+      darkTheme: 'arcane-dark',
+      lightTheme: 'arcane-light',
     });
   });
 

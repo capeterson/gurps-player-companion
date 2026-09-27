@@ -25,6 +25,7 @@ import {
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
@@ -582,6 +583,25 @@ function IdentityPanel({
   });
   const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
   const campaignFlash = useFieldFlash(campaignFlashKey);
+  const [pendingCampaign, setPendingCampaign] = useState<{
+    characterId: string;
+    from: string;
+    to: string | null;
+  } | null>(null);
+  useEffect(() => {
+    void character.id;
+    void character.campaignId;
+    setPendingCampaign(null);
+  }, [character.id, character.campaignId]);
+  const saveCampaign = (next: string | null) =>
+    enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: character.id,
+      fieldPath: 'campaignId',
+      attemptedValue: next,
+      humanName: 'campaign',
+      flashKey: campaignFlashKey,
+    });
 
   return (
     <section className="card p-5 space-y-3">
@@ -660,14 +680,16 @@ function IdentityPanel({
               data-flash-parity={campaignFlash['data-flash-parity']}
               onChange={(e) => {
                 const next = e.target.value || null;
-                void enqueueFieldPatch({
-                  entityClass: 'character',
-                  entityId: character.id,
-                  fieldPath: 'campaignId',
-                  attemptedValue: next,
-                  humanName: 'campaign',
-                  flashKey: campaignFlashKey,
-                });
+                if (next === character.campaignId) return;
+                if (character.campaignId != null) {
+                  setPendingCampaign({
+                    characterId: character.id,
+                    from: character.campaignId,
+                    to: next,
+                  });
+                } else {
+                  void saveCampaign(next);
+                }
               }}
             >
               <option value="">No campaign</option>
@@ -700,6 +722,27 @@ function IdentityPanel({
           <Markdown source={character.appearance ?? ''} />
         )}
       </div>
+      <ConfirmDialog
+        open={pendingCampaign !== null}
+        title="Change character campaign?"
+        confirmLabel="Change campaign"
+        onCancel={() => setPendingCampaign(null)}
+        onConfirm={() => {
+          if (
+            pendingCampaign &&
+            character.id === pendingCampaign.characterId &&
+            character.campaignId === pendingCampaign.from
+          ) {
+            void saveCampaign(pendingCampaign.to);
+          }
+          setPendingCampaign(null);
+        }}
+      >
+        Changing or leaving this campaign may impact your character sheet. Campaign library content
+        already copied to this character will be retained, but its live links will be removed.
+        Rejoining the campaign later will not restore those links, so that content will no longer
+        receive campaign library updates automatically.
+      </ConfirmDialog>
     </section>
   );
 }
@@ -1034,6 +1077,18 @@ function PointsPanel({
         </p>
       )}
       <ul className="text-sm space-y-1">
+        {pointTarget != null && (
+          <li className="flex justify-between">
+            <span>Point cap</span>
+            <span className="num">{pointTarget}</span>
+          </li>
+        )}
+        {(character.earnedPoints ?? 0) !== 0 && (
+          <li className="flex justify-between text-secondary">
+            <span>Earned points</span>
+            <span className="num">{character.earnedPoints}</span>
+          </li>
+        )}
         <li className="flex justify-between">
           <span>Attributes</span>
           <span className="num">{p.attributes}</span>
@@ -1403,7 +1458,11 @@ export function CharacterSheetPage() {
   const { id = '' } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const [selectedTab, setTab] = useState<SheetTab>('Combat');
+  const [selectedTab, setTab] = useState<SheetTab>('Overview');
+  useEffect(() => {
+    void id;
+    setTab('Overview');
+  }, [id]);
   const sectionHeading = useRef<HTMLHeadingElement>(null);
   const anchor = parseSheetAnchor(location.hash);
   const anchorTab: SheetTab | null = anchor
@@ -1500,7 +1559,8 @@ export function CharacterSheetPage() {
   }
 
   const { canWrite, isMinimal, campaign } = access;
-  const pointTarget = campaign?.pointTarget ?? null;
+  const pointTarget =
+    campaign?.pointTarget == null ? null : campaign.pointTarget + (character.earnedPoints ?? 0);
 
   if (isMinimal) {
     return (
@@ -1547,7 +1607,7 @@ export function CharacterSheetPage() {
       ? anchorTab
       : visibleTabs.includes(selectedTab)
         ? selectedTab
-        : 'Combat';
+        : 'Overview';
   function navigateSection(next: SheetTab) {
     setTab(next);
     if (location.hash) navigate({ pathname: location.pathname, search: location.search, hash: '' });

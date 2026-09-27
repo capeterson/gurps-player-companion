@@ -2,11 +2,11 @@
 
 **Your character sheet, combat companion, and campaign notebook — at the table or on the go.**
 
-Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with light and dark themes and an installable app that keeps character edits available offline.
+Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with customizable light and dark palettes (including classic Arcane purple) and an installable app that keeps character edits available offline.
 
 **[Play on the official hosted instance → gurps.abundant.zip](https://gurps.abundant.zip)**
 
-![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](docs/screenshots/armor-desktop.png)
+![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](public/screenshots/armor-desktop.png)
 
 *Choose a hit location on the armor diagram to see its protection, defense bonuses, and incoming-damage options.*
 
@@ -19,7 +19,7 @@ Keep your GURPS 4e characters ready for the next session. Roll attacks, see wher
 
 | Combat on your phone | Resolve incoming damage |
 | --- | --- |
-| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](docs/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing a cutting hit against mail and its calculated injury.](docs/screenshots/damage-mobile.png) |
+| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](public/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing a cutting hit against mail and its calculated injury.](public/screenshots/damage-mobile.png) |
 
 ## A character sheet that does the bookkeeping
 
@@ -30,15 +30,15 @@ Build out attributes, advantages, disadvantages, quirks, skills, techniques, lan
 - **Equipment that matters.** Organize nested containers with drag-and-drop, filter your pack, and track weight, cost, encumbrance, weapon modes, armor, and mechanical enchantments.
 - **Notes and a change history.** Keep character notes in a rich text or Markdown editor and review saved changes in the History tab.
 
-![Desktop inventory with equipped weapons, worn armor, and supplies organized in a nested trail pack.](docs/screenshots/inventory-desktop.png)
+![Desktop inventory with equipped weapons, worn armor, and supplies organized in a nested trail pack.](public/screenshots/inventory-desktop.png)
 
 ## Bring your campaign together
 
 Invite your players, set campaign point limits, tech level, mana, and house rules, and decide who can see full character sheets. GMs and managers get a party dashboard for checking characters during play; optional GM editing lets them help with player sheets.
 
-Build a shared library of traits, skills, spells, items, enchantments, and active effects. Portable YAML import/export lets you reuse campaign content, including languages, techniques, and styles. Record adventures with formatted session notes, locations, XP awards, and campaign-wide or private visibility.
+Build a shared library of traits, skills, spells, items, enchantments, and active effects. Portable YAML import/export lets you reuse campaign content, including languages, techniques, and styles. Record adventures with formatted session notes, locations, points gained (for all characters or a selected subset), and campaign-wide or private visibility.
 
-![Desktop campaign page for The Lantern Coast, with a three-character roster and a formatted adventure log.](docs/screenshots/campaign-desktop.png)
+![Desktop campaign overview for The Lantern Coast, with its three-character roster, rules, and adventure-log navigation.](public/screenshots/campaign-desktop.png)
 
 An **experimental turn tracker**, enabled in campaign settings, adds PC/NPC turn order and timed effects. A character also gets a personal initiative scratchpad when that setting is enabled.
 
@@ -46,7 +46,7 @@ An **experimental turn tracker**, enabled in campaign settings, adds PC/NPC turn
 
 Once you have signed in and synced your characters, character-sheet edits save on your device first and sync when the connection returns. That includes traits, skills, spells, languages, techniques, inventory, and combat state. The sync indicator shows pending work and explains problems when a change needs attention.
 
-Install the app from your browser for quick access. Campaign administration, library editing, adventure logs, invitations, and the shared encounter tracker require an internet connection.
+Install the app from your browser for quick access. Campaign administration, adventure logs, invitations, and the shared encounter tracker require an internet connection.
 
 ## Connect your assistant
 

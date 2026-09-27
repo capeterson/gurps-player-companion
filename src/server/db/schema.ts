@@ -593,6 +593,7 @@ export const characters = pgTable(
     iq: smallint('iq').notNull().default(10),
     ht: smallint('ht').notNull().default(10),
 
+    earnedPoints: integer('earned_points').notNull().default(0),
     hpMod: smallint('hp_mod').notNull().default(0),
     willMod: smallint('will_mod').notNull().default(0),
     perMod: smallint('per_mod').notNull().default(0),
@@ -1012,7 +1013,8 @@ export const adventureLogEntries = pgTable(
     location: varchar('location', { length: 200 }),
     body: text('body').notNull().default(''),
     visibility: visibilityEnum('visibility').notNull().default('campaign'),
-    /** Validated by `xpAward` (src/shared/schemas/adventureLog.ts). */
+    pointsGained: integer('points_gained'),
+    /** Validated by `xpAwardsField` (src/shared/schemas/adventureLog.ts). */
     xpAwards: jsonb('xp_awards').$type<XpAward[]>().notNull().default([]),
     createdAt: createdAt(),
     updatedAt: updatedAt(),

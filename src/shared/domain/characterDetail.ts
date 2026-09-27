@@ -89,6 +89,7 @@ export interface CharacterDetailInputCharacter {
   dx: number;
   iq: number;
   ht: number;
+  earnedPoints?: number;
   hpMod: number;
   willMod: number;
   perMod: number;
@@ -583,6 +584,8 @@ export function buildCharacterDetail(
   // by the trait itself, not double-billed against attribute spend.
   const languageInputs: CharacterLanguageInput[] = languages.map((l) => ({ points: l.points }));
   const techniqueInputs: CharacterTechniqueInput[] = techniques.map((t) => ({ points: t.points }));
+  const pointTarget =
+    campaign?.pointTarget == null ? null : campaign.pointTarget + (character.earnedPoints ?? 0);
   const points = computePointBreakdown(
     baseAttrs,
     traitInputs,
@@ -590,7 +593,7 @@ export function buildCharacterDetail(
     languageInputs,
     techniqueInputs,
     spellInputs,
-    campaign?.pointTarget ?? null,
+    pointTarget,
   );
 
   const weights = computeWeights(
@@ -865,7 +868,7 @@ export function buildCharacterDetail(
   });
 
   const caps: CampaignCaps = {
-    pointTarget: campaign?.pointTarget ?? null,
+    pointTarget,
     disadvantageCap: campaign?.disadvantageCap ?? null,
     quirkCap: campaign?.quirkCap ?? null,
   };
@@ -889,6 +892,7 @@ export function buildCharacterDetail(
 
   return {
     view: 'full',
+    earnedPoints: character.earnedPoints ?? 0,
     id: character.id,
     ownerId: character.ownerId,
     campaignId: character.campaignId,

@@ -299,6 +299,7 @@ export const characterDetail = z.object({
     .default([]),
   /** Discriminator so the client can switch between full and minimal views. */
   view: z.literal('full').default('full'),
+  earnedPoints: z.number().int().optional(),
   id: uuid,
   ownerId: uuid,
   ...characterIdentityShape,

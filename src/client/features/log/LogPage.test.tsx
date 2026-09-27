@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AdventureLogOut } from '../../../shared/schemas/adventureLog.ts';
+import { type AdventureLogOut, adventureLogUpdate } from '../../../shared/schemas/adventureLog.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { LogPage } from '../log/LogPage.tsx';
@@ -441,4 +441,66 @@ describe('LogPage', () => {
       'First title (rev)',
     );
   });
+
+  it.each([
+    [3, 3],
+    [3, 4],
+  ])(
+    'preserves legacy duplicate awards while saving text edits (%s and %s points)',
+    async (first, second) => {
+      const recipientId = '0193b3c0-f1f0-7000-8000-00000000c002';
+      let entry = makeEntry({
+        title: 'Legacy session',
+        body: 'Original notes',
+        pointsGained: null,
+        xpAwards: [
+          { characterId: recipientId, amount: first },
+          { characterId: recipientId, amount: second },
+        ],
+      });
+      vi.mocked(api).mockImplementation((async (
+        path: string,
+        options?: { method?: string; body?: unknown },
+      ) => {
+        if (path === '/auth/me') return { id: ME_ID };
+        if (path === '/campaigns') return [campaign];
+        if (path === `/campaigns/${CAMP_ID}`) return campaign;
+        if (path === `/campaigns/${CAMP_ID}/log`) return [entry];
+        if (path === `/campaigns/${CAMP_ID}/log/e1` && options?.method === 'PATCH') {
+          const wireBody = JSON.parse(JSON.stringify(options.body));
+          const patch = adventureLogUpdate.parse(wireBody);
+          // The mock applies the validated text-only request, preserving the
+          // historical rows just as the shared route handler does.
+          entry = { ...entry, body: patch.body ?? entry.body };
+          return entry;
+        }
+        return undefined;
+      }) as unknown as typeof api);
+      const user = userEvent.setup();
+      renderPage();
+      await screen.findByText('Legacy session');
+      await user.click(screen.getByLabelText('Edit Legacy session'));
+      expect(screen.getByText('Applies to 1 selected character')).toBeInTheDocument();
+      await user.clear(screen.getByTestId('rich-text-editor'));
+      await user.type(screen.getByTestId('rich-text-editor'), 'Revised notes');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+      await screen.findByText('Revised notes');
+      expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
+      const saved = vi
+        .mocked(api)
+        .mock.calls.find(
+          (call) => call[0] === `/campaigns/${CAMP_ID}/log/e1` && call[1]?.method === 'PATCH',
+        );
+      expect(saved).toBeDefined();
+      const wireBody = JSON.parse(JSON.stringify(saved?.[1]?.body));
+      expect(wireBody).toMatchObject({ body: 'Revised notes' });
+      expect(wireBody).not.toHaveProperty('xpAwards');
+      expect(wireBody).not.toHaveProperty('awardCharacterIds');
+      expect(wireBody).not.toHaveProperty('pointsGained');
+      expect(entry.xpAwards).toEqual([
+        { characterId: recipientId, amount: first },
+        { characterId: recipientId, amount: second },
+      ]);
+    },
+  );
 });

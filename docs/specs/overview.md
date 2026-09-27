@@ -103,6 +103,9 @@ callers may set `filterable={false}` on `Table` or `TableHeader` (including
 The portaled menu uses shared viewport collision handling, dynamic viewport size
 limits, internal scrolling, Escape/outside dismissal and keyboard focus management.
 
+### Public introduction
+
+Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -128,7 +131,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
 **Overview, Combat, Traits, Skills, Magic, Inventory, History**.
-Combat is the default section for live play. Magic is hidden on a read-only
+Overview is the default section when opening a character. Magic is hidden on a read-only
 view of a non-magical character; owners always have it available to add magic.
 Inventory items, traits, skills, and spells have stable ID-based URL anchors
 (`#inventory-<id>`, `#trait-<id>`, `#skill-<id>`, `#spell-<id>`). Opening a
@@ -155,7 +158,7 @@ shows the synced campaign name as a separate link to that campaign.
   content padding protect controls from the dock/FAB; navigation yields to modal
   dialogs. Reduced motion disables the flower entrance and sync rotation.
   `SheetNavigation.tsx` owns this responsive control. Overview appears first in
-  the dock and mobile navigation while Combat remains the initial live-play view.
+  the dock and mobile navigation and Overview is the initial view.
   `AppIcon.tsx` standardizes
   Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
   book, backpack and history for the sheet, with matching map, bell,
@@ -199,6 +202,7 @@ shows the synced campaign name as a separate link to that campaign.
   `src/client/components/markdown/`) used by the adventure log, with a
   raw-markdown/source toggle and sanitized rendering. It has no separate
   Notes destination or duplicate editing surface.
+- **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt. Pending confirmation clears when the displayed character or its campaign changes.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
@@ -482,8 +486,8 @@ shows the synced campaign name as a separate link to that campaign.
   Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
-- **Current Status and Combat tab (live-gameplay surfaces)**. Combat is the
-  initial sheet view, with Overview first in the navigation
+- **Current Status and Combat tab (live-gameplay surfaces)**. Combat follows
+  Overview in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
   consolidating everything a player touches mid-session onto one inline
   surface. There is no combat modal or separate live-gameplay route; the
@@ -820,7 +824,7 @@ there is no decorative cover slot or implied image-upload feature.
 - **Adventure log**: session log entries with per-entry visibility
   (campaign-wide or private), an optional **session number** (running
   session ordinal starting at 0, e.g. 13) and **location** (free-form text, e.g. "The
-  Hollow Beneath Greymoor"), and an optional **XP award** list per entry.
+  Hollow Beneath Greymoor"), and optional **Points gained**. New campaign awards snapshot all current characters by default; **Choose characters** selects a subset. Awards raise each recipient's point cap above the campaign starting target, and edits/deletions adjust the existing credit rather than adding it twice. Campaign owners may award any character; members may award their own characters. The concrete **XP award** list remains available through REST/MCP. Campaigns without a starting point target remain uncapped.
   Opening the create form suggests session 0 when no numbered entries exist,
   otherwise one above the greatest posted session number; the suggestion is
   editable. The campaign-scoped `/campaigns/:id/log` page never shows a campaign
@@ -924,8 +928,8 @@ there is no decorative cover slot or implied image-upload feature.
   support correlation without exposing raw error details.
 - **Themes**: the header toggles dark/light mode per device (defaulting to the
   OS preference). Settings → **Appearance** picks the palette for each mode —
-  dark: **Gilded Tome** (default), **Midnight Gilt** or **Verdigris & Brass**; light: **Illuminated
-  Manuscript** (default) or **Heraldic Vellum**. The palette choices are saved
+  dark: **Gilded Tome** (default), **Midnight Gilt**, **Verdigris & Brass**, or classic **Arcane Purple**; light: **Illuminated
+  Manuscript** (default), **Heraldic Vellum**, or classic **Arcane Purple**. The palette choices are saved
   to the account (`GET`/`PATCH /auth/preferences`, `users.dark_theme` /
   `light_theme`) so every device matches; changes apply immediately, are kept
   locally while offline and pushed when back online, and a server rejection
@@ -976,6 +980,8 @@ src/
                  (buildPatchSet, the shared PATCH-body-to-`.set()` helper),
                  entityWrites (per-entity insert/upsert-values builders
                  shared by REST and the sync dispatcher — AGENTS.md S12),
+                 adventureLogAwards (transactional recipient selection, award
+                 credit deltas and authorization),
                  characterChildren (per-class configs plus insert/update/
                  delete for library-linked character children and the
                  child-table map used by the cursor and replay lookups)
@@ -1029,6 +1035,7 @@ src/
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
+    features/home/LandingPage.tsx  Public overview with canonical README screenshots
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
@@ -1100,7 +1107,7 @@ src/
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
 docs/
   specs/         These design specs
-  screenshots/   Current-app README captures; fictional demo data, capture notes
+  screenshots/   Screenshot capture notes; canonical images are in public/screenshots/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked)
@@ -1109,6 +1116,10 @@ plugins/
                                public development MCP endpoint, including its
                                private registered-app mapping and a production-
                                publishing readiness checklist
+public/
+  screenshots/   Canonical app captures shared by the landing page and README
+scripts/
+  capture-screenshots.mjs  Refresh canonical captures from a seeded local app
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
   lantern_coast.yaml    Rich Lantern Coast library; bootstrap/README.md lists demo accounts

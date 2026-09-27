@@ -78,6 +78,7 @@ export interface LocalCharacter {
   dx: number;
   iq: number;
   ht: number;
+  earnedPoints?: number;
   hpMod: number;
   willMod: number;
   perMod: number;

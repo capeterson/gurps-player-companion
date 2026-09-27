@@ -53,12 +53,12 @@ export function ConfirmDialog({
         if (!pending) onCancel();
       }}
     >
-      <div className="modal-box bg-base-100 border border-base-300/60 rounded-2xl">
+      <div className="modal-box max-w-[calc(100dvw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto [overflow-wrap:anywhere] bg-base-100 border border-base-300/60 rounded-2xl">
         <h3 id={titleId} className="font-display text-xl font-semibold">
           {title}
         </h3>
         {children && <div className="py-3 text-sm">{children}</div>}
-        <div className="modal-action">
+        <div className="modal-action flex-wrap">
           <button type="button" onClick={onCancel} disabled={pending} className="btn btn-ghost">
             {cancelLabel}
           </button>

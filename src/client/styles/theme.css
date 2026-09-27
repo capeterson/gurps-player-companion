@@ -1,11 +1,11 @@
 /* ============================================================
    GURPS Companion · gold themes
-   Four DaisyUI 5 themes. Each device switches between a dark and a
+   Seven DaisyUI 5 themes. Each device switches between a dark and a
    light mode; the user's synced preferences pick which palette each
    mode uses (see src/client/lib/theme.ts):
 
-     dark:  "gilded-tome" (default) · "midnight-gilt" · "verdigris-brass"
-     light: "illuminated-manuscript" (default) · "heraldic-vellum"
+     dark:  "gilded-tome" (default) · "midnight-gilt" · "verdigris-brass" · "arcane-dark"
+     light: "illuminated-manuscript" (default) · "heraldic-vellum" · "arcane-light"
 
    Tuned for "stare at this for hours" comfort, carried over from the
    original Arcane handoff:
@@ -40,6 +40,169 @@
 @plugin "daisyui" {
   themes: false;
   logs: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "arcane-dark";
+  default: false;
+  prefersdark: false;
+  color-scheme: dark;
+
+  /* base = surfaces (faint violet cast, hue 300 ↔ primary)
+     Aligned to design handoff styles.css lines 143-152. */
+  --color-base-100: oklch(0.21 0.02 300); /* surface (cards, panels) */
+  --color-base-200: oklch(0.17 0.022 300); /* page bg (canvas) */
+  --color-base-300: oklch(0.34 0.04 300); /* default border (visible on dark surfaces) */
+  --color-base-content: oklch(0.88 0.01 300);
+
+  /* primary = violet (accent) */
+  --color-primary: oklch(0.7 0.13 305);
+  --color-primary-content: oklch(0.16 0.005 300);
+
+  /* secondary = teal (HP-full / second accent) */
+  --color-secondary: oklch(0.72 0.1 195);
+  --color-secondary-content: oklch(0.16 0.005 300);
+
+  /* accent = same as primary (kept for DaisyUI components that use it) */
+  --color-accent: oklch(0.7 0.13 305);
+  --color-accent-content: oklch(0.16 0.005 300);
+
+  /* neutral = surface-2 (muted card backs, chip rests) */
+  --color-neutral: oklch(0.25 0.022 300);
+  --color-neutral-content: oklch(0.88 0.01 300);
+
+  /* semantic */
+  --color-info: oklch(0.72 0.09 195);
+  --color-info-content: oklch(0.16 0.005 300);
+  --color-success: oklch(0.74 0.1 150);
+  --color-success-content: oklch(0.16 0.005 300);
+  --color-warning: oklch(0.76 0.12 90);
+  --color-warning-content: oklch(0.16 0.005 300);
+  --color-error: oklch(0.62 0.16 25);
+  --color-error-content: oklch(0.16 0.005 300);
+
+  /* shape */
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1.125rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: "arcane-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: oklch(1.0 0 0); /* surface (cards, panels) */
+  --color-base-200: oklch(0.97 0.005 90); /* page bg (warm paper) */
+  --color-base-300: oklch(0.9 0.008 300); /* default border */
+  --color-base-content: oklch(0.24 0.008 300);
+
+  --color-primary: oklch(0.48 0.16 305);
+  --color-primary-content: oklch(1 0 0);
+
+  --color-secondary: oklch(0.52 0.13 195);
+  --color-secondary-content: oklch(1 0 0);
+
+  --color-accent: oklch(0.48 0.16 305);
+  --color-accent-content: oklch(1 0 0);
+
+  --color-neutral: oklch(0.97 0.006 90);
+  --color-neutral-content: oklch(0.24 0.008 300);
+
+  --color-info: oklch(0.5 0.1 195);
+  --color-info-content: oklch(1 0 0);
+  --color-success: oklch(0.52 0.12 150);
+  --color-success-content: oklch(1 0 0);
+  --color-warning: oklch(0.62 0.14 90);
+  --color-warning-content: oklch(0.16 0.005 300);
+  --color-error: oklch(0.55 0.18 25);
+  --color-error-content: oklch(1 0 0);
+
+  --radius-selector: 0.75rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1.125rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+[data-theme="arcane-dark"] {
+  --gild: var(--color-primary);
+  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
+  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
+  --text-muted: oklch(0.68 0.018 300);
+  --sync-attention: oklch(0.76 0.11 45);
+  --text-dim: oklch(0.52 0.022 300);
+  --border-strong: oklch(0.46 0.055 300);
+  --accent-soft: oklch(0.36 0.1 305 / 0.5);
+
+  /* "deep" background — used for input fields, HP-bar wells, and
+     anywhere the design wants a recessed surface darker than the page.
+     Maps to design styles.css --bg-deep. */
+  --surface-deep: oklch(0.12 0.025 300);
+
+  /* HP severity ramp — full → critical → unconscious */
+  --hp-full: oklch(0.74 0.1 195);
+  --hp-good: oklch(0.74 0.1 150);
+  --hp-warn: oklch(0.76 0.12 90);
+  --hp-low: oklch(0.7 0.13 50);
+  --hp-crit: oklch(0.62 0.16 25);
+  --hp-out: oklch(0.46 0.09 320);
+
+  /* atmospheric vignette — warm candle in the top-right, deep violet
+     in the bottom-left. Tuned for dark mode where the etched + lit
+     chrome adds depth. */
+  --arcane-edge-warm: oklch(0.42 0.1 35 / 0.22);
+  --arcane-edge-violet: oklch(0.3 0.08 305 / 0.28);
+
+  /* Three-layer shadow system from design styles.css lines 171-173.
+     - shadow-1: card resting state (subtle drop + 1px border)
+     - shadow-2: elevated containers (modals, popovers)
+     - shadow-glow: accent-haloed pills (combat FAB) */
+  --shadow-1: 0 1px 2px rgba(8, 5, 16, 0.5), 0 0 0 1px var(--color-base-300);
+  --shadow-2: 0 12px 40px -14px oklch(0.1 0.06 305 / 0.7), 0 0 0 1px var(--color-base-300), inset 0
+    1px 0 oklch(0.7 0.15 305 / 0.04);
+  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
+}
+
+[data-theme="arcane-light"] {
+  --gild: var(--color-primary);
+  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
+  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
+  --text-muted: oklch(0.46 0.01 300);
+  --sync-attention: oklch(0.52 0.13 40);
+  --text-dim: oklch(0.62 0.012 300);
+  --border-strong: oklch(0.78 0.01 300);
+  --accent-soft: oklch(0.9 0.05 305 / 0.6);
+
+  /* Recessed surface for inputs / HP-bar wells in light mode. */
+  --surface-deep: oklch(0.94 0.006 90);
+
+  --hp-full: oklch(0.55 0.13 195);
+  --hp-good: oklch(0.55 0.13 150);
+  --hp-warn: oklch(0.6 0.14 85);
+  --hp-low: oklch(0.55 0.16 50);
+  --hp-crit: oklch(0.5 0.18 25);
+  --hp-out: oklch(0.4 0.1 320);
+
+  /* Light mode — same dual-source vignette, paler so the paper-tone
+     surface keeps reading flat under prolonged use. */
+  --arcane-edge-warm: oklch(0.92 0.06 60 / 0.5);
+  --arcane-edge-violet: oklch(0.9 0.04 305 / 0.5);
+
+  /* Lighter shadow stack so the paper-tone canvas keeps reading flat. */
+  --shadow-1: 0 1px 2px oklch(0.5 0.05 305 / 0.08), 0 0 0 1px var(--color-base-300);
+  --shadow-2: 0 12px 40px -14px oklch(0.5 0.08 305 / 0.25), 0 0 0 1px var(--color-base-300), inset 0
+    1px 0 oklch(1 0 0 / 0.6);
+  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
 }
 
 /* ----- Gilded Tome (default dark) ----------------------------- */

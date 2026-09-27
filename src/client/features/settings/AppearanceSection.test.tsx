@@ -61,10 +61,10 @@ describe('AppearanceSection', () => {
     expect(screen.getByRole('heading', { name: 'Appearance' })).toBeTruthy();
     expect(
       Array.from((dark as HTMLSelectElement).options).map((option) => option.textContent),
-    ).toEqual(['Gilded Tome', 'Midnight Gilt', 'Verdigris & Brass']);
+    ).toEqual(['Gilded Tome', 'Midnight Gilt', 'Verdigris & Brass', 'Arcane Purple']);
     expect(
       Array.from((light as HTMLSelectElement).options).map((option) => option.textContent),
-    ).toEqual(['Illuminated Manuscript', 'Heraldic Vellum']);
+    ).toEqual(['Illuminated Manuscript', 'Heraldic Vellum', 'Arcane Purple']);
     expect((dark as HTMLSelectElement).value).toBe('gilded-tome');
 
     await userEvent.selectOptions(dark, 'Midnight Gilt');

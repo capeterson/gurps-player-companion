@@ -13,6 +13,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api } from '../../lib/api.ts';
+import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
+import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
 
@@ -30,6 +32,8 @@ interface DraftSnapshot {
   body: string;
   visibility: AdventureLogCreate['visibility'];
   xpAwards: XpAward[];
+  pointsGained: number | null;
+  awardCharacterIds: string[] | null;
 }
 
 function snapshotOf(
@@ -45,6 +49,8 @@ function snapshotOf(
     body: draft.body,
     visibility: draft.visibility,
     xpAwards: draft.xpAwards,
+    pointsGained: draft.pointsGained ?? null,
+    awardCharacterIds: draft.awardCharacterIds ?? null,
   };
 }
 
@@ -60,6 +66,8 @@ function snapshotMatches(a: DraftSnapshot, b: DraftSnapshot): boolean {
   if (a.location !== b.location) return false;
   if (a.body !== b.body) return false;
   if (a.visibility !== b.visibility) return false;
+  if (a.pointsGained !== b.pointsGained) return false;
+  if (JSON.stringify(a.awardCharacterIds) !== JSON.stringify(b.awardCharacterIds)) return false;
   if (a.xpAwards.length !== b.xpAwards.length) return false;
   return a.xpAwards.every(
     (award, i) =>
@@ -107,6 +115,8 @@ function emptyDraft(sessionNumber: number | null = null): AdventureLogCreate {
     body: '',
     visibility: 'campaign',
     xpAwards: [],
+    pointsGained: null,
+    awardCharacterIds: null,
   };
 }
 
@@ -123,6 +133,16 @@ export function nextSessionNumber(entries: readonly AdventureLogOut[]): number {
   );
 }
 
+function pointsForEntry(entry: AdventureLogOut): number | null {
+  if (entry.pointsGained != null) return entry.pointsGained;
+  const first = entry.xpAwards[0];
+  return first &&
+    first.amount >= 0 &&
+    entry.xpAwards.every((award) => award.amount === first.amount)
+    ? first.amount
+    : null;
+}
+
 function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
   return {
     sessionDate: entry.sessionDate,
@@ -132,6 +152,8 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
     body: entry.body,
     visibility: entry.visibility,
     xpAwards: entry.xpAwards,
+    pointsGained: pointsForEntry(entry),
+    awardCharacterIds: [...new Set(entry.xpAwards.map((award) => award.characterId))],
   };
 }
 
@@ -171,6 +193,9 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     enabled: !!campaignId,
   });
 
+  const roster = useCampaignCharactersList(campaignId ?? undefined);
+  const [recipientDialog, setRecipientDialog] = useState(false);
+  const [recipientSelection, setRecipientSelection] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterKind>('all');
   const [editor, setEditor] = useState<EditorState>({ kind: 'hidden' });
   const [draft, setDraft] = useState<AdventureLogCreate>(emptyDraft());
@@ -185,6 +210,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     setDraft(emptyDraft());
     setSaveError(null);
     setEntryToDelete(null);
+    setRecipientDialog(false);
   }, [campaignId]);
 
   const create = useMutation({
@@ -195,6 +221,9 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       }),
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
+      void getSyncOrchestrator()
+        .triggerCursorPull()
+        .catch(() => undefined);
       // Only collapse the editor if it still corresponds to this save.
       // If the user has already opened a follow-up draft while this
       // request was in flight, leave their newer draft alone — clearing
@@ -228,6 +257,9 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       }),
     onSuccess: (_, { entryId, snapshot }) => {
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
+      void getSyncOrchestrator()
+        .triggerCursorPull()
+        .catch(() => undefined);
       // Same guard as create — only clear the editor if no newer draft
       // is waiting in it. Also verifies we're still editing the entry
       // this save targeted (the user may have cancelled and started a
@@ -256,6 +288,9 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     onSuccess: () => {
       setEntryToDelete(null);
       qc.invalidateQueries({ queryKey: ['campaigns', campaignId, 'log'] });
+      void getSyncOrchestrator()
+        .triggerCursorPull()
+        .catch(() => undefined);
     },
   });
 
@@ -288,7 +323,13 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   };
 
   const openCreate = () => {
-    setDraft(emptyDraft(nextSessionNumber(entries.data ?? [])));
+    const next = emptyDraft(nextSessionNumber(entries.data ?? []));
+    if (campaignQuery.data?.ownerId !== me.data?.id) {
+      next.awardCharacterIds = (roster ?? [])
+        .filter((character) => character.ownerId === me.data?.id)
+        .map((character) => character.id);
+    }
+    setDraft(next);
     setSaveError(null);
     setEditor({ kind: 'create' });
   };
@@ -320,10 +361,30 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     // the newer draft rather than silently wiping it).
     const snapshot = snapshotOf(draft, trimmed, trimmedLocation);
     if (editor.kind === 'edit') {
+      const original = entries.data?.find((entry) => entry.id === editor.entryId);
+      const originalDraft = original ? draftFromEntry(original) : null;
+      const unchangedAwards =
+        originalDraft &&
+        draft.pointsGained === originalDraft.pointsGained &&
+        JSON.stringify(draft.awardCharacterIds) === JSON.stringify(originalDraft.awardCharacterIds);
       update.mutate({
         entryId: editor.entryId,
         snapshot,
-        patch: { ...draft, title: trimmed, location, sessionNumber },
+        patch: {
+          ...draft,
+          title: trimmed,
+          location,
+          sessionNumber,
+          // Leave historical concrete awards alone for ordinary text edits,
+          // including legacy entries with duplicate recipient rows.
+          xpAwards: undefined,
+          ...(unchangedAwards ? { pointsGained: undefined, awardCharacterIds: undefined } : {}),
+          // Heterogeneous legacy awards have no single amount to display; keep
+          // their concrete list when the optional amount is left blank.
+          ...(draft.pointsGained == null && original && pointsForEntry(original) === null
+            ? { pointsGained: undefined }
+            : {}),
+        },
       });
     } else {
       create.mutate({ snapshot, payload: { ...draft, title: trimmed, location, sessionNumber } });
@@ -499,6 +560,49 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             </label>
           </div>
 
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="form-control w-40">
+              <span className="label-text">Points gained (optional)</span>
+              <input
+                type="number"
+                className="input input-bordered"
+                min={0}
+                max={1000}
+                step={1}
+                value={draft.pointsGained ?? ''}
+                onChange={(event) =>
+                  setDraft({
+                    ...draft,
+                    pointsGained: event.target.value === '' ? null : Number(event.target.value),
+                  })
+                }
+              />
+            </label>
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm text-muted">
+                {draft.awardCharacterIds == null
+                  ? 'Applies to all current campaign characters'
+                  : `Applies to ${draft.awardCharacterIds.length} selected character${draft.awardCharacterIds.length === 1 ? '' : 's'}`}
+              </p>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => {
+                  setRecipientSelection(
+                    draft.awardCharacterIds ?? (roster ?? []).map((character) => character.id),
+                  );
+                  setRecipientDialog(true);
+                }}
+              >
+                Choose characters
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-muted">
+            Points increase each recipient’s character point cap. Editing or deleting an award
+            adjusts that credit. The campaign’s starting point target stays the same.
+          </p>
+
           <div className="form-control">
             <span className="label-text">Body</span>
             <RichTextEditor
@@ -587,6 +691,14 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                 </div>
               </div>
               <h3 className="font-display text-2xl font-semibold leading-tight">{entry.title}</h3>
+              {(entry.pointsGained != null || entry.xpAwards.length > 0) && (
+                <p className="mt-2 text-sm text-secondary">
+                  {entry.pointsGained != null
+                    ? `${entry.pointsGained} points gained · `
+                    : 'Point awards · '}
+                  {entry.xpAwards.length} character{entry.xpAwards.length === 1 ? '' : 's'}
+                </p>
+              )}
               {entry.location && <p className="mt-1 text-sm text-muted">{entry.location}</p>}
               <div className="log-entry-body mt-3">
                 <Markdown source={entry.body} className="text-sm leading-relaxed" />
@@ -595,6 +707,55 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           );
         })}
       </div>
+      <ConfirmDialog
+        open={recipientDialog}
+        title="Apply points to characters"
+        confirmLabel="Use selected characters"
+        onCancel={() => setRecipientDialog(false)}
+        onConfirm={() => {
+          setDraft({ ...draft, awardCharacterIds: recipientSelection });
+          setRecipientDialog(false);
+        }}
+      >
+        <p className="mb-3 text-muted">
+          Leave out characters whose players missed the session or did not earn points.
+        </p>
+        <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
+          {(roster ?? []).map((character) => (
+            <label
+              key={character.id}
+              className="flex items-center gap-3 rounded-field bg-base-200 p-3"
+            >
+              <input
+                type="checkbox"
+                className="checkbox checkbox-sm"
+                checked={recipientSelection.includes(character.id)}
+                disabled={
+                  campaignQuery.data?.ownerId !== me.data?.id && character.ownerId !== me.data?.id
+                }
+                onChange={(event) =>
+                  setRecipientSelection((selected) =>
+                    event.target.checked
+                      ? [...selected, character.id]
+                      : selected.filter((id) => id !== character.id),
+                  )
+                }
+              />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{character.name}</span>
+            </label>
+          ))}
+          {(roster ?? []).length === 0 && <p>No campaign characters yet.</p>}
+        </div>
+        {campaignQuery.data?.ownerId === me.data?.id && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm mt-3"
+            onClick={() => setRecipientSelection((roster ?? []).map((character) => character.id))}
+          >
+            Select all characters
+          </button>
+        )}
+      </ConfirmDialog>
       <ConfirmDialog
         open={entryToDelete !== null}
         title={`Delete ${entryToDelete?.title ?? 'entry'}?`}
@@ -607,7 +768,8 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           if (entryToDelete && !remove.isPending) remove.mutate(entryToDelete.id);
         }}
       >
-        This adventure log entry cannot be restored.
+        This adventure log entry cannot be restored. Any points it awarded will be removed from the
+        recipients’ point caps.
         {remove.isError && (
           <p className="alert alert-error mt-2">
             {remove.error instanceof Error ? remove.error.message : 'Delete failed'}
