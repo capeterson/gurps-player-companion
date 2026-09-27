@@ -146,6 +146,14 @@ it.each([
     const owner = await registerUser(`cursor-${kind}`);
     const campaign = await createCampaign(owner.accessToken);
     const path = `/api/v1/campaigns/${campaign.id}/library`;
+    const initialHistory = (await (
+      await app.request(`/api/v1/campaigns/${campaign.id}/history`, {
+        headers: jsonHeaders(owner.accessToken),
+      })
+    ).json()) as { entityClass: string; op: string }[];
+    const initialLibraryEvents = initialHistory.filter((event) =>
+      event.entityClass.startsWith('campaign_library_'),
+    ).length;
     const request = (url: string, body?: unknown, method = 'POST') =>
       app.request(url, {
         method,
@@ -210,7 +218,7 @@ it.each([
     ).toHaveLength(1);
     expect(
       history.filter((event) => event.entityClass.startsWith('campaign_library_')),
-    ).toHaveLength(3);
+    ).toHaveLength(initialLibraryEvents + 3);
     const firstPage = (await (
       await request(`/api/v1/campaigns/${campaign.id}/history?limit=1`, undefined, 'GET')
     ).json()) as { entityClass: string; op: string }[];
@@ -252,6 +260,88 @@ describe('library trait CRUD', () => {
 });
 
 describe('library source and modifier CRUD authorization', () => {
+  it('seeds common fourth-edition sources for each new campaign and lets the owner remove them', async () => {
+    const owner = await registerUser('default-sources');
+    const first = await createCampaign(owner.accessToken);
+    const second = await createCampaign(owner.accessToken);
+    const readSources = async (campaignId: string) => {
+      const response = await app.request(
+        `/api/v1/campaigns/${campaignId}/library?section=sources`,
+        { headers: bearer(owner.accessToken) },
+      );
+      expect(response.status).toBe(200);
+      return (
+        (await response.json()) as {
+          sources: {
+            id: string;
+            key: string;
+            name: string;
+            abbreviation: string;
+            edition: string;
+          }[];
+        }
+      ).sources;
+    };
+    const firstSources = await readSources(String(first.id));
+    expect(firstSources).toHaveLength(17);
+    expect(firstSources.map(({ abbreviation }) => abbreviation).sort()).toEqual(
+      [
+        'B',
+        'BX',
+        'M',
+        'MA',
+        'P',
+        'F',
+        'S',
+        'LT',
+        'HT',
+        'UT',
+        'BT',
+        'T',
+        'SE',
+        'H',
+        'SU',
+        'PSI',
+        'MC',
+      ].sort(),
+    );
+    expect(firstSources).toContainEqual(
+      expect.objectContaining({
+        name: 'GURPS Basic Set: Characters',
+        key: 'basic-set-characters',
+        abbreviation: 'B',
+        edition: '4th Edition',
+      }),
+    );
+    const cursor = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        cursors: [{ entityClass: 'campaign_library_source', sinceRevision: 0 }],
+      }),
+    });
+    expect(cursor.status).toBe(200);
+    const firstSourceIds = new Set(firstSources.map((source) => source.id));
+    expect(
+      ((await cursor.json()) as SyncCursorResponse).changes.filter((change) =>
+        firstSourceIds.has(change.entityId),
+      ),
+    ).toHaveLength(17);
+    const basic = firstSources.find((source) => source.key === 'basic-set-characters');
+    expect(basic).toBeDefined();
+    const removed = await app.request(
+      `/api/v1/campaigns/${first.id}/library/sources/${basic?.id}`,
+      { method: 'DELETE', headers: bearer(owner.accessToken) },
+    );
+    expect(removed.status).toBe(204);
+    expect((await readSources(String(first.id))).some((source) => source.key === basic?.key)).toBe(
+      false,
+    );
+    expect(
+      (await readSources(String(second.id))).find((source) => source.key === basic?.key),
+    ).toMatchObject({ abbreviation: 'B', edition: '4th Edition' });
+  });
+
   const modifierCreate = {
     name: 'Reliable',
     category: 'enhancement',
@@ -944,7 +1034,7 @@ describe('YAML export/import round trip', () => {
       }[];
       modifiers: { id: string; description: string | null }[];
     };
-    expect(mergeList.sources).toHaveLength(2);
+    expect(mergeList.sources).toHaveLength(19);
     expect(mergeList.sources.find((row) => row.key === 'core')).toMatchObject({
       id: core.id,
       name: 'Core Rules Revised',
@@ -979,7 +1069,7 @@ describe('YAML export/import round trip', () => {
     const afterRollback = (await (
       await app.request(base, { headers: bearer(owner.accessToken) })
     ).json()) as typeof mergeList;
-    expect(afterRollback.sources).toHaveLength(2);
+    expect(afterRollback.sources).toHaveLength(19);
     expect(afterRollback.traits).toHaveLength(2);
     expect(afterRollback.modifiers).toHaveLength(1);
 
