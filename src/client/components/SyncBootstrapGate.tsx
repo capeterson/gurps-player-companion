@@ -10,18 +10,35 @@
  */
 
 import { useLiveQuery } from 'dexie-react-hooks';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { getLocalDb } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { isAccountMismatch, writeActiveUser } from '../sync/activeUser.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
+import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 
 interface MeResponse {
   id: string;
 }
 
 export function SyncBootstrapGate({ children }: { children: ReactNode }) {
+  const location = useLocation();
+  const hasSession = useSyncExternalStore(tokenStore.subscribe, () => tokenStore.hasToken());
+  const { error: syncError } = useSyncStatus();
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [retrying, setRetrying] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
   // Seed userId synchronously from the stored JWT so the gate blocks
   // immediately on first render — before /auth/me has had a chance to
   // resolve.  Without this, userId starts as null while the fetch is
@@ -97,8 +114,25 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   // Trigger the bootstrap once we know the user and it hasn't run yet.
   useEffect(() => {
     if (!userId || switching || bootstrapped !== false) return;
-    void getSyncOrchestrator().bootstrap(userId);
+    void getSyncOrchestrator()
+      .bootstrap(userId)
+      .catch((cause: unknown) => {
+        setBootstrapError(cause instanceof Error ? cause.message : 'The initial download failed.');
+      });
   }, [userId, bootstrapped, switching]);
+
+  async function retry() {
+    if (!userId || retrying) return;
+    setRetrying(true);
+    setBootstrapError(null);
+    try {
+      await getSyncOrchestrator().bootstrap(userId);
+    } catch (cause) {
+      setBootstrapError(cause instanceof Error ? cause.message : 'The initial download failed.');
+    } finally {
+      setRetrying(false);
+    }
+  }
 
   // Block children until bootstrap is confirmed. Three sub-states:
   //   bootstrapped === undefined  liveQuery hasn't resolved yet (Dexie opening)
@@ -111,9 +145,45 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   if (userId && (switching || bootstrapped !== true)) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <span className="loading loading-spinner loading-lg text-primary" aria-hidden="true" />
-          <p className="text-sm text-base-content/70">Bringing local data in sync…</p>
+        <div className="flex max-w-md flex-col items-center gap-3 p-4 text-center">
+          {!hasSession ? (
+            <>
+              <h1 className="font-display text-2xl">Sign in to finish loading</h1>
+              <p>Your session ended before this device could download your data.</p>
+              <Link
+                className="btn"
+                to="/login"
+                state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }}
+              >
+                Sign in again
+              </Link>
+            </>
+          ) : !online || syncError || bootstrapError ? (
+            <>
+              <h1 className="font-display text-2xl">Your data isn't ready on this device</h1>
+              <p role="alert" className="break-words text-sm">
+                {!online
+                  ? 'Connect to the internet to finish the first download. Offline access is available after that download completes.'
+                  : bootstrapError || syncError?.reason}
+              </p>
+              <button
+                type="button"
+                className="btn"
+                disabled={!online || retrying || switching}
+                onClick={() => void retry()}
+              >
+                {retrying ? 'Retrying…' : 'Retry download'}
+              </button>
+            </>
+          ) : (
+            <>
+              <span
+                className="loading loading-spinner loading-lg text-primary"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-base-content/70">Bringing local data in sync…</p>
+            </>
+          )}
         </div>
       </div>
     );

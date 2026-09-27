@@ -305,6 +305,76 @@ it('creates and deletes a trait through the outbox', async () => {
   expect(api).not.toHaveBeenCalled();
 });
 
+it('creates languages, techniques, and styles through the local-first library editor', async () => {
+  await seed();
+  setup();
+  const db = getLocalDb();
+
+  fireEvent.click(await screen.findByRole('button', { name: /^Languages/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '+ Add language' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Language name *' }), {
+    target: { value: 'Trade Sign' },
+  });
+  fireEvent.click(screen.getByLabelText('Sign language (no written fluency)'));
+  fireEvent.click(screen.getByRole('button', { name: 'Add language' }));
+  expect(await screen.findByRole('button', { name: 'Trade Sign' })).toBeVisible();
+
+  fireEvent.click(screen.getByRole('button', { name: /^Techniques/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '+ Add technique' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Technique name *' }), {
+    target: { value: 'Elbow Strike' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Defaults from skill *' }), {
+    target: { value: 'Karate' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add technique' }));
+  expect(await screen.findByRole('button', { name: 'Elbow Strike' })).toBeVisible();
+
+  fireEvent.click(screen.getByRole('button', { name: /^Styles/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '+ Add style' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Style name *' }), {
+    target: { value: 'Northern Fist' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Skills (one per line)' }), {
+    target: { value: 'Karate, specialized' },
+  });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Perks (one per line)' }), {
+    target: { value: 'Style Adaptation' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Add style' }));
+  expect(await screen.findByRole('button', { name: 'Northern Fist' })).toBeVisible();
+
+  expect(await db.campaignLibraryLanguages.toArray()).toEqual([
+    expect.objectContaining({ name: 'Trade Sign', isSignLanguage: true, campaignId: CAMPAIGN }),
+  ]);
+  expect(await db.campaignLibraryTechniques.toArray()).toEqual([
+    expect.objectContaining({
+      name: 'Elbow Strike',
+      defaultSkillName: 'Karate',
+      campaignId: CAMPAIGN,
+    }),
+  ]);
+  expect(await db.campaignLibraryStyles.toArray()).toEqual([
+    expect.objectContaining({
+      name: 'Northern Fist',
+      skills: ['Karate, specialized'],
+      perks: ['Style Adaptation'],
+      techniques: [],
+      campaignId: CAMPAIGN,
+    }),
+  ]);
+  expect(
+    (await db.outbox.toArray())
+      .map(({ entityClass, command, parentId }) => [entityClass, command, parentId])
+      .sort(([left], [right]) => String(left).localeCompare(String(right))),
+  ).toEqual([
+    ['campaign_library_language', 'create', CAMPAIGN],
+    ['campaign_library_style', 'create', CAMPAIGN],
+    ['campaign_library_technique', 'create', CAMPAIGN],
+  ]);
+  expect(api).not.toHaveBeenCalled();
+});
+
 it('hides owner controls from members', async () => {
   await seed({ owner: false });
   setup();
@@ -327,6 +397,8 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
   setup();
   await screen.findByRole('button', { name: 'Night Vision' });
   fireEvent.click(screen.getByRole('button', { name: /Import YAML/ }));
+  expect(screen.getByText(/canonical key and source edition/)).toBeVisible();
+  expect(screen.getByRole('option', { name: 'Merge (add/update)' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'replace' } });
   const file = new File(
     ['version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n'],
@@ -339,6 +411,7 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
   fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
   const dialog = await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
   expect(dialog).toHaveTextContent('Traits: 0 in file · 2 to remove');
+  expect(dialog).toHaveTextContent('Omitted optional sections remain untouched');
   expect(api).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog', { name: 'Import empty.yaml?' })).toBeNull();

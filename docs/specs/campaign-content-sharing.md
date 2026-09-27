@@ -318,11 +318,12 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by eight tables:
+A per-campaign catalog of reusable content, backed by eleven tables:
 `campaign_library_traits`, `campaign_library_skills`,
 `campaign_library_spells`, `campaign_library_items`,
 `campaign_library_languages`, `campaign_library_techniques`,
-`campaign_library_styles`, and `campaign_library_enchantments`. It's what lets a GM define campaign-specific
+`campaign_library_styles`, `campaign_library_enchantments`,
+`campaign_library_active_effects`, `campaign_library_sources` and `campaign_library_modifiers`. It's what lets a GM define campaign-specific
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
 
@@ -340,9 +341,9 @@ seeds the character row's written fluency to `n/a`.
   doors share one service layer (`createLibraryEntry` / `updateLibraryEntry` /
   `deleteLibraryEntry`). The PWA editor always uses the outbox, with whole-entry
   patches, so the owner can edit offline; see offline-sync.md "Campaign
-  library". Traits/skills/spells/items/enchantments/active effects have
-  dedicated editor forms; languages/techniques/styles are authored through the
-  YAML import flow and consumed on the character sheet.
+  library". All eleven categories have dedicated editor forms. Languages and
+  techniques are consumed on the character sheet; styles describe their component
+  skills, perks and techniques without creating a separate character style row.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
   and the top-nav `LibraryPage` (`/library`, the primary home for YAML
   import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
@@ -658,3 +659,27 @@ transfer, while edits refresh live links transactionally. Their private instance
 are excluded from minimal detail/list/cursor/history surfaces. Campaign cursor rows
 carry only reusable definitions, which are visible to campaign members.
 See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).
+
+### In-app authoring help
+
+`/help/campaign-library` is an authenticated, bundled Markdown guide linked from
+the library toolbar in a new tab so existing drafts remain open. Its table of
+contents links to focusable headings with the live header scroll offset. It covers
+source identity, completeness, basic authoring and adoption, bounded calculations,
+advanced mechanical rules, import/prune and deliberate updates. The article uses
+original examples rather than distributing rulebook content. Optional editor
+sections retain mounted drafts while folded; invalid advanced fields reopen their
+section. Source metadata validates in place and keeps its correction visible until
+repaired. Source forms present named validation errors, required labels and first-error
+focus. Skill prerequisites/defaults offer common guided rules and preserve nested or
+conditional definitions in their advanced JSON editor.
+
+Item armor authoring offers guided base/crushing/typed DR, DB, flexibility, coverage
+(including removable custom locations), facing and notes. Advanced YAML round-trips
+the complete schema; invalid input stays editable and opens its section. Facing
+controls prevent simultaneous front-only/back-only selection and explain conflicting
+imported data; saving contradictory facing YAML is blocked until repaired.
+Language/technique/style editors use the same whole-entry outbox
+validation as the other categories, disable edits while a submit is pending, and
+preserve commas inside newline-separated style component names. Styles remain
+reference packages: players learn constituent entries individually.

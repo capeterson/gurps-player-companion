@@ -2,16 +2,20 @@
 
 Campaign owners manage reusable active effects in Library → Active Effects. Each
 has description, source, tags, numeric declarations, typed capability declarations,
-duration, and an explicit stacking key/policy. Character effect instances remain part
-of the API, MCP, sync and calculation model, but the character sheet has no editor for
-applying or managing them. Source inventory links are optional; applying an effect
+duration, and an explicit stacking key/policy. Character effect instances can be applied and managed in the sheet’s
+Combat → Active Effects panel, alongside their API, MCP, sync and calculation model.
+The panel supports library and custom effects, notes, activation/deactivation, expiry,
+independent copies, removal and explicit round advancement. Reactivation starts a new
+duration; advancing the optional turn tracker also advances round effects. Source inventory links are optional; applying an effect
 does not consume the item. A deleted source item remains a historical reference and
 does not prevent subsequent instance edits.
+The definition form marks its name and stacking key as required, focuses a missing
+field after Save, and explains how shared keys combine effects.
 
 ## Persistence and ownership
 
 Definitions live in `campaign_library_active_effects`, with the normal library
-CRUD, ownership checks, revision invalidation, YAML v11, and campaign history.
+CRUD, ownership checks, revision invalidation, YAML import/export, and campaign history.
 `/campaigns/{id}/library/active-effects` supports POST and its `/{effectId}` route
 supports PATCH/DELETE. The aggregate library GET lists definitions. MCP exposes
 all three mutations through the shared handler graph.

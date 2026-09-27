@@ -9,7 +9,7 @@
  * the user picked a library trait.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { LibraryAutocomplete } from './LibraryAutocomplete.tsx';
@@ -76,5 +76,44 @@ describe('LibraryAutocomplete', () => {
     // did, callers' clear-on-edit handlers would wipe the library FK
     // they just captured in their own onPick.
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('portals options into the containing sheet dialog and keeps them clickable', async () => {
+    const onPick = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <dialog open aria-label="Character sheet">
+        <Harness onPickSpy={onPick} onChangeSpy={onChange} />
+      </dialog>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('search'), { target: { value: 'a' } });
+    const dialog = screen.getByRole('dialog', { name: 'Character sheet' });
+    const listbox = await within(dialog).findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Alpha' })).toBeVisible();
+
+    fireEvent.mouseDown(within(listbox).getByRole('option', { name: 'Alpha' }));
+
+    expect(onPick).toHaveBeenCalledWith({ id: 'a', name: 'Alpha' });
+    expect(within(dialog).queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('closes the portaled list when the user clicks outside the sheet control', async () => {
+    const onPick = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <dialog open aria-label="Character sheet">
+        <Harness onPickSpy={onPick} onChangeSpy={onChange} />
+      </dialog>,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('search'), { target: { value: 'a' } });
+    const dialog = screen.getByRole('dialog', { name: 'Character sheet' });
+    await within(dialog).findByRole('listbox');
+
+    fireEvent.mouseDown(document.body);
+
+    await waitFor(() => expect(within(dialog).queryByRole('listbox')).not.toBeInTheDocument());
+    expect(onPick).not.toHaveBeenCalled();
   });
 });

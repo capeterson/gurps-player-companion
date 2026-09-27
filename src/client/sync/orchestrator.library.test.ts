@@ -19,6 +19,73 @@ import { syncStateStore } from './state.ts';
 const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000ca01';
 const SKILL_A = '0193b3c0-f1f0-7000-8000-00000000a001';
 const SKILL_B = '0193b3c0-f1f0-7000-8000-00000000b001';
+const NEW_LIBRARY_ROWS = [
+  {
+    label: 'language',
+    entityClass: 'campaign_library_language',
+    store: 'campaignLibraryLanguages',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000c001',
+    attemptedValue: { name: 'Trade', isSignLanguage: false },
+    baseValue: { name: 'Trade', description: 'Server text', source: 'B222', isSignLanguage: false },
+  },
+  {
+    label: 'technique',
+    entityClass: 'campaign_library_technique',
+    store: 'campaignLibraryTechniques',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000c002',
+    attemptedValue: { name: 'Feint', defaultSkillName: 'Sword', difficulty: 'A' },
+    baseValue: {
+      name: 'Feint',
+      defaultSkillName: 'Sword',
+      difficulty: 'A',
+      maxLevel: null,
+      defaultModifier: 0,
+      description: 'Server text',
+      source: 'B222',
+      prereq: null,
+    },
+  },
+  {
+    label: 'style',
+    entityClass: 'campaign_library_style',
+    store: 'campaignLibraryStyles',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000c003',
+    attemptedValue: { name: 'Sword Style', techniques: [], perks: [], skills: [] },
+    baseValue: {
+      name: 'Sword Style',
+      description: 'Server text',
+      source: 'B222',
+      techniques: [],
+      perks: [],
+      skills: [],
+    },
+  },
+] as const;
+
+function libraryTable(store: string) {
+  return (
+    getLocalDb() as unknown as Record<
+      string,
+      { get: (id: string) => Promise<unknown>; put: (row: unknown) => Promise<unknown> }
+    >
+  )[store];
+}
+
+function categoryRow(
+  entityId: string,
+  value: Record<string, unknown>,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: entityId,
+    campaignId: CAMPAIGN,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    revision: 5,
+    ...value,
+    ...overrides,
+  };
+}
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -111,6 +178,195 @@ function login() {
 }
 
 describe('campaign library outbox path', () => {
+  it.each(NEW_LIBRARY_ROWS)(
+    'creates a campaign $label locally and adopts the server revision',
+    async ({ entityClass, entityId, attemptedValue, store }) => {
+      login();
+      await enqueueCreate({
+        entityClass,
+        entityId,
+        campaignId: CAMPAIGN,
+        attemptedValue,
+        humanName: `library ${entityClass.split('_').at(-1)}`,
+      });
+      const db = getLocalDb();
+      const table = libraryTable(store);
+      expect(await table?.get(entityId)).toMatchObject({
+        id: entityId,
+        campaignId: CAMPAIGN,
+        revision: -1,
+        ...attemptedValue,
+      });
+      const sent = stubServer((ops) =>
+        ops.map((op) => ({ clientOpId: op.clientOpId, status: 'applied', newRevision: 31 })),
+      );
+
+      await drain();
+
+      expect(sent[0]?.[0]).toMatchObject({
+        entityClass,
+        entityId,
+        command: 'create',
+        parentId: CAMPAIGN,
+      });
+      expect(sent[0]?.[0]?.attemptedValue).not.toHaveProperty('campaignId');
+      expect(await table?.get(entityId)).toMatchObject({ revision: 31 });
+      expect(await db.outbox.count()).toBe(0);
+    },
+  );
+
+  it.each(NEW_LIBRARY_ROWS)(
+    'rolls back a rejected $label edit with a persisted toast and entry flash',
+    async ({ entityClass, entityId, label, store, baseValue }) => {
+      login();
+      const table = libraryTable(store);
+      const before = categoryRow(entityId, baseValue);
+      await table?.put(before);
+      await enqueueEntityPatch({
+        entityClass,
+        entityId,
+        campaignId: CAMPAIGN,
+        attemptedValue: { description: 'Rejected local text' },
+        humanName: `library ${label} "${String(baseValue.name)}"`,
+      });
+      const flashes: FlashEvent[] = [];
+      const off = flashBus.subscribePrefix(`${entityClass}:${entityId}:`, (event) =>
+        flashes.push(event),
+      );
+      const toasts: string[] = [];
+      setRejectionNotifier((record) => toasts.push(`${record.humanName} — ${record.reason}`));
+      const sent = stubServer((ops) =>
+        ops.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'rejected',
+          reason: 'invalid entry',
+        })),
+      );
+
+      await drain();
+      off();
+
+      expect(sent[0]?.[0]).toMatchObject({ entityClass, entityId, parentId: CAMPAIGN });
+      expect(await table?.get(entityId)).toMatchObject({
+        id: entityId,
+        campaignId: CAMPAIGN,
+        revision: 5,
+        ...baseValue,
+      });
+      expect(await getLocalDb().rejectionToasts.toArray()).toEqual([
+        expect.objectContaining({ entityId, reason: 'invalid entry', status: 'rejected' }),
+      ]);
+      expect(toasts).toEqual([`library ${label} "${String(baseValue.name)}" — invalid entry`]);
+      expect(flashes.map((event) => event.key)).toEqual([`${entityClass}:${entityId}:entry`]);
+    },
+  );
+
+  it.each(NEW_LIBRARY_ROWS)(
+    'queues same-entry and different-entry $label edits through a slow save',
+    async ({ entityClass, entityId, label, store, baseValue }) => {
+      login();
+      const table = libraryTable(store);
+      const otherId = `${entityId.slice(0, -1)}4`;
+      await table?.put(categoryRow(entityId, baseValue));
+      await table?.put(
+        categoryRow(otherId, baseValue, { name: `Other ${String(baseValue.name)}` }),
+      );
+      await enqueueEntityPatch({
+        entityClass,
+        entityId,
+        campaignId: CAMPAIGN,
+        attemptedValue: { description: 'First' },
+      });
+      let release!: () => void;
+      const firstSettles = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let revision = 5;
+      const sent = stubServer(async (ops) => {
+        if (sent.length === 1) await firstSettles;
+        return ops.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: 'applied',
+          newRevision: ++revision,
+        }));
+      });
+
+      const firstDrain = drain();
+      await vi.waitFor(() => expect(sent).toHaveLength(1));
+      await enqueueEntityPatch({
+        entityClass,
+        entityId,
+        campaignId: CAMPAIGN,
+        attemptedValue: { description: 'Second' },
+      });
+      await enqueueEntityPatch({
+        entityClass,
+        entityId: otherId,
+        campaignId: CAMPAIGN,
+        attemptedValue: { description: 'Other entry edit' },
+      });
+      release();
+      await firstDrain;
+      await drain();
+
+      const operations = sent.flat();
+      expect(
+        operations.filter((op) => op.entityId === entityId).map((op) => op.attemptedValue),
+      ).toEqual([{ description: 'First' }, { description: 'Second' }]);
+      expect(operations).toContainEqual(
+        expect.objectContaining({
+          entityId: otherId,
+          attemptedValue: { description: 'Other entry edit' },
+        }),
+      );
+      expect(await table?.get(entityId)).toMatchObject({ description: 'Second' });
+      expect(await table?.get(otherId)).toMatchObject({ description: 'Other entry edit' });
+      expect(await getLocalDb().outbox.count()).toBe(0);
+      expect(label).toBeTruthy();
+    },
+  );
+
+  it.each(NEW_LIBRARY_ROWS)(
+    'preserves pending $label fields while applying unrelated cursor data',
+    async ({ entityClass, entityId, store, baseValue }) => {
+      login();
+      const table = libraryTable(store);
+      await table?.put(categoryRow(entityId, baseValue));
+      await enqueueEntityPatch({
+        entityClass,
+        entityId,
+        campaignId: CAMPAIGN,
+        attemptedValue: { name: 'Local name', description: 'Local text' },
+      });
+      stubServer(
+        () => [],
+        () => [
+          {
+            entityClass,
+            entityId,
+            command: 'patch',
+            revision: 9,
+            data: categoryRow(entityId, baseValue, {
+              name: 'Server name',
+              description: 'Server rewrite',
+              source: 'C333',
+              revision: 9,
+            }),
+          },
+        ],
+      );
+
+      await getSyncOrchestrator().triggerCursorPull();
+
+      expect(await table?.get(entityId)).toMatchObject({
+        name: 'Local name',
+        description: 'Local text',
+        source: 'C333',
+        revision: 9,
+      });
+    },
+  );
+
   it('creates locally under the campaign, sends it with parentId, and stamps the revision', async () => {
     login();
     await enqueueCreate({

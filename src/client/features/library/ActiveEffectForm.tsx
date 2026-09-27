@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   type ActiveEffectDefinition,
   activeEffectDefinitionCreate,
@@ -6,6 +6,7 @@ import {
 import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { EffectsEditor } from './EffectsEditor.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { libraryFormError } from './libraryFormErrors.ts';
 
 export function ActiveEffectForm({
   campaignId,
@@ -38,7 +39,19 @@ export function ActiveEffectForm({
   const [stackKey, setStackKey] = useState(initial?.stacking.key ?? '');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const stackKeyInput = useRef<HTMLInputElement>(null);
   async function save() {
+    if (!name.trim()) {
+      setError('Enter an effect name.');
+      nameInput.current?.focus();
+      return;
+    }
+    if (!stackKey.trim()) {
+      setError('Enter a stacking key to identify effects that combine with each other.');
+      stackKeyInput.current?.focus();
+      return;
+    }
     const parsed = activeEffectDefinitionCreate.safeParse({
       ...metadata,
       name,
@@ -55,7 +68,15 @@ export function ActiveEffectForm({
       stacking: { kind: stacking, key: stackKey },
     });
     if (!parsed.success) {
-      setError(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+      setError(
+        libraryFormError(parsed.error, {
+          name: 'Effect name',
+          duration: 'Duration',
+          amount: 'Amount',
+          stacking: 'Stacking',
+          capabilities: 'Capabilities',
+        }),
+      );
       return;
     }
     setPending(true);
@@ -71,9 +92,12 @@ export function ActiveEffectForm({
   return (
     <fieldset disabled={pending} className="card p-card space-y-3 border border-primary/30">
       <label className="block">
-        Effect name
+        Effect name *
         <input
+          ref={nameInput}
           aria-label="Effect name"
+          required
+          maxLength={160}
           className="input input-bordered w-full"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -144,9 +168,13 @@ export function ActiveEffectForm({
           </select>
         </label>
         <label>
-          Stacking key
+          Stacking key *
           <input
+            ref={stackKeyInput}
             aria-label="Stacking key"
+            required
+            maxLength={120}
+            placeholder="e.g. quickness"
             className="input input-bordered"
             value={stackKey}
             onChange={(e) => setStackKey(e.target.value)}
@@ -154,8 +182,9 @@ export function ActiveEffectForm({
         </label>
       </div>
       <p className="text-xs text-dim">
-        Effects sharing a key use the chosen policy. Highest keeps the strongest value per target;
-        replace keeps the latest application.
+        Give related effects the same stacking key (for example, quickness). Additive combines their
+        bonuses; highest keeps the strongest value per target; replace keeps the latest application.
+        Use different keys for effects that should work independently.
       </p>
       <EffectsEditor
         campaignId={campaignId}

@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Link } from 'react-router-dom';
 import {
   type LibraryGraph,
   libraryEditionDecisions,
@@ -42,8 +43,11 @@ import { CatalogSection } from './sections/CatalogSection.tsx';
 import type { LibrarySectionShellProps } from './sections/CrudLibrarySection.tsx';
 import { EnchantmentsSection } from './sections/EnchantmentsSection.tsx';
 import { ItemsSection } from './sections/ItemsSection.tsx';
+import { LanguagesSection } from './sections/LanguagesSection.tsx';
 import { SkillsSection } from './sections/SkillsSection.tsx';
 import { SpellsSection } from './sections/SpellsSection.tsx';
+import { StylesSection } from './sections/StylesSection.tsx';
+import { TechniquesSection } from './sections/TechniquesSection.tsx';
 import { TraitsSection } from './sections/TraitsSection.tsx';
 import { type LocalLibrary, emptyLibrary, useLocalLibrary } from './useLocalLibrary.ts';
 
@@ -54,6 +58,9 @@ type SectionKey =
   | 'skills'
   | 'spells'
   | 'items'
+  | 'languages'
+  | 'techniques'
+  | 'styles'
   | 'enchantments'
   | 'activeEffects';
 
@@ -64,6 +71,9 @@ const SECTIONS: readonly { key: SectionKey; label: string }[] = [
   { key: 'skills', label: 'Skills' },
   { key: 'spells', label: 'Spells' },
   { key: 'items', label: 'Items' },
+  { key: 'languages', label: 'Languages' },
+  { key: 'techniques', label: 'Techniques' },
+  { key: 'styles', label: 'Styles' },
   { key: 'enchantments', label: 'Enchantments' },
   { key: 'activeEffects', label: 'Active Effects' },
 ];
@@ -346,7 +356,16 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
             <h1 className="font-display text-4xl font-semibold leading-none">Library</h1>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <Link
+            className="link text-sm"
+            to={`/help/campaign-library${campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Library guide <span className="sr-only">(opens in a new tab)</span>
+            <span aria-hidden="true">↗</span>
+          </Link>
           {/* Hide campaign switcher when the parent already scoped us to a campaign */}
           {!campaignIdProp && sortedCampaigns && sortedCampaigns.length > 1 && (
             <select
@@ -392,10 +411,12 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         >
           <div className="space-y-3">
             <p className="text-sm text-muted">
-              Upload a campaign-library YAML document. <strong>Merge</strong> upserts entries by
-              natural key (kind+name for traits, name for skills/items) and never deletes;{' '}
-              <strong>Replace</strong> performs the same upserts and then deletes any existing entry
-              not present in the uploaded file. Importing needs a connection.
+              Upload a campaign-library YAML document. <strong>Merge</strong> adds or updates
+              entries by canonical key and source edition (traits also match kind; entries without
+              aliases use their names) and leaves absent entries alone. <strong>Replace</strong>{' '}
+              also removes entries missing from sections included in the file. Omitted optional
+              sections remain untouched; an explicit empty section clears it. Importing needs a
+              connection.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <label className="form-control">
@@ -405,7 +426,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
                   value={importMode}
                   onChange={(e) => setImportMode(e.target.value as 'merge' | 'replace')}
                 >
-                  <option value="merge">Merge (additive)</option>
+                  <option value="merge">Merge (add/update)</option>
                   <option value="replace">Replace (sync exact)</option>
                 </select>
               </label>
@@ -463,7 +484,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       >
         <p>
           {pendingImport?.mode === 'replace'
-            ? 'Replace will remove existing entries missing from this file.'
+            ? 'Replace removes entries missing from sections included in this file. Omitted optional sections remain untouched.'
             : 'Merge will add or update entries without deleting existing entries.'}
           {pendingImport?.applyCampaignSettings &&
             ' Campaign settings in the file will also be applied.'}
@@ -565,6 +586,9 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           <SkillsSection {...shell('skills')} />
           <SpellsSection {...shell('spells')} />
           <ItemsSection {...shell('items')} />
+          <LanguagesSection {...shell('languages')} />
+          <TechniquesSection {...shell('techniques')} />
+          <StylesSection {...shell('styles')} />
           <EnchantmentsSection {...shell('enchantments')} />
           <ActiveEffectsSection {...shell('activeEffects')} />
         </div>
@@ -582,7 +606,7 @@ function formatImportResult(r: ImportResult): string {
     ? `; ${r.incomplete} incomplete/reference entries blocked from adoption`
     : '';
   const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;
+  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('languages')}, ${totals('techniques')}, ${totals('styles')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;
 }
 
 function slugify(name: string): string {

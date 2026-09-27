@@ -494,7 +494,6 @@ export function InventoryPanel({
     selectedItems.length > 0 &&
     selectedItems.filter((i) => i.equipped).length * 2 >= selectedItems.length;
 
-  const sumEffective = items.reduce((acc, i) => acc + i.effectiveWeightLbs, 0);
   const sumRaw = items.reduce((acc, i) => acc + i.weightLbs * i.quantity, 0);
   const totalCost = items.reduce((acc, i) => acc + i.cost * i.quantity, 0);
 
@@ -966,7 +965,11 @@ export function InventoryPanel({
             <span className="label-eyebrow">Totals</span>
             <span className="num">
               <span className="text-base-content/40">encumbrance </span>
-              <span className="font-semibold text-base-content">{sumEffective.toFixed(1)} lb</span>
+              <span className="font-semibold text-base-content">
+                {character.libraryEffectsKnown === false
+                  ? 'unavailable'
+                  : `${encumbrance.playerWeightLbs.toFixed(1)} lb`}
+              </span>
             </span>
             <span className="num">
               <span className="text-base-content/40">raw </span>
