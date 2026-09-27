@@ -59,6 +59,60 @@ describe('Bun public auth transport', () => {
     }
   });
 
+  it('counts failed logins across trusted source IPs while successful logins stay available', async () => {
+    process.env.TRUST_PROXY = 'true';
+    resetConfigCache();
+    const email = `login-limit-${crypto.randomUUID()}@example.com`;
+    const registration = await post(
+      'register',
+      {
+        email,
+        password: 'correct-password',
+        displayName: 'Test',
+      },
+      '192.0.2.10',
+    );
+    expect(registration.status).toBe(201);
+    await registration.body?.cancel();
+    const rows = await getDb().select({ id: users.id }).from(users).where(eq(users.email, email));
+    userIds.push(...rows.map((row) => row.id));
+
+    const login = (password: string, ip: string) => post('login', { email, password }, ip);
+    expect((await login('correct-password', '192.0.2.11')).status).toBe(200);
+    expect((await login('correct-password', '192.0.2.12')).status).toBe(200);
+    expect((await login('wrong-password', '192.0.2.13')).status).toBe(401);
+    expect((await login('wrong-password', '192.0.2.14')).status).toBe(401);
+    const blocked = await login('wrong-password', '192.0.2.15');
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await login('correct-password', '192.0.2.16')).status).toBe(200);
+
+    const counters = await getDb().execute(
+      sql`select key, attempts from auth_rate_limits where scope = 'login'`,
+    );
+    expect(counters.rows).toHaveLength(7); // six sources and one failed-account bucket
+    expect(counters.rows.filter((row) => Number(row.attempts) === 3)).toHaveLength(1);
+  });
+
+  it('registers the same address from another trusted source without an account throttle', async () => {
+    process.env.TRUST_PROXY = 'true';
+    resetConfigCache();
+    const email = `register-limit-${crypto.randomUUID()}@example.com`;
+    const body = { email, password: 'test-password', displayName: 'Test' };
+    const first = await post('register', body, '192.0.2.20');
+    expect(first.status).toBe(201);
+    await first.body?.cancel();
+    const rows = await getDb().select({ id: users.id }).from(users).where(eq(users.email, email));
+    userIds.push(...rows.map((row) => row.id));
+    const duplicate = await post('register', body, '192.0.2.21');
+    expect(duplicate.status).toBe(409);
+    await duplicate.body?.cancel();
+    const counters = await getDb().execute(
+      sql`select key from auth_rate_limits where scope = 'register'`,
+    );
+    expect(counters.rows).toHaveLength(2);
+  });
+
   it('limits accountless passkey options even when client IP headers change', async () => {
     for (let i = 0; i < 3; i++) {
       const response = await post('passkeys/login/options', {}, `203.0.113.${i + 1}`);

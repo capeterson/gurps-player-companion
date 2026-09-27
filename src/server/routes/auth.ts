@@ -25,7 +25,7 @@ import { themePreferences, themePreferencesPatch } from '../../shared/schemas/th
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
-import { enforceAuthRateLimit } from '../auth/rateLimit.ts';
+import { enforceAuthRateLimit, enforceFailedLoginRateLimit } from '../auth/rateLimit.ts';
 import {
   AuthError,
   hasRecentAuthentication,
@@ -123,7 +123,7 @@ router.openapi(
   }),
   async (c) => {
     const body = c.req.valid('json');
-    await enforceAuthRateLimit(c, loadConfig(), 'register', body.email);
+    await enforceAuthRateLimit(c, loadConfig(), 'register');
     const db = getDb();
     // Fast-path pre-check so we don't burn argon2id work on a duplicate
     // email.  The unique index on users.email is the authoritative
@@ -179,7 +179,8 @@ router.openapi(
   }),
   async (c) => {
     const body = c.req.valid('json');
-    await enforceAuthRateLimit(c, loadConfig(), 'login', body.email);
+    const config = loadConfig();
+    await enforceAuthRateLimit(c, config, 'login');
     const db = getDb();
     const rows = await db.select().from(users).where(eq(users.email, body.email));
     const user = rows[0];
@@ -187,6 +188,7 @@ router.openapi(
     const hash = user?.passwordHash ?? (await getDummyPasswordHash());
     const ok = await verifyPassword(body.password, hash);
     if (!user || !ok) {
+      await enforceFailedLoginRateLimit(c, config, body.email);
       throw new HTTPException(401, { message: 'invalid credentials' });
     }
     const tokens = await issueTokenPair(user.id);

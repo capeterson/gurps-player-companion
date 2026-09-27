@@ -4,7 +4,12 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { getDb } from '../db/client.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
-import { enforceAuthRateLimit, normalizeRateLimitAccount, requestSource } from './rateLimit.ts';
+import {
+  enforceAuthRateLimit,
+  enforceFailedLoginRateLimit,
+  normalizeRateLimitAccount,
+  requestSource,
+} from './rateLimit.ts';
 
 configureIntegrationTestEnvironment();
 
@@ -29,9 +34,9 @@ describe('public auth rate-limit identities', () => {
         peer,
       ),
     ).resolves.toBe('192.0.2.1');
-    await expect(sourceFor({ 'x-forwarded-for': '198.51.100.4' }, true, peer)).resolves.toBe(
-      '198.51.100.4',
-    );
+    await expect(
+      sourceFor({ 'x-forwarded-for': '198.51.100.4, 192.0.2.1' }, true, peer),
+    ).resolves.toBe('198.51.100.4');
     await expect(sourceFor({}, true, peer)).resolves.toBe('192.0.2.1');
     await expect(sourceFor({}, false, { server: peer })).resolves.toBe('192.0.2.1');
   });
@@ -52,6 +57,7 @@ const testLimitConfig = {
   trustProxy: true,
   authRateLimitWindowSeconds: 600,
   authRateLimitLoginMax: 2,
+  authRateLimitRegisterMax: 2,
 };
 
 function limitTestApp() {
@@ -63,7 +69,12 @@ function limitTestApp() {
     return c.json({ error: 'internal_error' }, 500);
   });
   app.get('/', async (c) => {
-    await enforceAuthRateLimit(c, testLimitConfig, 'login', c.req.query('email'));
+    const scope = c.req.query('scope') === 'register' ? 'register' : 'login';
+    await enforceAuthRateLimit(c, testLimitConfig, scope, c.req.query('email'));
+    if (scope === 'login' && c.req.query('failed') === 'true') {
+      await enforceFailedLoginRateLimit(c, testLimitConfig, c.req.query('email') ?? '');
+      return c.json({ error: 'invalid credentials' }, 401);
+    }
     return c.json({ ok: true });
   });
   return app;
@@ -78,19 +89,38 @@ describe('durable public auth rate limits', () => {
     await getDb().execute(sql`delete from auth_rate_limits`);
   });
 
-  it('shares a normalized account bucket across distributed sources', async () => {
+  it('shares failed-login account budget across distributed sources without charging successes', async () => {
     const app = limitTestApp();
-    const request = (email: string, source: string) =>
-      app.request(`/?email=${encodeURIComponent(email)}`, {
+    const request = (email: string, source: string, failed = true) =>
+      app.request(`/?email=${encodeURIComponent(email)}&failed=${failed}`, {
         headers: { 'x-forwarded-for': source },
       });
 
-    expect((await request('Player@Example.com', '192.0.2.1')).status).toBe(200);
-    expect((await request('player@example.com', '192.0.2.2')).status).toBe(200);
-    const blocked = await request('PLAYER@example.com', '192.0.2.3');
+    expect((await request('Player@Example.com', '192.0.2.1', false)).status).toBe(200);
+    expect((await request('player@example.com', '192.0.2.2', false)).status).toBe(200);
+    expect((await request('Player@Example.com', '192.0.2.3')).status).toBe(401);
+    expect((await request('player@example.com', '192.0.2.4')).status).toBe(401);
+    expect((await request('PLAYER@example.com', '192.0.2.5', false)).status).toBe(200);
+    const blocked = await request('PLAYER@example.com', '192.0.2.6');
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
     expect(await blocked.json()).toEqual({ error: 'too many requests; please try again later' });
+  });
+
+  it('limits registration by trusted source IP without sharing an account bucket', async () => {
+    const app = limitTestApp();
+    const request = (source: string) =>
+      app.request('/?scope=register&email=same@example.com', {
+        headers: { 'x-forwarded-for': source },
+      });
+    expect((await request('192.0.2.1')).status).toBe(200);
+    expect((await request('192.0.2.1')).status).toBe(200);
+    expect((await request('192.0.2.1')).status).toBe(429);
+    expect((await request('192.0.2.2')).status).toBe(200);
+    const rows = await getDb().execute(
+      sql`select key from auth_rate_limits where scope = 'register'`,
+    );
+    expect(rows.rows).toHaveLength(2);
   });
 
   it('bounds a single source across distinct accounts and permits a retry after expiry', async () => {
@@ -122,7 +152,7 @@ describe('durable public auth rate limits', () => {
     }
     expect((await request('one@example.com')).status).toBe(429);
     const rows = await getDb().execute(sql`select key from auth_rate_limits where scope = 'login'`);
-    expect(rows.rows).toHaveLength(3); // one source, two admitted accounts
+    expect(rows.rows).toHaveLength(1); // blocked source creates no account buckets
     expect((await request('one@example.com', '198.51.100.2')).status).toBe(200);
   });
 
@@ -139,6 +169,6 @@ describe('durable public auth rate limits', () => {
     expect(responses.filter((response) => response.status === 200)).toHaveLength(2);
     expect(responses.filter((response) => response.status === 429)).toHaveLength(18);
     const rows = await getDb().execute(sql`select key from auth_rate_limits where scope = 'login'`);
-    expect(rows.rows).toHaveLength(3);
+    expect(rows.rows).toHaveLength(1);
   });
 });
