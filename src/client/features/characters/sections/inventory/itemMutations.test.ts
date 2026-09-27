@@ -125,7 +125,7 @@ describe('inline inventory local mutations', () => {
     await writeItemPath(ID, 'weaponData.ranged.range', null, 'Range');
     expect((await read()).weaponData?.ranged).toBeNull();
     expect((await read()).weaponData?.alternateModes).toEqual([
-      { name: 'Thrust', damage: 'thr+2 cr' },
+      expect.objectContaining({ key: 'alternate-1', name: 'Thrust', damage: 'thr+2 cr' }),
     ]);
   });
 
@@ -191,5 +191,35 @@ describe('inline inventory local mutations', () => {
       { spellName: 'Fortify', spellLevel: 15, category: '+3' },
       { spellName: 'Deflect', notes: 'Cloak', spellLevel: 0 },
     ]);
+  });
+
+  it('keeps stable and legacy weapon-mode projections aligned through edits and add/remove', async () => {
+    await seed();
+    await writeItemPath(
+      ID,
+      'weaponData.alternateModes',
+      [
+        { key: 'swing', name: 'Swing', skill: 'Broadsword', damage: 'sw+2 cut' },
+        { key: 'thrust', name: 'Thrust', skill: 'Spear', damage: 'thr+2 imp' },
+      ],
+      'Modes',
+    );
+    await writeItemPath(ID, 'weaponData.modes.2.damage', 'thr+3 imp', 'Thrust damage');
+
+    const edited = (await read()).weaponData;
+    expect(edited?.modes?.map(({ key, damage }) => [key, damage])).toEqual([
+      ['primary', 'sw+2 cr'],
+      ['swing', 'sw+2 cut'],
+      ['thrust', 'thr+3 imp'],
+    ]);
+    expect(edited?.alternateModes?.map(({ key, damage }) => [key, damage])).toEqual([
+      ['swing', 'sw+2 cut'],
+      ['thrust', 'thr+3 imp'],
+    ]);
+
+    await writeItemPath(ID, 'weaponData.alternateModes', [], 'Remove alternate modes');
+    const removed = (await read()).weaponData;
+    expect(removed?.modes).toHaveLength(1);
+    expect(removed?.alternateModes).toEqual([]);
   });
 });

@@ -379,6 +379,27 @@
       "when": 1800008000000,
       "tag": "0053_user_theme_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1800009000000,
+      "tag": "0054_library_calculations",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1800010000000,
+      "tag": "0055_library_rule_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1800011000000,
+      "tag": "0056_exact_library_prices",
+      "breakpoints": true
     }
   ]
 }

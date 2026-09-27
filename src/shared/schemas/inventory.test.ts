@@ -104,8 +104,10 @@ describe('weaponData', () => {
     });
   });
 
-  it('rejects more than 10 alternate modes', () => {
-    const modes = Array.from({ length: 11 }, (_, i) => ({ name: `Mode ${i}`, damage: '1d' }));
+  it('supports up to 20 alternate modes and rejects more', () => {
+    const modes = Array.from({ length: 20 }, (_, i) => ({ name: `Mode ${i}`, damage: '1d' }));
+    expect(weaponData.parse({ alternateModes: modes }).alternateModes).toHaveLength(20);
+    modes.push({ name: 'Mode 20', damage: '1d' });
     expect(() => weaponData.parse({ alternateModes: modes })).toThrow();
   });
 

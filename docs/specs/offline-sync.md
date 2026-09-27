@@ -31,7 +31,7 @@ character_combat
 campaign_library_trait  campaign_library_skill  campaign_library_spell
 campaign_library_item  campaign_library_language  campaign_library_technique
 campaign_library_style  campaign_library_enchantment
-campaign_library_active_effect
+campaign_library_active_effect  campaign_library_source  campaign_library_modifier
 ```
 
 Everything else is either read-only in the local store or fully online:
@@ -801,7 +801,7 @@ orchestrator test files are the working references.
 
 ## Campaign library
 
-All nine library classes are sync-backed (Dexie v11 stores
+All eleven library classes are sync-backed (Dexie v12 stores
 `campaignLibrary*`, indexed by `campaignId`). Reads are local-first for every
 campaign member: `/sync/cursor` emits each row's REST projection plus `revision`
 for campaigns in the viewer's accessible set, and migration 0051 adds
@@ -861,3 +861,22 @@ apply. Campaign cursor rows additionally carry read-only active-effect definitio
 for offline selection; calculation uses each instance's owned snapshot. Wall-clock
 expiry is reconciled on reading/foreground return, never by an assumed closed-app
 timer. [Detailed lifecycle](active-effects-skill-procedures.md).
+
+
+## Pricing resolutions
+
+Sources and modifiers use the same campaign-parent authorization, audited generic
+CRUD, revision/cursor/tombstone delivery, outbox serialization and logout purge as
+all other library rows. Pricing resolves from local definitions, never a PWA
+direct HTTP mutation. Trait/inventory re-resolution uses an atomic whole-entry
+patch for concrete values, chosen inputs and snapshots; pending keys remain
+protected from cursor overwrites and rejection uses entry toast/flash behavior.
+Definition changes do not enqueue character repricing. See
+[library-calculation-rules.md](library-calculation-rules.md).
+
+`libraryDependencies.ts` holds source-qualified references and character library
+copies behind unacknowledged definition creates/preceding edits, even if the
+prerequisite is retrying. Removing a definition also waits for preceding edits
+that remove references to it. This preserves graph-valid replay while unrelated
+entries drain in parallel. Resolver catalogs mark locally edited pricing rows as
+speculative; snapshots bind their exact rule until a durable revision exists.

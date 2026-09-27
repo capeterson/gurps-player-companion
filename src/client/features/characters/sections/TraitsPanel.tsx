@@ -1,10 +1,12 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
+import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
 import type { LibraryTraitOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { type TraitEffect, traitEffect } from '../../../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts';
+import type { TraitModifier as AppliedTraitModifier } from '../../../../shared/schemas/trait.ts';
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
@@ -22,6 +24,9 @@ import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { EffectsEditor, effectPreview } from '../../library/EffectsEditor.tsx';
+import { PricingResolver } from '../../library/PricingResolver.tsx';
+import { RepriceEntry } from '../../library/RepriceEntry.tsx';
+import { pricingDisplayValue } from '../../library/pricingDisplay.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import {
   type TraitSort,
@@ -74,6 +79,8 @@ interface AddTraitFormProps {
 }
 
 interface TraitSnapshot {
+  pricingResolution: PricingResolution | null;
+  resolvedModifiers: AppliedTraitModifier[];
   name: string;
   nameRaw: string;
   kind: TraitKind;
@@ -117,6 +124,9 @@ function previewLeveledCost(
 }
 
 function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
+  const [pricing, setPricing] = useState<PricingResolution | null>(null);
+  const [resolvedModifiers, setResolvedModifiers] = useState<AppliedTraitModifier[]>([]);
+  const [resolverOpen, setResolverOpen] = useState(false);
   const [name, setName] = useState('');
   const [kind, setKind] = useState<TraitKind>('advantage');
   const [points, setPoints] = useState('0');
@@ -134,6 +144,9 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const editName = (value: string) => {
     draftVersion.current++;
     setName(value);
+    setPricing(null);
+    setResolvedModifiers([]);
+    setResolverOpen(false);
     setPickedLibraryId(null);
     setPickedTrait(null);
     setSelectedModifiers([]);
@@ -141,7 +154,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
     setVariantName(null);
   };
 
-  const { fetchOptions } = useLibraryFetcher<LibraryTraitOut>('traits', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryTraitOut>(
+    'traits',
+    campaignId,
+  );
   const {
     creating,
     submit: submitEntity,
@@ -168,13 +184,14 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   const livePoints =
     pickedTrait !== null
       ? previewLeveledCost(
-          pickedTrait.basePoints,
-          pickedTrait.pointsPerLevel ?? null,
+          pricing?.outputs.points ?? pickedTrait.basePoints,
+          pricing ? null : (pickedTrait.pointsPerLevel ?? null),
           isLeveled ? parsedLevel : null,
           selectedVariant,
-          pickedTrait.availableModifiers
-            .filter((m) => selectedModifiers.includes(m.name))
-            .map((m) => ({ costType: m.costType, costValue: m.costValue })),
+          [
+            ...pickedTrait.availableModifiers.filter((m) => selectedModifiers.includes(m.name)),
+            ...resolvedModifiers,
+          ],
         )
       : null;
 
@@ -198,7 +215,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         ...(snap.level !== null ? { level: snap.level } : {}),
         ...(snap.variantName !== null ? { variantName: snap.variantName } : {}),
         ...(snap.libraryTraitId ? { libraryTraitId: snap.libraryTraitId } : {}),
-        ...(modifiers.length > 0 ? { modifiers } : {}),
+        pricingResolution: snap.pricingResolution,
+        modifiers: [...modifiers, ...snap.resolvedModifiers],
       },
       () => {
         // A library pick and its name, level, variant, modifiers, and points
@@ -238,6 +256,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (pickedTrait?.calculation && !pricing) {
+          setResolverOpen(true);
+          return;
+        }
         // When the modifier picker is active, prefer the live cost
         // preview over whatever's in the points input — the user's
         // intent is "what the picker says" once they've toggled
@@ -250,7 +272,11 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
         // Pts field for plain non-library traits.
         const usePreview =
           livePoints !== null &&
-          (selectedModifiers.length > 0 || isLeveled || selectedVariant !== null);
+          (pricing !== null ||
+            resolvedModifiers.length > 0 ||
+            selectedModifiers.length > 0 ||
+            isLeveled ||
+            selectedVariant !== null);
         const submittedPoints = usePreview
           ? (livePoints as number)
           : Number.isFinite(pParsed)
@@ -267,10 +293,36 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           libraryTraitId: pickedLibraryId,
           selectedModifierNames: selectedModifiers,
           pickedTrait,
+          pricingResolution: pricing,
+          resolvedModifiers,
           draftVersion: draftVersion.current,
         });
       }}
     >
+      {resolverOpen && pickedTrait && campaignId && (
+        <PricingResolver
+          campaignId={campaignId}
+          section="traits"
+          entry={pickedTrait}
+          initial={pricing}
+          initialModifiers={resolvedModifiers}
+          variant={selectedVariant}
+          onCancel={() => setResolverOpen(false)}
+          onResolve={(resolution, modifiers) => {
+            draftVersion.current++;
+            setPricing(resolution);
+            setResolvedModifiers(modifiers);
+            if (typeof resolution.inputs.level === 'number')
+              setLevelDraft(String(resolution.inputs.level));
+            setResolverOpen(false);
+          }}
+        />
+      )}
+      {pricing && (
+        <button type="button" className="btn btn-sm" onClick={() => setResolverOpen(true)}>
+          Change pricing choices
+        </button>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div className="form-control flex-1 min-w-[10rem]">
           <span className="label-text text-xs" id="add-trait-name-label">
@@ -287,6 +339,9 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 setPoints(String(opt.basePoints));
                 setPickedLibraryId(opt.id);
                 setPickedTrait(opt);
+                setPricing(null);
+                setResolvedModifiers([]);
+                setResolverOpen(true);
                 setSelectedModifiers([]);
                 // Default level to 1 for leveled traits (most useful starting
                 // value); leave blank otherwise so the input stays out of the way.
@@ -294,6 +349,9 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 setVariantName(null);
               }}
               fetchOptions={fetchOptions}
+              sourceSelection={
+                campaignId && setAllSources ? { allSources, onChange: setAllSources } : undefined
+              }
               getOptionKey={(o) => o.id}
               renderOption={(o) => (
                 <span className="flex items-baseline justify-between gap-2">
@@ -303,7 +361,12 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                       {o.kind.replace('_', ' ')}
                     </span>
                   </span>
-                  <span className="num text-xs text-base-content/70">{o.basePoints} pts</span>
+                  <span className="num text-xs text-base-content/70">
+                    {o.sourceKey ?? ''} ·{' '}
+                    {pricingDisplayValue(o.calculation, 'points', o.basePoints) == null
+                      ? 'Calculated'
+                      : `${pricingDisplayValue(o.calculation, 'points', o.basePoints)} pts`}
+                  </span>
                 </span>
               )}
               placeholder="e.g. Combat Reflexes"
@@ -336,7 +399,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             ))}
           </select>
         </label>
-        {isLeveled && (
+        {isLeveled && !pricing && (
           <label className="form-control w-20">
             <span
               className="label-text text-xs"
@@ -420,29 +483,32 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
           )}
         </label>
       )}
-      {pickedTrait !== null && pickedTrait.availableModifiers.length > 0 && (
-        <LibraryModifierPicker
-          basePoints={
-            // Show base+level+variant cost so modifier percentages preview
-            // against the right starting figure.
-            previewLeveledCost(
-              pickedTrait.basePoints,
-              pickedTrait.pointsPerLevel ?? null,
-              isLeveled ? parsedLevel : null,
-              selectedVariant,
-              [],
-            )
-          }
-          available={pickedTrait.availableModifiers}
-          selectedNames={selectedModifiers}
-          onToggle={(modName) => {
-            draftVersion.current++;
-            setSelectedModifiers((prev) =>
-              applyModifierToggle(pickedTrait.availableModifiers, prev, modName),
-            );
-          }}
-        />
-      )}
+      {pickedTrait !== null &&
+        pickedTrait.availableModifiers.length > 0 &&
+        !pricing &&
+        !pickedTrait.calculation && (
+          <LibraryModifierPicker
+            basePoints={
+              // Show base+level+variant cost so modifier percentages preview
+              // against the right starting figure.
+              previewLeveledCost(
+                pickedTrait.basePoints,
+                pickedTrait.pointsPerLevel ?? null,
+                isLeveled ? parsedLevel : null,
+                selectedVariant,
+                [],
+              )
+            }
+            available={pickedTrait.availableModifiers}
+            selectedNames={selectedModifiers}
+            onToggle={(modName) => {
+              draftVersion.current++;
+              setSelectedModifiers((prev) =>
+                applyModifierToggle(pickedTrait.availableModifiers, prev, modName),
+              );
+            }}
+          />
+        )}
     </form>
   );
 }
@@ -785,6 +851,7 @@ function TraitRow({
                     </span>
                   )}
                 </header>
+                <RepriceEntry section="traits" entry={trait} />
                 <div
                   className={`grid grid-cols-1 gap-2 md:gap-3 ${
                     trait.level == null

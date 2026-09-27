@@ -207,6 +207,10 @@ newer one still gets through.
    snapshots and emits post-commit WebSocket `sync_invalidate` nudges for REST
    and delegated writes so every affected viewer pulls sooner.
 
+## Library pricing and source editions
+
+The shared pure TypeScript calculation engine evaluates bounded declarative graphs with exact decimal arithmetic. Sources and modifiers join the existing library registry; metadata identifies canonical concepts and source editions independently of display names. Character pricing snapshots are immutable until explicit re-resolution, unlike live mechanics refresh. Typed rules, source evidence and snapshots are catalogued in [json-fields.md](json-fields.md). Full semantics and migration details: [library-calculation-rules.md](library-calculation-rules.md).
+
 ## Data model (Postgres 18)
 
 **Postgres 18 only** — no SQLite, no other backend (`AGENTS.md` — "Postgres 18
@@ -254,7 +258,7 @@ Tables (grouped):
   `character_skills`, `inventory_items` (self-FK for nesting),
   `character_spells`, `character_languages`, `character_techniques`,
   `combat_states` (1:1 by `character_id`).
-- **Campaign content**: `adventure_log_entries`, `campaign_library_traits`,
+- **Campaign content**: `campaign_library_sources`, `campaign_library_modifiers`, `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
   `campaign_library_items`, `campaign_library_languages`,
   `campaign_library_techniques`, `campaign_library_styles`,

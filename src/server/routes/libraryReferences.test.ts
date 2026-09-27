@@ -1,5 +1,7 @@
 import { expect, it } from 'bun:test';
 import { eq, sql } from 'drizzle-orm';
+import { fixedCalculation, legacyTraitCalculation } from '../../shared/domain/calculation.ts';
+import { definitionReference, resolveLibraryPricing } from '../../shared/domain/libraryPricing.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import { createApp } from '../app.ts';
@@ -662,6 +664,134 @@ it('does not reuse a GM grant after a detached skill changes specialization', as
   expect(relink.status).toBe(400);
   expect((await relink.json()) as { error: string }).toEqual({
     error: 'Unmet prerequisites for Approved specialty: GM permission: GM approved specialty',
+  });
+});
+
+it('gates incomplete/reference library entries and stores pricing snapshots for adoptable templates', async () => {
+  const owner = await register();
+  const campaign = await create(owner.token, '/campaigns', { name: 'Snapshot adoption gates' });
+  const character = await create(owner.token, '/characters', {
+    name: 'Snapshot owner',
+    campaignId: campaign.id,
+  });
+
+  const reviewTrait = await create(owner.token, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Needs Review',
+    key: 'needs-review',
+    kind: 'advantage',
+    basePoints: 8,
+    status: 'needs_review',
+    role: 'definition',
+  });
+  const referenceTrait = await create(owner.token, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Reference Only',
+    key: 'reference-only',
+    kind: 'advantage',
+    basePoints: 8,
+    status: 'complete',
+    role: 'reference',
+  });
+  for (const [name, libraryTraitId] of [
+    ['Needs Review', reviewTrait.id],
+    ['Reference Only', referenceTrait.id],
+  ]) {
+    const response = await request(owner.token, `/characters/${character.id}/traits`, {
+      name,
+      kind: 'advantage',
+      libraryTraitId,
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()) as { error: string }).toMatchObject({
+      error: 'This library entry is incomplete or reference-only',
+    });
+  }
+
+  const readyTrait = await create(owner.token, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Ready Template',
+    key: 'ready-template',
+    kind: 'advantage',
+    basePoints: 4,
+    pointsPerLevel: 3,
+    maxLevel: 5,
+    status: 'complete',
+    role: 'template',
+  });
+  const pricedTrait = {
+    ...readyTrait,
+    name: 'Ready Template',
+    calculation: legacyTraitCalculation(4, 3, 5),
+  };
+  const traitPricing = resolveLibraryPricing(
+    { traits: [pricedTrait], items: [], modifiers: [] },
+    definitionReference('traits', pricedTrait),
+    { level: 2 },
+  );
+  const addedTrait = await request(owner.token, `/characters/${character.id}/traits`, {
+    name: 'Ready Template',
+    kind: 'advantage',
+    level: 2,
+    libraryTraitId: readyTrait.id,
+    pricingResolution: traitPricing,
+  });
+  expect(addedTrait.status).toBe(201);
+  const traitBody = (await addedTrait.json()) as {
+    trait: { pricingResolution: { definitionId: string; outputs: Record<string, number> } };
+  };
+  expect(traitBody.trait.pricingResolution).toMatchObject({
+    definitionId: readyTrait.id,
+    outputs: { points: 10 },
+  });
+
+  const incompleteItem = await create(owner.token, `/campaigns/${campaign.id}/library/items`, {
+    name: 'Reference Item',
+    key: 'reference-item',
+    status: 'reference_only',
+    role: 'reference',
+    cost: 12,
+    weightLbs: 2,
+  });
+  const blockedItem = await request(owner.token, `/characters/${character.id}/inventory`, {
+    name: 'Reference Item',
+    libraryItemId: incompleteItem.id,
+  });
+  expect(blockedItem.status).toBe(400);
+  expect((await blockedItem.json()) as { error: string }).toMatchObject({
+    error: 'This library entry is incomplete or reference-only',
+  });
+
+  const readyItem = await create(owner.token, `/campaigns/${campaign.id}/library/items`, {
+    name: 'Ready Equipment',
+    key: 'ready-equipment',
+    status: 'complete',
+    role: 'template',
+    cost: 12.001,
+    weightLbs: 2.005,
+  });
+  const pricedItem = {
+    ...readyItem,
+    name: 'Ready Equipment',
+    calculation: fixedCalculation({
+      cost: { value: 12.001, unit: 'currency' },
+      weightLbs: { value: 2.005, unit: 'pounds' },
+    }),
+  };
+  const itemPricing = resolveLibraryPricing(
+    { traits: [], items: [pricedItem], modifiers: [] },
+    definitionReference('items', pricedItem),
+    {},
+  );
+  const addedItem = await request(owner.token, `/characters/${character.id}/inventory`, {
+    name: 'Ready Equipment',
+    libraryItemId: readyItem.id,
+    pricingResolution: itemPricing,
+  });
+  expect(addedItem.status).toBe(201);
+  const itemBody = (await addedItem.json()) as {
+    item: { pricingResolution: { definitionId: string; outputs: Record<string, number> } };
+  };
+  expect(itemBody.item.pricingResolution).toMatchObject({
+    definitionId: readyItem.id,
+    outputs: { cost: 12.001, weightLbs: 2.005 },
   });
 });
 

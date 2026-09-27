@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
+import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import type { LibraryEnchantmentOut } from '../../../../../shared/schemas/campaignLibrary.ts';
 import type {
   EnchantmentEffectTarget,
@@ -9,6 +10,7 @@ import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomple
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
+import { RepriceEntry } from '../../../library/RepriceEntry.tsx';
 import { ItemField, type ItemFieldSpec } from './ItemField.tsx';
 import {
   CATEGORY_LABELS,
@@ -82,6 +84,9 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
     case 'weapon':
       return [
         { path: 'weaponData.damage', label: 'Damage' },
+        { path: 'weaponData.modes.0.key', label: 'Primary mode key', advanced: true },
+        { path: 'weaponData.modes.0.name', label: 'Primary mode name', advanced: true },
+        text('weaponData.modes.0.sourceRow', 'Primary source row', true),
         text('weaponData.skill', 'Governing skill'),
         text('weaponData.reach', 'Reach'),
         text('weaponData.parry', 'Parry'),
@@ -270,7 +275,7 @@ function ItemListEditor({
   const { run, pending, flash } = useItemAction(item);
   const enchantments = kind === 'enchantments';
   const list = enchantments ? item.enchantments : (item.weaponData?.alternateModes ?? []);
-  const limit = enchantments ? 50 : 10;
+  const limit = enchantments ? 50 : 19;
   const title = enchantments ? 'Enchantment' : 'Attack mode';
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   return (
@@ -300,6 +305,16 @@ function ItemListEditor({
             ]
           : [
               { path: `${prefix}.name`, label: 'Mode name' },
+              { path: `${prefix}.key`, label: 'Mode key', advanced: true },
+              text(`${prefix}.skill`, 'Mode governing skill', true),
+              number(`${prefix}.stRequired`, 'Mode ST required', true, true),
+              number(`${prefix}.ranged.acc`, 'Mode accuracy', true, true),
+              text(`${prefix}.ranged.range`, 'Mode range', true),
+              text(`${prefix}.ranged.rof`, 'Mode rate of fire', true),
+              text(`${prefix}.ranged.shots`, 'Mode shots', true),
+              number(`${prefix}.ranged.bulk`, 'Mode bulk', true, true),
+              number(`${prefix}.ranged.recoil`, 'Mode recoil', true, true),
+              text(`${prefix}.sourceRow`, 'Mode source row', true),
               { path: `${prefix}.damage`, label: 'Mode damage' },
               text(`${prefix}.reach`, 'Mode reach', true),
               text(`${prefix}.parry`, 'Mode parry', true),
@@ -326,7 +341,14 @@ function ItemListEditor({
               )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {specs.map((spec) => (
-                <ItemField key={spec.path} item={item} spec={spec} more={more} />
+                <ItemField
+                  key={spec.path}
+                  item={item}
+                  spec={spec}
+                  more={more}
+                  campaignId={campaignId}
+                  skillNames={skillNames}
+                />
               ))}
             </div>
             {confirmIndex === index ? (
@@ -354,6 +376,9 @@ function ItemListEditor({
                           return {
                             weaponData: {
                               ...current.weaponData,
+                              modes: weaponModes(current.weaponData).filter(
+                                (__, i) => i !== index + 1,
+                              ),
                               alternateModes: current.weaponData.alternateModes.filter(
                                 (__, i) => i !== index,
                               ),
@@ -432,7 +457,10 @@ function ItemListEditor({
                 return {
                   weaponData: {
                     ...current.weaponData,
-                    alternateModes: [...current.weaponData.alternateModes, { name: name.trim() }],
+                    modes: [
+                      ...weaponModes(current.weaponData),
+                      { key: crypto.randomUUID(), name: name.trim() },
+                    ],
                   },
                 };
               }),
@@ -757,6 +785,7 @@ export function InventoryItemEditor({
           Done
         </button>
       </div>
+      {section === 'basics' && <RepriceEntry section="items" entry={item} />}
       {content}
     </section>
   );

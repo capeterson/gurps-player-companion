@@ -15,6 +15,7 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type {
   CharacterDetail,
@@ -50,6 +51,7 @@ export interface DefensesCardProps {
 }
 
 interface ParryRow {
+  itemId: string;
   readonly key: string;
   readonly name: string;
   readonly skill: string;
@@ -205,6 +207,20 @@ function DefenseTable({
   }));
 
   const parryRows: ParryRow[] = weapons
+    .flatMap((item) => {
+      if (!item.weaponData) return [];
+      const distinct = new Map(
+        weaponModes(item.weaponData)
+          .filter((mode) => mode.parry != null && mode.parry.trim() !== '')
+          .map((mode) => [JSON.stringify([mode.skill, mode.parry, mode.stRequired]), mode]),
+      );
+      return [...distinct.values()].map((mode) => ({
+        ...item,
+        defenseKey: `${item.id}:${mode.key}`,
+        defenseName: distinct.size > 1 ? `${item.name} (${mode.name})` : item.name,
+        weaponData: { ...item.weaponData, ...mode },
+      }));
+    })
     .filter((item) => item.weaponData?.parry != null && item.weaponData.parry.trim() !== '')
     .map((item) => {
       const weaponData = item.weaponData;
@@ -212,8 +228,9 @@ function DefenseTable({
       const parsed = parseParryString(raw);
       if (parsed == null || parsed.kind === 'no') {
         return {
-          key: item.id,
-          name: item.name,
+          key: item.defenseKey,
+          itemId: item.id,
+          name: item.defenseName,
           skill: weaponData?.skill?.trim() || '—',
           value: null,
           caption: undefined,
@@ -227,12 +244,20 @@ function DefenseTable({
         const adjusted =
           resolution.level -
           stShortfallPenalty(weaponData?.stRequired, state.strength(character.derived.effectiveSt));
-        const weaponEffects = weaponEffectsForRow(effects, item.id, 'weapon_parry');
+        const weaponEffects = weaponEffectsForRow(
+          effects,
+          item.id,
+          'weapon_parry',
+          weaponData?.name,
+          weaponData?.key,
+          weaponData?.skill ?? null,
+        );
         const skillEffects = skillEffectsForRow(effects, resolution.name);
         const baseValue = parryFromSkill(adjusted, parsed.mod);
         return {
-          key: item.id,
-          name: item.name,
+          key: item.defenseKey,
+          itemId: item.id,
+          name: item.defenseName,
           skill: resolution.name,
           value: parryFromSkill(
             adjusted,
@@ -247,8 +272,9 @@ function DefenseTable({
         };
       }
       return {
-        key: item.id,
-        name: item.name,
+        key: item.defenseKey,
+        itemId: item.id,
+        name: item.defenseName,
         skill: resolution.kind === 'missing' ? resolution.skillName : '—',
         value: null,
         caption:
@@ -283,7 +309,7 @@ function DefenseTable({
       const reason = row.value == null ? null : state.reason('parry');
       return {
         id: `parry:${row.key}`,
-        itemId: row.key,
+        itemId: row.itemId,
         label: `Parry (${row.name})`,
         skill: row.skill,
         beforeDb: row.value ?? '—',

@@ -1,4 +1,7 @@
-import { normalizeMechanicalName } from '../../../../../shared/domain/traitEffects.ts';
+import {
+  normalizeMechanicalName,
+  weaponSelectorMatchesSkill,
+} from '../../../../../shared/domain/traitEffects.ts';
 import { type ResolvedEffect, skillBonusFor } from '../../../../../shared/domain/traitEffects.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { ResolvedEffectOut } from '../../../../../shared/schemas/character.ts';
@@ -9,6 +12,8 @@ export function weaponEffectsForRow(
   itemId: string,
   target: WeaponEffectTarget,
   modeName?: string | null,
+  modeKey?: string | null,
+  skill?: string | null,
 ): ResolvedEffectOut[] {
   const normalizedMode = normalizeMechanicalName(modeName ?? '');
   return effects.filter((effect) => {
@@ -19,6 +24,8 @@ export function weaponEffectsForRow(
     ) {
       return false;
     }
+    if (!weaponSelectorMatchesSkill(effect.weaponSelector, skill)) return false;
+    if (effect.weaponSelector?.modeKey) return effect.weaponSelector.modeKey === modeKey;
     const wantedMode = normalizeMechanicalName(effect.weaponSelector?.modeName ?? '');
     return !wantedMode || wantedMode === normalizedMode;
   });

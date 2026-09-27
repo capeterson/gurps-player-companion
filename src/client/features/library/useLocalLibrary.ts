@@ -5,6 +5,12 @@
  */
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useCallback, useRef, useState } from 'react';
+import {
+  type LibraryGraph,
+  type LibraryGraphEntry,
+  validateLibraryGraph,
+} from '../../../shared/domain/libraryGraph.ts';
+import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
 import { validateLibrarySkillSpecializationDefault } from '../../../shared/domain/librarySkillSpecializations.ts';
 import {
   activeEffectDefinitionCreate,
@@ -22,7 +28,15 @@ import {
   libraryTraitCreate,
   libraryTraitUpdate,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import {
+  libraryModifierCreate,
+  libraryModifierUpdate,
+  librarySourceCreate,
+  librarySourceUpdate,
+} from '../../../shared/schemas/libraryMetadata.ts';
 import type { LibraryEntityClass } from '../../../shared/schemas/sync.ts';
+import { LIBRARY_STORE_NAMES } from '../../db/dexie.ts';
+import type { LocalLibraryModifier, LocalLibrarySource } from '../../db/dexie.ts';
 import {
   type LocalLibraryActiveEffect,
   type LocalLibraryEnchantment,
@@ -43,7 +57,9 @@ import {
   newClientId,
 } from '../../sync/outbox.ts';
 
-export interface LocalLibrary {
+export type LocalLibrary = {
+  sources: LocalLibrarySource[];
+  modifiers: LocalLibraryModifier[];
   traits: LocalLibraryTrait[];
   skills: LocalLibrarySkill[];
   spells: LocalLibrarySpell[];
@@ -53,6 +69,16 @@ export interface LocalLibrary {
   styles: LocalLibraryStyle[];
   enchantments: LocalLibraryEnchantment[];
   activeEffects: LocalLibraryActiveEffect[];
+};
+
+/** Cursor rows preserve PostgreSQL numeric strings; UI forms and pickers use API numbers. */
+export function normalizeLibraryItemRow(row: LocalLibraryItem): LocalLibraryItem {
+  return {
+    ...row,
+    cost: Number(row.cost),
+    weightLbs: Number(row.weightLbs),
+    hideawayCapacityLbs: Number(row.hideawayCapacityLbs),
+  };
 }
 
 export type LibrarySectionKey = keyof LocalLibrary;
@@ -96,29 +122,59 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
   return useLiveQuery(async () => {
     if (!campaignId) return emptyLibrary();
     const db = getLocalDb();
-    const [traits, skills, spells, items, languages, techniques, styles, enchantments, effects] =
-      await Promise.all([
-        db.campaignLibraryTraits.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibrarySkills.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibrarySpells.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryItems.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryLanguages.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryTechniques.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryStyles.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryEnchantments.where('campaignId').equals(campaignId).toArray(),
-        db.campaignLibraryActiveEffects.where('campaignId').equals(campaignId).toArray(),
-      ]);
+    const [
+      traits,
+      skills,
+      spells,
+      items,
+      languages,
+      techniques,
+      styles,
+      enchantments,
+      effects,
+      sources,
+      modifiers,
+      pending,
+    ] = await Promise.all([
+      db.campaignLibraryTraits.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibrarySkills.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibrarySpells.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryItems.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryLanguages.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryTechniques.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryStyles.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryEnchantments.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryActiveEffects.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibrarySources.where('campaignId').equals(campaignId).toArray(),
+      db.campaignLibraryModifiers.where('campaignId').equals(campaignId).toArray(),
+      db.outbox.where('status').anyOf(['pending', 'in_flight', 'transient_retry']).toArray(),
+    ]);
+    // A locally edited rule is not the server revision it was based on. Resolve
+    // against its exact definition until the queued write receives a revision.
+    const speculative = new Set(
+      pending
+        .filter(
+          (op) => op.parentId === campaignId && op.entityClass.startsWith('campaign_library_'),
+        )
+        .map((op) => op.entityId),
+    );
+    const pricingRows = <T extends { id: string; revision: number }>(rows: T[]) =>
+      rows.map((row) => (speculative.has(row.id) ? { ...row, revision: -1 } : row));
     const { keep, commit } = reuse();
     const library: LocalLibrary = {
-      traits: keep(traits).sort((a, b) => a.kind.localeCompare(b.kind) || byName(a, b)),
+      traits: keep(pricingRows(traits)).sort(
+        (a, b) => a.kind.localeCompare(b.kind) || byName(a, b),
+      ),
       skills: keep(skills).sort(byName),
       spells: keep(spells).sort(byName),
-      items: keep(items).sort(byName),
+      items: keep(pricingRows(items.map(normalizeLibraryItemRow))).sort(byName),
       languages: keep(languages).sort(byName),
       techniques: keep(techniques).sort(byName),
       styles: keep(styles).sort(byName),
       enchantments: keep(enchantments).sort(byName),
       activeEffects: keep(effects).sort(byName),
+      sources: keep(sources).sort(byName),
+      modifiers: keep(pricingRows(modifiers)).sort(byName),
     };
     commit();
     return library;
@@ -127,6 +183,8 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
 
 export function emptyLibrary(): LocalLibrary {
   return {
+    sources: [],
+    modifiers: [],
     traits: [],
     skills: [],
     spells: [],
@@ -141,6 +199,18 @@ export function emptyLibrary(): LocalLibrary {
 
 /** Sections the in-app editor writes, with the shared schemas the server applies too. */
 export const EDITABLE_LIBRARY_CLASSES = {
+  sources: {
+    entityClass: 'campaign_library_source',
+    noun: 'source',
+    create: librarySourceCreate,
+    update: librarySourceUpdate,
+  },
+  modifiers: {
+    entityClass: 'campaign_library_modifier',
+    noun: 'modifier',
+    create: libraryModifierCreate,
+    update: libraryModifierUpdate,
+  },
   traits: {
     entityClass: 'campaign_library_trait',
     noun: 'trait',
@@ -196,7 +266,12 @@ function naturalKey(section: EditableLibrarySection, body: Record<string, unknow
   const name = String(body.name ?? '')
     .trim()
     .toLowerCase();
-  return section === 'traits' ? `${String(body.kind)}::${name}` : name;
+  if (section === 'sources') return String(body.key ?? name).toLowerCase();
+  return libraryEntryKey({
+    ...body,
+    name,
+    ...(section === 'traits' ? { kind: String(body.kind) } : {}),
+  });
 }
 
 function firstIssue(error: unknown): string {
@@ -226,6 +301,14 @@ async function validateEntry(
       body.defaultSpecialization as string | null | undefined,
     );
   }
+  const graph = await readLocalLibraryGraph(campaignId);
+  validateLibraryGraph({
+    ...graph,
+    [section]: [
+      ...(graph[section] ?? []).filter((row) => row.id !== existingId),
+      { ...body, name: String(body.name ?? '') } as LibraryGraphEntry,
+    ],
+  });
   const entityClass = EDITABLE_LIBRARY_CLASSES[section].entityClass;
   const table = syncEntityTable(entityClass);
   if (!table) return;
@@ -311,6 +394,11 @@ export function useLibraryEntryMutations<Body extends Record<string, unknown>>(
     const current = (await syncEntityTable(config.entityClass)?.get(id)) as
       | Record<string, unknown>
       | undefined;
+    const graph = await readLocalLibraryGraph(campaignId);
+    validateLibraryGraph({
+      ...graph,
+      [section]: (graph[section] ?? []).filter((row) => row.id !== id),
+    });
     await enqueueDelete({
       entityClass: config.entityClass,
       entityId: id,
@@ -352,3 +440,16 @@ export function useLibraryEntryMutations<Body extends Record<string, unknown>>(
 }
 
 const idle: LibraryMutationState = { isPending: false, error: null };
+
+export async function readLocalLibraryGraph(campaignId: string): Promise<LibraryGraph> {
+  const db = getLocalDb();
+  return Object.fromEntries(
+    await Promise.all(
+      LIBRARY_STORE_NAMES.map(async (name) => {
+        const suffix = name.replace('campaignLibrary', '');
+        const key = suffix[0]?.toLowerCase() + suffix.slice(1);
+        return [key, await db.table(name).where('campaignId').equals(campaignId).toArray()];
+      }),
+    ),
+  ) as LibraryGraph;
+}

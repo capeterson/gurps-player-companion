@@ -6,11 +6,13 @@ import type {
   LibrarySkillOut,
   LibrarySkillSpecializationPolicy,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { EffectsEditor } from './EffectsEditor.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
+import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 
 interface SkillFormProps {
   campaignId: string | null;
@@ -31,6 +33,7 @@ export function SkillForm({
   onCancel,
   libraryItems,
 }: SkillFormProps) {
+  const [metadata, setMetadata] = useState(() => libraryMetadata.parse(initial ?? {}));
   const [name, setName] = useState(initial?.name ?? '');
   const [attribute, setAttribute] = useState<(typeof SKILL_ATTRIBUTES)[number]>(
     initial?.attribute ?? 'IQ',
@@ -109,6 +112,7 @@ export function SkillForm({
             )?.name ?? null)
           : selectedDefault || null;
     onSubmit({
+      ...metadata,
       name: name.trim(),
       attribute,
       difficulty,
@@ -430,6 +434,7 @@ export function SkillForm({
           placeholder="Description (Markdown supported)…"
         />
       </div>
+      <LibraryMetadataEditor value={metadata} onChange={setMetadata} />
       <LibraryFormFooter
         noun="skill"
         editing={Boolean(initial)}

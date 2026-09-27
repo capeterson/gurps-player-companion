@@ -1,3 +1,11 @@
+import type {
+  CalculationDefinitionV1,
+  PricingResolution,
+} from '../../shared/schemas/calculation.ts';
+import type {
+  LibraryMetadata,
+  LibraryModifierCreate,
+} from '../../shared/schemas/libraryMetadata.ts';
 /**
  * Drizzle schema for Postgres 18.  All ids default to uuidv7() (server side)
  * so they're time-ordered.  All syncable rows carry a `revision` column the
@@ -631,6 +639,7 @@ export const characters = pgTable(
 export const characterTraits = pgTable(
   'character_traits',
   {
+    pricingResolution: jsonb('pricing_resolution').$type<PricingResolution>(),
     id: id(),
     characterId: uuid('character_id')
       .notNull()
@@ -774,14 +783,15 @@ export const characterTechniques = pgTable(
 export const inventoryItems = pgTable(
   'inventory_items',
   {
+    pricingResolution: jsonb('pricing_resolution').$type<PricingResolution>(),
     id: id(),
     characterId: uuid('character_id')
       .notNull()
       .references(() => characters.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 160 }).notNull(),
     quantity: integer('quantity').notNull().default(1),
-    weightLbs: numeric('weight_lbs', { precision: 10, scale: 2 }).notNull().default('0'),
-    cost: numeric('cost', { precision: 14, scale: 2 }).notNull().default('0'),
+    weightLbs: numeric('weight_lbs').notNull().default('0'),
+    cost: numeric('cost').notNull().default('0'),
     notes: text('notes'),
     /** Self-references inventory_items.id; FK added by migration (see 0001). */
     parentId: uuid('parent_id'),
@@ -1015,10 +1025,29 @@ export const adventureLogEntries = pgTable(
 );
 
 // ---------- campaign library ----------
+function libraryMetadataColumns() {
+  return {
+    key: varchar('key', { length: 160 }).notNull().default(''),
+    sourceKey: varchar('source_key', { length: 160 }),
+    sourceLocator: varchar('source_locator', { length: 240 }),
+    status: varchar('status', { length: 24 })
+      .$type<NonNullable<LibraryMetadata['status']>>()
+      .notNull()
+      .default('complete'),
+    role: varchar('role', { length: 24 })
+      .$type<NonNullable<LibraryMetadata['role']>>()
+      .notNull()
+      .default('definition'),
+    preferredEdition: boolean('preferred_edition').notNull().default(false),
+    extraction: jsonb('extraction').$type<LibraryMetadata['extraction']>(),
+  };
+}
 
 export const campaignLibraryTraits = pgTable(
   'campaign_library_traits',
   {
+    calculation: jsonb('calculation').$type<CalculationDefinitionV1>(),
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1053,7 +1082,8 @@ export const campaignLibraryTraits = pgTable(
     naturalKey: uniqueIndex('campaign_library_traits_key').on(
       t.campaignId,
       t.kind,
-      sql`lower(${t.name})`,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
     ),
     campaignRevisionIdx: index('campaign_library_traits_campaign_revision_idx').on(
       t.campaignId,
@@ -1065,6 +1095,7 @@ export const campaignLibraryTraits = pgTable(
 export const campaignLibrarySkills = pgTable(
   'campaign_library_skills',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1109,7 +1140,11 @@ export const campaignLibrarySkills = pgTable(
   },
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
-    naturalKey: uniqueIndex('campaign_library_skills_key').on(t.campaignId, sql`lower(${t.name})`),
+    naturalKey: uniqueIndex('campaign_library_skills_key').on(
+      t.campaignId,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
+    ),
     campaignRevisionIdx: index('campaign_library_skills_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
@@ -1125,6 +1160,7 @@ export const campaignLibrarySkills = pgTable(
 export const campaignLibrarySpells = pgTable(
   'campaign_library_spells',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1147,7 +1183,11 @@ export const campaignLibrarySpells = pgTable(
   },
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
-    naturalKey: uniqueIndex('campaign_library_spells_key').on(t.campaignId, sql`lower(${t.name})`),
+    naturalKey: uniqueIndex('campaign_library_spells_key').on(
+      t.campaignId,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
+    ),
     campaignRevisionIdx: index('campaign_library_spells_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
@@ -1164,6 +1204,7 @@ export const campaignLibrarySpells = pgTable(
 export const campaignLibraryLanguages = pgTable(
   'campaign_library_languages',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1180,7 +1221,8 @@ export const campaignLibraryLanguages = pgTable(
     // Case-insensitive natural key -- see migration 0026.
     naturalKey: uniqueIndex('campaign_library_languages_key').on(
       t.campaignId,
-      sql`lower(${t.name})`,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
     ),
     campaignRevisionIdx: index('campaign_library_languages_campaign_revision_idx').on(
       t.campaignId,
@@ -1198,6 +1240,7 @@ export const campaignLibraryLanguages = pgTable(
 export const campaignLibraryTechniques = pgTable(
   'campaign_library_techniques',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1221,7 +1264,8 @@ export const campaignLibraryTechniques = pgTable(
     // Case-insensitive natural key -- see migration 0027.
     naturalKey: uniqueIndex('campaign_library_techniques_key').on(
       t.campaignId,
-      sql`lower(${t.name})`,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
     ),
     campaignRevisionIdx: index('campaign_library_techniques_campaign_revision_idx').on(
       t.campaignId,
@@ -1238,6 +1282,7 @@ export const campaignLibraryTechniques = pgTable(
 export const campaignLibraryStyles = pgTable(
   'campaign_library_styles',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1257,7 +1302,11 @@ export const campaignLibraryStyles = pgTable(
   },
   (t) => ({
     // Case-insensitive natural key -- see migration 0027.
-    naturalKey: uniqueIndex('campaign_library_styles_key').on(t.campaignId, sql`lower(${t.name})`),
+    naturalKey: uniqueIndex('campaign_library_styles_key').on(
+      t.campaignId,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
+    ),
     campaignRevisionIdx: index('campaign_library_styles_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
@@ -1268,6 +1317,7 @@ export const campaignLibraryStyles = pgTable(
 export const campaignLibraryEnchantments = pgTable(
   'campaign_library_enchantments',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1296,7 +1346,8 @@ export const campaignLibraryEnchantments = pgTable(
   (t) => ({
     naturalKey: uniqueIndex('campaign_library_enchantments_key').on(
       t.campaignId,
-      sql`lower(${t.name})`,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
     ),
     campaignRevisionIdx: index('campaign_library_enchantments_campaign_revision_idx').on(
       t.campaignId,
@@ -1308,6 +1359,8 @@ export const campaignLibraryEnchantments = pgTable(
 export const campaignLibraryItems = pgTable(
   'campaign_library_items',
   {
+    calculation: jsonb('calculation').$type<CalculationDefinitionV1>(),
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1315,8 +1368,8 @@ export const campaignLibraryItems = pgTable(
     name: varchar('name', { length: 160 }).notNull(),
     category: varchar('category', { length: 40 }).notNull().default('general'),
     defaultQuantity: integer('default_quantity').notNull().default(1),
-    weightLbs: numeric('weight_lbs', { precision: 10, scale: 2 }).notNull().default('0'),
-    cost: numeric('cost', { precision: 14, scale: 2 }).notNull().default('0'),
+    weightLbs: numeric('weight_lbs').notNull().default('0'),
+    cost: numeric('cost').notNull().default('0'),
     description: text('description'),
     source: varchar('source', { length: 40 }),
     isArmor: boolean('is_armor').notNull().default(false),
@@ -1342,7 +1395,11 @@ export const campaignLibraryItems = pgTable(
   },
   (t) => ({
     // Case-insensitive natural key -- see migration 0021.
-    naturalKey: uniqueIndex('campaign_library_items_key').on(t.campaignId, sql`lower(${t.name})`),
+    naturalKey: uniqueIndex('campaign_library_items_key').on(
+      t.campaignId,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
+    ),
     campaignRevisionIdx: index('campaign_library_items_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
@@ -1467,6 +1524,7 @@ export type DbEntityHistory = typeof entityHistory.$inferSelect;
 export const campaignLibraryActiveEffects = pgTable(
   'campaign_library_active_effects',
   {
+    ...libraryMetadataColumns(),
     id: id(),
     campaignId: uuid('campaign_id')
       .notNull()
@@ -1492,9 +1550,74 @@ export const campaignLibraryActiveEffects = pgTable(
   (t) => ({
     naturalKey: uniqueIndex('campaign_library_active_effects_key').on(
       t.campaignId,
-      sql`lower(${t.name})`,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
     ),
     campaignRevisionIdx: index('campaign_library_active_effects_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
+  }),
+);
+
+export const campaignLibrarySources = pgTable(
+  'campaign_library_sources',
+  {
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    key: varchar('key', { length: 160 }).notNull(),
+    abbreviation: varchar('abbreviation', { length: 40 }).notNull(),
+    edition: varchar('edition', { length: 160 }),
+    priority: integer('priority').notNull().default(100),
+    notes: text('notes'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_sources_key').on(t.campaignId, sql`lower(${t.key})`),
+    campaignRevisionIdx: index('campaign_library_sources_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
+  }),
+);
+export const campaignLibraryModifiers = pgTable(
+  'campaign_library_modifiers',
+  {
+    ...libraryMetadataColumns(),
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    category: varchar('category', { length: 20 })
+      .$type<LibraryModifierCreate['category']>()
+      .notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 40 }),
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    group: varchar('group', { length: 80 }),
+    costType: varchar('cost_type', { length: 16 })
+      .$type<LibraryModifierCreate['costType']>()
+      .notNull()
+      .default('percent'),
+    calculation: jsonb('calculation').$type<CalculationDefinitionV1>(),
+    applicability: jsonb('applicability').$type<LibraryModifierCreate['applicability']>().notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    naturalKey: uniqueIndex('campaign_library_modifiers_key').on(
+      t.campaignId,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(lower(${t.sourceKey}), '')`,
+    ),
+    campaignRevisionIdx: index('campaign_library_modifiers_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
     ),

@@ -54,7 +54,10 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
   const points =
     pointsOverride === null || pointsOverride === '' ? String(suggestedPoints) : pointsOverride;
 
-  const { fetchOptions } = useLibraryFetcher<LibraryLanguageOut>('languages', campaignId);
+  const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryLanguageOut>(
+    'languages',
+    campaignId,
+  );
   const {
     creating,
     flashProps,
@@ -140,6 +143,9 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
               if (opt.isSignLanguage) setWritten('n/a');
             }}
             fetchOptions={fetchOptions}
+            sourceSelection={
+              campaignId && setAllSources ? { allSources, onChange: setAllSources } : undefined
+            }
             getOptionKey={(o) => o.id}
             renderOption={(o) => (
               <span className="flex items-baseline justify-between gap-2">

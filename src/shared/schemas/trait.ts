@@ -1,5 +1,6 @@
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 import { MODIFIER_CATEGORIES, MODIFIER_COST_TYPES, TRAIT_KINDS } from '../constants/traits.ts';
+import { calculationDefinition, pricingResolution } from './calculation.ts';
 import { timestamps, uuid } from './common.ts';
 import { traitEffect } from './effects.ts';
 import { libraryMechanics } from './libraryMechanics.ts';
@@ -13,11 +14,25 @@ export const traitModifier = z
     name: z.string().min(1).max(160),
     category: modifierCategoryEnum,
     costType: modifierCostTypeEnum,
-    costValue: z.number().int().min(-200).max(500),
-    description: z.string().max(2000).optional(),
+    costValue: z.number().finite().min(-200).max(100000),
+    calculation: calculationDefinition.optional(),
+    pricingResolution: pricingResolution.optional(),
+    description: z.string().max(20000).optional(),
     group: z.string().max(80).optional(),
   })
-  .strict();
+  .strict()
+  .openapi('TraitModifier');
+
+/** A definition has a fixed value or an actual rule; an omitted unknown cost is never zero. */
+export const libraryTraitModifier = z
+  .union([
+    traitModifier.omit({ pricingResolution: true }),
+    traitModifier.omit({ pricingResolution: true }).extend({
+      calculation: calculationDefinition,
+      costValue: traitModifier.shape.costValue.default(0),
+    }),
+  ])
+  .openapi('LibraryTraitModifier');
 
 /**
  * A named variant of a trait — e.g. Damage Resistance has "Hardened",
@@ -42,6 +57,7 @@ export const traitVariant = z
   .strict();
 
 export const traitOut = z.object({
+  pricingResolution: pricingResolution.nullable().optional(),
   id: uuid,
   characterId: uuid,
   kind: traitKindEnum,
@@ -66,6 +82,7 @@ export const traitOut = z.object({
 });
 
 export const traitCreate = z.object({
+  pricingResolution: pricingResolution.nullable().optional(),
   kind: traitKindEnum,
   name: z.string().min(1).max(160).trim(),
   points: z.number().int().min(-1000).max(1000).default(0),

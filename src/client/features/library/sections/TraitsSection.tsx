@@ -7,6 +7,7 @@ import { compareOptionalLevel } from '../../characters/sections/useSortableChara
 import { effectPreview } from '../EffectsEditor.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
 import { TraitForm } from '../TraitForm.tsx';
+import { pricingDisplayValue } from '../pricingDisplay.ts';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
 import { CrudLibrarySection, type LibrarySectionShellProps } from './CrudLibrarySection.tsx';
 
@@ -30,14 +31,18 @@ export const traitsConfig: LibrarySectionConfig<LocalLibraryTrait> = {
       label: 'Points',
       shortLabel: 'Pts',
       className: 'w-14 text-right sm:w-16',
-      compare: (a, b) => compareOptionalLevel(a.basePoints, b.basePoints),
-      cell: (row) => row.basePoints,
+      compare: (a, b) =>
+        compareOptionalLevel(
+          pricingDisplayValue(a.calculation, 'points', a.basePoints),
+          pricingDisplayValue(b.calculation, 'points', b.basePoints),
+        ),
+      cell: (row) => pricingDisplayValue(row.calculation, 'points', row.basePoints) ?? 'Calculated',
     },
   ],
   group: (row) => kindLabel(row.kind),
   groupOrder: TRAIT_KINDS.map(kindLabel),
   meta: (row) =>
-    `${kindLabel(row.kind)} · ${row.basePoints} pt${row.pointsPerLevel ? ` + ${row.pointsPerLevel}/level` : ''}`,
+    `${kindLabel(row.kind)} · ${pricingDisplayValue(row.calculation, 'points', row.basePoints) ?? 'Calculated'} pt${!row.calculation && row.pointsPerLevel ? ` + ${row.pointsPerLevel}/level` : ''}`,
   detail: (row) => (
     <>
       {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
@@ -47,7 +52,12 @@ export const traitsConfig: LibrarySectionConfig<LocalLibraryTrait> = {
           {row.availableModifiers.map((m) => (
             <span key={`${m.name}-${m.costValue}`} className="chip text-xs">
               {m.name}{' '}
-              {m.costType === 'percent' ? signed(m.costValue, '%') : signed(m.costValue, ' pts')}
+              {pricingDisplayValue(m.calculation, 'modifier', m.costValue) == null
+                ? 'Calculated'
+                : signed(
+                    pricingDisplayValue(m.calculation, 'modifier', m.costValue) ?? 0,
+                    m.costType === 'percent' ? '%' : ' pts',
+                  )}
             </span>
           ))}
         </div>

@@ -1,9 +1,22 @@
+import { fixedCalculation, legacyTraitCalculation } from '../../shared/domain/calculation.ts';
+import { libraryEntryKey, libraryMetadataValues } from '../../shared/domain/libraryIdentity.ts';
 import { withLegacyModifiers } from '../../shared/domain/skillProcedures.ts';
+import { normalizeWeaponData } from '../../shared/domain/weaponModes.ts';
 import {
   activeEffectDefinitionCreate,
   activeEffectDefinitionOut,
   activeEffectDefinitionUpdate,
 } from '../../shared/schemas/activeEffects.ts';
+import {
+  type LibraryMetadata,
+  libraryModifierCreate,
+  libraryModifierOut,
+  libraryModifierUpdate,
+  librarySourceCreate,
+  librarySourceOut,
+  librarySourceUpdate,
+} from '../../shared/schemas/libraryMetadata.ts';
+import { campaignLibraryModifiers, campaignLibrarySources } from '../db/schema.ts';
 import { campaignLibraryActiveEffects } from '../db/schema.ts';
 /**
  * Per-entity configuration for the four campaign-library kinds (traits,
@@ -117,7 +130,9 @@ export interface LibraryEntityConfig<
     | 'techniques'
     | 'styles'
     | 'enchantments'
-    | 'activeEffects';
+    | 'activeEffects'
+    | 'sources'
+    | 'modifiers';
   readonly table: TTable;
   /** List ordering for `GET /campaigns/{id}/library`. */
   readonly orderBy: readonly SQL[];
@@ -142,7 +157,9 @@ export interface LibraryEntityConfig<
   readonly validateCreate?: (body: TCreate) => void;
   readonly validateRow?: (row: TTable['$inferSelect']) => void;
   /** Natural key for YAML upsert matching (lowercased name, +kind for traits). */
-  readonly keyOf: (input: { readonly name: string; readonly kind?: string }) => string;
+  readonly keyOf: (
+    input: LibraryMetadata & { readonly name: string; readonly kind?: string },
+  ) => string;
   /** Values for a new row — shared by the POST route and YAML import-insert. */
   readonly toInsertValues: (campaignId: string, body: TCreate) => TTable['$inferInsert'];
   /** Full-replace editable fields — used by YAML import-update (not PATCH, which diffs via `buildPatchSet`). */
@@ -164,12 +181,25 @@ export interface LibraryEntityConfig<
 
 function traitEditableFields(body: LibraryTraitCreate) {
   return {
+    calculation:
+      body.calculation ??
+      ((body.status ?? 'complete') === 'complete'
+        ? legacyTraitCalculation(body.basePoints, body.pointsPerLevel, body.maxLevel)
+        : null),
+    ...libraryMetadataValues(body),
     basePoints: body.basePoints ?? 0,
     pointsPerLevel: body.pointsPerLevel ?? null,
     maxLevel: body.maxLevel ?? null,
     description: body.description ?? null,
     source: body.source ?? null,
-    availableModifiers: body.availableModifiers ?? [],
+    availableModifiers: (body.availableModifiers ?? []).map((m) => ({
+      ...m,
+      calculation:
+        m.calculation ??
+        fixedCalculation({
+          modifier: { value: m.costValue, unit: m.costType === 'flat' ? 'points' : 'percentage' },
+        }),
+    })),
     variants: body.variants ?? [],
     effects: body.effects ?? [],
     tags: body.tags ?? [],
@@ -199,6 +229,9 @@ export const traitEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     libraryTraitOut.parse({
+      calculation: row.calculation,
+      ...libraryMetadataValues(row),
+      revision: Number(row.revision),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -215,7 +248,7 @@ export const traitEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => `${input.kind}::${input.name.toLowerCase()}`,
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -225,6 +258,8 @@ export const traitEntity: LibraryEntityConfig<
   toUpdateValues: (body) => traitEditableFields(body),
   rowToCreate: (row) =>
     libraryTraitCreate.parse({
+      calculation: row.calculation,
+      ...libraryMetadataValues(row),
       name: row.name,
       kind: row.kind,
       basePoints: row.basePoints,
@@ -248,6 +283,7 @@ function skillEditableFields(body: LibrarySkillCreate) {
       ? { kind: 'not_applicable' as const }
       : { kind: 'fixed' as const, techLevel: body.techLevel });
   return {
+    ...libraryMetadataValues(body),
     attribute: body.attribute,
     difficulty: body.difficulty,
     techLevel: techLevelPolicy.kind === 'fixed' ? techLevelPolicy.techLevel : null,
@@ -294,6 +330,7 @@ export const skillEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     librarySkillOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -338,7 +375,7 @@ export const skillEntity: LibraryEntityConfig<
       throw new HTTPException(400, { message: (error as Error).message });
     }
   },
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -368,6 +405,7 @@ export const skillEntity: LibraryEntityConfig<
   },
   rowToCreate: (row) =>
     librarySkillCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       attribute: row.attribute,
       difficulty: row.difficulty,
@@ -392,6 +430,7 @@ export const skillEntity: LibraryEntityConfig<
 
 function spellEditableFields(body: LibrarySpellCreate) {
   return {
+    ...libraryMetadataValues(body),
     college: body.college ?? null,
     difficulty: body.difficulty ?? 'H',
     baseEnergyCost: body.baseEnergyCost ?? 1,
@@ -427,6 +466,7 @@ export const spellEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     librarySpellOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -442,7 +482,7 @@ export const spellEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -451,6 +491,7 @@ export const spellEntity: LibraryEntityConfig<
   toUpdateValues: (body) => spellEditableFields(body),
   rowToCreate: (row) =>
     librarySpellCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       college: row.college ?? undefined,
       difficulty: row.difficulty,
@@ -468,6 +509,7 @@ export const spellEntity: LibraryEntityConfig<
 
 function enchantmentEditableFields(body: LibraryEnchantmentCreate) {
   return {
+    ...libraryMetadataValues(body),
     description: body.description ?? null,
     source: body.source ?? null,
     tags: body.tags ?? [],
@@ -501,6 +543,7 @@ export const enchantmentEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     libraryEnchantmentOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -515,7 +558,7 @@ export const enchantmentEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -524,6 +567,7 @@ export const enchantmentEntity: LibraryEntityConfig<
   toUpdateValues: (body) => enchantmentEditableFields(body),
   rowToCreate: (row) =>
     libraryEnchantmentCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       description: row.description ?? undefined,
       source: row.source ?? undefined,
@@ -539,6 +583,15 @@ export const enchantmentEntity: LibraryEntityConfig<
 
 function itemEditableFields(body: LibraryItemCreate) {
   return {
+    calculation:
+      body.calculation ??
+      ((body.status ?? 'complete') === 'complete'
+        ? fixedCalculation({
+            cost: { value: body.cost, unit: 'currency' },
+            weightLbs: { value: body.weightLbs, unit: 'pounds' },
+          })
+        : null),
+    ...libraryMetadataValues(body),
     category: body.category ?? 'general',
     defaultQuantity: body.defaultQuantity ?? 1,
     weightLbs: String(body.weightLbs ?? 0),
@@ -547,7 +600,7 @@ function itemEditableFields(body: LibraryItemCreate) {
     source: body.source ?? null,
     isArmor: body.isArmor ?? false,
     armor: body.armor ?? null,
-    weaponData: body.weaponData ?? null,
+    weaponData: normalizeWeaponData(body.weaponData),
     isContainer: body.isContainer ?? false,
     hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),
     weightReductionPercent: body.weightReductionPercent ?? 0,
@@ -583,6 +636,9 @@ export const itemEntity: LibraryEntityConfig<
     hydrateItemEnchantmentDefinitions(tx, campaignId, body, existing),
   toOut: (row) =>
     libraryItemOut.parse({
+      revision: Number(row.revision),
+      calculation: row.calculation,
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -594,7 +650,7 @@ export const itemEntity: LibraryEntityConfig<
       source: row.source,
       isArmor: row.isArmor,
       armor: row.armor ?? null,
-      weaponData: row.weaponData ?? null,
+      weaponData: normalizeWeaponData(row.weaponData),
       isContainer: row.isContainer,
       hideawayCapacityLbs: Number(row.hideawayCapacityLbs),
       weightReductionPercent: row.weightReductionPercent,
@@ -604,7 +660,7 @@ export const itemEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -613,6 +669,8 @@ export const itemEntity: LibraryEntityConfig<
   toUpdateValues: (body) => itemEditableFields(body),
   rowToCreate: (row) =>
     libraryItemCreate.parse({
+      calculation: row.calculation,
+      ...libraryMetadataValues(row),
       name: row.name,
       category: row.category,
       defaultQuantity: row.defaultQuantity,
@@ -622,7 +680,7 @@ export const itemEntity: LibraryEntityConfig<
       source: row.source ?? undefined,
       isArmor: row.isArmor,
       armor: row.armor ?? undefined,
-      weaponData: row.weaponData ?? undefined,
+      weaponData: normalizeWeaponData(row.weaponData),
       isContainer: row.isContainer,
       hideawayCapacityLbs: Number(row.hideawayCapacityLbs),
       weightReductionPercent: row.weightReductionPercent,
@@ -636,6 +694,7 @@ export const itemEntity: LibraryEntityConfig<
 
 function languageEditableFields(body: LibraryLanguageCreate) {
   return {
+    ...libraryMetadataValues(body),
     description: body.description ?? null,
     source: body.source ?? null,
     isSignLanguage: body.isSignLanguage ?? false,
@@ -665,6 +724,7 @@ export const languageEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     libraryLanguageOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -674,7 +734,7 @@ export const languageEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -683,6 +743,7 @@ export const languageEntity: LibraryEntityConfig<
   toUpdateValues: (body) => languageEditableFields(body),
   rowToCreate: (row) =>
     libraryLanguageCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       description: row.description ?? undefined,
       source: row.source ?? undefined,
@@ -694,6 +755,7 @@ export const languageEntity: LibraryEntityConfig<
 
 function techniqueEditableFields(body: LibraryTechniqueCreate) {
   return {
+    ...libraryMetadataValues(body),
     defaultSkillName: body.defaultSkillName,
     difficulty: body.difficulty ?? 'A',
     maxLevel: body.maxLevel ?? null,
@@ -727,6 +789,7 @@ export const techniqueEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     libraryTechniqueOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -740,7 +803,7 @@ export const techniqueEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -749,6 +812,7 @@ export const techniqueEntity: LibraryEntityConfig<
   toUpdateValues: (body) => techniqueEditableFields(body),
   rowToCreate: (row) =>
     libraryTechniqueCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       defaultSkillName: row.defaultSkillName,
       difficulty: row.difficulty,
@@ -764,6 +828,7 @@ export const techniqueEntity: LibraryEntityConfig<
 
 function styleEditableFields(body: LibraryStyleCreate) {
   return {
+    ...libraryMetadataValues(body),
     description: body.description ?? null,
     source: body.source ?? null,
     techniques: body.techniques ?? [],
@@ -795,6 +860,7 @@ export const styleEntity: LibraryEntityConfig<
   },
   toOut: (row) =>
     libraryStyleOut.parse({
+      ...libraryMetadataValues(row),
       id: row.id,
       campaignId: row.campaignId,
       name: row.name,
@@ -806,7 +872,7 @@ export const styleEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     campaignId,
     name: body.name,
@@ -815,6 +881,7 @@ export const styleEntity: LibraryEntityConfig<
   toUpdateValues: (body) => styleEditableFields(body),
   rowToCreate: (row) =>
     libraryStyleCreate.parse({
+      ...libraryMetadataValues(row),
       name: row.name,
       description: row.description ?? undefined,
       source: row.source ?? undefined,
@@ -853,14 +920,15 @@ export const activeEffectEntity: LibraryEntityConfig<
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }),
-  keyOf: (input) => input.name.toLowerCase(),
+  keyOf: libraryEntryKey,
   toInsertValues: (campaignId, body) => ({
     ...body,
+    ...libraryMetadataValues(body),
     description: body.description ?? null,
     source: body.source ?? null,
     campaignId,
   }),
-  toUpdateValues: (body) => ({ ...body }),
+  toUpdateValues: (body) => ({ ...body, ...libraryMetadataValues(body) }),
   rowToCreate: (row) =>
     activeEffectDefinitionCreate.parse(
       Object.fromEntries(
@@ -873,7 +941,98 @@ export const activeEffectEntity: LibraryEntityConfig<
 };
 
 /** All entity configs, in the order routes/list/export/import must process them. */
+export const sourceEntity: LibraryEntityConfig<
+  typeof campaignLibrarySources,
+  z.infer<typeof librarySourceCreate>,
+  z.infer<typeof librarySourceUpdate>,
+  z.infer<typeof librarySourceOut>,
+  'sourceId'
+> = {
+  pathSegment: 'sources',
+  paramName: 'sourceId',
+  entityLabel: 'source',
+  yamlKey: 'sources',
+  table: campaignLibrarySources,
+  orderBy: [asc(campaignLibrarySources.priority), asc(campaignLibrarySources.name)],
+  createSchema: librarySourceCreate,
+  updateSchema: librarySourceUpdate,
+  outSchema: librarySourceOut,
+  summaries: {
+    post: 'Add a library source (owner only)',
+    patch: 'Update a library source (owner only)',
+    delete: 'Delete a library source (owner only)',
+  },
+  keyOf: (input) => (input.key ?? input.name).toLowerCase(),
+  toOut: (row) =>
+    librarySourceOut.parse({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  toInsertValues: (campaignId, body) => ({
+    ...body,
+    key: body.key.toLowerCase(),
+    edition: body.edition ?? null,
+    notes: body.notes ?? null,
+    campaignId,
+  }),
+  toUpdateValues: (body) => ({ ...body }),
+  rowToCreate: (row) =>
+    librarySourceCreate.parse(
+      Object.fromEntries(
+        Object.keys(librarySourceCreate.shape).map((k) => [k, row[k as keyof typeof row]]),
+      ),
+    ),
+};
+export const modifierEntity: LibraryEntityConfig<
+  typeof campaignLibraryModifiers,
+  z.infer<typeof libraryModifierCreate>,
+  z.infer<typeof libraryModifierUpdate>,
+  z.infer<typeof libraryModifierOut>,
+  'modifierId'
+> = {
+  pathSegment: 'modifiers',
+  paramName: 'modifierId',
+  entityLabel: 'modifier',
+  yamlKey: 'modifiers',
+  table: campaignLibraryModifiers,
+  orderBy: [asc(campaignLibraryModifiers.name)],
+  createSchema: libraryModifierCreate,
+  updateSchema: libraryModifierUpdate,
+  outSchema: libraryModifierOut,
+  summaries: {
+    post: 'Add a library modifier (owner only)',
+    patch: 'Update a library modifier (owner only)',
+    delete: 'Delete a library modifier (owner only)',
+  },
+  keyOf: libraryEntryKey,
+  toOut: (row) =>
+    libraryModifierOut.parse({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  toInsertValues: (campaignId, body) => ({
+    ...body,
+    ...libraryMetadataValues(body),
+    description: body.description ?? null,
+    source: body.source ?? null,
+    group: body.group ?? null,
+    calculation: body.calculation ?? null,
+    campaignId,
+  }),
+  toUpdateValues: (body) => ({ ...body, ...libraryMetadataValues(body) }),
+  rowToCreate: (row) =>
+    libraryModifierCreate.parse(
+      Object.fromEntries(
+        Object.keys(libraryModifierCreate.shape).map((k) => [k, row[k as keyof typeof row]]),
+      ),
+    ),
+};
+
 export const libraryEntities = [
+  sourceEntity,
+  modifierEntity,
   traitEntity,
   skillEntity,
   spellEntity,
@@ -896,6 +1055,8 @@ export const LIBRARY_ENTITY_CONFIGS = {
   campaign_library_style: styleEntity,
   campaign_library_enchantment: enchantmentEntity,
   campaign_library_active_effect: activeEffectEntity,
+  campaign_library_source: sourceEntity,
+  campaign_library_modifier: modifierEntity,
 } as const satisfies Record<LibraryEntityClass, unknown>;
 
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous configs are only used through the generic services.

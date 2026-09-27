@@ -31,6 +31,7 @@ requirement — not optional documentation.**
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
   - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
+  - `library-calculation-rules.md` — source editions, bounded declarative pricing, completeness, purchase snapshots and weapon modes.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.
@@ -215,7 +216,7 @@ The outbox + cursor system covers the character classes (`character`,
 `character_language`, `character_technique`, `character_inventory`,
 `character_combat`) **and every campaign-library class**
 (`campaign_library_trait`, `_skill`, `_spell`, `_item`, `_language`,
-`_technique`, `_style`, `_enchantment`, `_active_effect`). The library is
+`_technique`, `_style`, `_enchantment`, `_active_effect`, `_source`, `_modifier`). The library is
 local-first like the character sheet: every library read comes from Dexie,
 and every library create/edit/delete goes through the outbox. Do not add a
 React Query/HTTP read or a direct REST write for library entries in the PWA.

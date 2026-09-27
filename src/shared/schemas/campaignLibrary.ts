@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
 import { activeEffectDefinitionCreate } from './activeEffects.ts';
+import { calculationDefinition } from './calculation.ts';
 import { campaignHouseRules } from './campaign.ts';
 import { timestamps, uuid } from './common.ts';
 import { libraryTraitEffect } from './effects.ts';
@@ -16,6 +17,12 @@ import {
   weaponData,
 } from './inventory.ts';
 import {
+  libraryMetadata,
+  libraryMetadataShape,
+  libraryModifierCreate,
+  librarySourceCreate,
+} from './libraryMetadata.ts';
+import {
   situationalModifier,
   skillAttributeEnum,
   skillDefaults,
@@ -26,7 +33,7 @@ import {
 import { skillProcedures } from './skillProcedures.ts';
 import { spellDifficulty } from './spell.ts';
 import { techniqueDifficulty } from './technique.ts';
-import { traitKindEnum, traitModifier, traitVariant } from './trait.ts';
+import { libraryTraitModifier, traitKindEnum, traitVariant } from './trait.ts';
 
 export const tagList = z.array(z.string().min(1).max(40)).max(100).default([]);
 
@@ -69,7 +76,7 @@ export const librarySkillSpecializationPolicy = z.discriminatedUnion('kind', [
 ]);
 export type LibrarySkillSpecializationPolicy = z.infer<typeof librarySkillSpecializationPolicy>;
 
-export const libraryEnchantmentOut = z.object({
+export const libraryEnchantmentOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -86,6 +93,7 @@ export const libraryEnchantmentOut = z.object({
 
 export const libraryEnchantmentCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).trim().nullable().optional(),
@@ -100,7 +108,9 @@ export const libraryEnchantmentUpdate = libraryEnchantmentCreate.partial();
 
 // ---------- Library entities (server-side persisted shape) ----------
 
-export const libraryTraitOut = z.object({
+export const libraryTraitOut = libraryMetadata.extend({
+  revision: z.number().int().optional(),
+  calculation: calculationDefinition.nullable().optional(),
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -117,7 +127,7 @@ export const libraryTraitOut = z.object({
   maxLevel: z.number().int().min(1).max(99).nullable(),
   description: z.string().max(20_000).nullable(),
   source: z.string().max(40).nullable(),
-  availableModifiers: z.array(traitModifier).default([]),
+  availableModifiers: z.array(libraryTraitModifier).default([]),
   /**
    * Named alternative forms of the trait.  Character picks at most one
    * variant; the variant's cost adjustment applies after level scaling
@@ -131,6 +141,8 @@ export const libraryTraitOut = z.object({
 
 export const libraryTraitCreate = z
   .object({
+    ...libraryMetadataShape,
+    calculation: calculationDefinition.nullable().optional(),
     name: z.string().min(1).max(160).trim(),
     kind: traitKindEnum,
     basePoints: z.number().int().min(-1000).max(1000).default(0),
@@ -138,7 +150,7 @@ export const libraryTraitCreate = z
     maxLevel: z.number().int().min(1).max(99).nullable().optional(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).trim().nullable().optional(),
-    availableModifiers: z.array(traitModifier).default([]),
+    availableModifiers: z.array(libraryTraitModifier).default([]),
     variants: z.array(traitVariant).default([]),
     effects: z.array(libraryTraitEffect).default([]),
     tags: tagList,
@@ -147,7 +159,7 @@ export const libraryTraitCreate = z
 
 export const libraryTraitUpdate = libraryTraitCreate.partial();
 
-export const librarySkillOut = z.object({
+export const librarySkillOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -172,6 +184,7 @@ export const librarySkillOut = z.object({
 
 export const librarySkillCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     attribute: skillAttributeEnum,
     difficulty: skillDifficultyEnum,
@@ -199,7 +212,7 @@ export const librarySkillUpdate = librarySkillCreate.partial();
  * per-character bits (points, character id): the library records the
  * book data a player copies when learning the spell.
  */
-export const librarySpellOut = z.object({
+export const librarySpellOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -221,6 +234,7 @@ export const librarySpellOut = z.object({
 
 export const librarySpellCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     college: z.string().max(80).trim().nullable().optional(),
     difficulty: spellDifficulty.default('H'),
@@ -242,7 +256,7 @@ export const librarySpellUpdate = librarySpellCreate.partial();
  * that a character copies when adding the language to their sheet.
  * Fluency and points are per-character and live on `character_languages`.
  */
-export const libraryLanguageOut = z.object({
+export const libraryLanguageOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -256,6 +270,7 @@ export const libraryLanguageOut = z.object({
 
 export const libraryLanguageCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).trim().nullable().optional(),
@@ -270,7 +285,7 @@ export const libraryLanguageUpdate = libraryLanguageCreate.partial();
  * sheet.  Per-character state (points invested) lives on
  * `character_techniques`.
  */
-export const libraryTechniqueOut = z.object({
+export const libraryTechniqueOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -289,6 +304,7 @@ export const libraryTechniqueOut = z.object({
 
 export const libraryTechniqueCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     defaultSkillName: z.string().min(1).max(160).trim(),
     difficulty: techniqueDifficulty.default('A'),
@@ -332,7 +348,7 @@ export const styleNameList = z.array(z.string().min(1).max(160).trim()).max(100)
  * "adopt" a style by adding its constituent pieces individually, so
  * there is no per-character style join table.
  */
-export const libraryStyleOut = z.object({
+export const libraryStyleOut = libraryMetadata.extend({
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -346,6 +362,7 @@ export const libraryStyleOut = z.object({
 
 export const libraryStyleCreate = z
   .object({
+    ...libraryMetadataShape,
     name: z.string().min(1).max(160).trim(),
     description: z.string().max(20_000).nullable().optional(),
     source: z.string().max(40).trim().nullable().optional(),
@@ -357,7 +374,9 @@ export const libraryStyleCreate = z
 
 export const libraryStyleUpdate = libraryStyleCreate.partial();
 
-export const libraryItemOut = z.object({
+export const libraryItemOut = libraryMetadata.extend({
+  revision: z.number().int().optional(),
+  calculation: calculationDefinition.nullable().optional(),
   id: uuid,
   campaignId: uuid,
   name: z.string().min(1).max(160),
@@ -382,6 +401,8 @@ export const libraryItemOut = z.object({
 
 export const libraryItemCreate = z
   .object({
+    ...libraryMetadataShape,
+    calculation: calculationDefinition.nullable().optional(),
     name: z.string().min(1).max(160).trim(),
     category: z.string().max(40).trim().default('general'),
     defaultQuantity: z.number().int().min(0).max(1_000_000).default(1),
@@ -414,6 +435,19 @@ export const importSectionResult = z.object({
 });
 
 export const importResult = z.object({
+  editionDecisions: z
+    .array(
+      z.object({
+        section: z.string(),
+        key: z.string(),
+        sourceKey: z.string().nullable(),
+        decision: z.enum(['update_edition', 'create_separate_edition']),
+      }),
+    )
+    .optional(),
+  sources: importSectionResult.optional(),
+  modifiers: importSectionResult.optional(),
+  incomplete: z.number().int().nonnegative().optional(),
   mode: importMode,
   traits: importSectionResult,
   skills: importSectionResult,
@@ -455,6 +489,7 @@ export const libraryYamlVersion = z.union([
   z.literal(9),
   z.literal(10),
   z.literal(11),
+  z.literal(12),
 ]);
 
 export const libraryYamlDoc = z
@@ -480,6 +515,8 @@ export const libraryYamlDoc = z
       .optional(),
     library: z
       .object({
+        sources: z.array(librarySourceCreate).optional(),
+        modifiers: z.array(libraryModifierCreate).optional(),
         traits: z.array(libraryTraitCreate).default([]),
         skills: z.array(librarySkillCreate).default([]),
         /** Optional (no default): pre-spell-library exports lack this
@@ -538,6 +575,49 @@ export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
  * explicit; the YAML tests also compare these keys to the runtime Zod shapes.
  */
 export const libraryPortableFieldManifest = {
+  sources: {
+    key: true,
+    name: true,
+    abbreviation: true,
+    edition: true,
+    priority: true,
+    notes: true,
+  } satisfies Record<keyof z.infer<typeof librarySourceCreate>, true>,
+  modifiers: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
+    name: true,
+    category: true,
+    description: true,
+    source: true,
+    tags: true,
+    group: true,
+    costType: true,
+    calculation: true,
+    applicability: true,
+  } satisfies Record<keyof z.infer<typeof libraryModifierCreate>, true>,
+  activeEffects: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
+    name: true,
+    description: true,
+    source: true,
+    tags: true,
+    effects: true,
+    capabilities: true,
+    duration: true,
+    stacking: true,
+  } satisfies Record<keyof z.infer<typeof activeEffectDefinitionCreate>, true>,
   campaign: {
     name: true,
     description: true,
@@ -551,6 +631,14 @@ export const libraryPortableFieldManifest = {
     enforceAttributeCaps: true,
   } satisfies Record<keyof NonNullable<LibraryYamlDoc['campaign']>, true>,
   traits: {
+    calculation: true,
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     kind: true,
     basePoints: true,
@@ -564,6 +652,13 @@ export const libraryPortableFieldManifest = {
     tags: true,
   } satisfies Record<keyof LibraryTraitCreate, true>,
   skills: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     attribute: true,
     difficulty: true,
@@ -583,6 +678,13 @@ export const libraryPortableFieldManifest = {
     effects: true,
   } satisfies Record<keyof LibrarySkillCreate, true>,
   spells: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     college: true,
     difficulty: true,
@@ -595,6 +697,14 @@ export const libraryPortableFieldManifest = {
     source: true,
   } satisfies Record<keyof LibrarySpellCreate, true>,
   items: {
+    calculation: true,
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     category: true,
     defaultQuantity: true,
@@ -613,6 +723,13 @@ export const libraryPortableFieldManifest = {
     enchantments: true,
   } satisfies Record<keyof LibraryItemCreate, true>,
   enchantments: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     description: true,
     source: true,
@@ -623,12 +740,26 @@ export const libraryPortableFieldManifest = {
     stackingPolicy: true,
   } satisfies Record<keyof LibraryEnchantmentCreate, true>,
   languages: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     description: true,
     source: true,
     isSignLanguage: true,
   } satisfies Record<keyof LibraryLanguageCreate, true>,
   techniques: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     defaultSkillName: true,
     difficulty: true,
@@ -639,6 +770,13 @@ export const libraryPortableFieldManifest = {
     prereq: true,
   } satisfies Record<keyof LibraryTechniqueCreate, true>,
   styles: {
+    key: true,
+    sourceKey: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    extraction: true,
     name: true,
     description: true,
     source: true,
