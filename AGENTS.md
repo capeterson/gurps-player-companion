@@ -24,6 +24,7 @@ requirement — not optional documentation.**
   LLM) should read it before scanning the tree. The set is:
   - `overview.md` — product surface + codebase map + orientation notes.
   - `architecture.md` — stack, process model, request lifecycle, data model.
+  - `interaction-design.md` — shared sheet UI patterns, summary tables, disclosures, draft lifetime and responsive layout.
   - `mcp-agent-access.md` — same-process MCP/OAuth subsystem and mandatory
     raw-API parity acceptance criteria.
   - `offline-sync.md` — the local-first / outbox / cursor / WS system.

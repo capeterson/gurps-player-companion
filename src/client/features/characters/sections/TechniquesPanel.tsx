@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { skillReferenceDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import { techniqueBonus } from '../../../../shared/domain/techniqueCalc.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
@@ -10,16 +10,15 @@ import {
   type TechniqueDifficulty,
   type TechniqueOut,
 } from '../../../../shared/schemas/technique.ts';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { SkillReferenceCombobox } from '../../../components/ui/SkillReferenceCombobox.tsx';
+import { Table, TableBody, TableHeader } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
-import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueDelete } from '../../../sync/outbox.ts';
+import { useFlashGroup } from '../../../hooks/useFlashGroup.ts';
 import { RollSheet } from './RollSheet.tsx';
 import type { RollRequest } from './rollTypes.ts';
-import { useAddEntityForm } from './useAddEntityForm.ts';
+import { type UseAddEntityFormReturn, useAddEntityForm } from './useAddEntityForm.ts';
 import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityDefaultModifierField,
@@ -36,6 +35,7 @@ interface AddTechniqueFormProps {
   campaignId: string | null;
   characterSkills: CharacterDetail['skills'];
   canWrite: boolean;
+  submission: UseAddEntityFormReturn;
 }
 
 interface TechniqueSnapshot {
@@ -57,6 +57,7 @@ function AddTechniqueForm({
   campaignId,
   characterSkills,
   canWrite,
+  submission,
 }: AddTechniqueFormProps) {
   const [name, setName] = useState('');
   const [defaultSkillName, setDefaultSkillName] = useState('');
@@ -73,15 +74,7 @@ function AddTechniqueForm({
     'techniques',
     campaignId,
   );
-  const {
-    creating,
-    flashProps,
-    submit: submitEntity,
-  } = useAddEntityForm({
-    entityClass: 'character_technique',
-    characterId,
-    label: 'technique',
-  });
+  const { creating, flashProps, submit: submitEntity } = submission;
 
   async function submit(snap: TechniqueSnapshot) {
     await submitEntity(
@@ -117,7 +110,7 @@ function AddTechniqueForm({
   return (
     <form
       {...flashProps}
-      className="field-rollback-flash grid grid-cols-2 gap-2 rounded border border-base-300 bg-base-100/40 p-3 sm:flex sm:flex-wrap sm:items-end"
+      className="field-rollback-flash grid grid-cols-2 items-end gap-3 rounded-box border border-base-300 bg-base-200 p-3 sm:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim() || !defaultSkillName.trim()) return;
@@ -158,7 +151,7 @@ function AddTechniqueForm({
         });
       }}
     >
-      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[10rem]">
+      <div className="form-control col-span-2 min-w-0 sm:col-span-4">
         <span className="label-text text-xs" id="add-technique-name-label">
           Technique
         </span>
@@ -208,7 +201,7 @@ function AddTechniqueForm({
           />
         )}
       </div>
-      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[8rem]">
+      <div className="form-control col-span-2 min-w-0 sm:col-span-4">
         <span className="label-text text-xs">Defaults from</span>
         <SkillReferenceCombobox
           aria-label="Defaults from"
@@ -220,7 +213,7 @@ function AddTechniqueForm({
         />
       </div>
       <label className="form-control min-w-0">
-        <span className="label-text text-xs">Diff</span>
+        <span className="label-text text-xs">Difficulty</span>
         <select
           className="select select-bordered select-sm w-full min-w-0"
           value={difficulty}
@@ -234,10 +227,10 @@ function AddTechniqueForm({
         </select>
       </label>
       <label
-        className="form-control min-w-0 sm:w-20"
+        className="form-control min-w-0"
         title="The technique's default line below its governing skill (e.g. -6). 0 = full skill."
       >
-        <span className="label-text text-xs">Default</span>
+        <span className="label-text text-xs">Default modifier</span>
         <input
           className="input input-bordered input-sm num w-full min-w-0"
           value={defaultModifier}
@@ -248,8 +241,8 @@ function AddTechniqueForm({
           placeholder="0"
         />
       </label>
-      <label className="form-control min-w-0 sm:w-20">
-        <span className="label-text text-xs">Pts</span>
+      <label className="form-control min-w-0">
+        <span className="label-text text-xs">Points</span>
         <input
           className="input input-bordered input-sm num w-full min-w-0"
           value={points}
@@ -259,11 +252,15 @@ function AddTechniqueForm({
           }}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary w-full sm:w-auto" disabled={creating}>
-        {creating ? 'Adding…' : 'Add'}
-      </button>
-      {pointsError && <p className="col-span-2 basis-full text-error text-xs">{pointsError}</p>}
-      {defaultError && <p className="col-span-2 basis-full text-error text-xs">{defaultError}</p>}
+      <div className="col-span-2 flex justify-end sm:col-span-4">
+        <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+          {creating ? 'Adding…' : 'Add technique'}
+        </button>
+      </div>
+      {pointsError && <p className="col-span-2 text-error text-xs sm:col-span-4">{pointsError}</p>}
+      {defaultError && (
+        <p className="col-span-2 text-error text-xs sm:col-span-4">{defaultError}</p>
+      )}
     </form>
   );
 }
@@ -339,175 +336,264 @@ function TechniqueRow({
             : ''
         } +${bonus}${technique.maxLevel !== null ? ` (capped at +${technique.maxLevel})` : ''}`;
 
+  const [expanded, setExpanded] = useState(false);
+  const editorId = useId();
+  const summaryFlash = useFlashGroup([
+    nameField.inputProps,
+    defaultSkillField.inputProps,
+    difficultyField.selectProps,
+    defaultModifierField.inputProps,
+    pointsField.inputProps,
+  ]);
   return (
-    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem_5rem_4rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
-      <div className="col-span-2 min-w-0 sm:col-span-1">
-        {canWrite ? (
-          <input
-            aria-label={`${technique.name} name`}
-            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 px-0 font-medium`}
-            {...nameField.inputProps}
-          />
-        ) : (
-          <span className="break-words font-medium">{technique.name}</span>
-        )}
-      </div>
-      <div className="col-span-2 min-w-0 sm:col-span-1">
-        <span className="label-eyebrow mb-1 block sm:hidden">Defaults from</span>
-        {canWrite ? (
-          <SkillReferenceCombobox
-            aria-label={`${technique.name} default skill`}
-            value={defaultSkillField.value}
-            onChange={defaultSkillField.setValue}
-            onPick={(option) => {
-              defaultSkillField.setValue(option.label);
-              defaultSkillField.commit();
-            }}
-            campaignId={campaignId}
-            characterSkills={characterSkills}
-            inputClassName={`${DRAFT_FIELD_CLASS} input-ghost px-0`}
-            inputProps={defaultSkillField.inputProps}
-          />
-        ) : (
-          <span className="break-words text-sm text-base-content/70">
-            {defaultSkillDisplayName}
-          </span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Diff</span>
-        {canWrite ? (
-          <select
-            aria-label={`${technique.name} difficulty`}
-            className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
-            {...difficultyField.selectProps}
-          >
-            {TECHNIQUE_DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {TECHNIQUE_DIFFICULTY_LABELS[d]}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="text-xs text-base-content/70">
+    <TableBody
+      filterValues={{
+        name: technique.name,
+        basis: defaultSkillDisplayName,
+        difficulty: TECHNIQUE_DIFFICULTY_LABELS[technique.difficulty],
+        modifier: technique.defaultModifier,
+        points: technique.points,
+        level: technique.level,
+      }}
+      aria-label={technique.name}
+    >
+      <tr className="field-rollback-flash" {...summaryFlash}>
+        <td className="min-w-0 whitespace-normal break-words py-3 font-medium">
+          {technique.name}
+          <span className="mt-1 block text-xs font-normal text-base-content/70 lg:hidden">
+            Defaults from {defaultSkillDisplayName}{' '}
+            {formatSigned(technique.defaultModifier, { zero: 'plain' })} ·{' '}
             {TECHNIQUE_DIFFICULTY_LABELS[technique.difficulty]}
           </span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Default mod</span>
-        {canWrite ? (
-          <input
-            aria-label={`${technique.name} default modifier`}
-            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-center`}
-            {...defaultModifierField.inputProps}
-            title="Default line below the governing skill (0 or negative)"
+        </td>
+        <td className="hidden whitespace-normal break-words text-xs lg:table-cell">
+          {defaultSkillDisplayName}
+        </td>
+        <td className="hidden text-xs lg:table-cell">
+          {TECHNIQUE_DIFFICULTY_LABELS[technique.difficulty]}
+        </td>
+        <td className="num hidden text-right lg:table-cell">
+          {formatSigned(technique.defaultModifier, { zero: 'plain' })}
+        </td>
+        <td className="num px-1 text-right">{technique.points}</td>
+        <td className="px-1 text-right">
+          <RollLevelChip
+            level={technique.level}
+            name={technique.name}
+            title={levelTitle}
+            onRoll={(level) => onRoll({ label: technique.name, baseTarget: level })}
           />
-        ) : (
-          <span className="num">
-            {technique.defaultModifier !== 0 ? technique.defaultModifier : 0}
-          </span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Pts</span>
-        {canWrite ? (
-          <input
-            aria-label={`${technique.name} points`}
-            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
-            {...pointsField.inputProps}
-          />
-        ) : (
-          <span className="num block text-right">{technique.points}</span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Lvl</span>
-        <RollLevelChip
-          level={technique.level}
-          name={technique.name}
-          title={levelTitle}
-          onRoll={(level) => onRoll({ label: technique.name, baseTarget: level })}
-        />
-      </div>
+        </td>
+        <td className="px-1 text-right">
+          {canWrite && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs min-h-11 px-1 sm:px-2"
+              aria-label={`${expanded ? 'Close' : 'Edit'} ${technique.name}`}
+              aria-expanded={expanded}
+              aria-controls={editorId}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? 'Done' : 'Edit'}
+            </button>
+          )}
+        </td>
+      </tr>
       {canWrite && (
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs col-span-2 justify-self-end sm:col-span-1"
-          onClick={deletion.request}
-          aria-label={`Delete technique ${technique.name}`}
-        >
-          ✕
-        </button>
+        <tr hidden={!expanded} id={editorId}>
+          <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Edit {technique.name}</p>
+              {(nameField.isSaving ||
+                defaultSkillField.isSaving ||
+                difficultyField.isSaving ||
+                defaultModifierField.isSaving ||
+                pointsField.isSaving) && <output className="text-xs text-warning">Saving…</output>}
+            </div>
+            <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
+              <div className="col-span-2 min-w-0">
+                <span className="label-eyebrow mb-1 block">Name</span>
+                <input
+                  aria-label={`${technique.name} name`}
+                  className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full min-w-0 font-medium`}
+                  {...nameField.inputProps}
+                />
+              </div>
+              <div className="col-span-2 min-w-0">
+                <span className="label-eyebrow mb-1 block">Defaults from</span>
+                <SkillReferenceCombobox
+                  aria-label={`${technique.name} default skill`}
+                  value={defaultSkillField.value}
+                  onChange={defaultSkillField.setValue}
+                  onPick={(option) => {
+                    defaultSkillField.setValue(option.label);
+                    defaultSkillField.commit();
+                  }}
+                  campaignId={campaignId}
+                  characterSkills={characterSkills}
+                  inputClassName={`${DRAFT_FIELD_CLASS} input-bordered`}
+                  inputProps={defaultSkillField.inputProps}
+                />
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Difficulty</span>
+                <select
+                  aria-label={`${technique.name} difficulty`}
+                  className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
+                  {...difficultyField.selectProps}
+                >
+                  {TECHNIQUE_DIFFICULTIES.map((d) => (
+                    <option key={d} value={d}>
+                      {TECHNIQUE_DIFFICULTY_LABELS[d]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Default modifier</span>
+                <input
+                  aria-label={`${technique.name} default modifier`}
+                  className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-center`}
+                  {...defaultModifierField.inputProps}
+                  title="Default line below the governing skill (0 or negative)"
+                />
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Points</span>
+                <input
+                  aria-label={`${technique.name} points`}
+                  className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+                  {...pointsField.inputProps}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-4">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={deletion.request}
+                  aria-label={`Delete technique ${technique.name}`}
+                >
+                  Delete technique
+                </button>
+              </div>
+            </div>
+            <p className="mt-3 break-words text-xs text-base-content/70">{levelTitle}</p>
+            {deletion.dialog}
+          </td>
+        </tr>
       )}
-      {deletion.dialog}
-    </li>
+    </TableBody>
   );
 }
 
 export function TechniquesPanel({
   character,
   canWrite,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-}) {
-  // Hosted once here (not per row) so every roll-target tap opens the
-  // SAME sheet instance -- mirrors SkillsPanel.
-  const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
-  const total = character.techniques.reduce((sum, t) => sum + t.points, 0);
+}: { character: CharacterDetail; canWrite: boolean }) {
+  return <TechniquesTable key={character.id} character={character} canWrite={canWrite} />;
+}
 
+function TechniquesTable({
+  character,
+  canWrite,
+}: { character: CharacterDetail; canWrite: boolean }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const addId = useId();
+  const submission = useAddEntityForm({
+    entityClass: 'character_technique',
+    characterId: character.id,
+    label: 'technique',
+  });
+  const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
+  const total = character.techniques.reduce((sum, entry) => sum + entry.points, 0);
   return (
-    <section className="card space-y-3 p-4 sm:p-5">
-      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <div>
-          <p className="label-eyebrow">Techniques</p>
-          <h2 className="font-display text-2xl">Techniques</h2>
-        </div>
+    <section className="min-w-0">
+      <header
+        className="field-rollback-flash flex flex-wrap items-center justify-between gap-2 pb-3 pt-2"
+        {...submission.flashProps}
+      >
         <p className="text-xs text-base-content/60">
           {character.techniques.length}{' '}
-          {character.techniques.length === 1 ? 'technique' : 'techniques'}
-          {' · '}
+          {character.techniques.length === 1 ? 'technique' : 'techniques'} ·{' '}
           <span className="num">{total}</span> pts
         </p>
+        {canWrite && (
+          <button
+            type="button"
+            className={`btn btn-sm ${showAdd ? 'btn-ghost' : 'btn-primary'}`}
+            aria-expanded={showAdd}
+            aria-controls={addId}
+            onClick={() => setShowAdd((current) => !current)}
+          >
+            {showAdd ? 'Close add form' : '+ Add technique'}
+          </button>
+        )}
       </header>
-
-      <AddTechniqueForm
-        characterId={character.id}
-        campaignId={character.campaignId ?? null}
-        characterSkills={character.skills}
-        canWrite={canWrite}
-      />
-
+      <div id={addId} hidden={!showAdd || !canWrite} className="pb-3">
+        <AddTechniqueForm
+          submission={submission}
+          characterId={character.id}
+          campaignId={character.campaignId ?? null}
+          canWrite={canWrite}
+          characterSkills={character.skills}
+        />
+      </div>
       {character.techniques.length === 0 ? (
-        <p className="text-sm text-base-content/60">No techniques yet.</p>
+        <p className="pb-4 text-sm text-base-content/60">No techniques yet.</p>
       ) : (
-        <>
-          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_5rem_5rem_4rem_4rem_auto] gap-2 border-b border-base-300 pb-1 sm:grid">
-            <span>Technique</span>
-            <span>Defaults from</span>
-            <span className="text-center">Diff</span>
-            <span className="text-center">Mod</span>
-            <span className="text-right">Pts</span>
-            <span className="text-right">Lvl</span>
-            <span />
-          </div>
-          <ul>
-            {character.techniques.map((t) => (
+        <div className="border-t border-base-300">
+          <Table
+            preferenceKey={`${character.id}:techniques`}
+            className="table table-sm w-full table-fixed"
+            aria-label="Techniques"
+          >
+            <thead>
+              <tr>
+                <TableHeader column="name" label="Technique" />
+                <TableHeader
+                  column="basis"
+                  label="Defaults from"
+                  className="hidden w-40 lg:table-cell"
+                />
+                <TableHeader
+                  column="difficulty"
+                  label="Difficulty"
+                  className="hidden w-24 lg:table-cell"
+                />
+                <TableHeader
+                  column="modifier"
+                  label="Default"
+                  className="hidden w-20 text-right lg:table-cell"
+                />
+                <TableHeader
+                  column="points"
+                  label="Points"
+                  className="w-14 px-1 text-right sm:w-16"
+                />
+                <TableHeader
+                  column="level"
+                  label="Level"
+                  className="w-12 px-1 text-right sm:w-16"
+                />
+                <th scope="col" className="w-12 px-1 sm:w-16">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            {character.techniques.map((entry) => (
               <TechniqueRow
-                key={t.id}
+                key={entry.id}
                 characterId={character.id}
+                technique={entry}
+                canWrite={canWrite}
                 campaignId={character.campaignId ?? null}
                 characterSkills={character.skills}
-                technique={t}
-                canWrite={canWrite}
                 onRoll={setRollRequest}
               />
             ))}
-          </ul>
-        </>
+          </Table>
+        </div>
       )}
-
       {rollRequest && (
         <RollSheet
           request={rollRequest}

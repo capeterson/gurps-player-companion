@@ -1,3 +1,28 @@
+.inventory-item-heading {
+  padding-left: var(--inventory-indent);
+  flex-wrap: wrap;
+}
+
+.inventory-item-name,
+.inventory-item-badges {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.inventory-item-name > button {
+  flex-shrink: 0;
+}
+
+.inventory-table .inventory-item-row .badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.inventory-item-detail {
+  padding-left: calc(var(--inventory-indent) + 1.5rem);
+}
+
 /* Below the sheet's small breakpoint, an item and its editor occupy the
    full available width. A table scroller must never clip editable fields. */
 @media (max-width: 639px) {
@@ -13,15 +38,17 @@
 
   .inventory-table .inventory-item-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-    gap: 4px;
+    grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.4fr) minmax(0, 0.85fr) auto;
+    gap: 4px 8px;
     padding: 8px;
   }
 
   .inventory-table .inventory-item-row > td {
     min-width: 0;
-    padding: 4px;
+    padding: 0;
     text-align: left;
+    border: 0;
+    overflow-wrap: anywhere;
   }
 
   .inventory-table .inventory-item-row > td:first-child {
@@ -30,9 +57,26 @@
 
   .inventory-table .inventory-item-row > td[data-label]::before {
     content: attr(data-label);
-    display: block;
+    display: inline;
+    margin-right: 4px;
     font-size: 10px;
     opacity: 0.65;
+  }
+
+  .inventory-table .inventory-item-row > td[data-label] {
+    align-self: center;
+    font-size: 12px;
+  }
+
+  .inventory-table .inventory-item-row > td[data-label] > span {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .inventory-item-heading,
+  .inventory-item-detail {
+    /* Deeply nested containers must leave room for names and category controls. */
+    padding-left: min(calc(var(--inventory-indent) * 0.5), 2.5rem);
   }
 
   .inventory-table .inventory-editor-row,
@@ -44,11 +88,5 @@
 
   .inventory-table .inventory-editor-row[hidden] {
     display: none;
-  }
-
-  .inventory-table .inventory-item-row .badge {
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
   }
 }

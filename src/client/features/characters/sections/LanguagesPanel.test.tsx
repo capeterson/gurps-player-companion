@@ -22,6 +22,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { LanguageOut } from '../../../../shared/schemas/language.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
+import { flashBus } from '../../../sync/flashBus.ts';
 import { LanguagesPanel } from './LanguagesPanel.tsx';
 
 const enqueueFieldPatch = vi.hoisted(() => vi.fn());
@@ -126,6 +127,14 @@ function renderPanel(character: CharacterDetail, canWrite = true) {
   return render(<LanguagesPanel character={character} canWrite={canWrite} />, { wrapper: Wrapper });
 }
 
+function openLanguageEditor(name = 'Latin') {
+  fireEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
+}
+
+function openAddLanguageForm() {
+  fireEvent.click(screen.getByRole('button', { name: '+ Add language' }));
+}
+
 beforeEach(() => {
   enqueueFieldPatch.mockReset();
   enqueueCreate.mockReset();
@@ -138,6 +147,7 @@ beforeEach(() => {
 describe('LanguagesPanel rendering', () => {
   it('lists a language with its fluency labels and point total', () => {
     renderPanel(makeCharacter([makeLanguage({ points: 3 })]), false);
+    expect(screen.getByRole('table', { name: 'Languages' })).toBeInTheDocument();
     expect(screen.getByText('Latin')).toBeInTheDocument();
     expect(screen.getByText('Broken')).toBeInTheDocument();
     expect(screen.getByText('None')).toBeInTheDocument();
@@ -147,6 +157,7 @@ describe('LanguagesPanel rendering', () => {
 
   it('hides the add form and every editor for a read-only viewer', () => {
     renderPanel(makeCharacter([makeLanguage()]), false);
+    expect(screen.queryByRole('button', { name: '+ Add language' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Latin name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Latin spoken fluency')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete language Latin' })).not.toBeInTheDocument();
@@ -156,11 +167,65 @@ describe('LanguagesPanel rendering', () => {
     renderPanel(makeCharacter([]));
     expect(screen.getByText('No languages yet.')).toBeInTheDocument();
   });
+
+  it('keeps row drafts mounted when the editor closes and reopens', () => {
+    renderPanel(makeCharacter([makeLanguage()]));
+    expect(screen.getByLabelText('Latin name')).not.toBeVisible();
+    openLanguageEditor();
+    const name = screen.getByLabelText('Latin name') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Vulgar Latin' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close Latin' }));
+    expect(screen.getByLabelText('Latin name')).not.toBeVisible();
+    openLanguageEditor();
+    expect(screen.getByLabelText('Latin name')).toHaveValue('Vulgar Latin');
+  });
+
+  it('flashes the visible row after a save rejection settles with its editor closed', async () => {
+    let rejectSave: ((error: Error) => void) | null = null;
+    enqueueFieldPatch.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
+    fireEvent.change(screen.getByLabelText('Latin spoken fluency'), {
+      target: { value: 'accented' },
+    });
+    await waitFor(() => expect(enqueueFieldPatch).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Close Latin' }));
+
+    await act(async () => rejectSave?.(new Error('server rejected fluency')));
+
+    const summary = screen.getByRole('rowgroup', { name: 'Latin' }).querySelector('tr');
+    await waitFor(() => expect(summary).toHaveAttribute('data-flashing', 'true'));
+    expect(
+      screen.getByText(/Couldn't save Latin spoken fluency — server rejected fluency/),
+    ).toBeVisible();
+  });
+
+  it('flashes the visible row for an asynchronous field rollback while its editor is closed', async () => {
+    renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Latin' }));
+
+    act(() => {
+      flashBus.emit({
+        key: `character_language:${LANG_ID}:spokenFluency`,
+        reason: 'server rejected fluency',
+      });
+    });
+
+    const summary = screen.getByRole('rowgroup', { name: 'Latin' }).querySelector('tr');
+    await waitFor(() => expect(summary).toHaveAttribute('data-flashing', 'true'));
+  });
 });
 
 describe('LanguagesPanel fluency select', () => {
   it('save success: patches the fluency field through the outbox', async () => {
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const select = screen.getByLabelText('Latin spoken fluency') as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: 'accented' } });
@@ -183,6 +248,7 @@ describe('LanguagesPanel fluency select', () => {
   it('server rejection: rolls back to the server value, toasts, and flashes', async () => {
     enqueueFieldPatch.mockRejectedValue(new Error('unknown fluency level'));
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const select = screen.getByLabelText('Latin spoken fluency') as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: 'native' } });
@@ -206,6 +272,7 @@ describe('LanguagesPanel fluency select', () => {
     });
 
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const spoken = screen.getByLabelText('Latin spoken fluency') as HTMLSelectElement;
     const written = screen.getByLabelText('Latin written fluency') as HTMLSelectElement;
 
@@ -239,6 +306,7 @@ describe('LanguagesPanel fluency select', () => {
     });
 
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const spoken = screen.getByLabelText('Latin spoken fluency') as HTMLSelectElement;
 
     fireEvent.change(spoken, { target: { value: 'accented' } });
@@ -260,6 +328,7 @@ describe('LanguagesPanel fluency select', () => {
 describe('LanguagesPanel points and name', () => {
   it('commits a points edit on blur', async () => {
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const points = screen.getByLabelText('Latin points') as HTMLInputElement;
 
     fireEvent.change(points, { target: { value: '4' } });
@@ -274,6 +343,7 @@ describe('LanguagesPanel points and name', () => {
 
   it('rejects a non-integer points value locally with a toast and rollback', async () => {
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const points = screen.getByLabelText('Latin points') as HTMLInputElement;
 
     fireEvent.change(points, { target: { value: 'many' } });
@@ -288,6 +358,7 @@ describe('LanguagesPanel points and name', () => {
 
   it('commits a name edit on blur', async () => {
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
     const name = screen.getByLabelText('Latin name') as HTMLInputElement;
 
     fireEvent.change(name, { target: { value: 'Vulgar Latin' } });
@@ -302,8 +373,49 @@ describe('LanguagesPanel points and name', () => {
 });
 
 describe('LanguagesPanel add form', () => {
+  it('starts closed and retains an unsaved draft when closed and reopened', () => {
+    renderPanel(makeCharacter([]));
+    expect(screen.getByLabelText('Language')).not.toBeVisible();
+    openAddLanguageForm();
+    const name = screen.getByLabelText('Language') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: '  Elvish  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
+    expect(screen.getByLabelText('Language')).not.toBeVisible();
+    openAddLanguageForm();
+    expect(screen.getByLabelText('Language')).toHaveValue('  Elvish  ');
+    expect(enqueueCreate).not.toHaveBeenCalled();
+  });
+
+  it('flashes the toolbar and keeps its draft after a create failure settles while closed', async () => {
+    let rejectCreate: ((error: Error) => void) | null = null;
+    enqueueCreate.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectCreate = reject;
+        }),
+    );
+    renderPanel(makeCharacter([]));
+    openAddLanguageForm();
+    const name = screen.getByLabelText('Language') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Aurelian' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
+
+    await act(async () => rejectCreate?.(new Error('outbox unavailable')));
+
+    const addButton = screen.getByRole('button', { name: '+ Add language' });
+    await waitFor(() =>
+      expect(addButton.closest('header')).toHaveAttribute('data-flashing', 'true'),
+    );
+    expect(screen.getByText(/Couldn't add language — outbox unavailable/)).toBeVisible();
+    openAddLanguageForm();
+    expect(screen.getByLabelText('Language')).toHaveValue('Aurelian');
+  });
+
   it('seeds points from the fluency pair and enqueues a create', async () => {
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
     const spoken = screen.getByLabelText('Spoken') as HTMLSelectElement;
     const written = screen.getByLabelText('Written') as HTMLSelectElement;
@@ -312,7 +424,7 @@ describe('LanguagesPanel add form', () => {
     // suggests at the written-native cost of 3.
     fireEvent.change(spoken, { target: { value: 'accented' } });
     fireEvent.change(written, { target: { value: 'broken' } });
-    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    const points = screen.getByLabelText('Points') as HTMLInputElement;
     expect(points.value).toBe('3'); // accented spoken (2) + broken written (1)
 
     fireEvent.change(name, { target: { value: '  Latin  ' } });
@@ -337,8 +449,9 @@ describe('LanguagesPanel add form', () => {
 
   it('an explicit points override wins over the fluency-derived suggestion', async () => {
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
-    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    const points = screen.getByLabelText('Points') as HTMLInputElement;
 
     fireEvent.change(name, { target: { value: 'Mother Tongue' } });
     fireEvent.change(points, { target: { value: '0' } });
@@ -355,6 +468,7 @@ describe('LanguagesPanel add form', () => {
 
   it('does not submit an empty name', () => {
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
     fireEvent.submit(name.closest('form') as HTMLFormElement);
     expect(enqueueCreate).not.toHaveBeenCalled();
@@ -369,6 +483,7 @@ describe('LanguagesPanel add form', () => {
         }),
     );
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
 
     fireEvent.change(name, { target: { value: 'Latin' } });
@@ -385,8 +500,9 @@ describe('LanguagesPanel add form', () => {
 
   it('blocks an invalid points draft instead of silently using the suggestion', () => {
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
-    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    const points = screen.getByLabelText('Points') as HTMLInputElement;
 
     for (const bad of ['-2', '1.5', 'abc']) {
       fireEvent.change(points, { target: { value: bad } });
@@ -415,13 +531,14 @@ describe('LanguagesPanel add form', () => {
 
   it('an empty points box falls back to the fluency-derived suggestion', () => {
     renderPanel(makeCharacter([]));
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
     const spoken = screen.getByLabelText('Spoken') as HTMLSelectElement;
     const written = screen.getByLabelText('Written') as HTMLSelectElement;
     fireEvent.change(spoken, { target: { value: 'accented' } });
     fireEvent.change(written, { target: { value: 'none' } });
 
-    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    const points = screen.getByLabelText('Points') as HTMLInputElement;
     fireEvent.change(points, { target: { value: '' } });
     expect(points.value).toBe('2'); // accented spoken only
 
@@ -450,6 +567,7 @@ describe('LanguagesPanel library picks', () => {
       campaignId: 'camp-1',
       languages: [],
     } as unknown as CharacterDetail);
+    openAddLanguageForm();
     const name = screen.getByLabelText('Language') as HTMLInputElement;
 
     fireEvent.click(screen.getByRole('button', { name: 'Pick Cathrian' }));
@@ -484,9 +602,20 @@ describe('LanguagesPanel library picks', () => {
 });
 
 describe('LanguagesPanel delete', () => {
+  it('cancels delete confirmation without queueing a delete', () => {
+    renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete language Latin' }));
+    expect(screen.getByRole('dialog', { name: 'Delete language "Latin"?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(enqueueDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole('rowgroup', { name: 'Latin' })).toBeInTheDocument();
+  });
+
   it('enqueues a delete carrying the row snapshot for rollback', async () => {
     const language = makeLanguage();
     renderPanel(makeCharacter([language]));
+    openLanguageEditor();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete language Latin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -505,6 +634,7 @@ describe('LanguagesPanel delete', () => {
   it('toasts when the delete enqueue itself fails', async () => {
     enqueueDelete.mockRejectedValue(new Error('db closed'));
     renderPanel(makeCharacter([makeLanguage()]));
+    openLanguageEditor();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete language Latin' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));

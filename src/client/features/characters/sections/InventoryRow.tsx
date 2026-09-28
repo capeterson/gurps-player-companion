@@ -1,6 +1,14 @@
 import { TableRow, useTableFiltersActive } from '../../../components/ui/Table.tsx';
 import './inventory/inventory.css';
-import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type DragEvent,
+  Fragment,
+  type MouseEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from 'react';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
@@ -208,15 +216,13 @@ export function InventoryRow(props: InventoryRowProps) {
           sel && !isHovered && !highlighted ? '!bg-primary/15 hover:!bg-primary/20' : '',
           !sel && !isHovered && !highlighted ? 'hover:bg-base-200/50' : '',
         ].join(' ')}
+        style={{ '--inventory-indent': `${depth * 1.25}rem` } as CSSProperties}
         aria-selected={sel}
         {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
-          <div
-            className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
-            style={{ paddingLeft: `${depth * 1.25}rem` }}
-          >
-            <span className="flex items-center gap-2">
+          <div className="inventory-item-heading flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span className="inventory-item-name flex min-w-0 items-center gap-2">
               {hasChildren ? (
                 expandContainers ? (
                   <span className="inline-block w-5 text-center text-base-content/50" aria-hidden>
@@ -241,11 +247,11 @@ export function InventoryRow(props: InventoryRowProps) {
                   </button>
                 )
               ) : (
-                <span className="inline-block w-5" aria-hidden />
+                <span className="hidden w-5 sm:inline-block" aria-hidden />
               )}
               <span className="font-medium">{item.name}</span>
             </span>
-            <span className="flex flex-wrap items-center gap-1 pl-7 sm:pl-0">
+            <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
               {isRoot && item.worn && (
                 <span className="badge badge-sm badge-soft badge-secondary">Worn</span>
               )}
@@ -356,18 +362,12 @@ export function InventoryRow(props: InventoryRowProps) {
             </span>
           </div>
           {isRoot && !item.worn && item.externalLocation && (
-            <div
-              className="text-base-content/60 text-xs mt-0.5"
-              style={{ paddingLeft: `${depth * 1.25 + 1.5}rem` }}
-            >
+            <div className="inventory-item-detail text-base-content/60 text-xs mt-0.5">
               {item.externalLocation}
             </div>
           )}
           {(item.enchantmentBreakdown?.length ?? 0) > 0 && (
-            <div
-              className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-base-content/60"
-              style={{ paddingLeft: `${depth * 1.25 + 1.5}rem` }}
-            >
+            <div className="inventory-item-detail mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-base-content/60">
               {item.enchantmentBreakdown?.map((effect, index) => (
                 <span
                   key={`${effect.sourceName}:${effect.target}:${index}`}

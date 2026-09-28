@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { LibraryLanguageOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import {
@@ -8,12 +8,11 @@ import {
   type LanguageOut,
   computeLanguagePoints,
 } from '../../../../shared/schemas/language.ts';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
+import { Table, TableBody, TableHeader } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
-import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueDelete } from '../../../sync/outbox.ts';
-import { useAddEntityForm } from './useAddEntityForm.ts';
+import { useFlashGroup } from '../../../hooks/useFlashGroup.ts';
+import { type UseAddEntityFormReturn, useAddEntityForm } from './useAddEntityForm.ts';
 import { useConfirmedEntityDelete } from './useConfirmedEntityDelete.tsx';
 import {
   useEntityEnumField,
@@ -27,6 +26,7 @@ interface AddLanguageFormProps {
   characterId: string;
   campaignId: string | null;
   canWrite: boolean;
+  submission: UseAddEntityFormReturn;
 }
 
 interface LanguageSnapshot {
@@ -39,7 +39,7 @@ interface LanguageSnapshot {
   libraryLanguageId: string | null;
 }
 
-function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormProps) {
+function AddLanguageForm({ characterId, campaignId, canWrite, submission }: AddLanguageFormProps) {
   const [name, setName] = useState('');
   const [spoken, setSpoken] = useState<FluencyLevel>('native');
   const [written, setWritten] = useState<FluencyLevel>('native');
@@ -58,15 +58,7 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
     'languages',
     campaignId,
   );
-  const {
-    creating,
-    flashProps,
-    submit: submitEntity,
-  } = useAddEntityForm({
-    entityClass: 'character_language',
-    characterId,
-    label: 'language',
-  });
+  const { creating, flashProps, submit: submitEntity } = submission;
 
   async function submit(snap: LanguageSnapshot) {
     await submitEntity(
@@ -97,7 +89,7 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
   return (
     <form
       {...flashProps}
-      className="field-rollback-flash grid grid-cols-2 gap-2 rounded border border-base-300 bg-base-100/40 p-3 sm:flex sm:flex-wrap sm:items-end"
+      className="field-rollback-flash grid grid-cols-2 items-end gap-3 rounded-box border border-base-300 bg-base-200 p-3 sm:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -124,7 +116,7 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
         });
       }}
     >
-      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[10rem]">
+      <div className="form-control col-span-2 min-w-0 sm:col-span-4">
         <span className="label-text text-xs" id="add-language-name-label">
           Language
         </span>
@@ -194,8 +186,8 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
           ))}
         </select>
       </label>
-      <label className="form-control min-w-0 sm:w-20">
-        <span className="label-text text-xs">Pts</span>
+      <label className="form-control min-w-0">
+        <span className="label-text text-xs">Points</span>
         <input
           className="input input-bordered input-sm num w-full min-w-0"
           value={points}
@@ -205,10 +197,12 @@ function AddLanguageForm({ characterId, campaignId, canWrite }: AddLanguageFormP
           }}
         />
       </label>
-      <button type="submit" className="btn btn-sm btn-primary w-full sm:w-auto" disabled={creating}>
-        {creating ? 'Adding…' : 'Add'}
-      </button>
-      {pointsError && <p className="col-span-2 basis-full text-error text-xs">{pointsError}</p>}
+      <div className="col-span-2 flex justify-end sm:col-span-4">
+        <button type="submit" className="btn btn-sm btn-primary" disabled={creating}>
+          {creating ? 'Adding…' : 'Add language'}
+        </button>
+      </div>
+      {pointsError && <p className="col-span-2 text-error text-xs sm:col-span-4">{pointsError}</p>}
     </form>
   );
 }
@@ -253,127 +247,213 @@ function LanguageRow({ characterId, language, canWrite }: LanguageRowProps) {
     characterId,
   });
 
+  const [expanded, setExpanded] = useState(false);
+  const editorId = useId();
+  const summaryFlash = useFlashGroup([
+    nameField.inputProps,
+    spokenField.selectProps,
+    writtenField.selectProps,
+    pointsField.inputProps,
+  ]);
   return (
-    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_6rem_6rem_4rem_auto] sm:items-center sm:gap-2 sm:py-2">
-      <div className="col-span-2 min-w-0 sm:col-span-1">
-        {canWrite ? (
-          <input
-            aria-label={`${language.name} name`}
-            className={`${DRAFT_FIELD_CLASS} input input-ghost input-sm w-full min-w-0 px-0 font-medium`}
-            {...nameField.inputProps}
-          />
-        ) : (
-          <span className="break-words font-medium">{language.name}</span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Spoken</span>
-        {canWrite ? (
-          <select
-            aria-label={`${language.name} spoken fluency`}
-            className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
-            {...spokenField.selectProps}
-          >
-            {FLUENCY_LEVELS.map((f) => (
-              <option key={f} value={f}>
-                {FLUENCY_LABELS[f]}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="text-sm">{FLUENCY_LABELS[language.spokenFluency]}</span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Written</span>
-        {canWrite ? (
-          <select
-            aria-label={`${language.name} written fluency`}
-            className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
-            {...writtenField.selectProps}
-          >
-            {FLUENCY_LEVELS.map((f) => (
-              <option key={f} value={f}>
-                {FLUENCY_LABELS[f]}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="text-sm">{FLUENCY_LABELS[language.writtenFluency]}</span>
-        )}
-      </div>
-      <div className="min-w-0">
-        <span className="label-eyebrow mb-1 block sm:hidden">Pts</span>
-        {canWrite ? (
-          <input
-            aria-label={`${language.name} points`}
-            className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
-            {...pointsField.inputProps}
-          />
-        ) : (
-          <span className="num block text-right">{language.points}</span>
-        )}
-      </div>
+    <TableBody
+      filterValues={{
+        name: language.name,
+        spoken: FLUENCY_LABELS[language.spokenFluency],
+        written: FLUENCY_LABELS[language.writtenFluency],
+        points: language.points,
+      }}
+      aria-label={language.name}
+    >
+      <tr className="field-rollback-flash" {...summaryFlash}>
+        <td className="min-w-0 whitespace-normal break-words py-3 font-medium">
+          {language.name}
+          <span className="mt-1 block text-xs font-normal text-base-content/70 sm:hidden">
+            Spoken: {FLUENCY_LABELS[language.spokenFluency]} · Written:{' '}
+            {FLUENCY_LABELS[language.writtenFluency]}
+          </span>
+        </td>
+        <td className="hidden text-xs sm:table-cell">{FLUENCY_LABELS[language.spokenFluency]}</td>
+        <td className="hidden text-xs sm:table-cell">{FLUENCY_LABELS[language.writtenFluency]}</td>
+        <td className="num px-1 text-right">{language.points}</td>
+        <td className="px-1 text-right">
+          {canWrite && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs min-h-11 px-1 sm:px-2"
+              aria-label={`${expanded ? 'Close' : 'Edit'} ${language.name}`}
+              aria-expanded={expanded}
+              aria-controls={editorId}
+              onClick={() => setExpanded((current) => !current)}
+            >
+              {expanded ? 'Done' : 'Edit'}
+            </button>
+          )}
+        </td>
+      </tr>
       {canWrite && (
-        <button
-          type="button"
-          className="btn btn-ghost btn-xs justify-self-end self-end sm:self-center"
-          onClick={deletion.request}
-          aria-label={`Delete language ${language.name}`}
-        >
-          ✕
-        </button>
+        <tr hidden={!expanded} id={editorId}>
+          <td colSpan={5} className="bg-base-200 p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Edit {language.name}</p>
+              {(nameField.isSaving ||
+                spokenField.isSaving ||
+                writtenField.isSaving ||
+                pointsField.isSaving) && <output className="text-xs text-warning">Saving…</output>}
+            </div>
+            <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
+              <div className="col-span-2 min-w-0">
+                <span className="label-eyebrow mb-1 block">Name</span>
+                <input
+                  aria-label={`${language.name} name`}
+                  className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full min-w-0 font-medium`}
+                  {...nameField.inputProps}
+                />
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Spoken</span>
+                <select
+                  aria-label={`${language.name} spoken fluency`}
+                  className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
+                  {...spokenField.selectProps}
+                >
+                  {FLUENCY_LEVELS.map((f) => (
+                    <option key={f} value={f}>
+                      {FLUENCY_LABELS[f]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Written</span>
+                <select
+                  aria-label={`${language.name} written fluency`}
+                  className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm w-full min-w-0`}
+                  {...writtenField.selectProps}
+                >
+                  {FLUENCY_LEVELS.map((f) => (
+                    <option key={f} value={f}>
+                      {FLUENCY_LABELS[f]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <span className="label-eyebrow mb-1 block">Points</span>
+                <input
+                  aria-label={`${language.name} points`}
+                  className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm num w-full min-w-0 text-right`}
+                  {...pointsField.inputProps}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-4">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={deletion.request}
+                  aria-label={`Delete language ${language.name}`}
+                >
+                  Delete language
+                </button>
+              </div>
+            </div>
+            {deletion.dialog}
+          </td>
+        </tr>
       )}
-      {deletion.dialog}
-    </li>
+    </TableBody>
   );
 }
 
 export function LanguagesPanel({
   character,
   canWrite,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-}) {
-  const total = character.languages.reduce((sum, l) => sum + l.points, 0);
+}: { character: CharacterDetail; canWrite: boolean }) {
+  return <LanguagesTable key={character.id} character={character} canWrite={canWrite} />;
+}
+
+function LanguagesTable({
+  character,
+  canWrite,
+}: { character: CharacterDetail; canWrite: boolean }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const addId = useId();
+  const submission = useAddEntityForm({
+    entityClass: 'character_language',
+    characterId: character.id,
+    label: 'language',
+  });
+
+  const total = character.languages.reduce((sum, entry) => sum + entry.points, 0);
   return (
-    <section className="card space-y-3 p-4 sm:p-5">
-      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <div>
-          <p className="label-eyebrow">Languages</p>
-          <h2 className="font-display text-2xl">Languages</h2>
-        </div>
+    <section className="min-w-0">
+      <header
+        className="field-rollback-flash flex flex-wrap items-center justify-between gap-2 pb-3 pt-2"
+        {...submission.flashProps}
+      >
         <p className="text-xs text-base-content/60">
-          {character.languages.length} {character.languages.length === 1 ? 'language' : 'languages'}
-          {' · '}
-          <span className="num">{total}</span> pts
+          {character.languages.length} {character.languages.length === 1 ? 'language' : 'languages'}{' '}
+          · <span className="num">{total}</span> pts
         </p>
+        {canWrite && (
+          <button
+            type="button"
+            className={`btn btn-sm ${showAdd ? 'btn-ghost' : 'btn-primary'}`}
+            aria-expanded={showAdd}
+            aria-controls={addId}
+            onClick={() => setShowAdd((current) => !current)}
+          >
+            {showAdd ? 'Close add form' : '+ Add language'}
+          </button>
+        )}
       </header>
-
-      <AddLanguageForm
-        characterId={character.id}
-        campaignId={character.campaignId ?? null}
-        canWrite={canWrite}
-      />
-
+      <div id={addId} hidden={!showAdd || !canWrite} className="pb-3">
+        <AddLanguageForm
+          submission={submission}
+          characterId={character.id}
+          campaignId={character.campaignId ?? null}
+          canWrite={canWrite}
+        />
+      </div>
       {character.languages.length === 0 ? (
-        <p className="text-sm text-base-content/60">No languages yet.</p>
+        <p className="pb-4 text-sm text-base-content/60">No languages yet.</p>
       ) : (
-        <>
-          <div className="label-eyebrow hidden grid-cols-[minmax(0,1fr)_6rem_6rem_4rem_auto] gap-2 border-b border-base-300 pb-1 sm:grid">
-            <span>Language</span>
-            <span className="text-center">Spoken</span>
-            <span className="text-center">Written</span>
-            <span className="text-right">Pts</span>
-            <span />
-          </div>
-          <ul>
-            {character.languages.map((l) => (
-              <LanguageRow key={l.id} characterId={character.id} language={l} canWrite={canWrite} />
+        <div className="border-t border-base-300">
+          <Table
+            preferenceKey={`${character.id}:languages`}
+            className="table table-sm w-full table-fixed"
+            aria-label="Languages"
+          >
+            <thead>
+              <tr>
+                <TableHeader column="name" label="Language" />
+                <TableHeader column="spoken" label="Spoken" className="hidden w-24 sm:table-cell" />
+                <TableHeader
+                  column="written"
+                  label="Written"
+                  className="hidden w-24 sm:table-cell"
+                />
+                <TableHeader
+                  column="points"
+                  label="Points"
+                  className="w-14 px-1 text-right sm:w-16"
+                />
+
+                <th scope="col" className="w-12 px-1 sm:w-16">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            {character.languages.map((entry) => (
+              <LanguageRow
+                key={entry.id}
+                characterId={character.id}
+                language={entry}
+                canWrite={canWrite}
+              />
             ))}
-          </ul>
-        </>
+          </Table>
+        </div>
       )}
     </section>
   );
