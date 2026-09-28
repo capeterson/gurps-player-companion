@@ -45,6 +45,12 @@ remain cacheable. The service worker's navigation fallback excludes `/api/*`,
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
 
+In production mode, insecure requests redirect to the HTTPS `APP_BASE_URL`, and
+secure responses include HSTS. Forwarded protocol headers are honored only when
+`TRUST_PROXY` is enabled. Health probes remain available over HTTP: `/api/v1/healthz`
+checks process liveness, while `/api/v1/readyz` verifies PostgreSQL 18 and the image's
+latest migration. Both expose the optional `APP_RELEASE` image identifier.
+
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
 dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via
@@ -241,8 +247,11 @@ Tables (grouped):
   returns JSON `429` with a `Retry-After` header. Source addresses come from
   Bun's server binding or Vite's incoming socket, with an `unknown` bucket
   when no peer is available; client-supplied `X-Gpc-Client-Ip` is ignored.
-  `TRUST_PROXY` must be set only behind a proxy that overwrites
-  `X-Forwarded-For`; missing forwarding headers fall back to the socket peer.
+  `TRUST_PROXY` defaults true in production and false elsewhere. Trusted
+  deployments use the final `X-Forwarded-For` hop from a proxy that appends or
+  overwrites it with the verified peer;
+  missing forwarding headers fall back to the socket peer. Expose the app only
+  behind the trusted proxy or explicitly disable trust for direct hosting.
   The Bun fetch handler preserves its original Request and server binding so
   WebSocket upgrades continue to work.
   Access and refresh JWTs also carry the user's server-checked authentication

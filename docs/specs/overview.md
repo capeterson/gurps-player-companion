@@ -999,6 +999,8 @@ player client.
 ```
 src/
   server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
+    https.ts     Production HTTPS redirects and HSTS
+    routes/health.ts  Liveness, database/migration readiness and release probes
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,

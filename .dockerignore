@@ -16,3 +16,8 @@ coverage
 playwright-report
 test-results
 .local
+.worktrees
+.pw-tmp
+artifacts
+
+.tmp

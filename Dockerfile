@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 # Multi-stage build: install -> client build -> server bundle -> runtime image.
 
-ARG BUN_VERSION=1.2-alpine
+ARG BUN_VERSION=alpine
 
 FROM oven/bun:${BUN_VERSION} AS deps
 WORKDIR /app
 COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile || bun install
+RUN bun install --frozen-lockfile
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /app
@@ -17,6 +17,8 @@ RUN bun run build
 FROM oven/bun:${BUN_VERSION} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ARG APP_RELEASE=development
+ENV APP_RELEASE=${APP_RELEASE}
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json

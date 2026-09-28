@@ -30,10 +30,14 @@
         "properties": {
           "ok": {
             "type": "boolean"
+          },
+          "release": {
+            "type": "string"
           }
         },
         "required": [
-          "ok"
+          "ok",
+          "release"
         ]
       },
       "ThemePreferences": {
@@ -6252,6 +6256,36 @@
         "responses": {
           "200": {
             "description": "Server is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Database and migration readiness probe",
+        "responses": {
+          "200": {
+            "description": "Postgres 18 is reachable and this image’s migrations are applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database unavailable or required migrations missing",
             "content": {
               "application/json": {
                 "schema": {

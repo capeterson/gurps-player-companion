@@ -62,8 +62,8 @@ const envSchema = z.object({
     }),
   TRUST_PROXY: z
     .enum(['true', 'false'])
-    .default('false')
-    .transform((value) => value === 'true'),
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
   AUTH_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().min(1).max(86_400).default(600),
   AUTH_RATE_LIMIT_LOGIN_MAX: z.coerce.number().int().positive().default(10),
   AUTH_RATE_LIMIT_REGISTER_MAX: z.coerce.number().int().positive().default(5),
@@ -179,7 +179,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     resendFromEmail: parsed.RESEND_FROM_EMAIL,
     appBaseUrl: parsed.APP_BASE_URL,
     oauthClients: parsed.OAUTH_CLIENTS,
-    trustProxy: parsed.TRUST_PROXY,
+    trustProxy: parsed.TRUST_PROXY ?? parsed.ENVIRONMENT === 'production',
     authRateLimitWindowSeconds: parsed.AUTH_RATE_LIMIT_WINDOW_SECONDS,
     authRateLimitLoginMax: parsed.AUTH_RATE_LIMIT_LOGIN_MAX,
     authRateLimitRegisterMax: parsed.AUTH_RATE_LIMIT_REGISTER_MAX,

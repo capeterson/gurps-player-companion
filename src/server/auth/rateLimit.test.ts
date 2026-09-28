@@ -36,7 +36,10 @@ describe('public auth rate-limit identities', () => {
     ).resolves.toBe('192.0.2.1');
     await expect(
       sourceFor({ 'x-forwarded-for': '198.51.100.4, 192.0.2.1' }, true, peer),
-    ).resolves.toBe('198.51.100.4');
+    ).resolves.toBe('192.0.2.1');
+    await expect(
+      sourceFor({ 'x-forwarded-for': 'spoofed, 198.51.100.4, ' }, true, peer),
+    ).resolves.toBe('192.0.2.1');
     await expect(sourceFor({}, true, peer)).resolves.toBe('192.0.2.1');
     await expect(sourceFor({}, false, { server: peer })).resolves.toBe('192.0.2.1');
   });

@@ -115,7 +115,8 @@ registration throttles/suspension bound open-signup abuse. Operators still need 
 reporting contact, copyright/abuse response process and budget/disk monitoring.
 There is no automated content-moderation service or antivirus integration.
 
-Every app replica may schedule cleanup; a PostgreSQL lease coordinates sweeps.
+Every app replica runs cleanup at startup and hourly thereafter; a PostgreSQL
+lease coordinates sweeps.
 Unattached uploads expire after 24 hours, detached published images after seven
 days, and cancelled or orphaned assets on the next eligible sweep. Active leases
 are protected with an additional grace period. Parent references are checked
@@ -155,3 +156,8 @@ transactions commit before object I/O on both REST and MCP paths.
 - Operator UI: `src/client/admin/pages/MediaPage.tsx`.
 - Deployment and recovery: [media-storage.md](../media-storage.md),
   `docker-compose.media.yml`, `deploy/garage.toml`.
+
+Cleanup holds the `gpc:media-cleanup` transaction advisory barrier for its entire
+sweep, allowing
+backup-pause installation to wait for active deletions safely. See the generic
+backup coordination procedure in [media-storage.md](../media-storage.md).

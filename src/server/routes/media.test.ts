@@ -459,6 +459,52 @@ describe('media upload and public image routes', () => {
     expect((await app.request(asset.thumbUrl as string)).status).toBe(404);
   });
 
+  it('retains eligible objects while a backup pause lease is active', async () => {
+    const owner = await register('backup-pause');
+    const character = await createCharacter(owner.accessToken);
+    const asset = await upload(owner.accessToken, 'character', character.id, await png());
+    await getDb()
+      .update(mediaAssets)
+      .set({
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      })
+      .where(eq(mediaAssets.id, asset.id));
+    await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'maintenance'));
+    await getDb()
+      .insert(mediaCounters)
+      .values({
+        key: 'backup-pause',
+        amount: 42,
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+      .onConflictDoUpdate({
+        target: mediaCounters.key,
+        set: {
+          amount: 42,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      });
+    try {
+      await sweepMedia();
+      expect(
+        await getDb().select().from(mediaAssets).where(eq(mediaAssets.id, asset.id)),
+      ).toHaveLength(1);
+      expect(
+        [...objects.keys()].filter((key) => key.startsWith(`images/${asset.id}/`)),
+      ).toHaveLength(2);
+    } finally {
+      await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'backup-pause'));
+      await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'maintenance'));
+    }
+    await sweepMedia();
+    expect(
+      await getDb().select().from(mediaAssets).where(eq(mediaAssets.id, asset.id)),
+    ).toHaveLength(0);
+    expect([...objects.keys()].filter((key) => key.startsWith(`images/${asset.id}/`))).toHaveLength(
+      0,
+    );
+  });
+
   it('cleans expired unattached objects, retains references, and retries failed deletion', async () => {
     const owner = await register('cleanup');
     const character = await createCharacter(owner.accessToken);

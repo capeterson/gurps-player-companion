@@ -487,3 +487,6 @@ OAuth audit provenance and no added users. The test respects the production MCP
 rate budget. Normal commits are cleaned up only within the test's own graph.
 The standard script creates six demo player accounts; MCP uses one existing user
 because account creation is deliberately outside the delegated tool surface.
+
+The operational `/api/v1/readyz` probe is an explicit service-infrastructure
+exclusion alongside `/api/v1/healthz`; both report the running release.
