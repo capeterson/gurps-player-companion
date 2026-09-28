@@ -403,7 +403,7 @@ function TechniqueRow({
         <tr hidden={!expanded} id={editorId}>
           <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">Edit {technique.name}</p>
+              <p className="min-w-0 font-medium [overflow-wrap:anywhere]">Edit {technique.name}</p>
               {(nameField.isSaving ||
                 defaultSkillField.isSaving ||
                 difficultyField.isSaving ||

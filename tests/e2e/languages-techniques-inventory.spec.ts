@@ -93,27 +93,6 @@ async function captureOverlay(page: Page, name: string, width: number) {
     await page.screenshot({ path: `test-results/interaction-${name}-${width}.png` });
   }
 }
-async function branchCircle(row: Locator) {
-  return row.locator('.inventory-branch-own').evaluate((node) => {
-    const rect = node.getBoundingClientRect();
-    const circle = getComputedStyle(node, '::after');
-    return {
-      x: rect.x + Number.parseFloat(circle.left) + Number.parseFloat(circle.width) / 2,
-      y: rect.y + Number.parseFloat(circle.top) + Number.parseFloat(circle.height) / 2,
-      railHeight: rect.height,
-      ends: node.classList.contains('inventory-branch-end'),
-    };
-  });
-}
-async function railCenterX(
-  row: Locator,
-  selector = '.inventory-branch-rail:not(.inventory-branch-own)',
-) {
-  return row.locator(selector).evaluate((node) => {
-    const rect = node.getBoundingClientRect();
-    return rect.x + rect.width / 2;
-  });
-}
 
 async function setup(page: Page) {
   await page.goto('/register');
@@ -437,10 +416,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await expect(nestedEditor).toBeVisible();
   await expect(nestedDamage).toHaveValue('sw+2 cut');
 
-  const packCount = pack.locator('.inventory-contents-count');
-  const pouchCount = pouch.locator('.inventory-contents-count');
-  const kitCount = lastKit.locator('.inventory-contents-count');
-
   // Search reveals a matching last sibling and only the ancestors needed to reach it.
   const inventorySearch = page.getByRole('searchbox', { name: 'Filter inventory' });
   await inventorySearch.fill('Trail rations');
@@ -451,22 +426,17 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await expect(lastKit).toBeHidden();
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
 
-  // A table-column filter uses the same matching descendants and updates the
-  // visible direct count plus the final sibling endpoint.
+  // A table-column filter uses the same matching descendants.
   await page.setViewportSize({ width: 1280, height: 900 });
   await inventory.getByRole('button', { name: 'Item', exact: true }).click();
   const itemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
   await itemFilter.getByRole('checkbox', { name: 'Trail rations', exact: true }).check();
   await itemFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
   await page.setViewportSize({ width: 375, height: 900 });
-  await expect(packCount).toBeVisible();
-  await expect(packCount).toHaveText('1 item');
-  await expect(packCount).toHaveAttribute('aria-label', '1 direct item');
   await expect(rations).toBeVisible();
   await expect(pouch).toBeHidden();
   await expect(nested).toBeHidden();
   await expect(lastKit).toBeHidden();
-  await expect((await branchCircle(rations)).ends).toBeTruthy();
   await page.setViewportSize({ width: 1280, height: 900 });
   await inventory.getByRole('button', { name: 'Item', exact: true }).click();
   const clearItemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
@@ -506,36 +476,45 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     }
     if (width < 640) {
       await expect(tip).toBeHidden();
-      const heading = await box(sword.locator('.inventory-item-heading'));
-      const qty = await box(sword.locator('[data-label="Qty"]'));
-      const weight = await box(sword.locator('[data-label="Weight (lb)"]'));
-      const cost = await box(sword.locator('[data-label="Cost"]'));
-      expect(qty.y).toBeGreaterThanOrEqual(heading.y + heading.height - 1);
-      expect(Math.abs(qty.y - weight.y)).toBeLessThanOrEqual(1);
+      // Two-line rows: name and chips on the left; weight above quantity and
+      // cost on the right. Quantity 1 is implied rather than repeated.
+      await expect(sword.locator('[data-label="Qty"]')).toBeHidden();
+      const heading = await box(rations.locator('.inventory-item-heading'));
+      const qty = await box(rations.locator('[data-label="Qty"]'));
+      const weight = await box(rations.locator('[data-label="Weight (lb)"]'));
+      const cost = await box(rations.locator('[data-label="Cost"]'));
+      await expect(rations.locator('[data-label="Qty"]')).toHaveText('3');
+      expect(heading.x + heading.width).toBeLessThanOrEqual(Math.min(weight.x, qty.x) + 1);
+      expect(weight.y).toBeLessThan(heading.y + heading.height);
+      expect(qty.y).toBeGreaterThanOrEqual(weight.y + weight.height - 1);
       expect(Math.abs(qty.y - cost.y)).toBeLessThanOrEqual(1);
-      expect(qty.x + qty.width).toBeLessThanOrEqual(weight.x + 1);
-      expect(weight.x + weight.width).toBeLessThanOrEqual(cost.x + 1);
-      await expect(packCount).toBeVisible();
-      await expect(packCount).toHaveText('3 items');
-      await expect(pouchCount).toBeVisible();
-      await expect(pouchCount).toHaveText('1 item');
-      await expect(kitCount).toBeVisible();
-      await expect(kitCount).toHaveText('1 item');
-      if ([320, 375, 639].includes(width)) {
-        const mapCircle = await branchCircle(pouch);
-        const mapIcon = await box(pouch.locator('.inventory-type-icon'));
-        expect(mapCircle.ends).toBe(false);
-        expect(mapCircle.y).toBeCloseTo(mapIcon.y + mapIcon.height / 2, 0);
-        expect(await railCenterX(nested)).toBeCloseTo(mapCircle.x, 0);
-        expect((await branchCircle(rations)).x).toBeCloseTo(mapCircle.x, 0);
-        expect(await railCenterX(rations, '.inventory-branch-own')).toBeCloseTo(mapCircle.x, 0);
+      expect(qty.x + qty.width).toBeLessThanOrEqual(cost.x + 1);
+      expect(Math.abs(weight.x + weight.width - (cost.x + cost.width))).toBeLessThanOrEqual(1);
+      expect((await box(rations)).height).toBeLessThanOrEqual(56);
 
-        const kitCircle = await branchCircle(lastKit);
-        expect(kitCircle.ends).toBe(true);
-        expect(kitCircle.railHeight).toBeCloseTo(26, 0);
-        const bladeRails = nestedBlade.locator('.inventory-branch-rail:not(.inventory-branch-own)');
-        await expect(bladeRails).toHaveCount(0);
-        expect((await branchCircle(nestedBlade)).x).toBeGreaterThan(kitCircle.x);
+      // Each nesting level indents the name, and the chevron's touch target
+      // extends beyond its 20px glyph slot.
+      const names = [];
+      for (const row of [pack, pouch, nested])
+        names.push(await box(row.locator('.inventory-item-title')));
+      expect(names[1].x).toBeGreaterThan(names[0].x + 8);
+      expect(names[2].x).toBeGreaterThan(names[1].x + 8);
+      const chevron = pack.getByRole('button', { name: 'Collapse contents' });
+      const chevronBox = await box(chevron);
+      for (const [dx, dy] of [
+        [0, -16],
+        [0, 16],
+        [-16, 0],
+      ]) {
+        const hit = await page.evaluate(
+          ({ x, y }) =>
+            document.elementFromPoint(x, y)?.closest('button')?.getAttribute('aria-label') ?? null,
+          {
+            x: chevronBox.x + chevronBox.width / 2 + dx,
+            y: chevronBox.y + chevronBox.height / 2 + dy,
+          },
+        );
+        expect(hit).toBe('Collapse contents');
       }
     } else {
       await expect(tip).toBeVisible();
@@ -570,6 +549,7 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await expect(page.locator(`#inventory-${fixture.longItem.id}`)).toHaveCount(0);
   await pack.scrollIntoViewIfNeeded();
   await pack.getByRole('button', { name: 'Collapse contents' }).click();
+  await expect(pack.getByLabel(/^\d+ contained items?$/)).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/inventory-mobile-collapsed.png` });
   await pack.getByRole('button', { name: 'Expand contents' }).click();
   await expect(nested).toBeVisible();

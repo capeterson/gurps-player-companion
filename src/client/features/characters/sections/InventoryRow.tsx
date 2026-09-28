@@ -30,11 +30,6 @@ export interface InventoryRowProps {
   /** Keep previously revealed descendant editors mounted when an ancestor closes. */
   ancestorHidden?: boolean;
   depth: number;
-  /** Rails for ancestor siblings that continue below this subtree. */
-  ancestorRails?: readonly number[];
-  hasFollowingSibling?: boolean;
-  /** One spacing for the whole root subtree; deep trees compress without merging rails. */
-  branchStep?: number;
   byParent: Map<string | null, InventoryItemOut[]>;
   isSelected: (id: string) => boolean;
   onRowClick: (id: string, e: MouseEvent) => void;
@@ -53,17 +48,6 @@ export interface InventoryRowProps {
   inStashed?: boolean;
 }
 
-function subtreeDepth(
-  item: InventoryItemOut,
-  byParent: Map<string | null, InventoryItemOut[]>,
-): number {
-  if (!item.isContainer) return 0;
-  const children = byParent.get(item.id) ?? [];
-  return children.length
-    ? 1 + Math.max(...children.map((child) => subtreeDepth(child, byParent)))
-    : 0;
-}
-
 function locationSummary(locations: string[]): string {
   if (locations.length === 0) return '—';
   const fmt = (l: string) => l.replace(/_/g, ' ');
@@ -77,8 +61,6 @@ export function InventoryRow(props: InventoryRowProps) {
     item,
     ancestorHidden = false,
     depth,
-    ancestorRails = [],
-    hasFollowingSibling = false,
     byParent,
     isSelected,
     onRowClick,
@@ -104,8 +86,8 @@ export function InventoryRow(props: InventoryRowProps) {
     wt: (inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs).toFixed(1),
     cost: entry.cost.toFixed(0),
   });
-  // Retain a matching descendant's ancestry, and derive endings from the same
-  // visible siblings. Hidden rows remain mounted to preserve open editor drafts.
+  // Retain a matching descendant's ancestry. Hidden rows remain mounted to
+  // preserve open editor drafts.
   function subtreeMatches(entry: InventoryItemOut): boolean {
     return (
       matchesRow(filterValues(entry)) ||
@@ -113,17 +95,9 @@ export function InventoryRow(props: InventoryRowProps) {
     );
   }
   const filteredOut = !subtreeMatches(item);
-  const visibleChildren = children.filter(subtreeMatches);
-  const continuingRails =
-    depth > 0 && hasFollowingSibling ? [...ancestorRails, depth - 1] : ancestorRails;
-  const branchStep =
-    props.branchStep ?? Math.min(8, 32 / Math.max(1, subtreeDepth(item, byParent) - 1));
-  const railPosition = (level: number) => 6 + level * branchStep;
-  const rowStyle = {
-    '--inventory-indent': `${depth * 1.25}rem`,
-    '--inventory-mobile-indent': `${depth > 0 ? Math.min(depth * 12, railPosition(depth - 1) + 10) : 0}px`,
-    '--inventory-rail-clearance': `${depth > 0 ? railPosition(depth - 1) + 8 : 0}px`,
-  } as CSSProperties;
+  // Indent guides are drawn in CSS from the depth, so they need no per-row
+  // sibling bookkeeping and stay correct while filtering or collapsing.
+  const rowStyle = { '--inventory-depth': depth } as CSSProperties;
   const itemIcon = item.isContainer
     ? 'inventory'
     : item.isArmor || item.weaponData?.db != null
@@ -135,26 +109,6 @@ export function InventoryRow(props: InventoryRowProps) {
             (item.enchantments?.length ?? 0) > 0
           ? 'modifier'
           : 'notes';
-  function rails(editor = false) {
-    const levels = editor ? continuingRails : ancestorRails;
-    return (
-      <span className="inventory-branches" aria-hidden="true">
-        {levels.map((level) => (
-          <span
-            key={level}
-            className="inventory-branch-rail"
-            style={{ left: `${railPosition(level)}px` }}
-          />
-        ))}
-        {!editor && depth > 0 && (
-          <span
-            className={`inventory-branch-rail inventory-branch-own ${hasFollowingSibling ? '' : 'inventory-branch-end'}`}
-            style={{ left: `${railPosition(depth - 1)}px` }}
-          />
-        )}
-      </span>
-    );
-  }
   const contentsForcedOpen =
     columnFiltersActive || expandContainers || Boolean(revealContainers?.has(item.id));
   const contentsOpen = contentsForcedOpen || open;
@@ -297,54 +251,35 @@ export function InventoryRow(props: InventoryRowProps) {
         {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
-          {rails()}
           <div className="inventory-item-heading flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <span className="inventory-item-name flex min-w-0 items-center gap-2">
-              {hasChildren ? (
-                contentsForcedOpen ? (
-                  <span
-                    className="inventory-expand inline-block w-5 text-center text-base-content/50"
-                    aria-hidden
-                  >
-                    <span className="hidden sm:inline">▾</span>
-                    <AppIcon name="chevronDown" size={15} className="sm:hidden" />
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      stop(e);
-                      setOpen((before) => {
-                        const next = !before;
-                        writeContainerExpanded(item.characterId, item.id, next);
-                        return next;
-                      });
-                    }}
-                    className="inventory-expand btn btn-ghost btn-xs px-1 text-base-content/50"
-                    aria-expanded={contentsOpen}
-                    aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
-                  >
-                    <span className="hidden sm:inline">{contentsOpen ? '▾' : '▸'}</span>
-                    <AppIcon
-                      name={contentsOpen ? 'chevronDown' : 'chevronRight'}
-                      size={15}
-                      className="sm:hidden"
-                    />
-                  </button>
-                )
-              ) : (
-                <span className="hidden w-5 sm:inline-block" aria-hidden />
-              )}
-              <AppIcon name={itemIcon} size={16} className="inventory-type-icon hidden" />
-              <span className="inventory-item-title font-medium">{item.name}</span>
-              {item.isContainer && (
-                <span
-                  className="inventory-contents-count hidden"
-                  aria-label={`${visibleChildren.length} direct ${visibleChildren.length === 1 ? 'item' : 'items'}`}
+            <span className="inventory-item-name flex min-w-0 items-start gap-2">
+              {hasChildren && !contentsForcedOpen ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    stop(e);
+                    setOpen((before) => {
+                      const next = !before;
+                      writeContainerExpanded(item.characterId, item.id, next);
+                      return next;
+                    });
+                  }}
+                  className="inventory-slot inventory-expand btn btn-ghost btn-xs text-base-content/60"
+                  aria-expanded={contentsOpen}
+                  aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
                 >
-                  {visibleChildren.length} {visibleChildren.length === 1 ? 'item' : 'items'}
+                  <AppIcon name={contentsOpen ? 'chevronDown' : 'chevronRight'} size={15} />
+                </button>
+              ) : hasChildren ? (
+                <span className="inventory-slot text-base-content/40" aria-hidden>
+                  <AppIcon name="chevronDown" size={15} />
+                </span>
+              ) : (
+                <span className="inventory-slot text-base-content/40" aria-hidden>
+                  <AppIcon name={itemIcon} size={15} />
                 </span>
               )}
+              <span className="inventory-item-title font-medium">{item.name}</span>
             </span>
             <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
               {isRoot && item.worn && (
@@ -365,7 +300,7 @@ export function InventoryRow(props: InventoryRowProps) {
                 )}
               {hasChildren && !contentsOpen && (
                 <span
-                  className="badge badge-sm badge-ghost hidden sm:inline-flex"
+                  className="badge badge-sm badge-ghost"
                   aria-label={`${descendantCount} contained ${descendantCount === 1 ? 'item' : 'items'}`}
                 >
                   {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
@@ -439,21 +374,6 @@ export function InventoryRow(props: InventoryRowProps) {
                 )}
               {(item.enchantments?.length ?? 0) > 0 &&
                 categoryChip('enchantments', <>Enchantments · {item.enchantments.length}</>)}
-              {canEdit && (
-                <button
-                  type="button"
-                  className="badge badge-sm badge-ghost min-h-8 h-auto border-dashed"
-                  aria-expanded={section === 'add'}
-                  aria-controls={editorId}
-                  aria-label={`Add category to ${item.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleSection('add', event.currentTarget);
-                  }}
-                >
-                  + Category
-                </button>
-              )}
             </span>
           </div>
           {isRoot && !item.worn && item.externalLocation && (
@@ -482,12 +402,15 @@ export function InventoryRow(props: InventoryRowProps) {
             </div>
           )}
         </td>
-        <td data-label="Qty" className="num text-right align-top sm:align-middle">
+        <td
+          data-label="Qty"
+          className={`inventory-qty num text-right align-top sm:align-middle ${item.quantity === 1 ? 'inventory-qty-one' : ''}`}
+        >
           {item.quantity}
         </td>
         <td
           data-label="Weight (lb)"
-          className={`num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
+          className={`inventory-weight num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
           title={
             weightModified
               ? item.isContainer && weightDelta > 0
@@ -499,11 +422,11 @@ export function InventoryRow(props: InventoryRowProps) {
           <span className="inline-flex items-baseline justify-end gap-1.5">
             {weightModified &&
               (item.isContainer && weightDelta > 0 ? (
-                <span className="text-[11px] text-base-content/60">
+                <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
                   {grossWeight.toFixed(1)} <span className="italic text-info">+ contents</span>
                 </span>
               ) : (
-                <span className="text-[11px] text-base-content/60">
+                <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
                   {grossWeight.toFixed(1)}{' '}
                   <span className="text-success">
                     {weightDelta >= 0 ? '+' : '-'}
@@ -516,7 +439,7 @@ export function InventoryRow(props: InventoryRowProps) {
         </td>
         <td
           data-label="Cost"
-          className="num text-right text-base-content/60 align-top sm:align-middle"
+          className="inventory-cost num text-right text-base-content/60 align-top sm:align-middle"
         >
           {item.cost.toFixed(0)}
         </td>
@@ -549,7 +472,6 @@ export function InventoryRow(props: InventoryRowProps) {
           id={editorId}
         >
           <td colSpan={5} className="!p-2 sm:!p-3">
-            {rails(true)}
             {visited.map((entry) => (
               <div key={entry} hidden={section !== entry}>
                 <InventoryItemEditor
@@ -579,12 +501,6 @@ export function InventoryRow(props: InventoryRowProps) {
             {...props}
             item={child}
             depth={depth + 1}
-            ancestorRails={continuingRails}
-            branchStep={branchStep}
-            hasFollowingSibling={
-              visibleChildren.findIndex((entry) => entry.id === child.id) <
-              visibleChildren.length - 1
-            }
             ancestorHidden={ancestorHidden || !contentsOpen}
           />
         ))}

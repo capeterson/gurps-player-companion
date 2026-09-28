@@ -1,6 +1,39 @@
+/* Hierarchy: every level indents by one step, and a faint guide runs through
+   the full height of each descendant row under its ancestor's chevron. The
+   guides are backgrounds derived from --inventory-depth, so a filtered or
+   collapsed tree needs no per-row sibling bookkeeping. */
+.inventory-table {
+  --inventory-step: 20px;
+  --inventory-max-depth: 8;
+  --inventory-gutter: 1rem;
+  --inventory-slot: 20px;
+  --inventory-guide: color-mix(in oklch, var(--color-base-content) 16%, transparent);
+}
+
+.inventory-table .inventory-item-row,
+.inventory-table .inventory-editor-row {
+  --inventory-levels: min(var(--inventory-depth, 0), var(--inventory-max-depth));
+  --inventory-indent: calc(var(--inventory-levels) * var(--inventory-step));
+}
+
+.inventory-table .inventory-item-row > td:first-child,
+.inventory-table .inventory-editor-row > td {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--inventory-guide) 0 1px,
+    transparent 1px var(--inventory-step)
+  );
+  background-repeat: no-repeat;
+  background-position: calc(var(--inventory-gutter) + var(--inventory-slot) / 2) 0;
+  background-size: var(--inventory-indent) 100%;
+}
+
+.inventory-table .inventory-editor-row > td {
+  padding-left: calc(var(--inventory-gutter) + var(--inventory-indent)) !important;
+}
+
 .inventory-item-heading {
   padding-left: var(--inventory-indent);
-  flex-wrap: wrap;
 }
 
 .inventory-item-name,
@@ -9,23 +42,62 @@
   overflow-wrap: anywhere;
 }
 
-.inventory-item-name > button {
-  flex-shrink: 0;
+.inventory-item-title {
+  line-height: 20px;
 }
 
+/* The slot sits on the name's first line, even when a long name wraps. */
+.inventory-slot {
+  display: inline-flex;
+  height: 20px;
+  flex: 0 0 var(--inventory-slot);
+  align-items: center;
+  justify-content: center;
+  width: var(--inventory-slot);
+}
+
+/* The chevron keeps the 20px visual slot so guides line up beneath it, but
+   its hit area extends to a comfortable touch target. */
+.inventory-slot.inventory-expand {
+  position: relative;
+  min-height: 0;
+  height: var(--inventory-slot);
+  padding: 0;
+}
+
+.inventory-slot.inventory-expand::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
+/* A chip's detail text wraps below its label rather than squeezing the label
+   into single letters. */
 .inventory-table .inventory-item-row .badge {
   max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  column-gap: 0;
+  text-align: left;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .inventory-item-detail {
-  padding-left: calc(var(--inventory-indent) + 1.5rem);
+  padding-left: calc(var(--inventory-indent) + var(--inventory-slot) + 0.5rem);
 }
 
-/* Below the sheet's small breakpoint, an item and its editor occupy the
-   full available width. A table scroller must never clip editable fields. */
+/* Below the sheet's small breakpoint each item is a compact two-line row:
+   name and chips on the left, weight over quantity/cost on the right, then
+   the edit action. Editors take the full width so fields are never clipped
+   by a table scroller. */
 @media (max-width: 639px) {
+  .inventory-table {
+    --inventory-step: 14px;
+    --inventory-max-depth: 5;
+    --inventory-gutter: 10px;
+  }
+
   .inventory-table,
   .inventory-table > tbody {
     display: block;
@@ -38,45 +110,112 @@
 
   .inventory-table .inventory-item-row {
     display: grid;
-    grid-template-columns: minmax(0, 0.65fr) minmax(0, 1.4fr) minmax(0, 0.85fr) auto;
-    gap: 4px 8px;
-    padding: 8px;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-areas:
+      "main weight weight edit"
+      "main qty cost edit";
+    column-gap: 8px;
+    row-gap: 0;
+    align-items: start;
+    padding: 0 4px 0 0;
+    background-color: transparent;
+    border-bottom: 1px solid var(--color-base-300);
   }
 
   .inventory-table .inventory-item-row > td {
     min-width: 0;
     padding: 0;
-    text-align: left;
     border: 0;
-    overflow-wrap: anywhere;
+    background-color: transparent;
   }
 
   .inventory-table .inventory-item-row > td:first-child {
-    grid-column: 1 / -1;
+    grid-area: main;
+    align-self: stretch;
+    padding: 8px 0 8px var(--inventory-gutter);
   }
 
-  .inventory-table .inventory-item-row > td[data-label]::before {
-    content: attr(data-label);
-    display: inline;
-    margin-right: 4px;
-    font-size: 10px;
-    opacity: 0.65;
+  .inventory-table .inventory-item-row > td.inventory-weight {
+    grid-area: weight;
+    padding-top: 9px;
+    font-size: 14px;
+    line-height: 20px;
   }
 
-  .inventory-table .inventory-item-row > td[data-label] {
-    align-self: center;
-    font-size: 12px;
+  .inventory-table .inventory-item-row > td.inventory-weight::after {
+    content: " lb";
+    font-size: 11px;
+    color: var(--color-base-content);
+    opacity: 0.55;
   }
 
-  .inventory-table .inventory-item-row > td[data-label] > span {
-    flex-wrap: wrap;
-    justify-content: flex-start;
+  .inventory-weight-breakdown {
+    display: none;
   }
 
-  .inventory-item-heading,
-  .inventory-item-detail {
-    /* Deeply nested containers must leave room for names and category controls. */
-    padding-left: min(calc(var(--inventory-indent) * 0.5), 2.5rem);
+  .inventory-table .inventory-item-row > td.inventory-qty,
+  .inventory-table .inventory-item-row > td.inventory-cost {
+    padding-bottom: 8px;
+    font-size: 11px;
+    line-height: 16px;
+    color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  }
+
+  .inventory-table .inventory-item-row > td.inventory-qty {
+    grid-area: qty;
+  }
+
+  .inventory-table .inventory-item-row > td.inventory-qty::before {
+    content: "×";
+  }
+
+  .inventory-table .inventory-item-row > td.inventory-qty-one {
+    visibility: hidden;
+  }
+
+  .inventory-table .inventory-item-row > td.inventory-cost {
+    grid-area: cost;
+  }
+
+  .inventory-table .inventory-item-row > td.inventory-cost::before {
+    content: "$";
+  }
+
+  .inventory-table .inventory-item-row > td:last-child:not(:first-child):not([data-label]) {
+    grid-area: edit;
+    align-self: start;
+    padding-top: 1px;
+  }
+
+  .inventory-table .inventory-item-row > td:last-child:not([data-label]) > .btn {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .inventory-table .inventory-container-row {
+    background-color: color-mix(in oklch, var(--color-base-content) 4%, transparent);
+  }
+
+  .inventory-table .inventory-item-row[aria-selected="true"] {
+    background-color: color-mix(in oklch, var(--color-primary) 15%, transparent);
+  }
+
+  .inventory-item-heading {
+    gap: 2px 6px;
+  }
+
+  .inventory-item-badges {
+    padding-left: calc(var(--inventory-slot) + 8px);
+  }
+
+  .inventory-item-badges:empty {
+    display: none;
+  }
+
+  .inventory-table .inventory-item-row .badge {
+    font-size: 11px;
   }
 
   .inventory-table .inventory-editor-row,
@@ -86,149 +225,13 @@
     min-width: 0;
   }
 
+  .inventory-table .inventory-editor-row > td {
+    padding-top: 8px !important;
+    padding-right: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
   .inventory-table .inventory-editor-row[hidden] {
     display: none;
-  }
-}
-
-/* Decorations live inside cells; the table keeps valid, flat rows so inline
-   editors and folded descendants remain mounted in their original positions. */
-.inventory-branches {
-  display: none;
-}
-
-@media (max-width: 639px) {
-  .inventory-surface {
-    border-color: color-mix(in oklch, var(--gild) 24%, var(--color-base-300));
-  }
-
-  .inventory-table .inventory-item-row {
-    --inventory-junction: 26px;
-    --inventory-row-left: max(12px, var(--inventory-rail-clearance));
-    position: relative;
-    padding: 10px 12px 10px var(--inventory-row-left);
-    background-color: transparent;
-    border-bottom: 1px solid color-mix(in oklch, var(--gild) 12%, transparent);
-    gap: 4px 8px;
-  }
-
-  .inventory-table .inventory-container-row {
-    background-image: linear-gradient(
-      90deg,
-      color-mix(in oklch, var(--gild) 11%, transparent),
-      var(--card-sheen) 70%
-    );
-    border-top: 1px solid color-mix(in oklch, var(--gild) 26%, transparent);
-    border-bottom-color: color-mix(in oklch, var(--gild) 22%, transparent);
-  }
-
-  .inventory-table .inventory-item-row[aria-selected="true"] {
-    background-color: color-mix(in oklch, var(--color-primary) 15%, transparent);
-  }
-
-  .inventory-item-heading,
-  .inventory-item-detail {
-    padding-left: calc(var(--inventory-mobile-indent) + 12px - var(--inventory-row-left));
-  }
-
-  .inventory-item-name {
-    width: 100%;
-    min-height: 32px;
-    align-items: flex-start;
-    gap: 7px;
-  }
-
-  .inventory-item-name .inventory-type-icon {
-    display: block;
-    margin-top: 8px;
-    color: var(--color-primary);
-  }
-
-  .inventory-item-title {
-    flex: 1;
-    min-width: 0;
-    padding-top: 5px;
-    font-size: 15px;
-    line-height: 22px;
-    font-weight: 500;
-  }
-
-  .inventory-container-row .inventory-item-title {
-    font-family: var(--font-display);
-    color: var(--color-primary);
-  }
-
-  .inventory-item-name .inventory-expand {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    order: 3;
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    border-radius: 50%;
-    color: var(--color-primary);
-  }
-
-  .inventory-contents-count {
-    display: block;
-    flex-shrink: 0;
-    padding-top: 8px;
-    font-size: 11px;
-    line-height: 16px;
-    color: var(--text-muted);
-  }
-
-  .inventory-table .inventory-item-row .badge {
-    font-size: 11px;
-  }
-
-  .inventory-table .inventory-item-row > td:last-child > .btn {
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    padding: 4px;
-  }
-
-  .inventory-branches {
-    display: block;
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .inventory-branch-rail {
-    position: absolute;
-    top: 0;
-    bottom: -1px;
-    width: 1px;
-    background: color-mix(in oklch, var(--gild) 48%, transparent);
-  }
-
-  .inventory-branch-end {
-    bottom: auto;
-    height: var(--inventory-junction);
-  }
-
-  .inventory-branch-own::after {
-    content: "";
-    position: absolute;
-    left: -2px;
-    top: calc(var(--inventory-junction) - 2.5px);
-    width: 5px;
-    height: 5px;
-    border: 1px solid var(--color-primary);
-    border-radius: 50%;
-    background: var(--color-base-200);
-  }
-
-  .inventory-table .inventory-editor-row {
-    position: relative;
-  }
-
-  .inventory-table .inventory-editor-row > td {
-    padding-left: max(8px, var(--inventory-rail-clearance)) !important;
   }
 }

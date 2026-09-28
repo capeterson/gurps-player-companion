@@ -295,7 +295,7 @@ function LanguageRow({ characterId, language, canWrite }: LanguageRowProps) {
         <tr hidden={!expanded} id={editorId}>
           <td colSpan={5} className="bg-base-200 p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">Edit {language.name}</p>
+              <p className="min-w-0 font-medium [overflow-wrap:anywhere]">Edit {language.name}</p>
               {(nameField.isSaving ||
                 spokenField.isSaving ||
                 writtenField.isSaving ||

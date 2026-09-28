@@ -781,9 +781,21 @@ export function InventoryItemEditor({
                 : CATEGORY_LABELS[section]}
           </h3>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
-          Done
-        </button>
+        <div className="flex flex-wrap justify-end gap-1">
+          {section === 'basics' && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              aria-label={`Add category to ${item.name}`}
+              onClick={() => onSection('add')}
+            >
+              + Category
+            </button>
+          )}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+            Done
+          </button>
+        </div>
       </div>
       {section === 'basics' && <RepriceEntry section="items" entry={item} />}
       {content}

@@ -509,8 +509,8 @@ shows the synced campaign name as a separate link to that campaign.
   chip again collapses it. The pencil opens basic item details in the same
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
-  **+ Category** adds another role without changing siblings or equipped/worn
-  state. Category removal has a separate inline confirmation; containers with
+  **+ Category**, in the pencil's item-details editor, adds another role
+  without changing siblings or equipped/worn state. Category removal has a separate inline confirmation; containers with
   contents must be emptied first. Read-only viewers see summary badges only.
   Fields save on blur through `useDraftField` and the local outbox. JSON leaf
   edits merge with the latest stored item inside a Dexie transaction so rapid
@@ -533,14 +533,14 @@ shows the synced campaign name as a separate link to that campaign.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
   new item's category chips.
-  On screens below 640px, inventory shows containers in warm theme-colored
-  bands with display headings and labeled contents counts. Connected branch
-  circles make nesting explicit: branches stop at their last visible sibling's
-  circle and continue alongside expanded descendants when a sibling follows.
-  Shallow gutters and bounded indentation preserve space for names, category
-  controls, and a compact quantity/weight/cost strip. Filtering retains matching
-  items' ancestor context; closing containers preserves editor drafts.
-  Desktop columns keep their existing layout. See
+  Every row leads with a container chevron or an item-type icon, and each
+  nesting level indents one step with a faint guide line under its parent's
+  chevron; a collapsed container shows its contained-item count. Below 640px
+  each item is a compact two-line row: name and chips on the left, weight over
+  quantity (shown only when above 1) and cost on the right, then the edit
+  action. Indentation is bounded so deep trees keep room for names. Filtering
+  retains matching items' ancestor context; closing containers preserves editor
+  drafts. Desktop keeps its Item/Qty/Wt/Cost columns. See
   [interaction-design.md](interaction-design.md) for the shared presentation patterns.
   Implementation lives under
   `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, `RangedRangeField`, and

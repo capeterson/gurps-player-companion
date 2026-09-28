@@ -849,7 +849,7 @@ export function InventoryPanel({
                   : 'Nothing worn — encumbrance is 0. Drop items here to wear them.'}
               </p>
             ) : (
-              <div className="inventory-surface overflow-x-auto rounded-xl border border-base-300/60">
+              <div className="overflow-x-auto rounded-xl border border-base-300/60">
                 <Table
                   preferenceKey={`${character.id}:inventory:worn`}
                   filterRows={flattenDFS(
@@ -939,7 +939,7 @@ export function InventoryPanel({
                   : 'Nothing stashed. Drop items here to set them aside.'}
               </p>
             ) : (
-              <div className="inventory-surface overflow-x-auto rounded-xl border border-base-300/60">
+              <div className="overflow-x-auto rounded-xl border border-base-300/60">
                 <Table
                   preferenceKey={`${character.id}:inventory:stashed`}
                   filterRows={flattenDFS(

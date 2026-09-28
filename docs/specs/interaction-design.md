@@ -110,30 +110,28 @@ shrinking (`min-w-0`, `w-full`) and summary text allows word wrapping. Use the
 app's existing daisyUI components and semantic theme colors; avoid bespoke
 palettes, nested decorative cards, and additional display fonts.
 
-Inventory preserves its desktop columns and uses a compact item layout below
-640px. Long names and heading badges wrap at every width so the table also fits
-at the desktop breakpoint. Mobile containers use a warm theme-colored band,
-display typography, and a visible direct-child count beside their expansion
-control. Item icons and
-connected branch circles make the hierarchy explicit. A branch continues below
-an item's circle only when another visible sibling follows; its final segment
-ends at the last circle. Ancestor branches continue beside expanded descendants
-and editors only when that ancestor has a following sibling. Collapsing a
-container shortens those branches while retaining its mounted editor drafts.
-Inventory column filters also hide excluded rows without unmounting their
-editors; its name/tag search retains the existing filtered-tree rendering path.
+Inventory preserves its desktop columns and uses a compact two-line item row
+below 640px: name and chips on the left, weight over quantity and cost on the
+right, then the edit action. Quantity 1 is implied rather than repeated, and
+the units (`lb`, `$`, `×`) replace per-row column labels. Long names and chip
+text wrap at every width so the table also fits at the desktop breakpoint.
 
-Names, worn/equipped controls, and category chips use the available width.
-Quantity, weight, cost, and the basic-details action form one compact metadata
-strip. Branches occupy a reserved gutter clear of the text and values; nested
-indentation stays bounded on narrow screens. The mobile tree is decoration over
-the existing table rows, rather than an invalid nested table or a second editing
-surface. Inventory uses `useTableRowMatches` to share the table's existing
-predicate. Search and column filters retain the ancestors of matching entries and
-derive branch endings from the visible sibling set, so a filtered tree still
-shows where each item belongs.
-Category chips remain the existing route to category editors, rather than
-duplicating those controls in another mobile menu.
+Each row leads with a 20px slot holding the container chevron (whose hit area
+extends to a touch-sized target) or an item-type icon. Each nesting level
+indents one step, and a faint guide line runs under every ancestor's chevron
+through the full row height. The guides are CSS backgrounds derived from the
+row's `--inventory-depth`, so they need no sibling bookkeeping and stay correct
+while filtering or collapsing; depth is capped on narrow screens so deep trees
+keep room for names. A collapsed container shows its contained-item count.
+Containers carry only a faint tint, not another typeface or palette. The tree
+is presentation over flat table rows, rather than an invalid nested table or a
+second editing surface.
+
+Inventory uses `useTableRowMatches` to share the table's existing predicate.
+Search and column filters retain the ancestors of matching entries, and hide
+excluded rows without unmounting their editors. Category chips remain the
+route to category editors. **+ Category** lives in the item-details editor the
+pencil opens, rather than repeating on every row.
 
 Disclosures expose `aria-expanded` and `aria-controls`; row actions include
 the entry name in their accessible label. Tables have accessible collection

@@ -13,7 +13,7 @@ creation, editing, rolling, and inventory interactions.
 | Capture | View |
 |---|---|
 | [Languages and techniques](languages-techniques-mobile.png) | Compact mobile summaries with creation forms closed. |
-| [Mobile inventory](inventory-mobile.png) | Gilt Bands container hierarchy, branch circles, and compact quantity/weight/cost rows. |
+| [Mobile inventory](inventory-mobile.png) | Two-line item rows with weight over quantity/cost, chevron/type-icon slots, and indent guides under each parent. |
 | [Collapsed mobile inventory](inventory-mobile-collapsed.png) | The same container tree with the travel pack closed. |
 | [Desktop inventory](inventory-desktop.png) | Existing desktop table columns. |
 
