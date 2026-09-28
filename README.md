@@ -87,7 +87,7 @@ is occupied. Pass other Compose commands through the same wrapper, including
 
 | Service | Local address / behavior |
 | --- | --- |
-| App and API | `http://localhost:3001`; container port `3000`. |
+| App and API | `http://localhost:3001`; container port `3001`. |
 | PostgreSQL 18 | `localhost:5434`; database/user/password are `gurps`; container port `5432`. |
 | Dependencies | One-shot `deps` service installs from the frozen lockfile in `bun_modules`, in parallel with database startup. |
 | Migrations | One-shot `migrate` service waits for dependencies and a healthy database; the app waits for it to succeed. |
@@ -124,7 +124,9 @@ cp .env.example .env
 openssl rand -hex 32
 ```
 
-Replace `JWT_SECRET` with the generated value. Set `APP_BASE_URL` to **your own public HTTPS origin**, such as `https://gurps.example.com`, with no path or query. The official hosted instance is `https://gurps.abundant.zip`; a separate deployment should use its own address.
+Replace `JWT_SECRET` with the generated value. Set `APP_HOSTNAME` to **your own bare public hostname**, such as `gurps.example.com`, without `http://`, `https://`, a port, or a path. The app derives `https://gurps.example.com` in production; the internal `PORT` does not appear in public links. The official hosted instance is `https://gurps.abundant.zip`; a separate deployment should use its own address.
+
+When upgrading, replace the former `APP_BASE_URL=https://gurps.example.com` setting with `APP_HOSTNAME=gurps.example.com`. The old variable is no longer read.
 
 ```sh
 docker compose -f docker-compose.yml up --build -d
@@ -134,7 +136,7 @@ curl -fsS http://localhost:3000/api/v1/healthz
 
 Production exposes **port 3000**. The stack builds the app, applies migrations, and starts only after they succeed. Put it behind an HTTPS reverse proxy pointing at port 3000; forward WebSocket upgrades and leave `/api/*`, `/mcp`, `/oauth/*`, and `/.well-known/*` uncached. Keep the `db_data` volume backed up. To update, pull the latest code and rerun the build/start command.
 
-The supplied Compose files set container variables explicitly: `.env` supplies `${...}` substitutions, **not every container setting automatically**. For options not forwarded in the file, add them to the app service’s `environment` in a Compose override and include that override with `-f`. The production file forwards `JWT_SECRET`, `APP_BASE_URL`, `OAUTH_CLIENTS`, `TRUST_PROXY`, and the `AUTH_RATE_LIMIT_*` settings; database credentials, ports, token lifetimes, and CORS are fixed in that file unless overridden.
+The supplied Compose files set container variables explicitly: `.env` supplies `${...}` substitutions, **not every container setting automatically**. For options not forwarded in the file, add them to the app service’s `environment` in a Compose override and include that override with `-f`. The production file forwards `JWT_SECRET`, `APP_HOSTNAME`, `OAUTH_CLIENTS`, `TRUST_PROXY`, and the `AUTH_RATE_LIMIT_*` settings; database credentials, ports, token lifetimes, and CORS are fixed in that file unless overridden.
 
 ### Environment variables
 
@@ -144,13 +146,13 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | --- | --- | --- |
 | `ENVIRONMENT` | `development` | `development`, `test`, or `production`. Production disables the API docs UI and live OpenAPI endpoint. Production Compose sets this to `production`. |
 | `HOST` | `0.0.0.0` | Server bind address. |
-| `PORT` | `3000` | Port inside the container; change Compose port mappings separately. |
+| `PORT` | `3000` | Server listening port. Dev/test also uses it in the derived public URL, so host and container ports must match; dev Compose sets both to `3001` (the worktree wrapper chooses its own port). Production uses HTTPS/443 publicly and can map the internal port separately. |
 | `DATABASE_URL` | Required | PostgreSQL 18 connection URL. Compose uses `postgres://gurps:gurps@db:5432/gurps`; host tools for the dev database use `localhost:5434`. |
 | `JWT_SECRET` | Required; at least 32 characters | Signing secret; placeholders are rejected. Generate with `openssl rand -hex 32`. |
 | `JWT_ACCESS_TTL_MINUTES` | `15` | Access-token lifetime in minutes. |
 | `JWT_REFRESH_TTL_DAYS` | `14` | Refresh-token lifetime in days. |
 | `API_KEY_PEPPER` | Falls back to `JWT_SECRET` | Optional independent API-key HMAC secret, at least 16 characters. |
-| `APP_BASE_URL` | Required in production | Canonical public origin for OAuth and emailed links. Production requires HTTPS; dev Compose sets `http://localhost:3001`. |
+| `APP_HOSTNAME` | Required in production; `localhost` otherwise | Bare hostname for OAuth, passkeys, redirects, and emailed links. Derives `https://<hostname>` in production and `http://<hostname>:<PORT>` in dev/test. No scheme, port, path, or other URL components. |
 | `CORS_ORIGINS` | `[]` | JSON array of allowed origins. Empty means same-origin only; both Compose files set `[]`. |
 | `RESEND_API_KEY` | Unset | Enables Resend delivery for password resets and campaign invitations. |
 | `RESEND_FROM_EMAIL` | Unset | Sender email for Resend; configure alongside the API key. |
@@ -162,7 +164,7 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `AUTH_RATE_LIMIT_RESET_MAX` | `3` | Password-recovery attempt limit per window. |
 | `AUTH_RATE_LIMIT_CHALLENGE_MAX` | `10` | Passkey-challenge attempt limit per window. |
 
-Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (default `3000`, set to `3001` by dev Compose), and `VITE_HMR_PROTOCOL` (`ws`, or `wss` for TLS). These control the browser’s hot-reload connection, not the public application URL. Test-runner overrides are documented in [playwright.config.ts](playwright.config.ts).
+Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (defaults to `PORT`, set to `3001` by dev Compose), and `VITE_HMR_PROTOCOL` (`ws`, or `wss` for TLS). These control the browser’s hot-reload connection, not the public application URL. Test-runner overrides are documented in [playwright.config.ts](playwright.config.ts).
 
 ### Development checks and further reading
 

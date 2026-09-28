@@ -7,7 +7,7 @@ import {
 } from '@simplewebauthn/server';
 import { and, eq, gt, isNull, lt } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { loadConfig } from '../config.ts';
+import { appUrl, loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { passkeyChallenges } from '../db/schema.ts';
 
@@ -25,8 +25,7 @@ export function sha256(data: string | Uint8Array): Buffer {
 
 export function webauthnRp() {
   const config = loadConfig();
-  const origin = config.appBaseUrl ?? `http://localhost:${config.port}`;
-  const url = new URL(origin);
+  const url = new URL(appUrl(config));
   return { rpName: 'GURPS Player Companion', rpId: url.hostname, origin: url.origin };
 }
 

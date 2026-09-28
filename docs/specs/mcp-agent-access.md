@@ -367,8 +367,11 @@ resource to `/oauth/authorize`; consent returns the one-time code to that
 callback. The client exchanges it with the original verifier and resource at
 `/oauth/token`, then uses the `gpco_` access token only at `/mcp`.
 
-`APP_BASE_URL` is the canonical origin used by discovery and audience checks.
-Production requires a pathless HTTPS origin. Proxies route `/mcp`, `/oauth/*`,
+`APP_HOSTNAME` is the bare public hostname used to derive the canonical origin
+for discovery and audience checks through `config.ts`'s `appUrl()`. Production
+requires it and derives HTTPS on port 443; development/test defaults to
+`localhost` and derives HTTP with `PORT`. Schemes, ports, paths, credentials,
+queries, and fragments are rejected in this setting. Proxies route `/mcp`, `/oauth/*`,
 and `/.well-known/*` without caching. The PWA navigation fallback excludes
 these protocol paths. The mutable service-worker entrypoints and HTML shells
 also carry `no-store` origin/CDN headers so an edge-cached old worker cannot

@@ -39,7 +39,7 @@ import {
   verifyRegistration,
   webauthnRp,
 } from '../auth/webauthn.ts';
-import { loadConfig } from '../config.ts';
+import { appUrl, loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -746,7 +746,7 @@ router.openapi(
     const resend = getResend(config);
 
     // Only attempt to send if we have everything needed to produce a usable link.
-    if (resend && config.resendFromEmail && config.appBaseUrl) {
+    if (resend && config.resendFromEmail) {
       const db = getDb();
       const rows = await db.select().from(users).where(eq(users.email, body.email));
       const user = rows[0];
@@ -766,7 +766,7 @@ router.openapi(
           await tx.insert(passwordResetTokens).values({ userId: user.id, tokenHash, expiresAt });
         });
 
-        const baseUrl = config.appBaseUrl.replace(/\/+$/, '');
+        const baseUrl = appUrl(config);
         const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
 
         sendPasswordResetEmail(resend, config.resendFromEmail, {

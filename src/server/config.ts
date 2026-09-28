@@ -9,6 +9,26 @@ const placeholderSecrets = new Set([
   'placeholder',
 ]);
 
+const appHostname = z
+  .string()
+  .min(1)
+  .max(253)
+  .refine((value) => {
+    // Accept DNS names, canonical IPv4, and bracketed IPv6 literals. Reject
+    // URL syntax and ports rather than silently extracting a hostname.
+    const dnsName = value
+      .split('.')
+      .every((label) => /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i.test(label));
+    const ipv6 = /^\[[a-f\d:]+\]$/i.test(value);
+    if (!dnsName && !ipv6) return false;
+    try {
+      return new URL(`https://${value}`).hostname === value.toLowerCase();
+    } catch {
+      return false;
+    }
+  }, 'APP_HOSTNAME must be a bare hostname without scheme, port, path, or URL components')
+  .transform((value) => value.toLowerCase());
+
 const envSchema = z.object({
   ENVIRONMENT: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -23,7 +43,7 @@ const envSchema = z.object({
   API_KEY_PEPPER: z.string().min(16).optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
-  APP_BASE_URL: z.string().url().optional(),
+  APP_HOSTNAME: appHostname.optional(),
   OAUTH_CLIENTS: z
     .string()
     .default('[]')
@@ -108,7 +128,7 @@ export type AppConfig = {
   corsOrigins: string[];
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
-  appBaseUrl: string | undefined;
+  appHostname: string;
   oauthClients: OAuthClientConfig[];
   trustProxy: boolean;
   authRateLimitWindowSeconds: number;
@@ -119,6 +139,15 @@ export type AppConfig = {
 };
 
 let cached: AppConfig | undefined;
+
+/** The public edge uses HTTPS/443; local servers use their listening port. */
+export function appUrl(config: Pick<AppConfig, 'environment' | 'appHostname' | 'port'>): string {
+  return new URL(
+    config.environment === 'production'
+      ? `https://${config.appHostname}`
+      : `http://${config.appHostname}:${config.port}`,
+  ).origin;
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (cached) return cached;
@@ -134,7 +163,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     CORS_ORIGINS: env.CORS_ORIGINS,
     RESEND_API_KEY: env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL,
-    APP_BASE_URL: env.APP_BASE_URL,
+    APP_HOSTNAME: env.APP_HOSTNAME,
     OAUTH_CLIENTS: env.OAUTH_CLIENTS,
     TRUST_PROXY: env.TRUST_PROXY,
     AUTH_RATE_LIMIT_WINDOW_SECONDS: env.AUTH_RATE_LIMIT_WINDOW_SECONDS,
@@ -143,26 +172,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     AUTH_RATE_LIMIT_RESET_MAX: env.AUTH_RATE_LIMIT_RESET_MAX,
     AUTH_RATE_LIMIT_CHALLENGE_MAX: env.AUTH_RATE_LIMIT_CHALLENGE_MAX,
   });
-  if (parsed.ENVIRONMENT === 'production' && !parsed.APP_BASE_URL) {
-    throw new Error('APP_BASE_URL is required in production for OAuth');
-  }
-  if (parsed.APP_BASE_URL) {
-    const publicUrl = new URL(parsed.APP_BASE_URL);
-    const safeProtocol =
-      publicUrl.protocol === 'https:' ||
-      (parsed.ENVIRONMENT !== 'production' && publicUrl.protocol === 'http:');
-    if (
-      !safeProtocol ||
-      publicUrl.username ||
-      publicUrl.password ||
-      publicUrl.hash ||
-      publicUrl.search ||
-      publicUrl.pathname !== '/'
-    ) {
-      throw new Error(
-        'APP_BASE_URL must be an origin without path, query, credentials, or fragment; production requires HTTPS',
-      );
-    }
+  if (parsed.ENVIRONMENT === 'production' && !parsed.APP_HOSTNAME) {
+    throw new Error('APP_HOSTNAME is required in production');
   }
 
   cached = {
@@ -177,7 +188,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: parsed.CORS_ORIGINS,
     resendApiKey: parsed.RESEND_API_KEY,
     resendFromEmail: parsed.RESEND_FROM_EMAIL,
-    appBaseUrl: parsed.APP_BASE_URL,
+    appHostname: parsed.APP_HOSTNAME ?? 'localhost',
     oauthClients: parsed.OAUTH_CLIENTS,
     trustProxy: parsed.TRUST_PROXY ?? parsed.ENVIRONMENT === 'production',
     authRateLimitWindowSeconds: parsed.AUTH_RATE_LIMIT_WINDOW_SECONDS,

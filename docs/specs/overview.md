@@ -17,7 +17,9 @@ all on one origin, one port.
 The official hosted instance is [gurps.abundant.zip](https://gurps.abundant.zip).
 The root [README](../../README.md) is the player-facing introduction, with
 current desktop/mobile screenshots and self-hosting/environment documentation
-at the end. Screenshot provenance and refresh notes live in
+at the end. `APP_HOSTNAME` is the bare public hostname; the server derives HTTPS
+in production and HTTP with `PORT` in development/test for all public app URLs.
+Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
 A first download that fails displays its reason and a retry action; an ended session

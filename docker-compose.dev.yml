@@ -59,17 +59,17 @@ services:
       MEDIA_S3_PATH_STYLE: ${MEDIA_S3_PATH_STYLE:-true}
       MEDIA_UPLOADS_ENABLED: ${MEDIA_UPLOADS_ENABLED:-true}
       ENVIRONMENT: development
-      PORT: 3000
+      PORT: ${GPC_APP_PORT:-3001}
       HOST: 0.0.0.0
       DATABASE_URL: postgres://gurps:gurps@db:5432/gurps
       JWT_SECRET: dev-only-secret-replace-me-replace-me-replace-me
       JWT_ACCESS_TTL_MINUTES: 15
       JWT_REFRESH_TTL_DAYS: 14
       CORS_ORIGINS: '[]'
-      APP_BASE_URL: http://localhost:${GPC_APP_PORT:-3001}
+      APP_HOSTNAME: localhost
       OAUTH_CLIENTS: '[]'
       # Vite HMR client runs in the *host* browser, so it must connect
-      # back to the host-mapped port, not the container's internal 3000.
+      # back to the same public port used by the server and derived app URL.
       # See vite.config.ts `server.hmr`.
       VITE_HMR_HOST: localhost
       VITE_HMR_PORT: '${GPC_APP_PORT:-3001}'
@@ -82,7 +82,7 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - '${GPC_APP_PORT:-3001}:3000'
+      - '${GPC_APP_PORT:-3001}:${GPC_APP_PORT:-3001}'
 
   client-tests:
     image: node:22-alpine
