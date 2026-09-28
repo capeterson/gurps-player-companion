@@ -1,5 +1,9 @@
 # Design Spec: Technical Architecture
 
+The shared character-sheet presentation and editing contracts are documented in
+[interaction-design.md](interaction-design.md): summary tables, on-demand Add/Edit
+disclosures, responsive layouts, preserved drafts, and accessible shared primitives.
+
 Describes the current technical architecture of GURPS Player Companion. For
 the product surface see [overview.md](overview.md); for the two key subsystems
 see [offline-sync.md](offline-sync.md) and

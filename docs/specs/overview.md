@@ -40,6 +40,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [active-effects-skill-procedures.md](active-effects-skill-procedures.md) | Campaign active effects, owned character instances, contextual skill modifiers, actions and level benefits. |
 | **overview.md** (this file) | Product surface, feature catalog, codebase map, orientation notes. |
 | [architecture.md](architecture.md) | Stack, process model, request lifecycle, data model, auth, testing, deploy. |
+| [interaction-design.md](interaction-design.md) | Character-sheet summary tables, disclosures, draft lifetime, responsive layout, and shared UI primitives. |
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
 | [library-calculation-rules.md](library-calculation-rules.md) | Declarative pricing, source editions, completeness, snapshots, modifiers and item modes. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
@@ -436,8 +437,11 @@ shows the synced campaign name as a separate link to that campaign.
   a "Skill 'X' not on sheet" tooltip instead of guessing. The default
   line and points are editable per row. A resolved
   level is a tappable roll target like a skill's. Rendered on the Skills
-  tab. Its add form and rows reflow into labeled two-column mobile layouts;
-  the desktop column header is hidden rather than forcing horizontal scroll.
+  tab. The compact summary table shows points and roll levels beside the name;
+  narrow rows place the governing skill, difficulty, and default line below it.
+  **Add technique** opens a closed-by-default creation form, and each **Edit**
+  action reveals labeled fields and confirmed deletion. Closing forms and row
+  editors preserves their drafts. Shared table column filters remain available.
   Default-skill references use the shared React Aria skill combobox: suggestions
   combine the character sheet and campaign library, with the campaign entry
   taking precedence for the same name and specialization. Free text remains
@@ -456,7 +460,11 @@ shows the synced campaign name as a separate link to that campaign.
   own **languages** bucket in the point ledger rather than inflating
   advantages, and the add form autocompletes against the campaign's
   language library. Rendered on the Skills tab under the skills table, with
-  the same labeled mobile-card treatment as skills and techniques.
+  compact summary rows showing spoken/written fluency and points. **Add language**
+  opens its closed-by-default creation form; **Edit** opens a labeled row editor
+  with confirmed deletion. Closing either disclosure preserves drafts. Languages
+  and Techniques use the shared filterable table and their outer fold heading
+  without repeating inner titles. See [interaction-design.md](interaction-design.md).
 - **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
   helper, **mana level** from campaign, and **powerstones / magic items**.
   On mobile, the add form, spell fields, stored-energy controls, magic-item
@@ -501,8 +509,8 @@ shows the synced campaign name as a separate link to that campaign.
   chip again collapses it. The pencil opens basic item details in the same
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
-  **+ Category** adds another role without changing siblings or equipped/worn
-  state. Category removal has a separate inline confirmation; containers with
+  **+ Category**, in the pencil's item-details editor, adds another role
+  without changing siblings or equipped/worn state. Category removal has a separate inline confirmation; containers with
   contents must be emptied first. Read-only viewers see summary badges only.
   Fields save on blur through `useDraftField` and the local outbox. JSON leaf
   edits merge with the latest stored item inside a Dexie transaction so rapid
@@ -524,7 +532,17 @@ shows the synced campaign name as a separate link to that campaign.
   including inactive and highest-policy-suppressed effects.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
-  new item's category chips. Implementation lives under
+  new item's category chips.
+  Every row leads with a container chevron or an item-type icon, and each
+  nesting level indents one step with a faint guide line under its parent's
+  chevron; a collapsed container shows its contained-item count. Below 640px
+  each item is a compact two-line row: name and chips on the left, weight over
+  quantity (shown only when above 1) and cost on the right, then the edit
+  action. Indentation is bounded so deep trees keep room for names. Filtering
+  retains matching items' ancestor context; closing containers preserves editor
+  drafts. Desktop keeps its Item/Qty/Wt/Cost columns. See
+  [interaction-design.md](interaction-design.md) for the shared presentation patterns.
+  Implementation lives under
   `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, `RangedRangeField`, and
   `itemMutations`), with regression tests for disclosure, local saves, rollback,
   category changes, and structured-data preservation.
@@ -1061,7 +1079,8 @@ src/
                                       structured Range inputs and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
-                 LanguagesPanel and TechniquesPanel (the new P0 panels),
+                 LanguagesPanel and TechniquesPanel (compact summary tables
+                 with retained Add/Edit disclosures),
                  TraitsPanel and traitTablePreferences (searchable/sortable
                  compact traits table, inline editor, and per-character
                  device-only sort/custom order),
@@ -1112,7 +1131,8 @@ src/
                  useAppHeaderBottom (live sticky-header offset),
                  useSelectedCampaignId (legacy Log/Library campaign URL selection),
                  useFlashState (shared flash-pulse primitive the draft
-                 hooks build on), ...
+                 hooks build on), useFlashGroup (visible summary feedback
+                 for retained language/technique editor rollbacks), ...
     components/  Shared UI (FoldSection: device-persisted folding without unmounting,
                  sync indicator/log, notifications bell,
                  SwUpdatePrompt (new-build toast), ui/*, markdown/ —

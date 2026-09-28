@@ -264,6 +264,9 @@ describe('inline inventory editing', () => {
 
   it('adds a category alongside armor and requires explicit removal confirmation', async () => {
     const user = await setup();
+    // Adding a category starts from the item details, not a chip on every row.
+    expect(screen.queryByRole('button', { name: 'Add category to Coat' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Edit Coat' }));
     await user.click(screen.getByRole('button', { name: 'Add category to Coat' }));
     await user.click(screen.getByRole('button', { name: '+ Weapon' }));
     await screen.findByRole('region', { name: 'Coat: Weapon' });

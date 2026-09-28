@@ -263,6 +263,12 @@ export function useTableFiltersActive(): boolean {
   return Boolean(table?.enabled && Object.keys(table.filters).length);
 }
 
+/** Let hierarchical tables retain matching rows' ancestors without duplicating filters. */
+export function useTableRowMatches(): (values: TableValues) => boolean {
+  const table = useContext(TableContext);
+  return (values) => !table?.enabled || rowMatchesFilters(values, table.filters);
+}
+
 /** Render grouped/folded source rows open while a column filter is active. */
 export function TableFilterScope({ children }: { children: (filtering: boolean) => ReactNode }) {
   return children(useTableFiltersActive());

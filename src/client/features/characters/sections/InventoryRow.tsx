@@ -1,6 +1,18 @@
-import { TableRow, useTableFiltersActive } from '../../../components/ui/Table.tsx';
+import {
+  TableRow,
+  useTableFiltersActive,
+  useTableRowMatches,
+} from '../../../components/ui/Table.tsx';
 import './inventory/inventory.css';
-import { type DragEvent, Fragment, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type DragEvent,
+  Fragment,
+  type MouseEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from 'react';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
@@ -67,8 +79,39 @@ export function InventoryRow(props: InventoryRowProps) {
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
   const columnFiltersActive = useTableFiltersActive();
-  const contentsOpen =
-    columnFiltersActive || expandContainers || revealContainers?.has(item.id) || open;
+  const matchesRow = useTableRowMatches();
+  const filterValues = (entry: InventoryItemOut) => ({
+    item: entry.name,
+    qty: entry.quantity,
+    wt: (inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs).toFixed(1),
+    cost: entry.cost.toFixed(0),
+  });
+  // Retain a matching descendant's ancestry. Hidden rows remain mounted to
+  // preserve open editor drafts.
+  function subtreeMatches(entry: InventoryItemOut): boolean {
+    return (
+      matchesRow(filterValues(entry)) ||
+      (entry.isContainer && (byParent.get(entry.id) ?? []).some(subtreeMatches))
+    );
+  }
+  const filteredOut = !subtreeMatches(item);
+  // Indent guides are drawn in CSS from the depth, so they need no per-row
+  // sibling bookkeeping and stay correct while filtering or collapsing.
+  const rowStyle = { '--inventory-depth': depth } as CSSProperties;
+  const itemIcon = item.isContainer
+    ? 'inventory'
+    : item.isArmor || item.weaponData?.db != null
+      ? 'defense'
+      : item.weaponData != null
+        ? 'combat'
+        : item.powerstoneData != null ||
+            item.magicItemData != null ||
+            (item.enchantments?.length ?? 0) > 0
+          ? 'modifier'
+          : 'notes';
+  const contentsForcedOpen =
+    columnFiltersActive || expandContainers || Boolean(revealContainers?.has(item.id));
+  const contentsOpen = contentsForcedOpen || open;
   const contentsVisited = useRef(false);
   if (contentsOpen) contentsVisited.current = true;
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
@@ -92,14 +135,15 @@ export function InventoryRow(props: InventoryRowProps) {
     triggerRef.current?.focus();
   }
   function categoryChip(category: ItemCategory, children: ReactNode) {
-    if (!canEdit) return <span className="badge badge-sm badge-ghost">{children}</span>;
+    if (!canEdit)
+      return <span className="inventory-chip badge badge-sm badge-ghost">{children}</span>;
     return (
       <button
         type="button"
         aria-label={`${CATEGORY_LABELS[category]} settings for ${item.name}`}
         aria-expanded={section === category}
         aria-controls={editorId}
-        className={`badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
+        className={`inventory-chip badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
         onClick={(event) => {
           event.stopPropagation();
           toggleSection(category, event.currentTarget);
@@ -181,13 +225,7 @@ export function InventoryRow(props: InventoryRowProps) {
   return (
     <Fragment>
       <TableRow
-        hidden={ancestorHidden}
-        filterValues={{
-          item: item.name,
-          qty: item.quantity,
-          wt: netWeight.toFixed(1),
-          cost: item.cost.toFixed(0),
-        }}
+        hidden={ancestorHidden || filteredOut}
         id={sheetAnchor('inventory', item.id)}
         onClick={canEdit ? (e) => onRowClick(item.id, e) : undefined}
         draggable={canEdit && !!drag}
@@ -199,6 +237,7 @@ export function InventoryRow(props: InventoryRowProps) {
         onDrop={canEdit && drag ? handleDrop : undefined}
         className={[
           'inventory-item-row transition-colors scroll-mt-24',
+          item.isContainer ? 'inventory-container-row' : '',
           highlighted ? '!bg-primary/20 outline outline-2 outline-primary' : '',
           rowFlash.flashing ? 'field-rollback-flash' : '',
           canEdit ? 'cursor-pointer' : '',
@@ -208,44 +247,42 @@ export function InventoryRow(props: InventoryRowProps) {
           sel && !isHovered && !highlighted ? '!bg-primary/15 hover:!bg-primary/20' : '',
           !sel && !isHovered && !highlighted ? 'hover:bg-base-200/50' : '',
         ].join(' ')}
+        style={rowStyle}
         aria-selected={sel}
         {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
-          <div
-            className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
-            style={{ paddingLeft: `${depth * 1.25}rem` }}
-          >
-            <span className="flex items-center gap-2">
-              {hasChildren ? (
-                expandContainers ? (
-                  <span className="inline-block w-5 text-center text-base-content/50" aria-hidden>
-                    ▾
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      stop(e);
-                      setOpen((before) => {
-                        const next = !before;
-                        writeContainerExpanded(item.characterId, item.id, next);
-                        return next;
-                      });
-                    }}
-                    className="btn btn-ghost btn-xs px-1 text-base-content/50"
-                    aria-expanded={contentsOpen}
-                    aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
-                  >
-                    {contentsOpen ? '▾' : '▸'}
-                  </button>
-                )
+          <div className="inventory-item-heading flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+            <span className="inventory-item-name flex min-w-0 items-start gap-2">
+              {hasChildren && !contentsForcedOpen ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    stop(e);
+                    setOpen((before) => {
+                      const next = !before;
+                      writeContainerExpanded(item.characterId, item.id, next);
+                      return next;
+                    });
+                  }}
+                  className="inventory-slot inventory-expand btn btn-ghost btn-xs text-base-content/60"
+                  aria-expanded={contentsOpen}
+                  aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
+                >
+                  <AppIcon name={contentsOpen ? 'chevronDown' : 'chevronRight'} size={15} />
+                </button>
+              ) : hasChildren ? (
+                <span className="inventory-slot text-base-content/60" aria-hidden>
+                  <AppIcon name="chevronDown" size={15} />
+                </span>
               ) : (
-                <span className="inline-block w-5" aria-hidden />
+                <span className="inventory-slot text-base-content/60" aria-hidden>
+                  <AppIcon name={itemIcon} size={15} />
+                </span>
               )}
-              <span className="font-medium">{item.name}</span>
+              <span className="inventory-item-title font-medium">{item.name}</span>
             </span>
-            <span className="flex flex-wrap items-center gap-1 pl-7 sm:pl-0">
+            <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
               {isRoot && item.worn && (
                 <span className="badge badge-sm badge-soft badge-secondary">Worn</span>
               )}
@@ -256,7 +293,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   <>
                     Container
                     {isRoot && item.worn && reductionLabel && (
-                      <span className="text-base-content/50 text-[10px] ml-1">
+                      <span className="text-base-content/70 text-[10px] ml-1">
                         {reductionLabel}
                       </span>
                     )}
@@ -276,7 +313,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'armor',
                   <>
                     Armor DR {item.armor.dr}
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {locationSummary(item.armor.locations)}
                     </span>
                   </>,
@@ -288,7 +325,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       <>
                         Shield DB {item.weaponData.db}
                         {item.weaponData.skill && (
-                          <span className="text-base-content/50 text-[10px] ml-1">
+                          <span className="text-base-content/70 text-[10px] ml-1">
                             {item.weaponData.skill}
                           </span>
                         )}
@@ -301,7 +338,7 @@ export function InventoryRow(props: InventoryRowProps) {
                         {(item.weaponData.damage ||
                           item.weaponData.skill ||
                           item.weaponData.ranged != null) && (
-                          <span className="text-base-content/50 text-[10px] ml-1">
+                          <span className="text-base-content/70 text-[10px] ml-1">
                             {[
                               item.weaponData.damage || null,
                               item.weaponData.ranged != null ? 'ranged' : null,
@@ -318,7 +355,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'powerstone',
                   <>
                     Powerstone
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {item.powerstoneData.currentEnergy}/{item.powerstoneData.maxEnergy}
                     </span>
                   </>,
@@ -328,7 +365,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'magicItem',
                   <>
                     Magic
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {item.magicItemData.spellName}
                       {item.magicItemData.mode === 'charged' &&
                         item.magicItemData.chargesCurrent != null &&
@@ -338,36 +375,15 @@ export function InventoryRow(props: InventoryRowProps) {
                 )}
               {(item.enchantments?.length ?? 0) > 0 &&
                 categoryChip('enchantments', <>Enchantments · {item.enchantments.length}</>)}
-              {canEdit && (
-                <button
-                  type="button"
-                  className="badge badge-sm badge-ghost min-h-8 h-auto border-dashed"
-                  aria-expanded={section === 'add'}
-                  aria-controls={editorId}
-                  aria-label={`Add category to ${item.name}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleSection('add', event.currentTarget);
-                  }}
-                >
-                  + Category
-                </button>
-              )}
             </span>
           </div>
           {isRoot && !item.worn && item.externalLocation && (
-            <div
-              className="text-base-content/60 text-xs mt-0.5"
-              style={{ paddingLeft: `${depth * 1.25 + 1.5}rem` }}
-            >
+            <div className="inventory-item-detail text-base-content/60 text-xs mt-0.5">
               {item.externalLocation}
             </div>
           )}
           {(item.enchantmentBreakdown?.length ?? 0) > 0 && (
-            <div
-              className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-base-content/60"
-              style={{ paddingLeft: `${depth * 1.25 + 1.5}rem` }}
-            >
+            <div className="inventory-item-detail mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-base-content/60">
               {item.enchantmentBreakdown?.map((effect, index) => (
                 <span
                   key={`${effect.sourceName}:${effect.target}:${index}`}
@@ -387,12 +403,15 @@ export function InventoryRow(props: InventoryRowProps) {
             </div>
           )}
         </td>
-        <td data-label="Qty" className="num text-right align-top sm:align-middle">
+        <td
+          data-label="Qty"
+          className={`inventory-qty num text-right align-top sm:align-middle ${item.quantity === 1 ? 'inventory-qty-one' : ''}`}
+        >
           {item.quantity}
         </td>
         <td
           data-label="Weight (lb)"
-          className={`num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
+          className={`inventory-weight num text-right align-top sm:align-middle ${netWeight === 0 ? 'text-base-content/50' : ''}`}
           title={
             weightModified
               ? item.isContainer && weightDelta > 0
@@ -404,11 +423,11 @@ export function InventoryRow(props: InventoryRowProps) {
           <span className="inline-flex items-baseline justify-end gap-1.5">
             {weightModified &&
               (item.isContainer && weightDelta > 0 ? (
-                <span className="text-[11px] text-base-content/60">
+                <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
                   {grossWeight.toFixed(1)} <span className="italic text-info">+ contents</span>
                 </span>
               ) : (
-                <span className="text-[11px] text-base-content/60">
+                <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
                   {grossWeight.toFixed(1)}{' '}
                   <span className="text-success">
                     {weightDelta >= 0 ? '+' : '-'}
@@ -421,7 +440,7 @@ export function InventoryRow(props: InventoryRowProps) {
         </td>
         <td
           data-label="Cost"
-          className="num text-right text-base-content/60 align-top sm:align-middle"
+          className="inventory-cost num text-right text-base-content/75 align-top sm:align-middle"
         >
           {item.cost.toFixed(0)}
         </td>
@@ -448,14 +467,9 @@ export function InventoryRow(props: InventoryRowProps) {
       </TableRow>
       {canEdit && visited.length > 0 && (
         <TableRow
-          filterValues={{
-            item: item.name,
-            qty: item.quantity,
-            wt: netWeight.toFixed(1),
-            cost: item.cost.toFixed(0),
-          }}
           className="inventory-editor-row"
-          hidden={ancestorHidden || section === null}
+          style={rowStyle}
+          hidden={ancestorHidden || filteredOut || section === null}
           id={editorId}
         >
           <td colSpan={5} className="!p-2 sm:!p-3">
