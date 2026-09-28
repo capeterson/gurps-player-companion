@@ -135,7 +135,8 @@ export function InventoryRow(props: InventoryRowProps) {
     triggerRef.current?.focus();
   }
   function categoryChip(category: ItemCategory, children: ReactNode) {
-    if (!canEdit) return <span className="inventory-chip badge badge-sm badge-ghost">{children}</span>;
+    if (!canEdit)
+      return <span className="inventory-chip badge badge-sm badge-ghost">{children}</span>;
     return (
       <button
         type="button"
