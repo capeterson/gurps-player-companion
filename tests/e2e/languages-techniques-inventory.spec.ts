@@ -93,6 +93,27 @@ async function captureOverlay(page: Page, name: string, width: number) {
     await page.screenshot({ path: `test-results/interaction-${name}-${width}.png` });
   }
 }
+async function branchCircle(row: Locator) {
+  return row.locator('.inventory-branch-own').evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const circle = getComputedStyle(node, '::after');
+    return {
+      x: rect.x + Number.parseFloat(circle.left) + Number.parseFloat(circle.width) / 2,
+      y: rect.y + Number.parseFloat(circle.top) + Number.parseFloat(circle.height) / 2,
+      railHeight: rect.height,
+      ends: node.classList.contains('inventory-branch-end'),
+    };
+  });
+}
+async function railCenterX(
+  row: Locator,
+  selector = '.inventory-branch-rail:not(.inventory-branch-own)',
+) {
+  return row.locator(selector).evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return rect.x + rect.width / 2;
+  });
+}
 
 async function setup(page: Page) {
   await page.goto('/register');
@@ -169,6 +190,33 @@ async function setup(page: Page) {
       cost: 15,
     })
   ).item;
+  const rations = (
+    await create(`${path}/inventory`, {
+      name: 'Trail rations',
+      parentId: pack.id,
+      quantity: 3,
+      weightLbs: 0.5,
+      cost: 12,
+    })
+  ).item;
+  const lastKit = (
+    await create(`${path}/inventory`, {
+      name: 'Weatherproof kit',
+      parentId: pack.id,
+      isContainer: true,
+      weightLbs: 1,
+      cost: 25,
+    })
+  ).item;
+  const nestedBlade = (
+    await create(`${path}/inventory`, {
+      name: 'Signal blade',
+      parentId: lastKit.id,
+      weightLbs: 1,
+      cost: 40,
+      weaponData: { damage: 'sw cut', skill: 'Knife' },
+    })
+  ).item;
   const sword = (
     await create(`${path}/inventory`, {
       name: 'Broadsword',
@@ -183,13 +231,25 @@ async function setup(page: Page) {
   ).item;
   await page.goto(path);
   await selectCharacterSection(page, 'Skills');
-  return { path, create, remove, pack, pouch, nested, sword, longItem };
+  return {
+    path,
+    create,
+    remove,
+    pack,
+    pouch,
+    nested,
+    rations,
+    lastKit,
+    nestedBlade,
+    sword,
+    longItem,
+  };
 }
 
 test('languages, techniques and inventory retain edits and fit their responsive layouts', async ({
   page,
 }) => {
-  test.setTimeout(360_000);
+  test.setTimeout(540_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   const fixture = await setup(page);
   const languageFold = page
@@ -337,10 +397,83 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   const pack = page.locator(`#inventory-${fixture.pack.id}`);
   const pouch = page.locator(`#inventory-${fixture.pouch.id}`);
   const nested = page.locator(`#inventory-${fixture.nested.id}`);
+  const rations = page.locator(`#inventory-${fixture.rations.id}`);
+  const lastKit = page.locator(`#inventory-${fixture.lastKit.id}`);
+  const nestedBlade = page.locator(`#inventory-${fixture.nestedBlade.id}`);
   const sword = page.locator(`#inventory-${fixture.sword.id}`);
+  await page.setViewportSize({ width: 375, height: 900 });
   await pack.getByRole('button', { name: 'Expand contents' }).click();
   await pouch.getByRole('button', { name: 'Expand contents' }).click();
+  await lastKit.getByRole('button', { name: 'Expand contents' }).click();
   await expect(nested.getByText('Coastal charts', { exact: true })).toBeVisible();
+  await expect(rations.getByText('Trail rations', { exact: true })).toBeVisible();
+  await expect(nestedBlade.getByText('Signal blade', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/inventory-tree-before-checks-mobile.png' });
+
+  // Selection and an unblurred editor draft must survive collapsing the root
+  // container. These are visible interactions, not a direct state assertion.
+  const unselectedColor = await nestedBlade.evaluate(
+    (row) => getComputedStyle(row).backgroundColor,
+  );
+  await nestedBlade.getByText('Signal blade', { exact: true }).click();
+  await expect(nestedBlade).toHaveAttribute('aria-selected', 'true');
+  await expect
+    .poll(() => nestedBlade.evaluate((row) => getComputedStyle(row).backgroundColor))
+    .not.toBe(unselectedColor);
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await nestedBlade.getByRole('button', { name: 'Weapon settings for Signal blade' }).click();
+  const nestedEditor = page.getByRole('region', { name: 'Signal blade: Weapon', exact: true });
+  const nestedDamage = nestedEditor.getByLabel('Damage', { exact: true });
+  await expect(nestedDamage).toHaveValue('sw cut');
+  await nestedDamage.fill('sw+2 cut');
+  await expect(nestedDamage).toHaveValue('sw+2 cut');
+  await pack.getByRole('button', { name: 'Collapse contents' }).dispatchEvent('click');
+  await expect(nestedBlade).toBeHidden();
+  await expect(nestedEditor).toBeHidden();
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await pack.getByRole('button', { name: 'Expand contents' }).dispatchEvent('click');
+  await expect(nestedBlade).toBeVisible();
+  await expect(nestedBlade).toHaveAttribute('aria-selected', 'true');
+  await expect(nestedEditor).toBeVisible();
+  await expect(nestedDamage).toHaveValue('sw+2 cut');
+
+  const packCount = pack.locator('.inventory-contents-count');
+  const pouchCount = pouch.locator('.inventory-contents-count');
+  const kitCount = lastKit.locator('.inventory-contents-count');
+
+  // Search reveals a matching last sibling and only the ancestors needed to reach it.
+  const inventorySearch = page.getByRole('searchbox', { name: 'Filter inventory' });
+  await inventorySearch.fill('Trail rations');
+  await expect(pack.getByText('Travel pack', { exact: true })).toBeVisible();
+  await expect(rations.getByText('Trail rations', { exact: true })).toBeVisible();
+  await expect(pouch).toBeHidden();
+  await expect(nested).toBeHidden();
+  await expect(lastKit).toBeHidden();
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+
+  // A table-column filter uses the same matching descendants and updates the
+  // visible direct count plus the final sibling endpoint.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await inventory.getByRole('button', { name: 'Item', exact: true }).click();
+  const itemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
+  await itemFilter.getByRole('checkbox', { name: 'Trail rations', exact: true }).check();
+  await itemFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
+  await page.setViewportSize({ width: 375, height: 900 });
+  await expect(packCount).toBeVisible();
+  await expect(packCount).toHaveText('1 item');
+  await expect(packCount).toHaveAttribute('aria-label', '1 direct item');
+  await expect(rations).toBeVisible();
+  await expect(pouch).toBeHidden();
+  await expect(nested).toBeHidden();
+  await expect(lastKit).toBeHidden();
+  await expect((await branchCircle(rations)).ends).toBeTruthy();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await inventory.getByRole('button', { name: 'Item', exact: true }).click();
+  const clearItemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
+  await clearItemFilter.getByRole('button', { name: 'Clear column filter', exact: true }).click();
+  await clearItemFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
+  await page.setViewportSize({ width: 375, height: 900 });
+
   await sword.getByRole('button', { name: 'Edit Broadsword', exact: true }).click();
   const itemEditor = page.getByRole('region', { name: 'Broadsword: Item details', exact: true });
   await itemEditor.getByLabel('Equipped', { exact: true }).check();
@@ -368,6 +501,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     const rootName = await box(pack.locator('.inventory-item-name'));
     const childName = await box(nested.locator('.inventory-item-name'));
     expect(childName.x).toBeGreaterThan(rootName.x);
+    for (const row of [pack, pouch, nested, rations, lastKit, nestedBlade]) {
+      await inside(page, row.locator('.inventory-item-name'));
+    }
     if (width < 640) {
       await expect(tip).toBeHidden();
       const heading = await box(sword.locator('.inventory-item-heading'));
@@ -379,6 +515,28 @@ test('languages, techniques and inventory retain edits and fit their responsive 
       expect(Math.abs(qty.y - cost.y)).toBeLessThanOrEqual(1);
       expect(qty.x + qty.width).toBeLessThanOrEqual(weight.x + 1);
       expect(weight.x + weight.width).toBeLessThanOrEqual(cost.x + 1);
+      await expect(packCount).toBeVisible();
+      await expect(packCount).toHaveText('3 items');
+      await expect(pouchCount).toBeVisible();
+      await expect(pouchCount).toHaveText('1 item');
+      await expect(kitCount).toBeVisible();
+      await expect(kitCount).toHaveText('1 item');
+      if ([320, 375, 639].includes(width)) {
+        const mapCircle = await branchCircle(pouch);
+        const mapIcon = await box(pouch.locator('.inventory-type-icon'));
+        expect(mapCircle.ends).toBe(false);
+        expect(mapCircle.y).toBeCloseTo(mapIcon.y + mapIcon.height / 2, 0);
+        expect(await railCenterX(nested)).toBeCloseTo(mapCircle.x, 0);
+        expect((await branchCircle(rations)).x).toBeCloseTo(mapCircle.x, 0);
+        expect(await railCenterX(rations, '.inventory-branch-own')).toBeCloseTo(mapCircle.x, 0);
+
+        const kitCircle = await branchCircle(lastKit);
+        expect(kitCircle.ends).toBe(true);
+        expect(kitCircle.railHeight).toBeCloseTo(26, 0);
+        const bladeRails = nestedBlade.locator('.inventory-branch-rail:not(.inventory-branch-own)');
+        await expect(bladeRails).toHaveCount(0);
+        expect((await branchCircle(nestedBlade)).x).toBeGreaterThan(kitCircle.x);
+      }
     } else {
       await expect(tip).toBeVisible();
       await expect(inventory.getByRole('columnheader', { name: 'Qty', exact: true })).toBeVisible();
@@ -393,6 +551,8 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await fixture.remove(`${fixture.path}/languages/${stressLanguage.language.id}`);
   await fixture.remove(`${fixture.path}/techniques/${stressTechnique.technique.id}`);
   await fixture.remove(`${fixture.path}/inventory/${fixture.longItem.id}`);
+  await fixture.remove(`${fixture.path}/inventory/${fixture.nestedBlade.id}`);
+  await fixture.remove(`${fixture.path}/inventory/${fixture.lastKit.id}`);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.reload();
   await selectCharacterSection(page, 'Skills');
@@ -409,6 +569,10 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await selectCharacterSection(page, 'Inventory');
   await expect(page.locator(`#inventory-${fixture.longItem.id}`)).toHaveCount(0);
   await pack.scrollIntoViewIfNeeded();
+  await pack.getByRole('button', { name: 'Collapse contents' }).click();
+  await page.screenshot({ path: `${SHOTS}/inventory-mobile-collapsed.png` });
+  await pack.getByRole('button', { name: 'Expand contents' }).click();
+  await expect(nested).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/inventory-mobile.png` });
   await page.setViewportSize({ width: 1280, height: 900 });
   await pack.scrollIntoViewIfNeeded();

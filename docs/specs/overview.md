@@ -533,10 +533,13 @@ shows the synced campaign name as a separate link to that campaign.
   Library templates still populate the quick-add form, and its small optional
   category/equipped/worn controls remain available; detailed editing uses the
   new item's category chips.
-  On screens below 640px, inventory uses shallower panel gutters and item
-  indentation, full-width names and category/status controls, and one compact
-  quantity/weight/cost strip. Leaf items do not reserve an empty container
-  expander slot; nested containers retain their hierarchy and expansion actions.
+  On screens below 640px, inventory shows containers in warm theme-colored
+  bands with display headings and labeled contents counts. Connected branch
+  circles make nesting explicit: branches stop at their last visible sibling's
+  circle and continue alongside expanded descendants when a sibling follows.
+  Shallow gutters and bounded indentation preserve space for names, category
+  controls, and a compact quantity/weight/cost strip. Filtering retains matching
+  items' ancestor context; closing containers preserves editor drafts.
   Desktop columns keep their existing layout. See
   [interaction-design.md](interaction-design.md) for the shared presentation patterns.
   Implementation lives under

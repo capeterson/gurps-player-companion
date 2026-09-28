@@ -1,4 +1,8 @@
-import { TableRow, useTableFiltersActive } from '../../../components/ui/Table.tsx';
+import {
+  TableRow,
+  useTableFiltersActive,
+  useTableRowMatches,
+} from '../../../components/ui/Table.tsx';
 import './inventory/inventory.css';
 import {
   type CSSProperties,
@@ -26,6 +30,11 @@ export interface InventoryRowProps {
   /** Keep previously revealed descendant editors mounted when an ancestor closes. */
   ancestorHidden?: boolean;
   depth: number;
+  /** Rails for ancestor siblings that continue below this subtree. */
+  ancestorRails?: readonly number[];
+  hasFollowingSibling?: boolean;
+  /** One spacing for the whole root subtree; deep trees compress without merging rails. */
+  branchStep?: number;
   byParent: Map<string | null, InventoryItemOut[]>;
   isSelected: (id: string) => boolean;
   onRowClick: (id: string, e: MouseEvent) => void;
@@ -44,6 +53,17 @@ export interface InventoryRowProps {
   inStashed?: boolean;
 }
 
+function subtreeDepth(
+  item: InventoryItemOut,
+  byParent: Map<string | null, InventoryItemOut[]>,
+): number {
+  if (!item.isContainer) return 0;
+  const children = byParent.get(item.id) ?? [];
+  return children.length
+    ? 1 + Math.max(...children.map((child) => subtreeDepth(child, byParent)))
+    : 0;
+}
+
 function locationSummary(locations: string[]): string {
   if (locations.length === 0) return '—';
   const fmt = (l: string) => l.replace(/_/g, ' ');
@@ -57,6 +77,8 @@ export function InventoryRow(props: InventoryRowProps) {
     item,
     ancestorHidden = false,
     depth,
+    ancestorRails = [],
+    hasFollowingSibling = false,
     byParent,
     isSelected,
     onRowClick,
@@ -75,8 +97,67 @@ export function InventoryRow(props: InventoryRowProps) {
   const hasChildren = item.isContainer && children.length > 0;
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
   const columnFiltersActive = useTableFiltersActive();
-  const contentsOpen =
-    columnFiltersActive || expandContainers || revealContainers?.has(item.id) || open;
+  const matchesRow = useTableRowMatches();
+  const filterValues = (entry: InventoryItemOut) => ({
+    item: entry.name,
+    qty: entry.quantity,
+    wt: (inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs).toFixed(1),
+    cost: entry.cost.toFixed(0),
+  });
+  // Retain a matching descendant's ancestry, and derive endings from the same
+  // visible siblings. Hidden rows remain mounted to preserve open editor drafts.
+  function subtreeMatches(entry: InventoryItemOut): boolean {
+    return (
+      matchesRow(filterValues(entry)) ||
+      (entry.isContainer && (byParent.get(entry.id) ?? []).some(subtreeMatches))
+    );
+  }
+  const filteredOut = !subtreeMatches(item);
+  const visibleChildren = children.filter(subtreeMatches);
+  const continuingRails =
+    depth > 0 && hasFollowingSibling ? [...ancestorRails, depth - 1] : ancestorRails;
+  const branchStep =
+    props.branchStep ?? Math.min(8, 32 / Math.max(1, subtreeDepth(item, byParent) - 1));
+  const railPosition = (level: number) => 6 + level * branchStep;
+  const rowStyle = {
+    '--inventory-indent': `${depth * 1.25}rem`,
+    '--inventory-mobile-indent': `${depth > 0 ? Math.min(depth * 12, railPosition(depth - 1) + 10) : 0}px`,
+    '--inventory-rail-clearance': `${depth > 0 ? railPosition(depth - 1) + 8 : 0}px`,
+  } as CSSProperties;
+  const itemIcon = item.isContainer
+    ? 'inventory'
+    : item.isArmor || item.weaponData?.db != null
+      ? 'defense'
+      : item.weaponData != null
+        ? 'combat'
+        : item.powerstoneData != null ||
+            item.magicItemData != null ||
+            (item.enchantments?.length ?? 0) > 0
+          ? 'modifier'
+          : 'notes';
+  function rails(editor = false) {
+    const levels = editor ? continuingRails : ancestorRails;
+    return (
+      <span className="inventory-branches" aria-hidden="true">
+        {levels.map((level) => (
+          <span
+            key={level}
+            className="inventory-branch-rail"
+            style={{ left: `${railPosition(level)}px` }}
+          />
+        ))}
+        {!editor && depth > 0 && (
+          <span
+            className={`inventory-branch-rail inventory-branch-own ${hasFollowingSibling ? '' : 'inventory-branch-end'}`}
+            style={{ left: `${railPosition(depth - 1)}px` }}
+          />
+        )}
+      </span>
+    );
+  }
+  const contentsForcedOpen =
+    columnFiltersActive || expandContainers || Boolean(revealContainers?.has(item.id));
+  const contentsOpen = contentsForcedOpen || open;
   const contentsVisited = useRef(false);
   if (contentsOpen) contentsVisited.current = true;
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
@@ -189,13 +270,7 @@ export function InventoryRow(props: InventoryRowProps) {
   return (
     <Fragment>
       <TableRow
-        hidden={ancestorHidden}
-        filterValues={{
-          item: item.name,
-          qty: item.quantity,
-          wt: netWeight.toFixed(1),
-          cost: item.cost.toFixed(0),
-        }}
+        hidden={ancestorHidden || filteredOut}
         id={sheetAnchor('inventory', item.id)}
         onClick={canEdit ? (e) => onRowClick(item.id, e) : undefined}
         draggable={canEdit && !!drag}
@@ -207,6 +282,7 @@ export function InventoryRow(props: InventoryRowProps) {
         onDrop={canEdit && drag ? handleDrop : undefined}
         className={[
           'inventory-item-row transition-colors scroll-mt-24',
+          item.isContainer ? 'inventory-container-row' : '',
           highlighted ? '!bg-primary/20 outline outline-2 outline-primary' : '',
           rowFlash.flashing ? 'field-rollback-flash' : '',
           canEdit ? 'cursor-pointer' : '',
@@ -216,17 +292,22 @@ export function InventoryRow(props: InventoryRowProps) {
           sel && !isHovered && !highlighted ? '!bg-primary/15 hover:!bg-primary/20' : '',
           !sel && !isHovered && !highlighted ? 'hover:bg-base-200/50' : '',
         ].join(' ')}
-        style={{ '--inventory-indent': `${depth * 1.25}rem` } as CSSProperties}
+        style={rowStyle}
         aria-selected={sel}
         {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
+          {rails()}
           <div className="inventory-item-heading flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span className="inventory-item-name flex min-w-0 items-center gap-2">
               {hasChildren ? (
-                expandContainers ? (
-                  <span className="inline-block w-5 text-center text-base-content/50" aria-hidden>
-                    ▾
+                contentsForcedOpen ? (
+                  <span
+                    className="inventory-expand inline-block w-5 text-center text-base-content/50"
+                    aria-hidden
+                  >
+                    <span className="hidden sm:inline">▾</span>
+                    <AppIcon name="chevronDown" size={15} className="sm:hidden" />
                   </span>
                 ) : (
                   <button
@@ -239,17 +320,31 @@ export function InventoryRow(props: InventoryRowProps) {
                         return next;
                       });
                     }}
-                    className="btn btn-ghost btn-xs px-1 text-base-content/50"
+                    className="inventory-expand btn btn-ghost btn-xs px-1 text-base-content/50"
                     aria-expanded={contentsOpen}
                     aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
                   >
-                    {contentsOpen ? '▾' : '▸'}
+                    <span className="hidden sm:inline">{contentsOpen ? '▾' : '▸'}</span>
+                    <AppIcon
+                      name={contentsOpen ? 'chevronDown' : 'chevronRight'}
+                      size={15}
+                      className="sm:hidden"
+                    />
                   </button>
                 )
               ) : (
                 <span className="hidden w-5 sm:inline-block" aria-hidden />
               )}
-              <span className="font-medium">{item.name}</span>
+              <AppIcon name={itemIcon} size={16} className="inventory-type-icon hidden" />
+              <span className="inventory-item-title font-medium">{item.name}</span>
+              {item.isContainer && (
+                <span
+                  className="inventory-contents-count hidden"
+                  aria-label={`${visibleChildren.length} direct ${visibleChildren.length === 1 ? 'item' : 'items'}`}
+                >
+                  {visibleChildren.length} {visibleChildren.length === 1 ? 'item' : 'items'}
+                </span>
+              )}
             </span>
             <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
               {isRoot && item.worn && (
@@ -270,7 +365,7 @@ export function InventoryRow(props: InventoryRowProps) {
                 )}
               {hasChildren && !contentsOpen && (
                 <span
-                  className="badge badge-sm badge-ghost"
+                  className="badge badge-sm badge-ghost hidden sm:inline-flex"
                   aria-label={`${descendantCount} contained ${descendantCount === 1 ? 'item' : 'items'}`}
                 >
                   {descendantCount} {descendantCount === 1 ? 'item' : 'items'}
@@ -448,17 +543,13 @@ export function InventoryRow(props: InventoryRowProps) {
       </TableRow>
       {canEdit && visited.length > 0 && (
         <TableRow
-          filterValues={{
-            item: item.name,
-            qty: item.quantity,
-            wt: netWeight.toFixed(1),
-            cost: item.cost.toFixed(0),
-          }}
           className="inventory-editor-row"
-          hidden={ancestorHidden || section === null}
+          style={rowStyle}
+          hidden={ancestorHidden || filteredOut || section === null}
           id={editorId}
         >
           <td colSpan={5} className="!p-2 sm:!p-3">
+            {rails(true)}
             {visited.map((entry) => (
               <div key={entry} hidden={section !== entry}>
                 <InventoryItemEditor
@@ -488,6 +579,12 @@ export function InventoryRow(props: InventoryRowProps) {
             {...props}
             item={child}
             depth={depth + 1}
+            ancestorRails={continuingRails}
+            branchStep={branchStep}
+            hasFollowingSibling={
+              visibleChildren.findIndex((entry) => entry.id === child.id) <
+              visibleChildren.length - 1
+            }
             ancestorHidden={ancestorHidden || !contentsOpen}
           />
         ))}

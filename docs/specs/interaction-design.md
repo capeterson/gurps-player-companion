@@ -66,8 +66,9 @@ columns; metadata columns and their filters appear at the wider table breakpoint
 
 ## Draft lifetime and save feedback
 
-Closing an add form, closing a row editor, filtering an entry, or folding a
-section hides its content without discarding its mounted state. Reopening
+For Languages and Techniques, closing an add form, closing a row editor,
+filtering an entry, or folding a section hides its content without discarding
+its mounted state. Reopening
 returns to the draft. Pending saves can finish while a disclosure is closed.
 State is scoped to the character, so switching characters cannot reuse the
 previous character's form or row expansion state.
@@ -111,11 +112,26 @@ palettes, nested decorative cards, and additional display fonts.
 
 Inventory preserves its desktop columns and uses a compact item layout below
 640px. Long names and heading badges wrap at every width so the table also fits
-at the desktop breakpoint. Names, worn/equipped controls, and category chips use the available
-width without reserving an empty container-expander slot for leaf items.
-Quantity, weight, cost, and the basic-details action form one metadata strip.
-Panel gutters and nested-item indentation stay shallow enough for narrow
-screens; actual containers retain their expansion control and hierarchy.
+at the desktop breakpoint. Mobile containers use a warm theme-colored band,
+display typography, and a visible direct-child count beside their expansion
+control. Item icons and
+connected branch circles make the hierarchy explicit. A branch continues below
+an item's circle only when another visible sibling follows; its final segment
+ends at the last circle. Ancestor branches continue beside expanded descendants
+and editors only when that ancestor has a following sibling. Collapsing a
+container shortens those branches while retaining its mounted editor drafts.
+Inventory column filters also hide excluded rows without unmounting their
+editors; its name/tag search retains the existing filtered-tree rendering path.
+
+Names, worn/equipped controls, and category chips use the available width.
+Quantity, weight, cost, and the basic-details action form one compact metadata
+strip. Branches occupy a reserved gutter clear of the text and values; nested
+indentation stays bounded on narrow screens. The mobile tree is decoration over
+the existing table rows, rather than an invalid nested table or a second editing
+surface. Inventory uses `useTableRowMatches` to share the table's existing
+predicate. Search and column filters retain the ancestors of matching entries and
+derive branch endings from the visible sibling set, so a filtered tree still
+shows where each item belongs.
 Category chips remain the existing route to category editors, rather than
 duplicating those controls in another mobile menu.
 
