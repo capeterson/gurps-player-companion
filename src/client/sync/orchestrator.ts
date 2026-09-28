@@ -2416,7 +2416,9 @@ class SyncOrchestrator {
   }
 
   private isClientOutdated(): boolean {
-    return Date.now() < this.clientOutdatedUntil;
+    // Skip the clock read in the common case; scheduling snapshots elsewhere
+    // depend on the order of Date.now() calls.
+    return this.clientOutdatedUntil !== 0 && Date.now() < this.clientOutdatedUntil;
   }
 
   /**
