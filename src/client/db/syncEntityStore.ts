@@ -12,7 +12,6 @@ export function syncEntityTable(entityClass: EntityClass): Table<SyncRow, string
 }
 
 export function writableSyncEntityTable(entityClass: EntityClass): Table<SyncRow, string> {
-  if (entityClass === 'campaign') throw new Error('Campaigns are cursor-only');
   const table = syncEntityTable(entityClass);
   if (!table) throw new Error(`No local writer for ${entityClass}`);
   return table;

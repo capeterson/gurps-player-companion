@@ -34,6 +34,7 @@ import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { DEFAULT_CAMPAIGN_SOURCES } from '../services/defaultCampaignSources.ts';
 import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
+import { prepareMediaAttachment } from '../services/media/service.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 
@@ -286,6 +287,12 @@ router.openapi(
     const body = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
     const row = await withAudit(user.id, undefined, async (tx) => {
+      await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(eq(campaigns.id, id))
+        .for('update');
+      await prepareMediaAttachment(tx, 'campaign', id, body);
       const [updated] = await tx
         .update(campaigns)
         .set(

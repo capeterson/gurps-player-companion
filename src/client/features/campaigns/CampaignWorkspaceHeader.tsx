@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
+import { MediaImage } from '../../components/MediaImage.tsx';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import type { CampaignWorkspace } from './useCampaignWorkspace.ts';
@@ -48,6 +49,13 @@ export function CampaignWorkspaceHeader({ campaignId, workspace }: Props) {
   return (
     <header className="card card-border overflow-hidden bg-base-100">
       <div className="card-body gap-3 p-4 sm:p-5">
+        <MediaImage
+          targetType="campaign"
+          targetId={campaignId}
+          assetId={campaign.coverAssetId}
+          name={campaign.name}
+          editable={viewerRole === 'owner'}
+        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="label-eyebrow">Campaign workspace</p>

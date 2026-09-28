@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { MediaImage } from '../../components/MediaImage.tsx';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
 import { useCharactersList } from './useCharacterDetail.ts';
@@ -106,6 +107,13 @@ export function CharactersPage() {
                 to={`/characters/${c.id}`}
                 className="link link-hover font-display text-xl font-semibold"
               >
+                <MediaImage
+                  targetType="character"
+                  targetId={c.id}
+                  assetId={c.portraitAssetId}
+                  name={c.name}
+                  thumbnail
+                />
                 {c.name}
               </Link>
               {c.campaignId && c.campaignName && (

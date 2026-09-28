@@ -115,7 +115,7 @@ export default defineConfig({
       adapter: bunAdapter,
       entry: 'src/server/dev-entry.ts',
       exclude: [
-        /^\/(?!api(?:[/?]|$)|mcp(?:[/?]|$)|\.well-known(?:[/?]|$)|oauth\/(?:authorize|token|revoke|register)(?:[/?]|$)).*/,
+        /^\/(?!api(?:[/?]|$)|media(?:[/?]|$)|mcp(?:[/?]|$)|\.well-known(?:[/?]|$)|oauth\/(?:authorize|token|revoke|register)(?:[/?]|$)).*/,
       ],
     }),
     stripPwaFromAdmin(),
@@ -138,6 +138,30 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) =>
+              url.origin === self.location.origin &&
+              /^\/media\/[a-f0-9]{64}\/thumb\.webp$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gpc-public-image-thumbs-v1',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 256, maxAgeSeconds: 31536000, purgeOnQuotaError: true },
+            },
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.origin === self.location.origin &&
+              /^\/media\/[a-f0-9]{64}\/display\.webp$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gpc-public-image-displays-v1',
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 32, maxAgeSeconds: 31536000, purgeOnQuotaError: true },
+            },
+          },
+        ],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // The admin app is a separate entry (admin.html); its assets
         // are excluded from the precache and the SW must not serve the
@@ -154,6 +178,7 @@ export default defineConfig({
         // /admin/* is denied so the SW doesn't intercept those
         // navigations and serve the player shell.
         navigateFallbackDenylist: [
+          /^\/media\//,
           /^\/api\//,
           /^\/admin(\/|$)/,
           /^\/mcp(?:[/?]|$)/,

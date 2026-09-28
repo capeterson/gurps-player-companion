@@ -1,3 +1,4 @@
+import { MediaImage } from '../../components/MediaImage.tsx';
 /**
  * Public-facing read-only view of a character. Rendered when the
  * parent campaign has `shareCharacterSheets=false` and the viewer is
@@ -32,6 +33,12 @@ export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
           </Link>{' '}
           · Limited view
         </p>
+        <MediaImage
+          targetType="character"
+          targetId={data.id}
+          assetId={data.portraitAssetId}
+          name={data.name}
+        />
         <h1 className="font-name text-5xl leading-none">{data.name}</h1>
         <p className="mt-3 text-sm text-base-content/60 max-w-prose">
           The campaign owner has hidden detailed sheet information from other players. Ask the owner

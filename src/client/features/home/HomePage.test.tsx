@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api.ts';
+import { ToastProvider } from '../../lib/toast.tsx';
 import { useCharactersList } from '../characters/useCharacterDetail.ts';
 import { HomePage } from './HomePage.tsx';
 
@@ -18,9 +19,11 @@ function renderPage() {
         })
       }
     >
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }

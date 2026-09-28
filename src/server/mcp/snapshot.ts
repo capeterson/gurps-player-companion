@@ -38,13 +38,26 @@ export function generateMcpSnapshot() {
     operations: OPERATION_POLICY,
     tools: catalog.map((entry) => ({
       ...describeMcpTool(entry),
-      operation: `${entry.policy.method} ${entry.policy.path}`,
-      scope: entry.policy.scope,
-      destructive: entry.policy.destructive,
+      ...(entry.policy.action
+        ? {
+            actions: entry.operations.map(({ policy }) => ({
+              action: policy.action,
+              operation: `${policy.method} ${policy.path}`,
+              scope: policy.scope,
+              destructive: policy.destructive,
+              resultMode: policy.resultMode,
+              parityTests: policy.parityTests,
+            })),
+          }
+        : {
+            operation: `${entry.policy.method} ${entry.policy.path}`,
+            scope: entry.policy.scope,
+            destructive: entry.policy.destructive,
+            resultMode: entry.policy.resultMode,
+            parityTests: entry.policy.parityTests,
+          }),
       handler: entry.policy.handler,
       schemaSource: entry.policy.schemaSource,
-      resultMode: entry.policy.resultMode,
-      parityTests: entry.policy.parityTests,
     })),
   };
 }

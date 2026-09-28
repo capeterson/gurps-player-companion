@@ -169,7 +169,9 @@ export const characterCreate = z.object({
   ...characterAttributesShape,
 });
 
-export const characterUpdate = characterCreate.partial();
+export const characterUpdate = characterCreate
+  .partial()
+  .extend({ portraitAssetId: uuid.nullable().optional() });
 
 /**
  * Schema for the `characters.dismissed_warnings` jsonb column: the set
@@ -281,6 +283,7 @@ export const encumbranceOut = z.object({
 });
 
 export const characterListItem = z.object({
+  portraitAssetId: uuid.nullable().optional(),
   id: uuid,
   ownerId: uuid,
   campaignId: uuid.nullable(),
@@ -294,6 +297,7 @@ export const characterListItem = z.object({
 });
 
 export const characterDetail = z.object({
+  portraitAssetId: uuid.nullable().optional(),
   capabilities: z
     .array(z.object({ sourceId: uuid, sourceName: z.string(), capability: capabilityEffect }))
     .default([]),
@@ -351,6 +355,7 @@ export const characterDetail = z.object({
  * accessing private stats / inventory / log entries.
  */
 export const characterMinimalOut = z.object({
+  portraitAssetId: uuid.nullable().optional(),
   view: z.literal('minimal'),
   id: uuid,
   ownerId: uuid,

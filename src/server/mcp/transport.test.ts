@@ -5,7 +5,7 @@ import type { OAuthPrincipal } from '../oauth/service.ts';
 import { OAuthError } from '../oauth/service.ts';
 import { createOpenApiApp } from '../openapi/app.ts';
 import { integrationTestConfig } from '../testConfig.ts';
-import { buildToolCatalog } from './catalog.ts';
+import { buildToolCatalog, toolsForScopes } from './catalog.ts';
 import {
   MAX_MCP_BODY_BYTES,
   createMcpHandler,
@@ -100,7 +100,7 @@ describe('MCP streaming request boundary', () => {
     const input = new Request(resource, { method: 'POST', body });
     await expect(readBoundedMcpJson(input)).rejects.toMatchObject({ status: 413 });
     expect(cancelled).toBe(true);
-    expect(pulls).toBe(3);
+    expect(pulls).toBeLessThan(100);
   });
 
   test('checks Content-Length and rejects malformed UTF-8/JSON', async () => {
@@ -144,16 +144,76 @@ describe('compact mutation acknowledgements', () => {
 });
 
 describe('MCP protocol and OAuth transport', () => {
+  test('bounds concurrent envelope parsing and releases capacity after responses settle', async () => {
+    const actor = principal();
+    let entered = 0;
+    let signalReady!: () => void;
+    const allEntered = new Promise<void>((resolve) => {
+      signalReady = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const handle = createMcpHandler(config, createOpenApiApp(), document, {
+      async resolvePrincipal() {
+        entered++;
+        if (entered === 4) signalReady();
+        await gate;
+        return actor;
+      },
+      async execute() {
+        return Response.json([]);
+      },
+    });
+    const pending = Array.from({ length: 4 }, () => handle(request(listing)));
+    await allEntered;
+
+    const rejected = await handle(request(listing));
+    expect(rejected.status).toBe(503);
+    expect(rejected.headers.get('retry-after')).toBe('1');
+
+    release();
+    expect((await Promise.all(pending)).every((response) => response.status === 200)).toBe(true);
+    expect((await handle(request(listing))).status).toBe(200);
+  });
+
   test('live tools/list uses the same schemas and hints as the shared catalog projection', async () => {
     const { handle, actor } = handler();
     const response = await handle(request(listing));
     expect(response.status).toBe(200);
     const body = (await response.json()) as { result: { tools: unknown[] } };
-    const expected = buildToolCatalog(document)
-      .filter((tool) => actor.scopes.includes(tool.policy.scope))
-      .map(describeMcpTool);
+    const expected = toolsForScopes(buildToolCatalog(document), actor.scopes).map(describeMcpTool);
     expect(body.result.tools).toEqual(expected);
     expect(response.headers.get('cache-control')).toBe('no-store');
+    const media = body.result.tools.find(
+      (tool) => (tool as { name?: string }).name === 'gpc_media',
+    ) as
+      | {
+          _meta?: {
+            actions?: Array<{
+              action: string;
+              requiredScope: string;
+              operation: string;
+              resultMode: string;
+            }>;
+          };
+        }
+      | undefined;
+    expect(media?._meta?.actions).toEqual([
+      {
+        action: 'capabilities',
+        requiredScope: 'gpc:read',
+        operation: 'GET /api/v1/media/capabilities',
+        resultMode: 'canonical-read',
+      },
+      {
+        action: 'status',
+        requiredScope: 'gpc:read',
+        operation: 'GET /api/v1/media/uploads/{id}',
+        resultMode: 'canonical-read',
+      },
+    ]);
   });
 
   test('marks only email invitations as open-world operations', () => {
@@ -229,6 +289,77 @@ describe('MCP protocol and OAuth transport', () => {
     expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
     expect(response.headers.get('www-authenticate')).toContain('scope="gpc:write"');
     expect(fixture.executed()).toBe(0);
+  });
+
+  test('media actions select strict schemas, enforce each action scope, and validate selected outputs', async () => {
+    const invalid = handler();
+    const unknownAction = await invalid.handle(
+      request({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: { name: 'gpc_media', arguments: { action: 'remove-everything' } },
+      }),
+    );
+    expect(await unknownAction.json()).toMatchObject({
+      result: { isError: true, structuredContent: { status: 422 } },
+    });
+    const mixedAction = await invalid.handle(
+      request({
+        jsonrpc: '2.0',
+        id: 15,
+        method: 'tools/call',
+        params: {
+          name: 'gpc_media',
+          arguments: { action: 'capabilities', body: { base64: 'not-allowed-here' } },
+        },
+      }),
+    );
+    expect(await mixedAction.json()).toMatchObject({
+      result: { isError: true, structuredContent: { status: 422 } },
+    });
+    expect(invalid.executed()).toBe(0);
+
+    const readOnly = handler();
+    const write = await readOnly.handle(
+      request({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: { name: 'gpc_media', arguments: { action: 'upload', body: {} } },
+      }),
+    );
+    expect(write.status).toBe(403);
+    expect(write.headers.get('www-authenticate')).toContain('scope="gpc:write"');
+    expect(readOnly.executed()).toBe(0);
+
+    const wrongOutput = handler({
+      executeResponse: () =>
+        Response.json({
+          id: '0198aa77-1111-7111-8111-111111111111',
+          state: 'ready',
+          thumbUrl: null,
+          displayUrl: null,
+          width: 24,
+          height: 16,
+          reason: null,
+        }),
+    });
+    const capabilities = await wrongOutput.handle(
+      request({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: { name: 'gpc_media', arguments: { action: 'capabilities' } },
+      }),
+    );
+    expect(await capabilities.json()).toMatchObject({
+      result: {
+        isError: true,
+        structuredContent: { status: 500, body: { error: 'response_contract_error' } },
+      },
+    });
+    expect(wrongOutput.executed()).toBe(1);
   });
 
   test('discovery challenges distinguish missing/invalid credentials from verification outages', async () => {

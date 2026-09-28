@@ -6,6 +6,7 @@ import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
+import { buildPendingImageExport } from '../sync/mediaRecovery.ts';
 import {
   characterAccessFrom,
   isOutboxAccessRestricted,
@@ -60,6 +61,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   );
   const [revertTarget, setRevertTarget] = useState<OutboxEntry | null>(null);
   const [resyncOpen, setResyncOpen] = useState(false);
+  const pendingImages = useLiveQuery(() => getLocalDb().mediaUploads.count(), [], 0);
   const [working, setWorking] = useState(false);
 
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
@@ -90,6 +92,22 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
       toasts.push(`Couldn't revert change — ${errorMessage(err)}`, { kind: 'error' });
     } finally {
       setWorking(false);
+    }
+  };
+
+  const downloadPendingImages = async () => {
+    try {
+      const data = await buildPendingImageExport();
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(data)], { type: 'application/json' }),
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'pending-images.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      toasts.push(`Couldn't export pending images — ${errorMessage(error)}`, { kind: 'error' });
     }
   };
 
@@ -297,6 +315,15 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               >
                 Download sync debug log
               </button>
+              {pendingImages > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm h-auto whitespace-normal py-2"
+                  onClick={() => void downloadPendingImages()}
+                >
+                  Export {pendingImages} unsaved image{pendingImages === 1 ? '' : 's'}
+                </button>
+              )}
               <button
                 type="button"
                 className="btn btn-error btn-outline btn-sm h-auto whitespace-normal py-2"
@@ -350,8 +377,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           if (!working) setResyncOpen(false);
         }}
       >
-        This permanently discards every pending local edit, clears the local database, and downloads
-        a fresh copy from the server.
+        Export unsaved images first if you want to keep their original files. This permanently
+        discards every pending local edit and unsaved image, clears the local database, and
+        downloads a fresh copy from the server.
       </ConfirmDialog>
     </>
   );

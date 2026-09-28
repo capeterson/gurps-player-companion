@@ -14,17 +14,6 @@
       }
     },
     "schemas": {
-      "Health": {
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ]
-      },
       "ErrorBody": {
         "type": "object",
         "properties": {
@@ -34,6 +23,17 @@
         },
         "required": [
           "error"
+        ]
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
         ]
       },
       "ThemePreferences": {
@@ -5311,6 +5311,938 @@
         }
       }
     },
+    "/api/v1/media/capabilities": {
+      "get": {
+        "summary": "Check whether image uploads are enabled and read their size limit.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Media availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "maxInputBytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "maxInputBytes"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/uploads": {
+      "post": {
+        "summary": "Upload an image with a stable clientUploadId; retry identical input after a lost response. Attach the returned asset using the character or campaign update.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "clientUploadId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "character",
+                      "campaign"
+                    ]
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "byteLength": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10485760
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "base64": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 13981016,
+                    "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+                  }
+                },
+                "required": [
+                  "clientUploadId",
+                  "targetType",
+                  "targetId",
+                  "byteLength",
+                  "sha256",
+                  "base64"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image upload status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ready",
+                        "cancelled",
+                        "deleting",
+                        "rejected"
+                      ]
+                    },
+                    "thumbUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "displayUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "width": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "height": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "thumbUrl",
+                    "displayUrl",
+                    "width",
+                    "height",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/uploads/{id}": {
+      "get": {
+        "summary": "Read image status and URLs by asset ID, or by the caller’s clientUploadId after a lost response.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assetId",
+                "clientUploadId"
+              ],
+              "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+            },
+            "required": false,
+            "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload.",
+            "name": "lookup",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image upload status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ready",
+                        "cancelled",
+                        "deleting",
+                        "rejected"
+                      ]
+                    },
+                    "thumbUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "displayUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "width": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "height": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "thumbUrl",
+                    "displayUrl",
+                    "width",
+                    "height",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel an unattached image by asset ID or the caller’s clientUploadId. Remove attached images through character or campaign updates.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assetId",
+                "clientUploadId"
+              ],
+              "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+            },
+            "required": false,
+            "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload.",
+            "name": "lookup",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image upload status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ready",
+                        "cancelled",
+                        "deleting",
+                        "rejected"
+                      ]
+                    },
+                    "thumbUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "displayUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "width": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "height": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "thumbUrl",
+                    "displayUrl",
+                    "width",
+                    "height",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/media/uploads/bytes": {
+      "post": {
+        "summary": "Binary form of the single-request image upload; metadata travels in the query.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "clientUploadId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "character",
+                "campaign"
+              ]
+            },
+            "required": true,
+            "name": "targetType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "targetId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10485760
+            },
+            "required": true,
+            "name": "byteLength",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "required": true,
+            "name": "sha256",
+            "in": "query"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image upload status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ready",
+                        "cancelled",
+                        "deleting",
+                        "rejected"
+                      ]
+                    },
+                    "thumbUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "displayUrl": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "width": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "height": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "thumbUrl",
+                    "displayUrl",
+                    "width",
+                    "height",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Upload changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Media temporarily unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/{token}/{variant}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "thumb.webp",
+                "display.webp"
+              ]
+            },
+            "required": true,
+            "name": "variant",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public immutable sanitized image",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Read budget exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Storage unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media": {
+      "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent uploads (50 per page)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "uploaderId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
+                      "uploadsDisabled": {
+                        "type": "boolean"
+                      },
+                      "previewUrl": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "targetType": {
+                        "type": "string",
+                        "enum": [
+                          "character",
+                          "campaign"
+                        ]
+                      },
+                      "targetId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "bytes": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "uploaderId",
+                      "uploadsDisabled",
+                      "previewUrl",
+                      "targetType",
+                      "targetId",
+                      "state",
+                      "bytes",
+                      "createdAt"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/{id}": {
+      "delete": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Image taken down"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/media/users/{id}": {
+      "patch": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "disabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "disabled"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Upload access changed"
+          }
+        }
+      }
+    },
     "/api/v1/healthz": {
       "get": {
         "tags": [
@@ -6950,6 +7882,11 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "coverAssetId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
                       "id": {
                         "type": "string",
                         "format": "uuid"
@@ -7393,6 +8330,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -7681,6 +8623,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -8127,6 +9074,11 @@
                   },
                   "experimentalTurnTracker": {
                     "type": "boolean"
+                  },
+                  "coverAssetId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
                   }
                 }
               }
@@ -8141,6 +9093,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -8496,6 +9453,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -8825,6 +9787,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -9208,6 +10175,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -30416,6 +31388,11 @@
                   "items": {
                     "type": "object",
                     "properties": {
+                      "portraitAssetId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
                       "id": {
                         "type": "string",
                         "format": "uuid"
@@ -30705,6 +31682,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -34328,6 +35310,11 @@
                     {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -37897,6 +38884,11 @@
                     {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "view": {
                           "type": "string",
                           "enum": [
@@ -38208,6 +39200,11 @@
                     },
                     "maxItems": 100,
                     "default": []
+                  },
+                  "portraitAssetId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid"
                   }
                 }
               }
@@ -38222,6 +39219,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -41924,6 +42926,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -46472,6 +47479,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -51041,6 +52053,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -54686,6 +55703,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -58861,6 +59883,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -63056,6 +64083,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -66701,6 +67733,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -70512,6 +71549,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -74345,6 +75387,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -77990,6 +79037,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -81746,6 +82798,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -85524,6 +86581,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -89169,6 +90231,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -92944,6 +94011,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -96740,6 +97812,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -100385,6 +101462,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -106071,6 +107153,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -111779,6 +112866,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -115424,6 +116516,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "type": "string",
+                      "nullable": true,
+                      "format": "uuid"
+                    },
                     "capabilities": {
                       "type": "array",
                       "items": {
@@ -119160,6 +120257,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -122808,6 +123910,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {
@@ -126454,6 +127561,11 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "portraitAssetId": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "uuid"
+                        },
                         "capabilities": {
                           "type": "array",
                           "items": {

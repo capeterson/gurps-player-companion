@@ -65,6 +65,7 @@ const TEMP_EFFECT_AXIS_LABELS: Record<string, string> = {
 
 const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
   name: 'Name',
+  coverAssetId: 'Campaign cover',
   description: 'Description',
   pointTarget: 'Point target',
   disadvantageCap: 'Disadvantage cap',
@@ -248,6 +249,7 @@ function summarizeCharacter(
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
   const c = changes[0] as FieldChange;
+  if (c.field === 'portraitAssetId') return c.newValue ? 'Portrait updated' : 'Portrait removed';
   if (c.field === 'activeEffects') {
     const before = (c.oldValue ?? []) as Array<{ id: string; name: string; state: string }>;
     const after = (c.newValue ?? []) as typeof before;
@@ -461,7 +463,9 @@ function summarizeCampaign(
   const msgs: string[] = [];
   for (const c of changes) {
     const label = CAMPAIGN_FIELD_LABELS[c.field] ?? humanizeFieldKey(c.field);
-    if (c.field === 'shareCharacterSheets') {
+    if (c.field === 'coverAssetId') {
+      msgs.push(c.newValue ? 'Campaign cover updated' : 'Campaign cover removed');
+    } else if (c.field === 'shareCharacterSheets') {
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'houseRules') {
       const oldRules = c.oldValue as

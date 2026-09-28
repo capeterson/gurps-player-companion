@@ -779,6 +779,7 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     age: row.age,
     birthdate: row.birthdate,
     appearance: row.appearance,
+    portraitAssetId: row.portraitAssetId,
     // Stat defaults so the row stays schema-valid (notNull columns).
     // The minimal view never reads these, but if a future code path
     // ever falls through to buildCharacterDetail with this row it

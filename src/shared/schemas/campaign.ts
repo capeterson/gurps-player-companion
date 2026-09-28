@@ -56,6 +56,7 @@ export const campaignMemberOut = z.object({
 });
 
 export const campaignOut = z.object({
+  coverAssetId: uuid.nullable().optional(),
   id: uuid,
   name: campaignName,
   description: campaignDescription,
@@ -103,7 +104,9 @@ export const campaignCreate = z.object({
   experimentalTurnTracker: z.boolean().optional(),
 });
 
-export const campaignUpdate = campaignCreate.partial();
+export const campaignUpdate = campaignCreate
+  .partial()
+  .extend({ coverAssetId: uuid.nullable().optional() });
 
 export const addMemberRequest = z.object({
   email,

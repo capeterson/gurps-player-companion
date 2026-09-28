@@ -15,6 +15,7 @@ const encounter = vi.hoisted(() => ({
 }));
 
 vi.mock('dexie-react-hooks', () => ({ useLiveQuery: () => [] }));
+vi.mock('../../components/MediaImage.tsx', () => ({ MediaImage: () => null }));
 vi.mock('../characters/useCharacterDetail.ts', () => ({ useCampaignCharactersList: () => [] }));
 vi.mock('./useEncounters.ts', () => ({
   useEncounter: () => ({ data: encounter.data, isLoading: false, error: null }),

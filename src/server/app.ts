@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { type OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { bodyLimit } from 'hono/body-limit';
 import { upgradeWebSocket, websocket } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';
+import { requireActiveUser } from './auth/middleware.ts';
 import type { AppConfig } from './config.ts';
 import { assertExactCoverage } from './mcp/catalog.ts';
 import { createMcpHandler } from './mcp/transport.ts';
@@ -22,10 +24,14 @@ import { encounterRouter } from './routes/encounters.ts';
 import { healthRouter } from './routes/health.ts';
 import { historyRouter } from './routes/history.ts';
 import { invitationsRouter } from './routes/invitations.ts';
+import { mediaRouter } from './routes/media.ts';
 import { notificationsRouter } from './routes/notifications.ts';
 import { syncRouter } from './routes/sync.ts';
 import { createSyncWsHandler } from './routes/syncWs.ts';
 import { durableIdempotency } from './services/idempotency.ts';
+import { mediaAdmission } from './services/media/admission.ts';
+import { mediaConfig } from './services/media/config.ts';
+import { startMediaMaintenance } from './services/media/maintenance.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
 import { attachStaticHandler } from './static.ts';
 
@@ -43,7 +49,10 @@ function acceptsGzip(value: string): boolean {
 }
 
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
+  if (mediaConfig().backend === 'local' && config.environment === 'production')
+    throw new Error('Local media storage is forbidden in production');
   const app = createOpenApiApp();
+  startMediaMaintenance();
 
   // Generate correlation IDs at the trusted server boundary. Never accept a
   // caller-supplied ID: the response header can be shown to a user safely and
@@ -55,6 +64,9 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     await next();
   });
 
+  app.use('/api/v1/media/*', requireActiveUser);
+  app.use('/api/v1/media/*', mediaAdmission);
+  app.use('/api/v1/media/*', bodyLimit({ maxSize: 14 * 1024 * 1024 }));
   app.use('/api/v1/*', durableIdempotency);
   app.use('/api/v1/*', mutationInvalidation);
 
@@ -129,6 +141,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   }
 
   app.route('/', createOAuthRouter(config));
+  app.route('/', mediaRouter);
 
   // Mount sub-routers under /api/v1
   app.route('/api/v1', healthRouter);
@@ -253,7 +266,9 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
             requestId,
             userId: c.get('user')?.id,
             method: c.req.method,
-            path: new URL(c.req.url).pathname,
+            path: c.req.path.startsWith('/media/')
+              ? '/media/[redacted]'
+              : new URL(c.req.url).pathname,
           },
           err,
         );
@@ -266,7 +281,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
         requestId,
         userId: c.get('user')?.id,
         method: c.req.method,
-        path: new URL(c.req.url).pathname,
+        path: c.req.path.startsWith('/media/') ? '/media/[redacted]' : new URL(c.req.url).pathname,
       },
       err,
     );

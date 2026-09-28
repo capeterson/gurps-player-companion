@@ -2,6 +2,7 @@ import {
   activeEffectDefinitionOut,
   activeEffectsField,
 } from '../../shared/schemas/activeEffects.ts';
+import { drainOneImage, warmMediaManifests } from './mediaUploads.ts';
 import { patchKeys, patchesOverlap, unsettledPatch } from './patchKeys.ts';
 /**
  * Sync orchestrator -- the long-lived singleton that:
@@ -632,6 +633,9 @@ class SyncOrchestrator {
 
     const wasStarted = this.started;
     this.recoveryInProgress = true;
+    this.invalidateSessionWork();
+    await this.mediaWork;
+    await this.mediaWarm;
     this.running = false;
     this.wake();
 
@@ -735,6 +739,8 @@ class SyncOrchestrator {
   async purge(): Promise<void> {
     this.purging = true;
     this.invalidateSessionWork();
+    await this.mediaWork;
+    await this.mediaWarm;
     this.currentUserId = null;
     this.rejectionHousekeepingDone = false;
     // The wiped Dexie no longer belongs to anyone.
@@ -836,6 +842,35 @@ class SyncOrchestrator {
     }
   }
 
+  private mediaWork: Promise<void> | null = null;
+  private mediaWarm: Promise<void> | null = null;
+
+  private startMediaWork(): void {
+    if (!this.currentUserId || this.sessionAbort.signal.aborted) return;
+    const userId = this.currentUserId;
+    const signal = this.sessionAbort.signal;
+    if (!this.mediaWork) {
+      this.mediaWork = runWithLock('sync-media', async () => {
+        if (signal.aborted) return;
+        const worked = await drainOneImage(userId, signal, (op, reason) =>
+          this.rollbackLocally(op, { clientOpId: op.clientOpId, status: 'rejected', reason }),
+        );
+        if (worked && !signal.aborted) this.wake();
+      })
+        .catch(() => undefined)
+        .finally(() => {
+          this.mediaWork = null;
+        });
+    }
+    if (!this.mediaWarm) {
+      this.mediaWarm = warmMediaManifests(signal)
+        .catch(() => undefined)
+        .finally(() => {
+          this.mediaWarm = null;
+        });
+    }
+  }
+
   private async maybeDrainOnce(): Promise<number | undefined> {
     const generation = this.sessionGeneration;
     if (!this.sessionIsCurrent(generation)) return;
@@ -855,6 +890,8 @@ class SyncOrchestrator {
       if (pending > 0) syncStateStore.set('syncing');
       return;
     }
+
+    this.startMediaWork();
 
     // Acquire an exclusive cross-tab lock so two open tabs don't both
     // POST the same outbox rows.  The other tab still reads from
@@ -1145,6 +1182,16 @@ class SyncOrchestrator {
     const db = getLocalDb();
     await db.transaction('rw', ALL_STORE_NAMES, async () => {
       for (const { op, outcome } of run) {
+        if (op.localMediaUploadId) await db.mediaUploads.delete(op.localMediaUploadId);
+        if (op.fieldPath === 'portraitAssetId' || op.fieldPath === 'coverAssetId')
+          await db.mediaUploads
+            .filter(
+              (u) =>
+                u.state === 'ready' &&
+                u.assetId === op.attemptedValue &&
+                u.targetId === op.entityId,
+            )
+            .delete();
         if (typeof outcome.newRevision === 'number') {
           await this.stampRevision(op.entityClass, op.entityId, outcome.newRevision);
         }
@@ -1385,6 +1432,14 @@ class SyncOrchestrator {
     // Reconciliation and the durable notice commit together. A storage failure
     // leaves the optimistic row and operation intact for recovery/replay.
     const { preserved, rec } = await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      if (op.fieldPath === 'portraitAssetId' || op.fieldPath === 'coverAssetId')
+        await db.mediaUploads
+          .filter(
+            (u) =>
+              u.id === op.localMediaUploadId ||
+              (u.assetId === op.attemptedValue && u.targetId === op.entityId),
+          )
+          .modify({ state: 'failed', reason: outcome.reason ?? 'Image attachment rejected' });
       const preserved = await this.revertLocal(op, outcome);
       const rec = await this.recordRejection(op, outcome);
       await db.outbox.delete(op.clientOpId);
@@ -1467,6 +1522,14 @@ class SyncOrchestrator {
       createdAt: new Date().toISOString(),
     };
     const preserved = await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      if (op.fieldPath === 'portraitAssetId' || op.fieldPath === 'coverAssetId')
+        await db.mediaUploads
+          .filter(
+            (u) =>
+              u.id === op.localMediaUploadId ||
+              (u.assetId === op.attemptedValue && u.targetId === op.entityId),
+          )
+          .modify({ state: 'failed', reason: outcome.reason ?? 'Image attachment rejected' });
       const preserved = await this.revertLocal(op, outcome);
       await db.rejectionToasts.put(rec);
       await db.outbox.delete(op.clientOpId);

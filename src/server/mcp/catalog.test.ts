@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { z } from 'zod';
-import { assertExactCoverage, buildToolCatalog, toJsonSchema } from './catalog.ts';
+import {
+  assertExactCoverage,
+  buildToolCatalog,
+  operationForInput,
+  toJsonSchema,
+  toolsForScopes,
+} from './catalog.ts';
 import { type IncludedOperation, TOOLS } from './operationManifest.ts';
 
 const policy: IncludedOperation = {
@@ -50,12 +56,68 @@ describe('MCP canonical schema conversion', () => {
   test('compiles the complete committed player API catalog, including unconstrained nullable history values', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
-    expect(tools.length).toBe(TOOLS.length);
+    expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
+    expect(TOOLS.length).toBe(104);
     expect(tools.length).toBeGreaterThan(80);
     for (const tool of tools) {
       expect(tool.inputSchema.type).toBe('object');
       expect(tool.outputSchema.type).toBe('object');
     }
+  });
+
+  test('groups media actions while keeping scope, strict input, and response contracts per operation', async () => {
+    const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
+    const media = tools.find((entry) => entry.policy.tool === 'gpc_media');
+    expect(media).toBeDefined();
+    if (!media) throw new Error('missing gpc_media tool');
+    expect(media?.operations.map((entry) => entry.policy.action)).toEqual([
+      'capabilities',
+      'upload',
+      'status',
+      'cancel',
+    ]);
+    expect(media?.validateInput({ action: 'capabilities' })).toBe(true);
+    expect(media?.validateInput({ action: 'unknown' })).toBe(false);
+    expect(media?.validateInput({ action: 'capabilities', idempotencyKey: 'wrong-surface' })).toBe(
+      false,
+    );
+
+    const readOnlyMedia = toolsForScopes(tools, ['gpc:read']).find(
+      (entry) => entry.policy.tool === 'gpc_media',
+    );
+    expect(readOnlyMedia?.operations.map((entry) => entry.policy.action)).toEqual([
+      'capabilities',
+      'status',
+    ]);
+    expect(readOnlyMedia?.validateInput({ action: 'upload' })).toBe(false);
+
+    const capabilities = operationForInput(media, { action: 'capabilities' });
+    const status = operationForInput(media, { action: 'status' });
+    expect(capabilities).toBeDefined();
+    expect(status).toBeDefined();
+    const capabilitiesBody = { enabled: true, maxInputBytes: 10_485_760 };
+    const statusBody = {
+      id: '0198aa77-1111-7111-8111-111111111111',
+      state: 'ready',
+      thumbUrl: null,
+      displayUrl: null,
+      width: 24,
+      height: 16,
+      reason: null,
+    };
+    expect(
+      await capabilities?.validateResponse(200, 'application/json', capabilitiesBody),
+    ).toBeNull();
+    expect(
+      await capabilities?.validateResponse(200, 'application/json', statusBody),
+    ).not.toBeNull();
+    expect(await status?.validateResponse(200, 'application/json', statusBody)).toBeNull();
+    expect(
+      await status?.validateResponse(200, 'application/json', capabilitiesBody),
+    ).not.toBeNull();
+    expect(await media.validateResponse(200, 'application/json', capabilitiesBody)).toContain(
+      'Select a tool action',
+    );
   });
 
   test('advertises weapon selectors and owned custom effects on the existing authoring tools', () => {
@@ -338,8 +400,8 @@ describe('MCP canonical schema conversion', () => {
         total + JSON.stringify(tool.inputSchema).length + JSON.stringify(tool.outputSchema).length,
       0,
     );
-    // Structured weapon Range adds a small typed value to item reads.
-    expect(outputBytes).toBeLessThan(255_000);
+    // Media tools and portrait/cover asset IDs add required, compact output fields.
+    expect(outputBytes).toBeLessThan(260_000);
     // Calculator inputs plus source/modifier metadata are bounded, first-class
     // portable fields; reserve a measured 550 KB for the complete catalog while
     // still guarding against accidental schema duplication or unbounded growth.
@@ -405,5 +467,36 @@ describe('MCP exact operation coverage', () => {
       'removed: POST /example/{id}',
     );
     expect(() => assertExactCoverage(input, [policy, policy])).toThrow('duplicates: POST');
+  });
+
+  test('accepts distinct explicit actions and rejects duplicate or mixed action groups', () => {
+    const readAction: IncludedOperation = {
+      ...policy,
+      path: '/example/read',
+      tool: 'example_task',
+      method: 'GET',
+      action: 'read',
+    };
+    const writeAction: IncludedOperation = {
+      ...policy,
+      path: '/example/write',
+      tool: 'example_task',
+      action: 'write',
+    };
+    const groupedDocument = {
+      paths: {
+        [readAction.path]: { get: { responses: {} } },
+        [writeAction.path]: { post: { responses: {} } },
+      },
+    };
+
+    expect(() => assertExactCoverage(groupedDocument, [readAction, writeAction])).not.toThrow();
+    expect(() =>
+      assertExactCoverage(groupedDocument, [readAction, { ...writeAction, action: 'read' }]),
+    ).toThrow('collisions: example_task');
+    const { action: _action, ...ungrouped } = writeAction;
+    expect(() => assertExactCoverage(groupedDocument, [readAction, ungrouped])).toThrow(
+      'collisions: example_task',
+    );
   });
 });

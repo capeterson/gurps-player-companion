@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { LocalCampaign } from '../../db/dexie.ts';
+import { ToastProvider } from '../../lib/toast.tsx';
 import { CampaignWorkspaceHeader } from './CampaignWorkspaceHeader.tsx';
 import type { CampaignWorkspace } from './useCampaignWorkspace.ts';
+
+vi.mock('../../lib/api.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/api.ts')>()),
+  api: vi.fn().mockResolvedValue({ enabled: false }),
+}));
 
 const campaign: LocalCampaign = {
   id: 'camp-1',
@@ -41,9 +47,11 @@ function workspace(overrides: Partial<CampaignWorkspace> = {}): CampaignWorkspac
 describe('CampaignWorkspaceHeader', () => {
   it('shows consistent campaign navigation from the local mirror and marks the current page', () => {
     render(
-      <MemoryRouter initialEntries={['/campaigns/camp-1/library']}>
-        <CampaignWorkspaceHeader campaignId="camp-1" workspace={workspace()} />
-      </MemoryRouter>,
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/campaigns/camp-1/library']}>
+          <CampaignWorkspaceHeader campaignId="camp-1" workspace={workspace()} />
+        </MemoryRouter>
+      </ToastProvider>,
     );
 
     expect(screen.getByRole('heading', { name: 'The Lantern Coast' })).toBeInTheDocument();
@@ -65,12 +73,14 @@ describe('CampaignWorkspaceHeader', () => {
 
   it('reveals staff navigation while keeping settings honest when offline', () => {
     render(
-      <MemoryRouter initialEntries={['/campaigns/camp-1/gm']}>
-        <CampaignWorkspaceHeader
-          campaignId="camp-1"
-          workspace={workspace({ viewerRole: 'owner', canManage: true })}
-        />
-      </MemoryRouter>,
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/campaigns/camp-1/gm']}>
+          <CampaignWorkspaceHeader
+            campaignId="camp-1"
+            workspace={workspace({ viewerRole: 'owner', canManage: true })}
+          />
+        </MemoryRouter>
+      </ToastProvider>,
     );
 
     expect(screen.getByRole('link', { name: 'GM dashboard' })).toHaveAttribute(

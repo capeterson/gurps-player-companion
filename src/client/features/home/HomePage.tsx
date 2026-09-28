@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { MediaImage } from '../../components/MediaImage.tsx';
 import { api } from '../../lib/api.ts';
 import { useCharactersList } from '../characters/useCharacterDetail.ts';
 
@@ -55,9 +56,16 @@ export function HomePage() {
                 className="card flex min-w-0 flex-col gap-1 p-card transition hover:border-border-strong"
               >
                 <Link to={`/characters/${c.id}`} className="min-w-0">
-                  <p className="font-display text-lg font-semibold leading-tight truncate">
+                  <div className="font-display text-lg font-semibold leading-tight truncate">
+                    <MediaImage
+                      targetType="character"
+                      targetId={c.id}
+                      assetId={c.portraitAssetId}
+                      name={c.name}
+                      thumbnail
+                    />
                     {c.name}
-                  </p>
+                  </div>
                   <p className="text-xs text-muted">
                     ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
                   </p>

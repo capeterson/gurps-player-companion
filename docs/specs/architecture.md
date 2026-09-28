@@ -393,3 +393,18 @@ write’s audited transaction. Full cursor rows carry this value into Dexie; the
 detail builder adds it to the campaign starting target for cap, unspent points, and
 warnings. No new sync entity/store is needed. `adventureLogAwards.ts` handles roster
 snapshotting, authorization, delta updates, locks, and post-commit WS nudges.
+
+## Optional image storage
+
+Production portrait and cover bytes live in private S3-compatible storage, shared
+by all app replicas. Development/test defaults to a local `.local/media` adapter
+when no S3 connection is configured; local storage is rejected in production.
+`media_assets` and `media_counters` hold metadata/reservations only.
+Parent UUID fields `characters.portrait_asset_id` and `campaigns.cover_asset_id`
+use existing revision/history infrastructure. `users.media_uploads_disabled` is
+an operator control. Short database leases coordinate processing and cleanup;
+object I/O happens outside audit transactions. Sharp emits sanitized WebP variants
+and the same Bun process serves public immutable URLs, with optional CDN caching.
+Garage's single-node Compose overlay can use Unraid bind-mounted storage; it does
+not add an application service or put blobs in PostgreSQL. See
+[media-uploads.md](media-uploads.md) and [../media-storage.md](../media-storage.md).

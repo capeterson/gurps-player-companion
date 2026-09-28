@@ -10,10 +10,17 @@ import {
   resolveOAuthAccessToken,
 } from '../oauth/service.ts';
 import type { AppEnv } from '../openapi/app.ts';
-import { type RuntimeTool, buildToolCatalog } from './catalog.ts';
+import {
+  type RuntimeTool,
+  buildToolCatalog,
+  operationForInput,
+  toolsForScopes,
+} from './catalog.ts';
 import { type OperationInput, executeOperation } from './executor.ts';
 
-export const MAX_MCP_BODY_BYTES = 1024 * 1024;
+export const MAX_MCP_BODY_BYTES = 14 * 1024 * 1024;
+// Larger image envelopes need a process-wide bound, not only per-user rates.
+let activeMcpRequests = 0;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 120;
 const rate = new Map<string, { startedAt: number; count: number }>();
@@ -95,21 +102,34 @@ function consumeRate(key: string): boolean {
 
 /** Shared by discovery and the checked-in snapshot so hints cannot drift. */
 export function describeMcpTool(entry: RuntimeTool) {
+  const policies = entry.operations.map((operation) => operation.policy);
+  const grouped = policies.some((policy) => policy.action);
   return {
     name: entry.policy.tool,
     description: entry.description,
     inputSchema: entry.inputSchema,
     outputSchema: entry.outputSchema,
     annotations: {
-      readOnlyHint: entry.policy.method === 'GET',
-      destructiveHint: entry.policy.destructive,
-      idempotentHint: entry.policy.method === 'GET',
-      openWorldHint: entry.policy.openWorld,
+      readOnlyHint: policies.every((policy) => policy.method === 'GET'),
+      destructiveHint: policies.some((policy) => policy.destructive),
+      idempotentHint: policies.every((policy) => policy.method === 'GET'),
+      openWorldHint: policies.some((policy) => policy.openWorld),
     },
     _meta: {
-      requiredScope: entry.policy.scope,
-      operation: `${entry.policy.method} ${entry.policy.path}`,
-      resultMode: entry.policy.resultMode,
+      ...(grouped
+        ? {
+            actions: policies.map((policy) => ({
+              action: policy.action,
+              requiredScope: policy.scope,
+              operation: `${policy.method} ${policy.path}`,
+              resultMode: policy.resultMode,
+            })),
+          }
+        : {
+            requiredScope: entry.policy.scope,
+            operation: `${entry.policy.method} ${entry.policy.path}`,
+            resultMode: entry.policy.resultMode,
+          }),
     },
   };
 }
@@ -205,7 +225,7 @@ export function createMcpHandler(
   const tools = buildToolCatalog(openApiDocument, app.openAPIRegistry.definitions);
   const byName = new Map(tools.map((entry) => [entry.policy.tool, entry]));
 
-  return async (request, routeParsedBody) => {
+  const handle = async (request: Request, routeParsedBody?: unknown): Promise<Response> => {
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(resource).origin && !config.corsOrigins.includes(origin)) {
       return json({ error: 'invalid_origin' }, 403);
@@ -280,9 +300,10 @@ export function createMcpHandler(
     const call = CallToolRequestSchema.safeParse(parsedBody);
     if (call.success) {
       const entry = byName.get(call.data.params.name);
-      if (entry && !principal.scopes.includes(entry.policy.scope)) {
+      const operation = entry && operationForInput(entry, call.data.params.arguments ?? {});
+      if (operation && !principal.scopes.includes(operation.policy.scope)) {
         return json({ error: 'insufficient_scope' }, 403, {
-          'www-authenticate': challenge(resource, 'insufficient_scope', entry.policy.scope),
+          'www-authenticate': challenge(resource, 'insufficient_scope', operation.policy.scope),
         });
       }
     }
@@ -292,27 +313,27 @@ export function createMcpHandler(
       {
         capabilities: { tools: {} },
         instructions:
-          'Tools mirror the GPC player API. Mutations return only a compact acknowledgement; call the corresponding read tool when refreshed state is needed. Supply a stable idempotencyKey for mutations and reuse it after a lost response; do not retry with a new key without checking the outcome.',
+          'Tools cover the GPC player API; task tools have explicit typed actions. Mutations return a compact acknowledgement; use a read action or tool for refreshed state. Image uploads combine metadata and bytes in one call: reuse clientUploadId and identical content after a lost response, then attach resourceId through a character/campaign update. Non-media mutations accept idempotencyKey; reuse it after a lost response.',
       },
     );
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: tools
-        .filter((entry) => principal.scopes.includes(entry.policy.scope))
-        .map(describeMcpTool),
+      tools: toolsForScopes(tools, principal.scopes).map(describeMcpTool),
     }));
     server.setRequestHandler(CallToolRequestSchema, async (toolCall) => {
-      const runtime = byName.get(toolCall.params.name);
-      if (!runtime) return toolError('unknown_tool', 'Unknown tool');
-      if (!principal.scopes.includes(runtime.policy.scope))
-        return toolError('insufficient_scope', 'Additional consent required', 403);
+      const tool = byName.get(toolCall.params.name);
+      if (!tool) return toolError('unknown_tool', 'Unknown tool');
       const input = (toolCall.params.arguments ?? {}) as OperationInput;
-      if (!runtime.validateInput(input)) {
+      if (!tool.validateInput(input)) {
         return toolError(
           'validation_error',
-          `Invalid tool input: ${JSON.stringify(runtime.validateInput.errors)}`,
+          `Invalid tool input: ${JSON.stringify(tool.validateInput.errors)}`,
           422,
         );
       }
+      const runtime = operationForInput(tool, input);
+      if (!runtime) return toolError('validation_error', 'Unknown tool action', 422);
+      if (!principal.scopes.includes(runtime.policy.scope))
+        return toolError('insufficient_scope', 'Additional consent required', 403);
       try {
         // The executor owns the database deadline and transaction settlement.
         // Do not race it against a timer that leaves an unseen mutation running.
@@ -392,6 +413,16 @@ export function createMcpHandler(
       );
     } finally {
       await server.close();
+    }
+  };
+  return async (request, parsedBody) => {
+    if (activeMcpRequests >= 4)
+      return json({ error: 'temporarily_unavailable' }, 503, { 'retry-after': '1' });
+    activeMcpRequests++;
+    try {
+      return await handle(request, parsedBody);
+    } finally {
+      activeMcpRequests--;
     }
   };
 }

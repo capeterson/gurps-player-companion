@@ -36,13 +36,17 @@ type RegistryDefinition = {
   };
 };
 
-export interface RuntimeTool {
+export interface RuntimeOperation {
   policy: IncludedOperation;
   description: string;
   inputSchema: JsonSchema;
   outputSchema: JsonSchema;
   validateInput: ValidateFunction;
   validateResponse(status: number, contentType: string, body: unknown): Promise<string | null>;
+}
+
+export interface RuntimeTool extends RuntimeOperation {
+  operations: readonly RuntimeOperation[];
 }
 
 /** OpenAPI 3.0's nullable/exclusive-bound vocabulary is not JSON Schema. */
@@ -106,6 +110,10 @@ function requestSchema(
 ): JsonSchema {
   const properties: JsonSchema = {};
   const required: string[] = [];
+  if (policy.action) {
+    properties.action = { type: 'string', const: policy.action };
+    required.push('action');
+  }
   for (const location of ['path', 'query'] as const) {
     const fields: JsonSchema = {};
     const requiredFields: string[] = [];
@@ -133,7 +141,7 @@ function requestSchema(
     properties.body = content.schema;
     if (operation.requestBody?.required) required.push('body');
   }
-  if (policy.method !== 'GET') {
+  if (policy.method !== 'GET' && !policy.path.startsWith('/api/v1/media/')) {
     properties.idempotencyKey = {
       type: 'string',
       minLength: 1,
@@ -287,7 +295,7 @@ export function buildToolCatalog(
   const definitions = document.components?.schemas ?? {};
   const genericError = compile(sharedErrorBody);
   const registry = registryDefinitions as readonly RegistryDefinition[];
-  return policies.map((policy) => {
+  const operations = policies.map((policy) => {
     const operation = document.paths?.[policy.path]?.[policy.method.toLowerCase()];
     if (!operation)
       throw new Error(
@@ -342,8 +350,75 @@ export function buildToolCatalog(
         }
         return null;
       },
-    } satisfies RuntimeTool;
+    } satisfies RuntimeOperation;
   });
+  return groupOperations(operations);
+}
+
+/** Hoist canonical refs: refs inside anyOf still resolve against the root. */
+function schemaUnion(schemas: readonly JsonSchema[]): JsonSchema {
+  const definitions: JsonSchema = {};
+  const anyOf = schemas.map(({ $defs, ...schema }) => {
+    Object.assign(definitions, $defs);
+    return schema;
+  });
+  return {
+    type: 'object',
+    anyOf,
+    ...(Object.keys(definitions).length ? { $defs: definitions } : {}),
+  };
+}
+
+function groupOperations(operations: readonly RuntimeOperation[]): RuntimeTool[] {
+  const groups = new Map<string, RuntimeOperation[]>();
+  for (const operation of operations) {
+    const members = groups.get(operation.policy.tool) ?? [];
+    members.push(operation);
+    groups.set(operation.policy.tool, members);
+  }
+  return [...groups.values()].map((members) => {
+    const first = members[0];
+    if (!first) throw new Error('Empty MCP tool group');
+    if (members.length === 1) return { ...first, operations: members };
+    const actions = members.map((entry) => entry.policy.action);
+    if (actions.some((action) => !action) || new Set(actions).size !== actions.length)
+      throw new Error(`MCP tool ${first.policy.tool} requires distinct explicit actions`);
+    const inputSchema = schemaUnion(members.map((entry) => entry.inputSchema));
+    const outputSchema = schemaUnion(members.map((entry) => entry.outputSchema));
+    compile(outputSchema);
+    return {
+      ...first,
+      operations: members,
+      description: members
+        .map((entry) => `${entry.policy.action}: ${entry.description}`)
+        .join('\n'),
+      inputSchema,
+      outputSchema,
+      validateInput: compile(inputSchema),
+      // The discovery union is not a dispatch validator. Fail closed if a
+      // caller forgets to select the action's canonical response contract.
+      async validateResponse() {
+        return 'Select a tool action before validating its response';
+      },
+    };
+  });
+}
+
+export function operationForInput(
+  tool: RuntimeTool,
+  input: { action?: unknown },
+): RuntimeOperation | undefined {
+  return tool.operations.find((entry) => entry.policy.action === input.action);
+}
+
+/** Read-only delegates see only read branches, including their schemas/hints. */
+export function toolsForScopes(
+  tools: readonly RuntimeTool[],
+  scopes: readonly string[],
+): RuntimeTool[] {
+  return groupOperations(
+    tools.flatMap((tool) => tool.operations.filter((entry) => scopes.includes(entry.policy.scope))),
+  );
 }
 
 export function assertExactCoverage(
@@ -365,7 +440,14 @@ export function assertExactCoverage(
   const missing = [...emitted].filter((key) => !mapped.has(key));
   const removed = [...mapped].filter((key) => !emitted.has(key));
   const names = policies.flatMap((entry) => (entry.kind === 'tool' ? [entry.tool] : []));
-  const collisions = names.filter((name, index) => names.indexOf(name) !== index);
+  const collisions = [...new Set(names)].filter((name) => {
+    const members = policies.filter(
+      (entry): entry is IncludedOperation => entry.kind === 'tool' && entry.tool === name,
+    );
+    if (members.length === 1) return false;
+    const actions = members.map((entry) => entry.action);
+    return actions.some((action) => !action) || new Set(actions).size !== actions.length;
+  });
   if (missing.length || removed.length || collisions.length || duplicates.length) {
     throw new Error(
       `MCP coverage drift\nmissing: ${missing.join(', ') || '(none)'}\nremoved: ${removed.join(', ') || '(none)'}\nduplicates: ${duplicates.join(', ') || '(none)'}\ncollisions: ${[...new Set(collisions)].join(', ') || '(none)'}`,

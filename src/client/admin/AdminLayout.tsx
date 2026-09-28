@@ -90,6 +90,9 @@ export function AdminLayout() {
             >
               Campaigns
             </NavLink>
+            <NavLink to="/admin/media" className="rounded-field px-3 py-2 text-sm">
+              Images
+            </NavLink>
           </nav>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">

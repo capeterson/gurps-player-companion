@@ -133,6 +133,23 @@ describe('summarizeEvent character', () => {
     });
     expect(summary).toContain('ST');
   });
+
+  it.each([
+    ['portrait_asset_id', null, 'asset-id', 'Portrait updated'],
+    ['portrait_asset_id', 'asset-id', null, 'Portrait removed'],
+  ] as const)(
+    'summarizes %s changes without exposing asset identifiers',
+    (field, oldValue, newValue, expected) => {
+      const { summary } = summarizeEvent({
+        entityClass: 'character',
+        op: 'update',
+        oldRow: { [field]: oldValue },
+        newRow: { [field]: newValue },
+      });
+      expect(summary).toBe(expected);
+      expect(summary).not.toContain('asset-id');
+    },
+  );
 });
 
 // ---------- summarizeEvent — character.tempEffects ----------
@@ -665,6 +682,23 @@ describe('summarizeEvent campaign', () => {
     });
     expect(summary).toBe('Attribute caps disabled');
   });
+
+  it.each([
+    ['cover_asset_id', null, 'asset-id', 'Campaign cover updated'],
+    ['cover_asset_id', 'asset-id', null, 'Campaign cover removed'],
+  ] as const)(
+    'summarizes %s changes without exposing asset identifiers',
+    (field, oldValue, newValue, expected) => {
+      const { summary } = summarizeEvent({
+        entityClass: 'campaign',
+        op: 'update',
+        oldRow: { [field]: oldValue },
+        newRow: { [field]: newValue },
+      });
+      expect(summary).toBe(expected);
+      expect(summary).not.toContain('asset-id');
+    },
+  );
 });
 
 describe('summarizeEvent campaign_library_trait', () => {
