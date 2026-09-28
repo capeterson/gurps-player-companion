@@ -31,6 +31,7 @@ export function lanternMcpRequest(call: LanternToolCall): LanternRequest {
     });
     if (!operation) throw new Error(`No MCP operation for Lantern ${method} ${path}`);
     const result = await call(operation.tool, {
+      ...(operation.action ? { action: operation.action } : {}),
       ...(Object.keys(parameters).length ? { path: parameters } : {}),
       ...(body === undefined ? {} : { body }),
     });

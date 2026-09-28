@@ -7,15 +7,18 @@ import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { populateLanternCoast } from '../src/server/db/seeds/lanternCoastContent.ts';
 import { lanternMcpRequest } from '../src/server/db/seeds/lanternCoastMcp.ts';
+import { TOOLS } from '../src/server/mcp/operationManifest.ts';
 
 const input = createInterface({ input: process.stdin });
 const lines = input[Symbol.asyncIterator]();
 const runKey = process.env.LANTERN_SEED_RUN_KEY ?? randomUUID();
 let step = 0;
 const request = lanternMcpRequest(async (name, args) => {
+  const operation = TOOLS.find((entry) => entry.tool === name && entry.action === args.action);
+  if (!operation) throw new Error(`Missing MCP operation ${name} action=${args.action ?? ''}`);
   const idempotencyKey = `${runKey}:${++step}`;
   process.stdout.write(
-    `${JSON.stringify({ kind: 'call', name, args: { ...args, ...(name.startsWith('gpc_get_') ? {} : { idempotencyKey }) } })}\n`,
+    `${JSON.stringify({ kind: 'call', name, args: { ...args, ...(operation.method === 'GET' ? {} : { idempotencyKey }) } })}\n`,
   );
   const line = await lines.next();
   if (line.done) throw new Error(`Bridge ended before ${name} returned a result`);

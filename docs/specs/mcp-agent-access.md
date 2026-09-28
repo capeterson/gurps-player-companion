@@ -84,7 +84,9 @@ revocation and cleanup rules. Expired request, code, access, and refresh rows ar
 pruned opportunistically at most once per minute; unused DCR registrations older
 than 24 hours are also pruned, while granted clients remain for explicit revocation
 and history provenance. CIMD registrations refresh after their bounded metadata
-cache expires. New tables use PG18 migrations and server-default
+cache expires. Configured HTTPS client IDs remain operator-managed after removal;
+metadata discovery cannot re-enable them or overwrite their configuration,
+including a concurrent metadata refresh. New tables use PG18 migrations and server-default
 UUIDs. Every persisted JSON field needs its shared Zod schema, Drizzle `$type`,
 write-boundary validation, and a row in [json-fields.md](json-fields.md).
 Never store credentials in entity history, tool results, or diagnostic logs.
@@ -136,16 +138,39 @@ represents the null branch; the JSON Schema converter emits `{ type: 'null' }`
 there so valid ranged-weapon values do not match two `oneOf` branches.
 Successful mutation tools deliberately advertise and return one
 small acknowledgement shape (`acknowledged`, plus `resourceId` from the result
-or target path and `revision` when the canonical result exposes it) instead of
-repeating the REST resource schema. The complete REST response is still
-validated before projection.
+or canonical target path and `revision` when the result exposes it for that
+resource) instead of repeating the REST resource schema. The complete REST response is still
+validated before projection. DELETE acknowledgements identify the canonical
+path target even when REST returns a refreshed parent; they never attach the
+parent's revision to the deleted child. Target selection follows route parameter
+order, independent of input object key order. Media cancellation by
+`clientUploadId` reports the canonical asset ID from the validated manifest;
+the retry alias is never labeled as the affected resource ID.
 The complete generated input/output catalog has a regression budget of 550 KB;
 the current bounded calculator, source, and modifier contracts account for
-about 535 KB. Compact mutation acknowledgements remain independently capped at
+about 438 KB after grouping (previously about 549 KB). Compact mutation acknowledgements remain independently capped at
 2 KB per mutation operation (including grouped actions) and aggregate outputs at 260 KB, so future schema growth
 must remain bounded and avoid duplicating shared definitions.
-Keep stable tool names; descriptions explain field meaning and effects. Successful
-calls keep the authoritative payload only in `structuredContent`; their text
+Tool names are server-local, unprefixed snake_case identifiers such as
+`list_characters`, `character_skill`, and `media`. The MCP naming guidance
+recommends uniqueness within a server, not an application namespace. Clients
+refresh discovery to replace the former `gpc_` names; those names are not
+registered as aliases. OAuth scope names remain `gpc:read`, `gpc:write`, and
+`gpc:manage`. Related writes share an entity task tool with explicit actions:
+for example, `character_skill` and `library_skill` each accept `create`, `update`,
+or `delete`. Character/campaign writes, campaign members, received invitations,
+notifications, adventure-log entries, encounters/combatants/effects and condition
+groups follow the same pattern. Read tools remain separate, preserving their
+read-only hints and compact selection. `media` retains its existing mixed task
+actions. Email invitations, ownership transfer, YAML import and specialized
+character updates remain distinct tasks. Each action retains its exact canonical
+schema, OAuth scope, authorization, audit and parity fixture; discovery exposes
+only authorized action branches and derives hints from those branches. Deleting
+any campaign-library entry requires `gpc:manage`, including sources and modifiers.
+Identical grouped output contracts are deduplicated so CRUD acknowledgements do
+not repeat one schema per action.
+Keep these tool names stable; descriptions explain field meaning and effects.
+Successful calls keep the authoritative payload only in `structuredContent`; their text
 content is a short HTTP-status pointer so model context does not contain a second
 serialized copy. Failed calls retain their complete domain error text and
 structured payload, including field errors, conflicts and retry guidance;
@@ -215,7 +240,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 101 player-domain tools and gives each excluded
+method/path. It exposes 49 player-domain tools covering 104 exact operations and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -381,15 +406,14 @@ The implementation is released only with evidence for these gates:
    Publish a completed operation coverage report. Update overview, architecture,
    sync, sharing, history and JSON specs to describe the implemented state.
 
-The checked-in evidence includes the generated 94-tool catalog, per-operation
+The checked-in evidence includes the generated 49-tool catalog, per-operation
 successful REST/MCP differential and scope-denial fixtures, OAuth boundary and
 transport tests, transaction/idempotency regressions, client consent/Settings
 tests, and the Playwright browser authorization acceptance flow.
 
 ## Active effects and skill procedures
 
-The manifest also includes `gpc_create_library_active_effect`,
-`gpc_update_library_active_effect`, and `gpc_delete_library_active_effect`. Character
+The `library_active_effect` tool includes `create`, `update`, and `delete` actions. Character
 active effects and condition groups use the existing character write tools. Skill
 procedure schemas and owned snapshots are exposed by the existing library/skill
 operations. All share REST validation and authorization; the per-operation parity
@@ -418,8 +442,8 @@ same route schemas; old free-text Range writes are rejected.
 
 ## Image upload task tool
 
-One `gpc_media` tool exposes four explicit actions: `capabilities` and `status`
-require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 101-tool catalog
+One `media` tool exposes four explicit actions: `capabilities` and `status`
+require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 49-tool catalog
 maps 104 player operations; each action retains an exact method/path mapping,
 canonical request/response validators and REST parity coverage. An unknown
 action, a mixed-action payload or insufficient scope cannot dispatch a request.

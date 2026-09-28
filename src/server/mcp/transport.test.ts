@@ -78,7 +78,7 @@ const readCall = {
   jsonrpc: '2.0',
   id: 2,
   method: 'tools/call',
-  params: { name: 'gpc_list_characters', arguments: {} },
+  params: { name: 'list_characters', arguments: {} },
 };
 
 describe('MCP streaming request boundary', () => {
@@ -133,13 +133,60 @@ describe('compact mutation acknowledgements', () => {
           character: { id: characterId, revision: 12, inventory: [] },
         },
         { path: { id: characterId } },
+        { method: 'POST', path: '/api/v1/characters/{id}/inventory' },
       ),
     ).toEqual({ acknowledged: true, resourceId: childId, revision: 7 });
     expect(
-      mutationAcknowledgement(null, {
-        path: { id: characterId, itemId: childId },
-      }),
+      mutationAcknowledgement(
+        null,
+        { path: { id: characterId, itemId: childId } },
+        { method: 'DELETE', path: '/api/v1/characters/{id}/inventory/{itemId}' },
+      ),
     ).toEqual({ acknowledged: true, resourceId: childId });
+  });
+
+  test('uses canonical path order and identifies deleted children instead of returned parents', () => {
+    const childId = '0198aa77-1111-7111-8111-111111111111';
+    const characterId = '0198aa77-2222-7222-8222-222222222222';
+    const operation = {
+      method: 'DELETE' as const,
+      path: '/api/v1/characters/{id}/skills/{skillId}',
+    };
+    for (const path of [
+      { id: characterId, skillId: childId },
+      { skillId: childId, id: characterId },
+    ]) {
+      // Character child DELETE handlers return the refreshed character detail.
+      for (const body of [null, { id: characterId, revision: 12, skills: [] }]) {
+        expect(mutationAcknowledgement(body, { path }, operation)).toEqual({
+          acknowledged: true,
+          resourceId: childId,
+        });
+      }
+    }
+    expect(
+      mutationAcknowledgement(
+        { id: childId, revision: 7 },
+        { path: { id: characterId, skillId: childId } },
+        operation,
+      ),
+    ).toEqual({ acknowledged: true, resourceId: childId, revision: 7 });
+  });
+
+  test('never reports a media retry alias as the canonical asset ID', () => {
+    const clientUploadId = '0198aa77-1111-7111-8111-111111111111';
+    const assetId = '0198aa77-2222-7222-8222-222222222222';
+    const operation = { method: 'DELETE' as const, path: '/api/v1/media/uploads/{id}' };
+    const input = { path: { id: clientUploadId }, query: { lookup: 'clientUploadId' } };
+    expect(mutationAcknowledgement({ id: assetId }, input, operation)).toEqual({
+      acknowledged: true,
+      resourceId: assetId,
+    });
+    expect(mutationAcknowledgement(null, input, operation)).toEqual({ acknowledged: true });
+    expect(mutationAcknowledgement(null, { path: { id: assetId } }, operation)).toEqual({
+      acknowledged: true,
+      resourceId: assetId,
+    });
   });
 });
 
@@ -185,10 +232,12 @@ describe('MCP protocol and OAuth transport', () => {
     const body = (await response.json()) as { result: { tools: unknown[] } };
     const expected = toolsForScopes(buildToolCatalog(document), actor.scopes).map(describeMcpTool);
     expect(body.result.tools).toEqual(expected);
+    expect(body.result.tools).toContainEqual(expect.objectContaining({ name: 'list_characters' }));
+    expect(body.result.tools).not.toContainEqual(
+      expect.objectContaining({ name: 'gpc_list_characters' }),
+    );
     expect(response.headers.get('cache-control')).toBe('no-store');
-    const media = body.result.tools.find(
-      (tool) => (tool as { name?: string }).name === 'gpc_media',
-    ) as
+    const media = body.result.tools.find((tool) => (tool as { name?: string }).name === 'media') as
       | {
           _meta?: {
             actions?: Array<{
@@ -223,10 +272,10 @@ describe('MCP protocol and OAuth transport', () => {
         describeMcpTool(tool).annotations,
       ]),
     );
-    expect(annotations.get('gpc_list_characters')?.openWorldHint).toBe(false);
-    expect(annotations.get('gpc_update_character')?.openWorldHint).toBe(false);
-    expect(annotations.get('gpc_add_campaign_member')?.openWorldHint).toBe(false);
-    expect(annotations.get('gpc_invite_campaign_member')?.openWorldHint).toBe(true);
+    expect(annotations.get('list_characters')?.openWorldHint).toBe(false);
+    expect(annotations.get('character')?.openWorldHint).toBe(false);
+    expect(annotations.get('campaign_member')?.openWorldHint).toBe(false);
+    expect(annotations.get('invite_campaign_member')?.openWorldHint).toBe(true);
   });
 
   test('stateless SDK supports successive list/call requests and typed output', async () => {
@@ -251,7 +300,7 @@ describe('MCP protocol and OAuth transport', () => {
         jsonrpc: '2.0',
         id: 3,
         method: 'tools/call',
-        params: { name: 'gpc_mark_all_notifications_read', arguments: {} },
+        params: { name: 'notification', arguments: { action: 'mark_all_read' } },
       }),
     );
     expect(await response.json()).toMatchObject({
@@ -282,12 +331,45 @@ describe('MCP protocol and OAuth transport', () => {
     const response = await fixture.handle(
       request({
         ...readCall,
-        params: { name: 'gpc_create_character', arguments: { body: { name: 'Nope' } } },
+        params: { name: 'character', arguments: { action: 'create', body: { name: 'Nope' } } },
       }),
     );
     expect(response.status).toBe(403);
     expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
     expect(response.headers.get('www-authenticate')).toContain('scope="gpc:write"');
+    expect(fixture.executed()).toBe(0);
+  });
+
+  test('grouped library deletes require manage scope and disappear from write-only discovery', async () => {
+    const actor = principal();
+    actor.scopes = ['gpc:read', 'gpc:write'];
+    const fixture = handler({ principal: actor });
+    const discovery = await fixture.handle(request(listing));
+    const payload = (await discovery.json()) as {
+      result: {
+        tools: Array<{
+          name: string;
+          annotations: { readOnlyHint: boolean; destructiveHint: boolean };
+          _meta: { actions?: Array<{ action: string }> };
+        }>;
+      };
+    };
+    for (const name of ['library_source', 'library_modifier']) {
+      const listed = payload.result.tools.find((tool) => tool.name === name);
+      expect(listed?._meta.actions?.map((action) => action.action).sort()).toEqual([
+        'create',
+        'update',
+      ]);
+      expect(listed?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      const denied = await fixture.handle(
+        request({
+          ...readCall,
+          params: { name, arguments: { action: 'delete', path: { id: randomUUID() } } },
+        }),
+      );
+      expect(denied.status).toBe(403);
+      expect(denied.headers.get('www-authenticate')).toContain('scope="gpc:manage"');
+    }
     expect(fixture.executed()).toBe(0);
   });
 
@@ -298,7 +380,7 @@ describe('MCP protocol and OAuth transport', () => {
         jsonrpc: '2.0',
         id: 12,
         method: 'tools/call',
-        params: { name: 'gpc_media', arguments: { action: 'remove-everything' } },
+        params: { name: 'media', arguments: { action: 'remove-everything' } },
       }),
     );
     expect(await unknownAction.json()).toMatchObject({
@@ -310,7 +392,7 @@ describe('MCP protocol and OAuth transport', () => {
         id: 15,
         method: 'tools/call',
         params: {
-          name: 'gpc_media',
+          name: 'media',
           arguments: { action: 'capabilities', body: { base64: 'not-allowed-here' } },
         },
       }),
@@ -326,7 +408,7 @@ describe('MCP protocol and OAuth transport', () => {
         jsonrpc: '2.0',
         id: 13,
         method: 'tools/call',
-        params: { name: 'gpc_media', arguments: { action: 'upload', body: {} } },
+        params: { name: 'media', arguments: { action: 'upload', body: {} } },
       }),
     );
     expect(write.status).toBe(403);
@@ -350,7 +432,7 @@ describe('MCP protocol and OAuth transport', () => {
         jsonrpc: '2.0',
         id: 14,
         method: 'tools/call',
-        params: { name: 'gpc_media', arguments: { action: 'capabilities' } },
+        params: { name: 'media', arguments: { action: 'capabilities' } },
       }),
     );
     expect(await capabilities.json()).toMatchObject({
@@ -360,6 +442,53 @@ describe('MCP protocol and OAuth transport', () => {
       },
     });
     expect(wrongOutput.executed()).toBe(1);
+  });
+
+  test('media cancel acknowledgements retain the asset ID for direct and retry-alias lookups', async () => {
+    const clientUploadId = randomUUID();
+    const assetId = randomUUID();
+    const actor = principal();
+    actor.scopes = ['gpc:write'];
+    const fixture = handler({
+      principal: actor,
+      executeResponse: () =>
+        Response.json({
+          id: assetId,
+          state: 'cancelled',
+          thumbUrl: null,
+          displayUrl: null,
+          width: null,
+          height: null,
+          reason: null,
+        }),
+    });
+    for (const lookup of [undefined, 'assetId', 'clientUploadId']) {
+      const response = await fixture.handle(
+        request({
+          jsonrpc: '2.0',
+          id: 16,
+          method: 'tools/call',
+          params: {
+            name: 'media',
+            arguments: {
+              action: 'cancel',
+              path: { id: lookup === 'clientUploadId' ? clientUploadId : assetId },
+              ...(lookup ? { query: { lookup } } : {}),
+            },
+          },
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        result: {
+          structuredContent: {
+            status: 200,
+            body: { acknowledged: true, resourceId: assetId },
+          },
+        },
+      });
+    }
+    expect(fixture.executed()).toBe(3);
   });
 
   test('discovery challenges distinguish missing/invalid credentials from verification outages', async () => {

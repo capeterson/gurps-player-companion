@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, gt, inArray, isNull, lt, notExists, notInArray } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, notExists, notInArray, sql } from 'drizzle-orm';
 import {
   type OAuthAuthorizationQuery,
   type OAuthDynamicClientRegistration,
@@ -245,6 +245,12 @@ async function resolveOAuthClient(config: AppConfig, clientId: string) {
     .select()
     .from(oauthClients)
     .where(eq(oauthClients.clientId, clientId));
+  // Operator-managed registrations remain authoritative even when their IDs
+  // happen to be metadata URLs. Never resurrect a removed/disabled client (and
+  // all of its existing grants) by converting that same row to CIMD.
+  if (existing?.disabledAt) {
+    throw new OAuthError('invalid_client', 'client is not registered');
+  }
   if (
     existing &&
     !existing.disabledAt &&
@@ -277,6 +283,9 @@ async function resolveOAuthClient(config: AppConfig, clientId: string) {
     })
     .onConflictDoUpdate({
       target: oauthClients.clientId,
+      // Metadata retrieval performs network I/O. A concurrent configuration
+      // reconcile or disable must also win if it happens during that fetch.
+      setWhere: sql`${eq(oauthClients.registrationMethod, 'cimd')} and ${isNull(oauthClients.disabledAt)}`,
       set: {
         name: resolved.metadata.client_name ?? new URL(clientId).hostname,
         redirectUris: resolved.metadata.redirect_uris,

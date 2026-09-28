@@ -238,15 +238,33 @@ test.describe('delegated MCP OAuth acceptance', () => {
       const tools = await client.listTools();
       expect(tools.tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining([
-          'gpc_get_current_user',
-          'gpc_create_character',
-          'gpc_update_character',
-          'gpc_get_character_history',
+          'get_current_user',
+          'character',
+          'get_character',
+          'get_character_history',
         ]),
+      );
+      expect(tools.tools).toHaveLength(49);
+      expect(tools.tools.some((tool) => tool.name.startsWith('gpc_'))).toBe(false);
+      expect(
+        tools.tools.find((tool) => tool.name === 'get_character')?.annotations?.readOnlyHint,
+      ).toBe(true);
+      const characterTool = tools.tools.find((tool) => tool.name === 'character');
+      expect(characterTool?.annotations?.readOnlyHint).toBe(false);
+      expect(characterTool?.inputSchema.anyOf).toEqual(
+        expect.arrayContaining(
+          ['create', 'update', 'delete'].map((action) =>
+            expect.objectContaining({
+              properties: expect.objectContaining({
+                action: { type: 'string', const: action },
+              }),
+            }),
+          ),
+        ),
       );
 
       const me = toolEnvelope<{ email: string; displayName: string }>(
-        await client.callTool({ name: 'gpc_get_current_user', arguments: {} }),
+        await client.callTool({ name: 'get_current_user', arguments: {} }),
       );
       expect(me.body).toMatchObject({ email, displayName: 'MCP E2E Player' });
 
@@ -257,8 +275,9 @@ test.describe('delegated MCP OAuth acceptance', () => {
         revision: number;
       }>(
         await client.callTool({
-          name: 'gpc_create_character',
+          name: 'character',
           arguments: {
+            action: 'create',
             body: { name: characterName },
             idempotencyKey: `e2e-create-${randomUUID()}`,
           },
@@ -270,7 +289,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       const characterId = created.body.resourceId;
       const createdDetail = toolEnvelope<{ name: string; st: number; dx: number }>(
         await client.callTool({
-          name: 'gpc_get_character',
+          name: 'get_character',
           arguments: { path: { id: characterId } },
         }),
       );
@@ -300,7 +319,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
         Array<{ summary: string; agentClientName?: string | null }>
       >(
         await client.callTool({
-          name: 'gpc_get_character_history',
+          name: 'get_character_history',
           arguments: { path: { id: characterId } },
         }),
       );
@@ -331,8 +350,9 @@ test.describe('delegated MCP OAuth acceptance', () => {
 
       toolEnvelope(
         await client.callTool({
-          name: 'gpc_update_character',
+          name: 'character',
           arguments: {
+            action: 'update',
             path: { id: characterId },
             body: { dx: 12 },
             idempotencyKey: `e2e-update-${randomUUID()}`,
@@ -341,7 +361,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
       );
       const beforeReconnect = toolEnvelope<{ st: number; dx: number }>(
         await client.callTool({
-          name: 'gpc_get_character',
+          name: 'get_character',
           arguments: { path: { id: characterId } },
         }),
       );
@@ -359,7 +379,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
           async () => {
             const current = toolEnvelope<{ st: number }>(
               await client.callTool({
-                name: 'gpc_get_character',
+                name: 'get_character',
                 arguments: { path: { id: characterId } },
               }),
             );
@@ -377,7 +397,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
 
       const converged = toolEnvelope<{ st: number; dx: number }>(
         await client.callTool({
-          name: 'gpc_get_character',
+          name: 'get_character',
           arguments: { path: { id: characterId } },
         }),
       );
