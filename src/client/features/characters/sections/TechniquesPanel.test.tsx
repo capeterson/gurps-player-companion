@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TechniqueOut } from '../../../../shared/schemas/technique.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
+import { flashBus } from '../../../sync/flashBus.ts';
 import { TechniquesPanel } from './TechniquesPanel.tsx';
 
 const enqueueFieldPatch = vi.hoisted(() => vi.fn());
@@ -133,6 +134,14 @@ function renderPanel(character: CharacterDetail, canWrite = true) {
   });
 }
 
+function openTechniqueEditor(name = 'Feint') {
+  fireEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
+}
+
+function openAddTechniqueForm() {
+  fireEvent.click(screen.getByRole('button', { name: '+ Add technique' }));
+}
+
 beforeEach(() => {
   enqueueFieldPatch.mockReset();
   enqueueCreate.mockReset();
@@ -162,6 +171,18 @@ describe('TechniquesPanel rendering', () => {
     expect(screen.getByText('No techniques yet.')).toBeInTheDocument();
   });
 
+  it('keeps row drafts mounted when the editor closes and reopens', () => {
+    renderPanel(makeCharacter([makeTechnique()]));
+    expect(screen.getByLabelText('Feint name')).not.toBeVisible();
+    openTechniqueEditor();
+    const name = screen.getByLabelText('Feint name') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Disarming' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close Feint' }));
+    expect(screen.getByLabelText('Feint name')).not.toBeVisible();
+    openTechniqueEditor();
+    expect(screen.getByLabelText('Feint name')).toHaveValue('Disarming');
+  });
+
   it('hides every editor for a read-only viewer', () => {
     renderPanel(makeCharacter([makeTechnique()]), false);
     expect(screen.queryByLabelText('Feint name')).not.toBeInTheDocument();
@@ -170,11 +191,51 @@ describe('TechniquesPanel rendering', () => {
       screen.queryByRole('button', { name: 'Delete technique Feint' }),
     ).not.toBeInTheDocument();
   });
+
+  it('flashes the visible row after a save rejection settles with its editor closed', async () => {
+    let rejectSave: ((error: Error) => void) | null = null;
+    enqueueFieldPatch.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSave = reject;
+        }),
+    );
+    renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
+    fireEvent.change(screen.getByLabelText('Feint difficulty'), { target: { value: 'H' } });
+    await waitFor(() => expect(enqueueFieldPatch).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Close Feint' }));
+
+    await act(async () => rejectSave?.(new Error('server rejected difficulty')));
+
+    const summary = screen.getByRole('rowgroup', { name: 'Feint' }).querySelector('tr');
+    await waitFor(() => expect(summary).toHaveAttribute('data-flashing', 'true'));
+    expect(
+      screen.getByText(/Couldn't save Feint difficulty — server rejected difficulty/),
+    ).toBeVisible();
+  });
+
+  it('flashes the visible row for an asynchronous field rollback while its editor is closed', async () => {
+    renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Feint' }));
+
+    act(() => {
+      flashBus.emit({
+        key: `character_technique:${TECH_ID}:difficulty`,
+        reason: 'server rejected difficulty',
+      });
+    });
+
+    const summary = screen.getByRole('rowgroup', { name: 'Feint' }).querySelector('tr');
+    await waitFor(() => expect(summary).toHaveAttribute('data-flashing', 'true'));
+  });
 });
 
 describe('TechniquesPanel row editing', () => {
   it('patches the default-skill binding through its own fieldPath, not `name`', async () => {
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const input = screen.getByLabelText('Feint default skill') as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: 'Rapier' } });
@@ -195,6 +256,7 @@ describe('TechniquesPanel row editing', () => {
 
   it('rejects an empty default skill locally with a toast and rollback', async () => {
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const input = screen.getByLabelText('Feint default skill') as HTMLInputElement;
 
     fireEvent.change(input, { target: { value: '   ' } });
@@ -209,6 +271,7 @@ describe('TechniquesPanel row editing', () => {
 
   it('patches the difficulty select on change', async () => {
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const select = screen.getByLabelText('Feint difficulty') as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: 'H' } });
@@ -224,6 +287,7 @@ describe('TechniquesPanel row editing', () => {
   it('server rejection on the difficulty select rolls back, toasts, and flashes', async () => {
     enqueueFieldPatch.mockRejectedValue(new Error('field not writable'));
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const select = screen.getByLabelText('Feint difficulty') as HTMLSelectElement;
 
     fireEvent.change(select, { target: { value: 'H' } });
@@ -247,6 +311,7 @@ describe('TechniquesPanel row editing', () => {
     });
 
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const points = screen.getByLabelText('Feint points') as HTMLInputElement;
     const skill = screen.getByLabelText('Feint default skill') as HTMLInputElement;
 
@@ -281,6 +346,7 @@ describe('TechniquesPanel row editing', () => {
     });
 
     renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
     const points = screen.getByLabelText('Feint points') as HTMLInputElement;
 
     fireEvent.change(points, { target: { value: '3' } });
@@ -300,11 +366,54 @@ describe('TechniquesPanel row editing', () => {
 });
 
 describe('TechniquesPanel add form', () => {
+  it('starts closed and retains an unsaved draft when closed and reopened', () => {
+    renderPanel(makeCharacter([]));
+    expect(screen.getByLabelText('Technique')).not.toBeVisible();
+    openAddTechniqueForm();
+    const name = screen.getByLabelText('Technique') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Disarming' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
+    expect(screen.getByLabelText('Technique')).not.toBeVisible();
+    openAddTechniqueForm();
+    expect(screen.getByLabelText('Technique')).toHaveValue('Disarming');
+    expect(enqueueCreate).not.toHaveBeenCalled();
+  });
+
+  it('flashes the toolbar and keeps its draft after a create failure settles while closed', async () => {
+    let rejectCreate: ((error: Error) => void) | null = null;
+    enqueueCreate.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectCreate = reject;
+        }),
+    );
+    renderPanel(makeCharacter([]));
+    openAddTechniqueForm();
+    const name = screen.getByLabelText('Technique') as HTMLInputElement;
+    fireEvent.change(name, { target: { value: 'Disarming' } });
+    fireEvent.change(screen.getByLabelText('Defaults from'), { target: { value: 'Broadsword' } });
+    fireEvent.submit(name.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
+
+    await act(async () => rejectCreate?.(new Error('outbox unavailable')));
+
+    const addButton = screen.getByRole('button', { name: '+ Add technique' });
+    await waitFor(() =>
+      expect(addButton.closest('header')).toHaveAttribute('data-flashing', 'true'),
+    );
+    expect(screen.getByText(/Couldn't add technique — outbox unavailable/)).toBeVisible();
+    openAddTechniqueForm();
+    expect(screen.getByLabelText('Technique')).toHaveValue('Disarming');
+    expect(screen.getByLabelText('Defaults from')).toHaveValue('Broadsword');
+  });
+
   it('enqueues a create with the default skill and difficulty', async () => {
     renderPanel(makeCharacter([]));
+    openAddTechniqueForm();
     const name = screen.getByLabelText('Technique') as HTMLInputElement;
     const skill = screen.getByLabelText('Defaults from') as HTMLInputElement;
-    const difficulty = screen.getByLabelText('Diff') as HTMLSelectElement;
+    const difficulty = screen.getByLabelText('Difficulty') as HTMLSelectElement;
 
     fireEvent.change(name, { target: { value: 'Disarming' } });
     fireEvent.change(skill, { target: { value: 'Broadsword' } });
@@ -331,6 +440,7 @@ describe('TechniquesPanel add form', () => {
 
   it('does not submit without both a name and a default skill', () => {
     renderPanel(makeCharacter([]));
+    openAddTechniqueForm();
     const name = screen.getByLabelText('Technique') as HTMLInputElement;
     const form = name.closest('form') as HTMLFormElement;
 
@@ -344,9 +454,10 @@ describe('TechniquesPanel add form', () => {
 
   it('blocks an invalid points draft instead of silently substituting 1', () => {
     renderPanel(makeCharacter([]));
+    openAddTechniqueForm();
     const name = screen.getByLabelText('Technique') as HTMLInputElement;
     const skill = screen.getByLabelText('Defaults from') as HTMLInputElement;
-    const points = screen.getByLabelText('Pts') as HTMLInputElement;
+    const points = screen.getByLabelText('Points') as HTMLInputElement;
 
     fireEvent.change(name, { target: { value: 'Disarming' } });
     fireEvent.change(skill, { target: { value: 'Broadsword' } });
@@ -376,12 +487,13 @@ describe('TechniquesPanel library picks', () => {
       campaignId: 'camp-1',
       techniques: [],
     } as unknown as CharacterDetail);
+    openAddTechniqueForm();
     const name = screen.getByLabelText('Technique') as HTMLInputElement;
 
     fireEvent.click(screen.getByRole('button', { name: 'Pick Counterattack' }));
     expect(name.value).toBe('Counterattack');
     expect((screen.getByLabelText('Defaults from') as HTMLInputElement).value).toBe('Broadsword');
-    expect((screen.getByLabelText('Diff') as HTMLSelectElement).value).toBe('H');
+    expect((screen.getByLabelText('Difficulty') as HTMLSelectElement).value).toBe('H');
 
     fireEvent.submit(name.closest('form') as HTMLFormElement);
     await waitFor(() =>
@@ -419,6 +531,7 @@ describe('TechniquesPanel library picks', () => {
       campaignId: 'camp-1',
       techniques: [],
     } as unknown as CharacterDetail);
+    openAddTechniqueForm();
     const name = screen.getByLabelText('Technique') as HTMLInputElement;
 
     fireEvent.click(screen.getByRole('button', { name: 'Pick Counterattack' }));
@@ -448,9 +561,20 @@ describe('TechniquesPanel library picks', () => {
 });
 
 describe('TechniquesPanel delete', () => {
+  it('cancels delete confirmation without queueing a delete', () => {
+    renderPanel(makeCharacter([makeTechnique()]));
+    openTechniqueEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete technique Feint' }));
+    expect(screen.getByRole('dialog', { name: 'Delete technique "Feint"?' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(enqueueDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole('rowgroup', { name: 'Feint' })).toBeInTheDocument();
+  });
+
   it('enqueues a delete carrying the row snapshot for rollback', async () => {
     const technique = makeTechnique();
     renderPanel(makeCharacter([technique]));
+    openTechniqueEditor();
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete technique Feint' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));

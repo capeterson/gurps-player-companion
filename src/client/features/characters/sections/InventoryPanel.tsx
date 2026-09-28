@@ -543,7 +543,7 @@ export function InventoryPanel({
   return (
     <section className="card border border-base-300/60 bg-base-100 rounded-2xl overflow-visible">
       {character.libraryEffectsKnown !== false && (
-        <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-5 py-3 text-sm">
+        <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-2 py-2 sm:px-5 sm:py-3 text-sm">
           <span className="num text-base-content/60">
             {encumbrance.playerWeightLbs.toFixed(1)} lbs
           </span>
@@ -629,14 +629,14 @@ export function InventoryPanel({
             </span>
           </InfoTooltip>
           <span className="grow" />
-          <span className="num text-base-content/40 text-xs">
+          <span className="num hidden text-base-content/40 text-xs sm:inline">
             tip: shift-click to select a range; ⌘/ctrl-click to toggle
           </span>
         </header>
       )}
 
       {items.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 px-5 py-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 px-2 sm:px-5 py-2">
           <input
             type="search"
             className="input input-bordered input-sm min-w-0 flex-1 sm:max-w-xs"
@@ -687,7 +687,7 @@ export function InventoryPanel({
       )}
 
       {canWrite && count > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 bg-primary/5 px-5 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 bg-primary/5 px-2 sm:px-5 py-2.5 text-sm">
           <span className="num font-medium">{count} selected</span>
           <button
             type="button"
@@ -793,7 +793,7 @@ export function InventoryPanel({
       )}
 
       {items.length > 0 && (
-        <div className="px-5 py-4 space-y-6">
+        <div className="px-0 py-2 space-y-3 sm:px-5 sm:py-4 sm:space-y-6">
           <section
             onDragEnter={
               canWrite

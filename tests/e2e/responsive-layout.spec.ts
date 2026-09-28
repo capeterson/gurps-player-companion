@@ -165,17 +165,20 @@ test('skill, technique, and language rows reflow into readable mobile cards at 3
   await expect(skillNameInput).toBeVisible();
 
   const techniqueName = 'Retain Weapon After a Very Long Technique Name';
-  const techniqueForm = page.getByLabel(/^technique$/i).locator('xpath=ancestor::form');
+  await page.getByRole('button', { name: '+ Add technique' }).click();
   await page.getByLabel(/^technique$/i).fill(techniqueName);
-  await techniqueForm.getByLabel('Defaults from').fill(skillName);
-  await techniqueForm.getByRole('button', { name: /^add$/i }).click();
+  await page.getByLabel('Defaults from', { exact: true }).fill(skillName);
+  await page.getByRole('option', { name: skillName }).click();
+  await page.getByRole('button', { name: 'Add technique', exact: true }).click();
+  await page.getByRole('button', { name: `Edit ${techniqueName}` }).click();
   const techniqueNameInput = page.getByLabel(`${techniqueName} name`);
   await expect(techniqueNameInput).toBeVisible();
 
   const languageName = 'Pneumonoultramicroscopicsilicovolcanoconiosis Language';
-  const languageForm = page.getByLabel(/^language$/i).locator('xpath=ancestor::form');
+  await page.getByRole('button', { name: '+ Add language' }).click();
   await page.getByLabel(/^language$/i).fill(languageName);
-  await languageForm.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: 'Add language', exact: true }).click();
+  await page.getByRole('button', { name: `Edit ${languageName}` }).click();
   const languageNameInput = page.getByLabel(`${languageName} name`);
   await expect(languageNameInput).toBeVisible();
 
@@ -320,6 +323,7 @@ test('inline inventory categories toggle and retain populated advanced fields on
   await page.getByLabel('Item name').fill('Reachable item');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Reachable item' }).click();
   await page.getByRole('button', { name: 'Add category to Reachable item' }).click();
   await page.getByRole('button', { name: '+ Armor', exact: true }).click();
   const editor = page.getByRole('region', { name: 'Reachable item: Armor' });
@@ -542,12 +546,14 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   const powerstoneName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakablePowerstone';
   await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: `Edit ${powerstoneName}` }).click();
   await page.getByRole('button', { name: `Add category to ${powerstoneName}` }).click();
   await page.getByRole('button', { name: '+ Powerstone', exact: true }).click();
 
   const magicItemName = 'ThaumatologicallyOverengineeredUnbreakableResponsiveWand';
   await page.getByLabel('Item name').fill(magicItemName);
   await page.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: `Edit ${magicItemName}` }).click();
   await page.getByRole('button', { name: `Add category to ${magicItemName}` }).click();
   await page.getByRole('button', { name: '+ Magic item', exact: true }).click();
   await page.getByLabel('Magic item spell name').fill('Light');

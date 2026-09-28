@@ -24,6 +24,7 @@ requirement — not optional documentation.**
   LLM) should read it before scanning the tree. The set is:
   - `overview.md` — product surface + codebase map + orientation notes.
   - `architecture.md` — stack, process model, request lifecycle, data model.
+  - `interaction-design.md` — shared sheet UI patterns, summary tables, disclosures, draft lifetime and responsive layout.
   - `mcp-agent-access.md` — same-process MCP/OAuth subsystem and mandatory
     raw-API parity acceptance criteria.
   - `offline-sync.md` — the local-first / outbox / cursor / WS system.
@@ -63,6 +64,15 @@ Assign worktree-specific host ports as well, or omit host port publishing when
 the services are accessed only inside Compose. Never recreate, migrate, stop,
 or run tests in a stack belonging to another checkout; tear down only the exact
 project created for the current worktree.
+
+When the pull request a worktree's stack was created for is merged, tear that
+stack down: from the worktree, run `./scripts/dev-worktree.sh down -v
+--remove-orphans` (the same wrapper, so the project name matches) to remove its
+containers, network, and named volumes. Confirm the merge first; a closed but
+unmerged PR, or a worktree still in use for follow-up work, keeps its stack.
+Also stop any temporary servers or databases started for that worktree outside
+Compose. Never tear down a stack by guessing its project name or by pattern
+across `gpc-*` projects; each belongs to a specific checkout.
 
 ## Interaction design rules
 
