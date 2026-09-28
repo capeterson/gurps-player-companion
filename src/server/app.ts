@@ -8,6 +8,7 @@ import { HTTPException } from 'hono/http-exception';
 import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';
 import { requireActiveUser } from './auth/middleware.ts';
 import type { AppConfig } from './config.ts';
+import { productionHttps } from './https.ts';
 import { assertExactCoverage } from './mcp/catalog.ts';
 import { createMcpHandler } from './mcp/transport.ts';
 import { createOAuthAccountRouter, createOAuthRouter } from './oauth/routes.ts';
@@ -63,6 +64,8 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     c.header('x-request-id', requestId);
     await next();
   });
+
+  app.use('*', productionHttps(config));
 
   app.use('/api/v1/media/*', requireActiveUser);
   app.use('/api/v1/media/*', mediaAdmission);

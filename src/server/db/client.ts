@@ -19,7 +19,8 @@ export function getDb() {
   if (current) return current.tx as unknown as RootDb;
   if (dbInstance) return dbInstance;
   const config = loadConfig();
-  pool = new Pool({ connectionString: config.databaseUrl });
+  pool = new Pool({ connectionString: config.databaseUrl, connectionTimeoutMillis: 5_000 });
+  pool.on('error', () => console.error('idle database connection failed'));
   dbInstance = drizzle(pool, { schema });
   return dbInstance;
 }

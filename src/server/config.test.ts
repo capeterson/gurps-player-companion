@@ -14,6 +14,22 @@ const goodEnv = {
 
 describe('loadConfig', () => {
   afterEach(resetConfigCache);
+  it('defaults proxy trust on only in production and respects explicit overrides', () => {
+    for (const environment of ['development', 'test', 'production']) {
+      for (const override of [undefined, 'true', 'false']) {
+        resetConfigCache();
+        const cfg = loadConfig({
+          ...goodEnv,
+          ENVIRONMENT: environment,
+          APP_BASE_URL: 'https://gpc.example',
+          TRUST_PROXY: override,
+        });
+        expect(cfg.trustProxy).toBe(
+          override === undefined ? environment === 'production' : override === 'true',
+        );
+      }
+    }
+  });
   it('parses a valid environment', () => {
     resetConfigCache();
     const cfg = loadConfig({ ...goodEnv });

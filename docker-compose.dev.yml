@@ -2,7 +2,7 @@ name: nimble-rocket-29ef18d6
 
 services:
   deps:
-    image: oven/bun:1.2-alpine
+    image: oven/bun:alpine
     working_dir: /app
     restart: 'no'
     command: ['bun', 'install', '--frozen-lockfile']
@@ -28,7 +28,7 @@ services:
       retries: 20
 
   migrate:
-    image: oven/bun:1.2-alpine
+    image: oven/bun:alpine
     working_dir: /app
     restart: 'no'
     command: ['bun', 'run', 'db:migrate']
@@ -45,7 +45,7 @@ services:
         condition: service_completed_successfully
 
   app:
-    image: oven/bun:1.2-alpine
+    image: oven/bun:alpine
     working_dir: /app
     command: ['bun', 'run', 'dev']
     environment:

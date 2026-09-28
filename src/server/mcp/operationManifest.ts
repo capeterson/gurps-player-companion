@@ -117,6 +117,7 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   excluded('GET', '/oauth/authorize', 'OAuth consent infrastructure'),
   excluded('POST', '/mcp', 'MCP transport infrastructure'),
   excluded('GET', '/api/v1/healthz', 'service infrastructure'),
+  excluded('GET', '/api/v1/readyz', 'service infrastructure'),
   excluded('POST', '/api/v1/auth/register', 'account and credential infrastructure'),
   excluded('POST', '/api/v1/auth/login', 'account and credential infrastructure'),
   excluded('GET', '/api/v1/auth/passkeys', 'credential infrastructure'),

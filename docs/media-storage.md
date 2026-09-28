@@ -151,8 +151,9 @@ A consistent maintenance-window procedure is:
 For online backup automation, prevent garbage collection before taking the DB
 snapshot: insert/update `media_counters` key `backup-pause`, amount `0`, with an
 `expires_at` covering the entire backup. Wait for the current sweep to finish;
-then dump DB **before** copying objects. Immutable generations make copying safe
-while uploads continue. Keep cleanup paused until verification completes; renew
+acquire the `gpc:media-cleanup` advisory barrier to do this
+without guessing the sweep duration. Then dump DB **before** copying objects.
+Immutable generations make copying safe while uploads continue. Keep cleanup paused until verification completes; renew
 its expiry for long copies. Extra objects uploaded after the snapshot are harmless.
 A stopped-app maintenance window is easier to verify and is the default procedure.
 

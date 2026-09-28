@@ -149,6 +149,12 @@
     },
     {
       "kind": "excluded",
+      "method": "GET",
+      "path": "/api/v1/readyz",
+      "reason": "service infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "POST",
       "path": "/api/v1/auth/register",
       "reason": "account and credential infrastructure"

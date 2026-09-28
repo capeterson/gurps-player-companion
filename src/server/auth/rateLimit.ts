@@ -31,10 +31,10 @@ function digest(value: string): string {
 }
 
 export function requestSource(c: Context, config: AppConfig): string {
-  // Only honor forwarding headers when the deployment's proxy is explicitly trusted.
-  // Otherwise a client could cycle X-Forwarded-For values to evade the source bucket.
+  // Trust exactly the last hop. The trusted proxy must append or overwrite the
+  // verified peer; earlier entries may be client supplied.
   if (config.trustProxy) {
-    const forwarded = c.req.header('x-forwarded-for')?.split(',')[0]?.trim();
+    const forwarded = c.req.header('x-forwarded-for')?.split(',').at(-1)?.trim();
     if (forwarded) return forwarded;
   }
   // Bun passes its server as the fetch binding; Vite supplies the original
