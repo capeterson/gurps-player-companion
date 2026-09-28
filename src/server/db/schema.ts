@@ -1002,6 +1002,7 @@ export const adventureLogEntries = pgTable(
   'adventure_log_entries',
   {
     id: id(),
+    characterId: uuid('character_id').references(() => characters.id, { onDelete: 'set null' }),
     campaignId: uuid('campaign_id')
       .notNull()
       .references(() => campaigns.id, { onDelete: 'cascade' }),
@@ -1025,6 +1026,7 @@ export const adventureLogEntries = pgTable(
   },
   (t) => ({
     campaignIdx: index('adventure_log_campaign_idx').on(t.campaignId),
+    characterIdx: index('adventure_log_character_idx').on(t.characterId),
     authorIdx: index('adventure_log_author_idx').on(t.authorId),
   }),
 );

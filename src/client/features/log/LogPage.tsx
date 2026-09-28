@@ -10,11 +10,12 @@ import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
+import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
-import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
+import { useCampaignCharactersList, useCharactersList } from '../characters/useCharacterDetail.ts';
 
 type FilterKind = 'all' | 'shared' | 'private';
 
@@ -31,6 +32,7 @@ interface DraftSnapshot {
   location: string;
   body: string;
   visibility: AdventureLogCreate['visibility'];
+  characterId: string | null;
   xpAwards: XpAward[];
   pointsGained: number | null;
   awardCharacterIds: string[] | null;
@@ -48,6 +50,7 @@ function snapshotOf(
     location: trimmedLocation,
     body: draft.body,
     visibility: draft.visibility,
+    characterId: draft.characterId ?? null,
     xpAwards: draft.xpAwards,
     pointsGained: draft.pointsGained ?? null,
     awardCharacterIds: draft.awardCharacterIds ?? null,
@@ -66,6 +69,7 @@ function snapshotMatches(a: DraftSnapshot, b: DraftSnapshot): boolean {
   if (a.location !== b.location) return false;
   if (a.body !== b.body) return false;
   if (a.visibility !== b.visibility) return false;
+  if (a.characterId !== b.characterId) return false;
   if (a.pointsGained !== b.pointsGained) return false;
   if (JSON.stringify(a.awardCharacterIds) !== JSON.stringify(b.awardCharacterIds)) return false;
   if (a.xpAwards.length !== b.xpAwards.length) return false;
@@ -114,6 +118,7 @@ function emptyDraft(sessionNumber: number | null = null): AdventureLogCreate {
     location: '',
     body: '',
     visibility: 'campaign',
+    characterId: null,
     xpAwards: [],
     pointsGained: null,
     awardCharacterIds: null,
@@ -151,6 +156,7 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
     location: entry.location ?? '',
     body: entry.body,
     visibility: entry.visibility,
+    characterId: entry.characterId ?? undefined,
     xpAwards: entry.xpAwards,
     pointsGained: pointsForEntry(entry),
     awardCharacterIds: [...new Set(entry.xpAwards.map((award) => award.characterId))],
@@ -193,6 +199,10 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     enabled: !!campaignId,
   });
 
+  const characters = useCharactersList();
+  const ownedCharacters = (characters ?? []).filter(
+    (character) => character.ownerId === me.data?.id,
+  );
   const roster = useCampaignCharactersList(campaignId ?? undefined);
   const [recipientDialog, setRecipientDialog] = useState(false);
   const [recipientSelection, setRecipientSelection] = useState<string[]>([]);
@@ -372,6 +382,10 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
         snapshot,
         patch: {
           ...draft,
+          ...((draft.characterId ?? null) === (original?.characterId ?? null) &&
+          draft.visibility === original?.visibility
+            ? { characterId: undefined, visibility: undefined }
+            : {}),
           title: trimmed,
           location,
           sessionNumber,
@@ -511,22 +525,53 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                 required
               />
             </label>
-            <label className="form-control">
-              <span className="label-text">Visibility</span>
+            <div className="form-control min-w-0">
+              <div className="flex items-baseline gap-2">
+                <label htmlFor="log-attachment" className="label-text">
+                  Attached to
+                </label>
+                <InfoTooltip
+                  ariaLabel="About log attachments"
+                  side="bottom"
+                  contentClassName="w-64 max-h-[calc(100dvh-2rem)] overflow-y-auto"
+                  content="Campaign entries are shared with all campaign members. Select one of your characters to make a private entry visible only to you. Point recipients are chosen separately."
+                >
+                  ?
+                </InfoTooltip>
+              </div>
               <select
-                className="select select-bordered"
-                value={draft.visibility}
+                id="log-attachment"
+                className="select w-full min-w-0"
+                value={
+                  draft.characterId ?? (draft.visibility === 'private' ? 'legacy-private' : '')
+                }
                 onChange={(e) =>
                   setDraft({
                     ...draft,
-                    visibility: e.target.value as AdventureLogCreate['visibility'],
+                    characterId: e.target.value || null,
+                    visibility: e.target.value ? 'private' : 'campaign',
                   })
                 }
               >
-                <option value="campaign">Shared</option>
-                <option value="private">Private</option>
+                <option value="">Campaign</option>
+                {draft.visibility === 'private' && !draft.characterId && (
+                  <option value="legacy-private" disabled>
+                    Private (no character attached)
+                  </option>
+                )}
+                {draft.characterId &&
+                  !ownedCharacters.some((character) => character.id === draft.characterId) && (
+                    <option value={draft.characterId} disabled>
+                      Private (character unavailable)
+                    </option>
+                  )}
+                {ownedCharacters.map((character) => (
+                  <option key={character.id} value={character.id}>
+                    {character.name}
+                  </option>
+                ))}
               </select>
-            </label>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
@@ -655,7 +700,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           const canShowRowActions = modifiable && editor.kind === 'hidden';
           return (
             <article key={entry.id} className="card p-card">
-              <div className="mb-1 flex items-baseline justify-between gap-3">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
                 <span className="num text-xs uppercase tracking-widest text-dim">
                   {formatDate(entry.sessionDate)}
                   {entry.sessionNumber !== null && <span> · Session {entry.sessionNumber}</span>}
@@ -663,9 +708,14 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                     by <span className="text-base-content">{entry.authorDisplayName}</span>
                   </span>
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
                   {entry.visibility === 'private' && (
-                    <span className="chip text-[10px]">private</span>
+                    <span className="chip max-w-full whitespace-normal text-[10px] [overflow-wrap:anywhere]">
+                      private
+                      {entry.characterId
+                        ? ` · ${ownedCharacters.find((character) => character.id === entry.characterId)?.name ?? 'Character unavailable'}`
+                        : ''}
+                    </span>
                   )}
                   {canShowRowActions && (
                     <>

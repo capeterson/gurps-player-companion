@@ -612,12 +612,20 @@ unsafe link target was removed appears as ordinary text.
 Per-campaign session notes (`adventure_log_entries`, exposed via
 `src/server/routes/adventureLog.ts`):
 
+- **Attachment:** the **Attached to** dropdown defaults to **Campaign** (shared).
+  It also lists every character owned by the current user, including characters outside
+  this campaign. Selecting one persists `characterId` and makes the entry private;
+  selecting Campaign clears the attachment and shares the entry. The tooltip explains
+  visibility and that point recipients remain separate. Only authors may attach entries
+  to their own characters; forged foreign/missing attachments are rejected server-side.
+  Existing unattached private notes remain private until explicitly reassigned. Deleting
+  a character clears the foreign key without publishing its private notes.
 - **Read:** campaign members, **but private entries are hidden from non-authors**
-  (`visibility` = campaign-wide vs private GM/player scratch).
+  (including campaign owners and detailed campaign history).
 - **Write:** the entry's **author or the campaign owner**. The author or owner
   may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
   `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
-- Entries carry `sessionDate`, `title`, `body`, `visibility`, optional `pointsGained`, and `xpAwards`.
+- Entries carry nullable `characterId`, `sessionDate`, `title`, `body`, `visibility`, optional `pointsGained`, and `xpAwards`.
   `pointsGained` is a nullable integer from 0 to 1000. Creating an award snapshots all current
   campaign characters unless `awardCharacterIds` selects a subset (including an empty list).
   The form defaults to all for campaign owners, and to owned characters for other members;

@@ -22,6 +22,25 @@ vi.mock('../../components/markdown/RichTextEditor.tsx', () => ({
   ),
 }));
 
+const attachmentCharacters = vi.hoisted(() => [
+  {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'My wanderer',
+    ownerId: 'user-me',
+    campaignId: 'another-campaign',
+  },
+  {
+    id: '22222222-2222-4222-8222-222222222222',
+    name: 'Someone else',
+    ownerId: 'owner-x',
+    campaignId: 'c1',
+  },
+]);
+vi.mock('../characters/useCharacterDetail.ts', () => ({
+  useCharactersList: () => attachmentCharacters,
+  useCampaignCharactersList: () => [],
+}));
+
 const mockConfirm = vi.hoisted(() => vi.fn(() => true));
 Object.defineProperty(window, 'confirm', { value: mockConfirm, writable: true });
 
@@ -118,6 +137,74 @@ describe('LogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfirm.mockReturnValue(true);
+  });
+
+  it('defaults to Campaign, offers only owned characters, and saves a private attachment', async () => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((async (
+      path: string,
+      options?: { method?: string; body?: unknown },
+    ) => {
+      if (options?.method === 'POST')
+        return makeEntry({
+          title: 'Secret',
+          characterId: attachmentCharacters[0]?.id,
+          visibility: 'private',
+        });
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '+ New entry' }));
+    const attachment = screen.getByRole('combobox', { name: 'Attached to' });
+    expect(attachment).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'Campaign' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'My wanderer' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Someone else' })).not.toBeInTheDocument();
+    await user.hover(screen.getByRole('button', { name: 'About log attachments' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('visible only to you');
+    await user.selectOptions(attachment, attachmentCharacters[0]?.id ?? '');
+    await user.type(screen.getByLabelText('Title'), 'Secret');
+    await user.click(screen.getByRole('button', { name: 'Save entry' }));
+    expect(api).toHaveBeenCalledWith(
+      `/campaigns/${CAMP_ID}/log`,
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          characterId: attachmentCharacters[0]?.id,
+          visibility: 'private',
+        }),
+      }),
+    );
+  });
+
+  it('preserves a legacy private attachment during ordinary edits', async () => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((async (path: string, options?: { method?: string }) => {
+      if (path === `/campaigns/${CAMP_ID}/log` && !options?.method)
+        return [makeEntry({ visibility: 'private', characterId: null })];
+      if (options?.method === 'PATCH')
+        return makeEntry({ visibility: 'private', characterId: null });
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit My entry' }));
+    expect(screen.getByRole('combobox', { name: 'Attached to' })).toHaveValue('legacy-private');
+    expect(
+      screen.getByRole('option', { name: 'Private (no character attached)' }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Title'), ' revised');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(api).toHaveBeenCalledWith(
+      `/campaigns/${CAMP_ID}/log/e1`,
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({ characterId: undefined, visibility: undefined }),
+      }),
+    );
   });
 
   it('renders the layout and markdown-rendered entry bodies (no raw HTML execution)', async () => {

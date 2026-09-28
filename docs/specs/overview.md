@@ -884,8 +884,9 @@ there is no decorative cover slot or implied image-upload feature.
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v13 retains them.
-- **Adventure log**: session log entries with per-entry visibility
-  (campaign-wide or private), an optional **session number** (running
+- **Adventure log**: session log entries attached to Campaign (shared, default)
+  or an owned character (private), with an attachment dropdown and explanatory
+  tooltip, an optional **session number** (running
   session ordinal starting at 0, e.g. 13) and **location** (free-form text, e.g. "The
   Hollow Beneath Greymoor"), and optional **Points gained**. New campaign awards snapshot all current characters by default; **Choose characters** selects a subset. Awards raise each recipient's point cap above the campaign starting target, and edits/deletions adjust the existing credit rather than adding it twice. Campaign owners may award any character; members may award their own characters. The concrete **XP award** list remains available through REST/MCP. Campaigns without a starting point target remain uncapped.
   Opening the create form suggests session 0 when no numbered entries exist,

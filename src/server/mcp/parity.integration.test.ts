@@ -1478,7 +1478,7 @@ describe('delegated operation behavioral parity', () => {
     );
   });
 
-  it('keeps adventure point awards and character cap changes identical through REST and MCP', async () => {
+  it('keeps log attachments, point awards, and character caps identical through REST and MCP', async () => {
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -1512,10 +1512,32 @@ describe('delegated operation behavioral parity', () => {
       await call<{ id: string; xpAwards: unknown[] }>(owner, 'adventure_log_entry', {
         action: 'create',
         ...path(campaign.id),
-        body: { sessionDate: '2026-09-12', title: 'Award session', pointsGained: 3 },
+        body: {
+          sessionDate: '2026-09-12',
+          title: 'Award session',
+          pointsGained: 3,
+          characterId: first.id,
+        },
       })
     ).body;
     expect(entry.xpAwards).toHaveLength(2);
+    const attached = await call<
+      Array<{ id: string; characterId: string | null; visibility: string }>
+    >(owner, 'list_adventure_log', path(campaign.id));
+    expect(attached.body).toContainEqual(
+      expect.objectContaining({ id: entry.id, characterId: first.id, visibility: 'private' }),
+    );
+    await call(owner, 'adventure_log_entry', {
+      action: 'update',
+      ...path(campaign.id, { entryId: entry.id }),
+      body: { characterId: null },
+    });
+    const shared = await call<
+      Array<{ id: string; characterId: string | null; visibility: string }>
+    >(owner, 'list_adventure_log', path(campaign.id));
+    expect(shared.body).toContainEqual(
+      expect.objectContaining({ id: entry.id, characterId: null, visibility: 'campaign' }),
+    );
     const read = async (id: string) =>
       (
         await call<{ earnedPoints: number; points: { unspent: number } }>(

@@ -19,9 +19,9 @@ import {
 import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { loadCampaignOr403, requireCampaignMember } from '../auth/permissions.ts';
-import { withAudit } from '../db/auditContext.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
-import { type DbAdventureLogEntry, adventureLogEntries, users } from '../db/schema.ts';
+import { type DbAdventureLogEntry, adventureLogEntries, characters, users } from '../db/schema.ts';
 import { escapeLikePattern } from '../db/search.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { lockLogCampaign, resolveLogAwards } from '../services/adventureLogAwards.ts';
@@ -41,6 +41,7 @@ function entryToOut(row: DbAdventureLogEntry, author: AuthorRow) {
   return {
     id: row.id,
     campaignId: row.campaignId,
+    characterId: row.characterId,
     authorId: row.authorId,
     authorDisplayName: author.displayName,
     sessionDate: row.sessionDate,
@@ -54,6 +55,54 @@ function entryToOut(row: DbAdventureLogEntry, author: AuthorRow) {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** Attachment determines privacy; old unattached private notes remain private
+ * until an explicit attachment change. */
+async function resolveAttachment(
+  tx: AuditTx,
+  userId: string,
+  body: {
+    characterId?: string | null | undefined;
+    visibility?: 'campaign' | 'private' | undefined;
+  },
+  current?: DbAdventureLogEntry,
+) {
+  const characterId =
+    body.characterId !== undefined
+      ? body.characterId
+      : body.visibility === 'campaign'
+        ? null
+        : (current?.characterId ?? null);
+  const visibility =
+    body.characterId !== undefined
+      ? characterId
+        ? 'private'
+        : 'campaign'
+      : (body.visibility ?? current?.visibility ?? 'campaign');
+  if (characterId && (body.characterId !== undefined || body.visibility !== undefined)) {
+    const [character] = await tx
+      .select({ ownerId: characters.ownerId })
+      .from(characters)
+      .where(eq(characters.id, characterId))
+      .for('share');
+    if (!character || character.ownerId !== userId) {
+      throw new HTTPException(403, { message: 'Log attachment must be a character you own' });
+    }
+    if (current && current.authorId !== userId) {
+      throw new HTTPException(403, {
+        message: 'Only the author may attach a private log to a character',
+      });
+    }
+  }
+  if (
+    visibility === 'private' &&
+    !characterId &&
+    (!current || body.visibility !== undefined || body.characterId !== undefined)
+  ) {
+    throw new HTTPException(422, { message: 'Select an owned character for a private log' });
+  }
+  return { characterId, visibility };
 }
 
 router.openapi(
@@ -142,6 +191,7 @@ router.openapi(
     await requireCampaignMember(id, user.id);
     const created = await withAudit(user.id, crypto.randomUUID(), async (tx) => {
       const campaign = await lockLogCampaign(tx, id, user.id);
+      const attachment = await resolveAttachment(tx, user.id, body);
       const xpAwards = await resolveLogAwards(tx, id, user.id, campaign.ownerId, body);
       const [row] = await tx
         .insert(adventureLogEntries)
@@ -153,7 +203,7 @@ router.openapi(
           title: body.title,
           location: body.location ?? null,
           body: body.body,
-          visibility: body.visibility,
+          ...attachment,
           pointsGained: body.pointsGained ?? null,
           xpAwards,
         })
@@ -213,6 +263,7 @@ router.openapi(
       if (current.authorId !== user.id && lockedCampaign.ownerId !== user.id) {
         throw new HTTPException(403, { message: 'author or owner only' });
       }
+      const attachment = await resolveAttachment(tx, user.id, body, current);
       const xpAwards = await resolveLogAwards(
         tx,
         id,
@@ -225,7 +276,7 @@ router.openapi(
       const { awardCharacterIds: _recipients, ...patch } = body;
       const [row] = await tx
         .update(adventureLogEntries)
-        .set(buildPatchSet({ ...patch, xpAwards }))
+        .set(buildPatchSet({ ...patch, ...attachment, xpAwards }))
         .where(eq(adventureLogEntries.id, entryId))
         .returning();
       if (!row) throw new HTTPException(500, { message: 'update failed' });
