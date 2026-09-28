@@ -25,6 +25,7 @@ export const integrationTestConfig: AppConfig = {
   authRateLimitRegisterMax: 10_000,
   authRateLimitResetMax: 10_000,
   authRateLimitChallengeMax: 10_000,
+  shutdownGraceSeconds: 15,
 };
 
 export function configureIntegrationTestEnvironment(): void {

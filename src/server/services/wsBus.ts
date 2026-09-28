@@ -25,6 +25,7 @@ interface WsLike {
   send(text: string): void;
   /** Non-standard but Bun's WebSocket has this. */
   readyState?: number;
+  close?(code?: number, reason?: string): void;
 }
 
 const subscribers = new Map<string, Set<WsLike>>();
@@ -61,6 +62,27 @@ function deliver(userId: string, message: WsBroadcast): void {
       // own close handler.
     }
   }
+}
+
+/**
+ * Close every subscribed socket (graceful shutdown). 1012 "service restart"
+ * tells clients to reconnect, which lands them on the replacement process;
+ * their HTTP cursor pull covers anything published in between.
+ */
+export function closeAll(code = 1012, reason = 'server restarting'): number {
+  let closed = 0;
+  for (const bucket of subscribers.values()) {
+    for (const ws of bucket) {
+      try {
+        ws.close?.(code, reason);
+        closed += 1;
+      } catch {
+        // Already closed.
+      }
+    }
+  }
+  subscribers.clear();
+  return closed;
 }
 
 /** Test/diagnostic helper. */

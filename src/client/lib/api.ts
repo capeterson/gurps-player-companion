@@ -3,6 +3,7 @@
  * Replace with an OpenAPI-generated client in a follow-up.
  */
 
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { type TokenSnapshot, tokenStore } from './tokenStore.ts';
 
 const API_ROOT = '/api/v1';
@@ -191,7 +192,12 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
 export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
   const tokens = tokenStore.read();
-  const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  const headers: Record<string, string> = {
+    // Lets /sync/* refuse (426) a build whose queued operations it can no
+    // longer interpret; see shared/syncProtocol.ts.
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+    ...(options.headers ?? {}),
+  };
   if (options.authenticated !== false && tokens) {
     headers.authorization = `Bearer ${tokens.accessToken}`;
   }

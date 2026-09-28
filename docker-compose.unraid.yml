@@ -87,6 +87,8 @@ services:
     image: ghcr.io/capeterson/gurps-player-companion:${TAG:-latest}
     container_name: gurps-app
     restart: unless-stopped
+    # The server drains for SHUTDOWN_GRACE_SECONDS (default 15) on SIGTERM.
+    stop_grace_period: 25s
     environment:
       MEDIA_S3_ENDPOINT: ${MEDIA_S3_ENDPOINT:-}
       MEDIA_S3_REGION: ${MEDIA_S3_REGION:-garage}

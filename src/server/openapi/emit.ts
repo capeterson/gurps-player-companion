@@ -29,6 +29,7 @@ const config: AppConfig = {
   authRateLimitRegisterMax: 5,
   authRateLimitResetMax: 3,
   authRateLimitChallengeMax: 10,
+  shutdownGraceSeconds: 15,
 };
 
 const app = createApp(config);

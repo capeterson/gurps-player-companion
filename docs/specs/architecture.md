@@ -55,6 +55,18 @@ secure responses include HSTS. Forwarded protocol headers are honored only when
 checks process liveness, while `/api/v1/readyz` verifies PostgreSQL 18 and the image's
 latest migration. Both expose the optional `APP_RELEASE` image identifier.
 
+**Graceful shutdown.** On `SIGTERM`/`SIGINT`, `src/server/index.ts` calls
+`shutdownServer`: it flips the draining flag in `src/server/lifecycle.ts` (so
+`/readyz` returns 503 while `/healthz` stays 200, and every response carries
+`Connection: close`), closes all `/sync/ws` sockets with code 1012 so clients
+reconnect to the replacement, stops accepting connections, and waits up to
+`SHUTDOWN_GRACE_SECONDS` (default 15) for in-flight requests — sync batches and
+in-request media processing — and any running media-cleanup sweep. Whatever is
+still running at the deadline is force-closed (the outbox replays it), then the
+database pool closes and the process exits. A second signal exits immediately.
+Compose files give the app a 25 s `stop_grace_period` so Docker does not
+`SIGKILL` it before the drain finishes.
+
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
 dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via
@@ -186,6 +198,18 @@ while one is pending, so without this a single dismissal would latch the tab
 closed against every future release. The *announced worker* is remembered
 separately, so polling won't re-nag about the same build while a genuinely
 newer one still gets through.
+
+**Forced update for an incompatible build.** The prompt above stays optional
+because an old build still syncs correctly. When the server refuses the build's
+sync protocol (HTTP 426 from `/sync/*`, see [offline-sync.md](offline-sync.md#sync-protocol-version)),
+the orchestrator calls `requestClientUpdate()`: it dispatches
+`gpc:client-outdated` (which `SwUpdatePrompt` shows as a persistent
+"Updating the app…" toast with **Reload now**), runs `registration.update()`,
+activates the newest worker with `SKIP_WAITING`, waits until no input, select,
+textarea or contenteditable element has focus (so a `useDraftField` blur commit
+reaches the outbox first), and reloads. A sessionStorage timestamp limits forced
+reloads to one per `FORCED_RELOAD_MIN_INTERVAL_MS` (60 s) per tab, so a server
+still mid-deploy cannot cause a reload loop.
 
 ## Request lifecycle
 
@@ -383,7 +407,8 @@ Key PG18 / trigger machinery, layered by migration:
 ## Configuration
 
 - `src/server/config.ts` reads env (JWT secret ≥ 32 chars, DB URL, CORS
-  origins, Resend key, environment). `.env.example` documents the surface.
+  origins, Resend key, environment, shutdown grace period). `.env.example`
+  documents the surface.
 - Seed: `bun run db:seed` (`src/server/db/seed.ts`) refreshes the Sample
   campaign library and creates the populated Lantern Coast fixture once.
   `seeds/lanternCoast.ts` uses the normal in-process API handlers for validated,
