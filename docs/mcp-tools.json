@@ -13366,20 +13366,10 @@
                 "$ref": "#/$defs/SkillPrerequisite"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ],
             "oneOf": [
@@ -15048,12 +15038,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           },
@@ -19040,20 +19025,10 @@
                 "$ref": "#/$defs/SkillPrerequisite"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ],
             "oneOf": [
@@ -21572,20 +21547,10 @@
                 "$ref": "#/$defs/SkillPrerequisite"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ],
             "oneOf": [
@@ -26036,12 +26001,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           }
@@ -28314,12 +28274,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           }
@@ -45699,20 +45654,10 @@
                 "$ref": "#/$defs/SkillPrerequisite"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ],
             "oneOf": [
@@ -46480,12 +46425,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           },
@@ -55200,12 +55140,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           }
@@ -57518,12 +57453,7 @@
                 "additionalProperties": false
               },
               {
-                "anyOf": [
-                  {},
-                  {
-                    "type": "null"
-                  }
-                ]
+                "type": "null"
               }
             ]
           }

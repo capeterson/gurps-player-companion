@@ -131,7 +131,10 @@ response against the selected operation before projecting an acknowledgement.
 Generate tool inputs and read outputs from the canonical shared schemas and
 validate every raw handler output as well as every input. Preserve required
 fields, refinements, nullable values, unions, bounds, pagination, filters, and
-import formats. Successful mutation tools deliberately advertise and return one
+import formats. A bare `{ nullable: true }` alternative inside an OpenAPI union
+represents the null branch; the JSON Schema converter emits `{ type: 'null' }`
+there so valid ranged-weapon values do not match two `oneOf` branches.
+Successful mutation tools deliberately advertise and return one
 small acknowledgement shape (`acknowledged`, plus `resourceId` from the result
 or target path and `revision` when the canonical result exposes it) instead of
 repeating the REST resource schema. The complete REST response is still
@@ -283,9 +286,9 @@ The same generated tools expose library `techLevelPolicy`, nested
 and `campaign.skillPrerequisitePolicy`. Because MCP executes the raw OpenAPI
 handler, required-TL and block/warn enforcement is identical to REST and sync.
 
-Library export returns YAML v10 as typed text, retaining effect order, scaling,
+Library export returns YAML v13 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
-without the campaign-local library UUID. Import accepts the existing v1–v9
+without the campaign-local library UUID. Import accepts the existing v1–v12
 formats and preserves shared merge/replace and campaign-settings options. No
 extra tools or scopes are required for effects authoring. The manifest links
 these operations to the focused `effects-authoring-parity` fixture, which checks
@@ -439,3 +442,24 @@ buffering. Delegated execution retains trusted authority and audit context.
 The authenticated MCP envelope remains bounded at 14 MiB to fit a 10 MiB base64
 input; four in-flight requests per process bound aggregate memory. Full lifecycle:
 [media-uploads.md](media-uploads.md).
+
+## Reusable Lantern Coast acceptance dataset
+
+`src/server/db/seeds/lanternCoastContent.ts` is the shared content recipe for the
+standard REST seed and the connector bridge (`scripts/seed-lantern-mcp.ts`).
+`lanternCoastMcp.ts` resolves exact manifest operations and consumes normal compact
+mutation acknowledgements; encounter creation re-reads through MCP to obtain
+combatant IDs. Every domain write goes through an existing tool/handler.
+
+`lanternCoastMcp.integration.test.ts` initializes the real `/mcp` HTTP route with
+a persisted OAuth client, grant and access token, then creates the whole campaign:
+four fictional sources, all eleven library categories, six complete characters,
+owned pricing and mechanics, nested/enhanced inventory, pools and active effects,
+shared/private logs with XP awards, and an encounter with hidden NPC and effect.
+The REST reference collects private notes through each author’s authorized feed,
+so GM privacy remains intact. It compares the complete graph with the standard REST seed, normalizing generated
+IDs/revisions/timestamps and the permitted ownership difference, and asserts
+OAuth audit provenance and no added users. The test respects the production MCP
+rate budget. Normal commits are cleaned up only within the test's own graph.
+The standard script creates six demo player accounts; MCP uses one existing user
+because account creation is deliberately outside the delegated tool surface.

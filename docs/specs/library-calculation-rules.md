@@ -186,3 +186,16 @@ replacement. Item presets retain the current basic or constant calculated weight
 unless the author edits it. Returning to **Use basic price fields** clears the
 calculation and restores the basic-value controls. Modifier catalog entries use
 the calculation editor directly and do not offer absent basic-price fields.
+
+## Synthetic development catalog
+
+The Lantern Coast bootstrap uses only original fixture definitions. Its four
+fictional sourcebooks have distinct non-default abbreviations (`LCGV`, `LCST`,
+`LCTR`, `LCQO`), and every entry carries an explicit source key, section locator,
+completeness status and definition role. Fixed and leveled trait pricing plus item
+cost/weight calculations produce character-owned purchase resolutions through
+the shared recipe. Equipment uses current independent weapon modes, structured
+Range, directional/typed armor facets, enchantment mechanics and snapshots.
+The mage trait retains `Magery` in its original campaign-specific name to use
+the existing spell/mana semantics; its price and training benefit are synthetic.
+No fictional source is represented as a published rules reference.

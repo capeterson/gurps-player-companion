@@ -557,10 +557,15 @@ mechanism for sharing content between campaigns or seeding a new one.
     off, the document had no `campaign` block, or the block had no
     recognized fields).
 - **Seed:** `db:seed` imports `bootstrap/sample_library.yaml` into Sample and
-  creates The Lantern Coast from `bootstrap/lantern_coast.yaml` plus populated
-  character fixtures. Its owner, manager, and member accounts, private/shared
+  creates The Lantern Coast from the synthetic `bootstrap/lantern_coast.yaml`
+  plus six populated character fixtures. Its owner, manager, and member accounts, private/shared
   logs, and hidden-NPC encounter exercise the same permissions as normal API
-  writes. Existing Lantern play state is preserved on repeat runs. See the
+  writes. Its eleven library categories use four fictional sourcebooks (`LCGV`,
+  `LCST`, `LCTR`, `LCQO`) and current calculation/pricing snapshots, weapon modes,
+  structured Range, prerequisites and procedures. The reusable shared recipe
+  also runs through MCP with one existing owner; integration coverage compares
+  its complete content graph against the multi-user REST seed. Existing Lantern
+  play state is preserved on repeat runs. See the
   [seed guide](../../bootstrap/README.md).
 
 Keys used for upsert matching are section + canonical portable key + source key,

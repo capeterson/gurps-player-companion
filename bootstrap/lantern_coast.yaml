@@ -1,10 +1,10 @@
-# Fictional campaign fixtures, not an authoritative rules catalog.
+# Original synthetic coastal fantasy fixtures; all sourcebooks and locators are fictional.
 version: 13
 campaign:
   name: The Lantern Coast
-  description: |
-    An ancient beacon has gone dark. Three companions follow its last light
-    across the coast. A populated test campaign with original adventure content.
+  description: Six companions follow a vanished beacon through Greyhaven’s tide caves. Original coastal fantasy
+    rules inspired by the broad character-building, equipment and ritual-magic patterns of tabletop sourcebooks;
+    no published entries or page references are reproduced.
   pointTarget: 250
   disadvantageCap: 50
   quirkCap: 5
@@ -17,179 +17,2129 @@ campaign:
     protectNaturalDr: false
 library:
   traits:
-    - name: Combat Reflexes
-      kind: advantage
-      basePoints: 15
-      effects: [{target: dodge, value: 1}, {target: parry, value: 1}, {target: block, value: 1}]
-    - name: Fit
-      kind: advantage
-      basePoints: 5
-      description: Recovery and endurance reminders; adjudicate unmodeled benefits manually.
-    - name: Acute Vision
-      kind: advantage
-      basePoints: 0
-      pointsPerLevel: 2
-      maxLevel: 5
-      description: Apply to vision tasks, not every Per-based roll.
-    - name: Magery
-      kind: advantage
-      basePoints: 5
-      pointsPerLevel: 10
-      maxLevel: 3
-      effects: [{target: skill, skillName: Thaumatology, value: 1, scaling: per_level}]
-    - name: Stoneblood
-      kind: advantage
-      basePoints: 5
-      description: Campaign-specific innate DR 1, including beneath worn armor.
-      effects: [{target: dr, value: 1}]
-    - name: Sense of Duty
-      kind: disadvantage
-      basePoints: -5
-      description: Never abandon the people of Greyhaven.
-    - name: Curious
-      kind: disadvantage
-      basePoints: -5
-      availableModifiers:
-        - {name: Easier self-control, category: limitation, costType: percent, costValue: -50}
-    - name: Code of Honor
-      kind: disadvantage
-      basePoints: -10
-    - name: Lantern vigil
-      kind: quirk
-      basePoints: -1
-      description: Always light a candle for the lost.
+  - name: Breakwater Poise
+    kind: advantage
+    basePoints: 12
+    effects:
+    - target: parry
+      value: 1
+    - target: will
+      value: 1
+    description: Hold your line while spray and panic break around you. +1 Parry and Will; no other reflex or surprise
+      benefit.
+    key: traits_1
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 12
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.1
+    source: LCGV traits.1
+  - name: Longwatch Lungs
+    kind: advantage
+    basePoints: 7
+    description: 'A reserve built on night watches: +1 FP. Recovery follows the ordinary sheet rules.'
+    effects:
+    - target: fp
+      value: 1
+    key: traits_2
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 7
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.2
+    source: LCGV traits.2
+  - name: Horizon Reader
+    kind: advantage
+    basePoints: 0
+    pointsPerLevel: 3
+    maxLevel: 5
+    description: A practiced eye for beacon intervals; +1 Horizon Watch per level, rather than a universal vision
+      bonus.
+    effects:
+    - target: skill
+      skillName: Horizon Watch
+      value: 1
+      scaling: per_level
+    key: traits_3
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: traits.3
+    source: LCGV traits.3
+  - name: Magery (Tideglass attunement)
+    kind: advantage
+    basePoints: 7
+    pointsPerLevel: 9
+    maxLevel: 3
+    effects:
+    - target: skill
+      skillName: Beacon Resonance
+      value: 1
+      scaling: per_level
+    description: Original beacon-magic aptitude, priced at 7 + 9 per level. The Magery keyword uses the app’s normal
+      spell-level and mana gate; +1 Beacon Resonance per level.
+    tags:
+    - beacon
+    key: traits_4
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: traits.4
+    source: LCGV traits.4
+  - name: Stoneblood
+    kind: advantage
+    basePoints: 6
+    description: 'Greyhaven quarry heritage: innate DR 1 and a visible mineral sheen. No immunity to injury.'
+    effects:
+    - target: dr
+      value: 1
+    key: traits_5
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 6
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.5
+    source: LCGV traits.5
+  - name: Greyhaven Promise
+    kind: disadvantage
+    basePoints: -7
+    description: Return every rescued traveler to a safe harbor, even when a faster route would abandon them.
+    key: traits_6
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -7
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.6
+    source: LCGV traits.6
+  - name: Echo Collector
+    kind: disadvantage
+    basePoints: -6
+    availableModifiers:
+    - name: Trusted companion intervenes
+      category: limitation
+      costType: percent
+      costValue: -30
+    description: Stop to record unfamiliar beacon echoes when it costs time; the GM adjudicates the compulsion.
+    key: traits_7
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -6
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.7
+    source: LCGV traits.7
+  - name: Bridgekeeper Oath
+    kind: disadvantage
+    basePoints: -8
+    description: Never charge a refugee for passage; repair damage you cause to a public crossing.
+    key: traits_8
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -8
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.8
+    source: LCGV traits.8
+  - name: Lantern vigil
+    kind: quirk
+    basePoints: -1
+    description: Always light a candle for the lost.
+    key: traits_9
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.9
+    source: LCGV traits.9
+  - name: Tidewise Balance
+    kind: advantage
+    basePoints: 8
+    description: Deck-trained balance grants +1 Current Riding and Cliff Traverse.
+    effects:
+    - target: skill
+      skillName: Current Riding
+      value: 1
+    - target: skill
+      skillName: Cliff Traverse
+      value: 1
+    key: traits_10
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 8
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.10
+    source: LCGV traits.10
+  - name: Signal Memory
+    kind: advantage
+    basePoints: 6
+    description: 'Recall routes encoded in bell patterns: +1 Signal Weaving and Archive Diving.'
+    effects:
+    - target: skill
+      skillName: Signal Weaving
+      value: 1
+    - target: skill
+      skillName: Archive Diving
+      value: 1
+    key: traits_11
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 6
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.11
+    source: LCGV traits.11
+  - name: Gentle Hands
+    kind: advantage
+    basePoints: 7
+    description: A calm bedside manner adds +1 Saltwound Care and Harbor Mediation.
+    effects:
+    - target: skill
+      skillName: Saltwound Care
+      value: 1
+    - target: skill
+      skillName: Harbor Mediation
+      value: 1
+    key: traits_12
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 7
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.12
+    source: LCGV traits.12
+  - name: Storm Debt
+    kind: disadvantage
+    basePoints: -9
+    description: Your berth is pledged to the storm guild; answer its salvage summons before accepting other work.
+    key: traits_13
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -9
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.13
+    source: LCGV traits.13
+  - name: Counts the gulls
+    kind: quirk
+    basePoints: -1
+    description: Count the gulls before setting sail, and invent an omen for the result.
+    key: traits_14
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.14
+    source: LCGV traits.14
+  - name: Pocket gardener
+    kind: perk
+    basePoints: 1
+    description: Keep a miniature salt-tolerant garden; a narrative conversation starter, not a supply bonus.
+    key: traits_15
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.15
+    source: LCGV traits.15
   skills:
-    - {name: Broadsword, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
-    - {name: Shield, attribute: DX, difficulty: E, defaults: [{kind: attribute, attribute: DX, modifier: -4}]}
-    - {name: Bow, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
-    - {name: Axe/Mace, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
-    - {name: Staff, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
-    - {name: Brawling, attribute: DX, difficulty: E, defaults: []}
-    - name: Stealth
+  - name: Quayblade
+    attribute: DX
+    difficulty: A
+    defaults:
+    - kind: attribute
       attribute: DX
-      difficulty: A
-      defaults: [{kind: attribute, attribute: DX, modifier: -5}]
-      description: '**Move unseen.** The following task modifier is an explicit campaign example.'
-      procedures:
-        modifiers:
-          - id: noisy_ground
+      modifier: -5
+    description: Original Greyhaven training in quayblade; adjudicate task scope at the table.
+    key: skills_1
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.1
+    source: LCST skills.1
+  - name: Bulwark Handling
+    attribute: DX
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -4
+    description: Original Greyhaven training in bulwark handling; adjudicate task scope at the table.
+    key: skills_2
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.2
+    source: LCST skills.2
+  - name: Reedbow
+    attribute: DX
+    difficulty: H
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    description: Original Greyhaven training in reedbow; adjudicate task scope at the table.
+    key: skills_3
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.3
+    source: LCST skills.3
+  - name: Salvage Haft
+    attribute: DX
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    description: Original Greyhaven training in salvage haft; adjudicate task scope at the table.
+    key: skills_4
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.4
+    source: LCST skills.4
+  - name: Beacon Rod
+    attribute: DX
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    description: Original Greyhaven training in beacon rod; adjudicate task scope at the table.
+    key: skills_5
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.5
+    source: LCST skills.5
+  - name: Dockside Scrapping
+    attribute: DX
+    difficulty: E
+    defaults: []
+    description: Original Greyhaven training in dockside scrapping; adjudicate task scope at the table.
+    key: skills_6
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.6
+    source: LCST skills.6
+  - name: Shingle Ghosting
+    attribute: DX
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    description: '**Move unseen.** The following task modifier is an explicit campaign example.'
+    procedures:
+      modifiers:
+      - id: noisy_ground
+        label: Loose shingle underfoot
+        when:
+        - input:
+            domain: environment
+            key: loose_shingle
             label: Loose shingle underfoot
-            when: [{input: {domain: environment, key: loose_shingle, label: Loose shingle underfoot}, operator: equals, value: true}]
-            value: {kind: fixed, value: -2}
-            appliesTo: task_roll
-        actions:
-          - id: slip_past
-            label: Slip past the lookout
-            roll: {basis: skill}
-            contest: {kind: quick, opponent: Observation}
-            outcomes: [{on: success, kind: note, text: Reach cover if the contest is won; the GM resolves the opponent.}]
-        benefits:
-          - id: practiced_scout
-            label: Practiced coastal scout
-            when: {minimumRelativeLevel: 2}
-            effects: []
-            sourceText: Narrative campaign milestone; no automatic numerical bonus.
-    - name: Survival
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+      actions:
+      - id: slip_past
+        label: Slip past the lookout
+        roll:
+          basis: skill
+        contest:
+          kind: quick
+          opponent: Horizon Watch
+        outcomes:
+        - kind: note
+          text: Reach cover if the contest is won; the GM resolves the opponent.
+          'on': success
+      benefits:
+      - id: practiced_scout
+        label: Practiced coastal scout
+        when:
+          minimumRelativeLevel: 2
+        effects: []
+        sourceText: Narrative campaign milestone; no automatic numerical bonus.
+    key: skills_7
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.7
+    source: LCST skills.7
+  - name: Coastal Foraging
+    attribute: Per
+    difficulty: A
+    specializationPolicy:
+      kind: required_catalog
+      options:
+      - name: Cliff Gardens
+        description: Gather rainwater and edible cliff plants.
+      - name: Tide Flats
+        description: Harvest shellfish and mark safe channels.
+    defaults:
+    - kind: attribute
       attribute: Per
-      difficulty: A
-      specializationPolicy:
-        kind: required_catalog
-        options:
-          - {name: Woodlands, description: Find shelter and supplies inland.}
-          - {name: Island/Beach, description: Read the tides and locate fresh water.}
-      defaults: [{kind: attribute, attribute: Per, modifier: -5}]
-    - {name: Observation, attribute: Per, difficulty: A, defaults: [{kind: attribute, attribute: Per, modifier: -5}]}
-    - {name: Swimming, attribute: HT, difficulty: E, defaults: [{kind: attribute, attribute: HT, modifier: -4}]}
-    - {name: Climbing, attribute: DX, difficulty: A, defaults: [{kind: attribute, attribute: DX, modifier: -5}]}
-    - {name: Thaumatology, attribute: IQ, difficulty: VH, prerequisiteRules: {kind: all, children: [{kind: attribute, attribute: IQ, minimum: 12}, {kind: trait, name: Magery, minimumLevel: 0}]}, defaults: [{kind: attribute, attribute: IQ, modifier: -7}]}
-    - name: First Aid
+      modifier: -5
+    description: Original Greyhaven training in coastal foraging; adjudicate task scope at the table.
+    key: skills_8
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.8
+    source: LCST skills.8
+  - name: Horizon Watch
+    attribute: Per
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: Per
+      modifier: -5
+    description: Original Greyhaven training in horizon watch; adjudicate task scope at the table.
+    key: skills_9
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.9
+    source: LCST skills.9
+  - name: Current Riding
+    attribute: HT
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: HT
+      modifier: -4
+    description: Original Greyhaven training in current riding; adjudicate task scope at the table.
+    key: skills_10
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.10
+    source: LCST skills.10
+  - name: Cliff Traverse
+    attribute: DX
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    description: Original Greyhaven training in cliff traverse; adjudicate task scope at the table.
+    key: skills_11
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.11
+    source: LCST skills.11
+  - name: Beacon Resonance
+    attribute: IQ
+    difficulty: VH
+    prerequisiteRules:
+      kind: all
+      children:
+      - kind: attribute
+        attribute: IQ
+        minimum: 12
+      - kind: trait
+        name: Magery (Tideglass attunement)
+        minimumLevel: 0
+    defaults:
+    - kind: attribute
       attribute: IQ
-      difficulty: E
-      techLevelPolicy: {kind: required}
-      defaults: [{kind: attribute, attribute: IQ, modifier: -4}]
-      description: Record the learned TL and use the action as a campaign task preview.
-      procedures:
-        actions:
-          - id: dress_wound
-            label: Dress a wound
-            roll: {basis: skill}
-            time: {amount: {kind: constant, value: 1}, unit: minutes}
-            outcomes: [{on: success, kind: note, text: Consult the treatment rules and record the patient's recovery manually.}]
-    - {name: Research, attribute: IQ, difficulty: A, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
-    - {name: Diplomacy, attribute: IQ, difficulty: H, defaults: [{kind: attribute, attribute: IQ, modifier: -6}]}
-    - {name: Merchant, attribute: IQ, difficulty: A, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
-    - {name: Armoury, attribute: IQ, difficulty: A, techLevelPolicy: {kind: required}, specializationPolicy: {kind: required_freeform}, defaults: [{kind: attribute, attribute: IQ, modifier: -5}]}
+      modifier: -7
+    description: Original Greyhaven training in beacon resonance; adjudicate task scope at the table.
+    key: skills_12
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.12
+    source: LCST skills.12
+  - name: Saltwound Care
+    attribute: IQ
+    difficulty: A
+    techLevelPolicy:
+      kind: required
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -4
+    description: Record the learned TL and use the action as a campaign task preview.
+    procedures:
+      actions:
+      - id: dress_wound
+        label: Dress a wound
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: Consult the treatment rules and record the patient's recovery manually.
+          'on': success
+    key: skills_13
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.13
+    source: LCST skills.13
+  - name: Archive Diving
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    description: Original Greyhaven training in archive diving; adjudicate task scope at the table.
+    key: skills_14
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.14
+    source: LCST skills.14
+  - name: Harbor Mediation
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -6
+    description: Original Greyhaven training in harbor mediation; adjudicate task scope at the table.
+    key: skills_15
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.15
+    source: LCST skills.15
+  - name: Quayside Barter
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    description: Original Greyhaven training in quayside barter; adjudicate task scope at the table.
+    key: skills_16
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.16
+    source: LCST skills.16
+  - name: Salvage Fitting
+    attribute: IQ
+    difficulty: A
+    techLevelPolicy:
+      kind: required
+    specializationPolicy:
+      kind: required_freeform
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    description: Original Greyhaven training in salvage fitting; adjudicate task scope at the table.
+    key: skills_17
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.17
+    source: LCST skills.17
+  - name: Tidepilot
+    attribute: IQ
+    difficulty: H
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -6
+    description: Plot routes between moving shoals; a route does not grant automatic safe passage.
+    key: skills_18
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.18
+    source: LCST skills.18
+  - name: Signal Weaving
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    description: Compose bell, pennant and lantern codes for a harbor crew.
+    key: skills_19
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.19
+    source: LCST skills.19
+  - name: Marsh Distilling
+    attribute: IQ
+    difficulty: H
+    techLevelPolicy:
+      kind: required
+    defaults: []
+    description: Prepare fictional salt-herb infusions at the learned TL; effects are adjudicated manually.
+    key: skills_20
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.20
+    source: LCST skills.20
+  - name: Harbor Winchcraft
+    attribute: IQ
+    difficulty: A
+    techLevelPolicy:
+      kind: required
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    description: Rig tide-powered winches and identify unsafe loads.
+    key: skills_21
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.21
+    source: LCST skills.21
+  - name: Gullcall Performance
+    attribute: HT
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: HT
+      modifier: -5
+    description: Project patterned calls across windy quays.
+    key: skills_22
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.22
+    source: LCST skills.22
+  - name: Tether Cast
+    attribute: DX
+    difficulty: H
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -6
+    description: Place weighted rescue lines without entangling a swimmer.
+    key: skills_23
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.23
+    source: LCST skills.23
   spells:
-    - {name: Light, college: Light and Darkness, difficulty: H, baseEnergyCost: 1, maintenanceCost: 1, castingTime: 1 second, duration: 1 minute}
-    - {name: Ignite Fire, college: Fire, difficulty: H, baseEnergyCost: 1, castingTime: 1 second, duration: Instant}
-    - {name: Lend Energy, college: Healing, difficulty: H, baseEnergyCost: 2, castingTime: 1 second}
-    - {name: Minor Healing, college: Healing, difficulty: H, baseEnergyCost: 1, castingTime: 1 second}
-    - {name: Major Healing, college: Healing, difficulty: VH, baseEnergyCost: 2, castingTime: 1 second, prerequisites: 'Magery 1, Minor Healing'}
-    - {name: Shield, college: Protection and Warning, difficulty: H, baseEnergyCost: 2, maintenanceCost: 1, castingTime: 1 second, duration: 1 minute}
+  - name: Glimmer Shoal
+    college: Beacon Light
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 2 seconds
+    duration: 90 seconds
+    description: A school of thumb-sized glimmers circles a marked rope; it cannot illuminate an entire room.
+    maintenanceCost: 1
+    key: spells_1
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.1
+    source: LCTR spells.1
+  - name: Ember Thread
+    college: Hearthcraft
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 3 seconds
+    duration: 20 seconds
+    description: A warm filament dries one knot of damp tinder; the GM decides whether it catches.
+    key: spells_2
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.2
+    source: LCTR spells.2
+  - name: Borrowed Dawn
+    college: Tide Vitality
+    difficulty: H
+    baseEnergyCost: 3
+    castingTime: 4 seconds
+    duration: Instant
+    description: Move a little of your rest into a consenting ally’s next breath; record any pool changes manually.
+    key: spells_3
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.3
+    source: LCTR spells.3
+  - name: Stitch the Salt
+    college: Tide Vitality
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 5 seconds
+    duration: Instant
+    description: Draw salt from a shallow scrape and close it with luminous thread; the GM resolves recovery.
+    key: spells_4
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.4
+    source: LCTR spells.4
+  - name: Mend the Undertow
+    college: Tide Vitality
+    difficulty: VH
+    baseEnergyCost: 4
+    castingTime: 8 seconds
+    prerequisites: Tideglass attunement 1; Stitch the Salt
+    duration: Instant
+    description: Reconstruct a tide-battered wound from its reflection; this ritual does not restore lost limbs.
+    key: spells_5
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.5
+    source: LCTR spells.5
+  - name: Breakwater Veil
+    college: Shelter
+    difficulty: H
+    baseEnergyCost: 3
+    castingTime: 2 seconds
+    duration: 45 seconds
+    description: A translucent ribbon marks a protected stance; the GM adjudicates protection and records bonuses.
+    maintenanceCost: 2
+    key: spells_6
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.6
+    source: LCTR spells.6
+  - name: Wake Compass
+    college: Wayfinding
+    difficulty: H
+    baseEnergyCost: 2
+    maintenanceCost: 1
+    castingTime: 3 seconds
+    duration: 4 minutes
+    description: A floating needle points to a previously touched mooring, never to an unknown destination.
+    key: spells_7
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.7
+    source: LCTR spells.7
+  - name: Quiet Mooring
+    college: Shelter
+    difficulty: H
+    baseEnergyCost: 3
+    maintenanceCost: 1
+    castingTime: 6 seconds
+    duration: 3 minutes
+    description: Soften creaks from one tied vessel; voices and footsteps remain audible.
+    key: spells_8
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.8
+    source: LCTR spells.8
+  - name: Glasswake Message
+    college: Beacon Light
+    difficulty: VH
+    baseEnergyCost: 5
+    maintenanceCost: 2
+    castingTime: 10 seconds
+    duration: 2 minutes
+    description: Pass a short image between two prepared tideglass mirrors; no unattended recording.
+    key: spells_9
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.9
+    source: LCTR spells.9
+  - name: Root the Jetty
+    college: Shorecraft
+    difficulty: H
+    baseEnergyCost: 3
+    maintenanceCost: 1
+    castingTime: 4 seconds
+    duration: 75 seconds
+    description: Bind loose jetty planks with spectral roots; it does not create timber.
+    key: spells_10
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.10
+    source: LCTR spells.10
   languages:
-    - {name: Coast Common, description: The party's free mother tongue.}
-    - {name: Old Beacon Script, description: Fragmentary language found in the lighthouse archives.}
-    - {name: Harbor Sign, isSignLanguage: true, description: Silent communication between dock crews.}
+  - name: Coast Common
+    description: The party's free mother tongue.
+    key: languages_1
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: languages.1
+    source: LCGV languages.1
+  - name: Old Beacon Script
+    description: Fragmentary language found in the lighthouse archives.
+    key: languages_2
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: languages.2
+    source: LCGV languages.2
+  - name: Harbor Sign
+    isSignLanguage: true
+    description: Silent communication between dock crews.
+    key: languages_3
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: languages.3
+    source: LCGV languages.3
   techniques:
-    - {name: Feint, defaultSkillName: Broadsword, difficulty: H, defaultModifier: 0, maxLevel: 4, description: A bought-up feint for sword combat.}
-    - {name: Disarming, defaultSkillName: Axe/Mace, difficulty: H, defaultModifier: 0, maxLevel: 5}
+  - name: False Lantern Step
+    defaultSkillName: Quayblade
+    difficulty: H
+    defaultModifier: -1
+    maxLevel: 3
+    description: Practice a misleading lantern motion in a quayblade exchange; the GM resolves the contest.
+    key: techniques_1
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.1
+    source: LCST techniques.1
+  - name: Hook the Haft
+    defaultSkillName: Salvage Haft
+    difficulty: H
+    defaultModifier: -2
+    maxLevel: 4
+    description: Catch a rival haft with a hooked salvage head; the GM resolves release.
+    key: techniques_2
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.2
+    source: LCST techniques.2
   styles:
-    - name: Greyhaven Watch
-      description: A fictional coastal watch training package; add its components to a character.
-      skills: [Broadsword, Shield, Observation]
-      techniques: [{name: Feint, defaultSkillName: Broadsword}]
-      perks: []
+  - name: Greyhaven Watch
+    description: Original Greyhaven harbor-watch curriculum; a suggested package, not a published style.
+    skills:
+    - Quayblade
+    - Bulwark Handling
+    - Horizon Watch
+    techniques:
+    - name: False Lantern Step
+      defaultSkillName: Quayblade
+    perks: []
+    key: styles_1
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: styles.1
+    source: LCST styles.1
   enchantments:
-    - name: Beacon Edge
-      description: Campaign enchantment demonstrating an equipped weapon's damage bonus.
-      applicability: weapon
-      effects: [{target: weapon_damage, value: 1}]
-      stackingPolicy: {kind: stack}
-    - name: Warden's Stitch
-      description: Campaign armor enchantment demonstrating additive DR.
-      applicability: armor
-      effects: [{target: dr, value: 1}]
-      stackingPolicy: {kind: highest, key: wardens_stitch}
+  - name: Beacon Edge
+    description: 'Leave a warm beacon streak on a struck surface: +1 damage on the equipped weapon.'
+    applicability: weapon
+    effects:
+    - target: weapon_damage
+      value: 1
+    stackingPolicy:
+      kind: stack
+    key: enchantments_1
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.1
+    source: LCTR enchantments.1
+  - name: Warden's Stitch
+    description: 'Tidewire seams stiffen under impact: +1 DR on the equipped armor; same-key stitches use the highest.'
+    applicability: armor
+    effects:
+    - target: dr
+      value: 1
+    stackingPolicy:
+      kind: highest
+      key: wardens_stitch
+    key: enchantments_2
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.2
+    source: LCTR enchantments.2
+  - name: Gullfeather Draw
+    description: A reedglass sightline adds accuracy, not skill or damage.
+    applicability: weapon
+    effects:
+    - target: weapon_accuracy
+      value: 1
+    stackingPolicy:
+      kind: highest
+      key: gullfeather_draw
+    key: enchantments_3
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.3
+    source: LCTR enchantments.3
+  - name: Mooring Counterweight
+    description: A bound stone steadies the blocking hand.
+    applicability: shield
+    effects:
+    - target: weapon_block
+      value: 1
+    stackingPolicy:
+      kind: stack
+    key: enchantments_4
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.4
+    source: LCTR enchantments.4
+  - name: Foamfold Lining
+    description: A folding-space seam reduces this item’s carried weight by 20 percent.
+    applicability: any
+    effects:
+    - target: weight_reduction_percent
+      value: 20
+    stackingPolicy:
+      kind: highest
+      key: foamfold_lining
+    key: enchantments_5
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.5
+    source: LCTR enchantments.5
+  - name: Harbor Whisper
+    description: Prepared signal beads improve Signal Weaving while this item is equipped.
+    applicability: any
+    effects:
+    - target: skill
+      skillName: Signal Weaving
+      value: 1
+    stackingPolicy:
+      kind: highest
+      key: harbor_whisper
+    key: enchantments_6
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: enchantments.6
+    source: LCTR enchantments.6
   activeEffects:
-    - name: Beacon Ward
-      description: A campaign blessing with visible remaining rounds.
-      effects: [{target: dr, value: 1}]
-      capabilities: [{kind: resistance, key: sea_chill, label: Sheltered from sea chill, parameters: {notes: Narrative protection; no automatic fatigue recovery.}}]
-      duration: {kind: rounds, amount: 6}
-      stacking: {kind: highest, key: beacon_ward}
-    - name: Lantern Sight
-      description: A persistent sense reminder that can be activated or deactivated.
-      effects: []
-      capabilities: [{kind: sense, key: lantern_sight, label: See beacon markings, parameters: {range: 10}}]
-      duration: {kind: indefinite}
-      stacking: {kind: replace, key: lantern_sight}
-    - name: Rallying Draught
-      description: A short-lived campaign strength boost; advancing rounds does not consume the source item.
-      effects: [{target: st, value: 2}]
-      duration: {kind: rounds, amount: 3}
-      stacking: {kind: additive, key: rallying_draught}
+  - name: Beacon Ward
+    description: A campaign blessing with visible remaining rounds.
+    effects:
+    - target: dr
+      value: 1
+    capabilities:
+    - kind: resistance
+      key: sea_chill
+      label: Sheltered from sea chill
+      parameters:
+        notes: Narrative protection; no automatic fatigue recovery.
+    duration:
+      kind: rounds
+      amount: 6
+    stacking:
+      kind: highest
+      key: beacon_ward
+    key: activeeffects_1
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: activeEffects.1
+    source: LCTR activeEffects.1
+  - name: Lantern Sight
+    description: A persistent sense reminder that can be activated or deactivated.
+    effects: []
+    capabilities:
+    - kind: sense
+      key: lantern_sight
+      label: See beacon markings
+      parameters:
+        range: 10
+    duration:
+      kind: indefinite
+    stacking:
+      kind: replace
+      key: lantern_sight
+    key: activeeffects_2
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: activeEffects.2
+    source: LCTR activeEffects.2
+  - name: Rallying Draught
+    description: A short-lived campaign strength boost; advancing rounds does not consume the source item.
+    effects:
+    - target: st
+      value: 2
+    duration:
+      kind: rounds
+      amount: 3
+    stacking:
+      kind: additive
+      key: rallying_draught
+    key: activeeffects_3
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: activeEffects.3
+    source: LCTR activeEffects.3
   items:
-    - name: Wayfarer's sword
-      category: weapon
-      weightLbs: 3
-      cost: 500
-      weaponData:
-        damage: sw+1 cut
+  - name: Wayfarer's sword
+    category: weapon
+    weightLbs: 2.7
+    cost: 435
+    weaponData:
+      modes:
+      - key: sweep
+        name: Quay sweep
+        damage: sw cut
         reach: '1'
         parry: '0'
-        stRequired: 10
-        skill: Broadsword
-        alternateModes: [{name: Thrust, damage: thr+2 imp}]
-    - {name: Round shield, category: weapon, weightLbs: 8, cost: 60, weaponData: {damage: thr cr, reach: '1', parry: 'No', db: 2, skill: Shield}}
-    - name: Coastal bow
-      category: weapon
-      weightLbs: 2
-      cost: 100
-      weaponData: {damage: thr+1 imp, skill: Bow, stRequired: 10, parry: 'No', ranged: {acc: 2, range: {kind: fixed, halfDamageYards: 120, maxYards: 180}, rof: '1', shots: '1(2)', bulk: -6, recoil: 1}}
-    - {name: Mail hauberk, category: armor, weightLbs: 16, cost: 230, isArmor: true, armor: {dr: 4, drCrushing: 2, flexible: true, locations: [torso, groin, arm_left, arm_right]}}
-    - {name: Steel cap, category: armor, weightLbs: 2, cost: 100, isArmor: true, armor: {dr: 4, locations: [skull]}}
-    - {name: Leather leggings, category: armor, weightLbs: 4, cost: 40, isArmor: true, armor: {dr: 2, locations: [leg_left, leg_right]}}
-    - {name: Travel boots, category: armor, weightLbs: 3, cost: 80, isArmor: true, armor: {dr: 2, locations: [foot_left, foot_right]}}
-    - {name: Trail pack, category: general, weightLbs: 2, cost: 60, isContainer: true, hideawayCapacityLbs: 40}
-    - {name: Focus crystal, category: magic, weightLbs: 0.1, cost: 500, powerstoneData: {maxEnergy: 8, currentEnergy: 5}}
-    - {name: Tideglass wand, category: magic, weightLbs: 1, cost: 900, magicItemData: {spellName: Light, spellSkillLevel: 15, mode: charged, chargesMax: 10, chargesCurrent: 3}}
+        stRequired: 9
+        skill: Quayblade
+      - key: point
+        name: Beacon point
+        damage: thr+1 imp
+        reach: '1'
+        parry: '0'
+        stRequired: 9
+        skill: Quayblade
+    key: items_1
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Wayfarer''s sword.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 435
+      - id: weightLbs
+        op: constant
+        value: 2.7
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.1
+    source: LCQO items.1
+  - name: Breakwater buckler
+    category: weapon
+    weightLbs: 5.5
+    cost: 73
+    weaponData:
+      damage: thr-1 cr
+      reach: '1'
+      parry: 'No'
+      db: 1
+      skill: Bulwark Handling
+      wieldedSide: left
+    key: items_2
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Breakwater buckler.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 73
+      - id: weightLbs
+        op: constant
+        value: 5.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.2
+    source: LCQO items.2
+  - name: Reedglass bow
+    category: weapon
+    weightLbs: 2.4
+    cost: 145
+    weaponData:
+      modes:
+      - key: reed_shot
+        name: Reed shot
+        damage: thr imp
+        parry: 'No'
+        stRequired: 9
+        skill: Reedbow
+        ranged:
+          acc: 3
+          range:
+            kind: st_multiplier
+            halfDamageFactor: 9
+            maxFactor: 14
+            strengthSource: wielder
+          rof: '1'
+          shots: 1(3)
+          bulk: -5
+          recoil: 1
+    key: items_3
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Reedglass bow.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 145
+      - id: weightLbs
+        op: constant
+        value: 2.4
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.3
+    source: LCQO items.3
+  - name: Tidewire coat
+    category: armor
+    weightLbs: 13.5
+    cost: 285
+    isArmor: true
+    armor:
+      dr: 3
+      typedDr:
+        cut: 4
+        corr: 2
+      drCrushing: 1
+      flexible: true
+      locations:
+      - torso
+      - groin
+      - arm_left
+      - arm_right
+    key: items_4
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Tidewire coat.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 285
+      - id: weightLbs
+        op: constant
+        value: 13.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.4
+    source: LCQO items.4
+  - name: Beacon rivet cap
+    category: armor
+    weightLbs: 1.8
+    cost: 86
+    isArmor: true
+    armor:
+      dr: 3
+      locations:
+      - skull
+    key: items_5
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Beacon rivet cap.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 86
+      - id: weightLbs
+        op: constant
+        value: 1.8
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.5
+    source: LCQO items.5
+  - name: Reedweave greaves
+    category: armor
+    weightLbs: 3.2
+    cost: 54
+    isArmor: true
+    armor:
+      dr: 1
+      typedDr:
+        cut: 2
+      locations:
+      - leg_left
+      - leg_right
+    key: items_6
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Reedweave greaves.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 54
+      - id: weightLbs
+        op: constant
+        value: 3.2
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.6
+    source: LCQO items.6
+  - name: Cliffgrip boots
+    category: armor
+    weightLbs: 2.6
+    cost: 64
+    isArmor: true
+    armor:
+      dr: 1
+      locations:
+      - foot_left
+      - foot_right
+    key: items_7
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Cliffgrip boots.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 64
+      - id: weightLbs
+        op: constant
+        value: 2.6
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.7
+    source: LCQO items.7
+  - name: Trail pack
+    category: general
+    weightLbs: 2
+    cost: 60
+    isContainer: true
+    hideawayCapacityLbs: 32
+    key: items_8
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Trail pack.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 60
+      - id: weightLbs
+        op: constant
+        value: 2
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.8
+    source: LCQO items.8
+  - name: Focus crystal
+    category: magic
+    weightLbs: 0.1
+    cost: 465
+    powerstoneData:
+      maxEnergy: 7
+      currentEnergy: 5
+    key: items_9
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Focus crystal.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 465
+      - id: weightLbs
+        op: constant
+        value: 0.1
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.9
+    source: LCQO items.9
+  - name: Tideglass wand
+    category: magic
+    weightLbs: 1
+    cost: 825
+    magicItemData:
+      spellName: Glimmer Shoal
+      spellSkillLevel: 16
+      mode: charged
+      chargesMax: 9
+      chargesCurrent: 3
+    key: items_10
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Tideglass wand.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 825
+      - id: weightLbs
+        op: constant
+        value: 1
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.10
+    source: LCQO items.10
+  - name: Beacon rod
+    category: weapon
+    weightLbs: 3.5
+    cost: 32
+    weaponData:
+      modes:
+      - key: tap
+        name: Beacon tap
+        damage: thr+1 cr
+        reach: 1,2
+        parry: '0'
+        stRequired: 7
+        skill: Beacon Rod
+      - key: sweep
+        name: Rod sweep
+        damage: sw+1 cr
+        reach: 1,2
+        parry: '0'
+        stRequired: 7
+        skill: Beacon Rod
+    key: items_11
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Beacon rod.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 32
+      - id: weightLbs
+        op: constant
+        value: 3.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.11
+    source: LCQO items.11
+  - name: Bridgehook axe
+    category: weapon
+    weightLbs: 4.5
+    cost: 118
+    weaponData:
+      modes:
+      - key: hook
+        name: Bridgehook chop
+        damage: sw+1 cut
+        reach: '1'
+        parry: 0U
+        stRequired: 11
+        skill: Salvage Haft
+    key: items_12
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Bridgehook axe.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 118
+      - id: weightLbs
+        op: constant
+        value: 4.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.12
+    source: LCQO items.12
+  - name: Storm mantle
+    category: armor
+    weightLbs: 2.2
+    cost: 165
+    isArmor: true
+    armor:
+      dr: 1
+      typedDr:
+        burn: 3
+      locations:
+      - torso
+      - neck
+      flexible: true
+    key: items_13
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Storm mantle.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 165
+      - id: weightLbs
+        op: constant
+        value: 2.2
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.13
+    source: LCQO items.13
+  - name: Mistquilt coat
+    category: armor
+    weightLbs: 4.8
+    cost: 44
+    isArmor: true
+    armor:
+      dr: 1
+      locations:
+      - torso
+      - arm_left
+      - arm_right
+      flexible: true
+    key: items_14
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Mistquilt coat.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 44
+      - id: weightLbs
+        op: constant
+        value: 4.8
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.14
+    source: LCQO items.14
+  - name: Rescue tether
+    category: weapon
+    weightLbs: 2.3
+    cost: 39
+    weaponData:
+      modes:
+      - key: cast
+        name: Weighted cast
+        damage: thr-1 cr
+        parry: 'No'
+        stRequired: 8
+        skill: Tether Cast
+        ranged:
+          acc: 1
+          range:
+            kind: fixed
+            maxYards: 18
+            minimumYards: 2
+            halfDamageYards: null
+          rof: '1'
+          shots: 1(4)
+          bulk: -3
+          recoil: 1
+    key: items_15
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Rescue tether.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 39
+      - id: weightLbs
+        op: constant
+        value: 2.3
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.15
+    source: LCQO items.15
+  - name: Signal beads
+    category: general
+    weightLbs: 0.3
+    cost: 27
+    description: Six colored glass beads used to draft harbor codes.
+    key: items_16
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 27
+      - id: weightLbs
+        op: constant
+        value: 0.3
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.16
+    source: LCQO items.16
+  - name: Distiller roll
+    category: general
+    weightLbs: 2.8
+    cost: 92
+    isContainer: true
+    hideawayCapacityLbs: 6
+    description: Holds the fictional marsh-distilling apparatus and sealed sample jars.
+    key: items_17
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 92
+      - id: weightLbs
+        op: constant
+        value: 2.8
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.17
+    source: LCQO items.17
+  - name: Tideglass mirror
+    category: magic
+    weightLbs: 0.6
+    cost: 210
+    description: A prepared focus for Glasswake Message; no automatic remote communication.
+    key: items_18
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 210
+      - id: weightLbs
+        op: constant
+        value: 0.6
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.18
+    source: LCQO items.18
+  - name: Jetty toolbelt
+    category: general
+    weightLbs: 1.4
+    cost: 38
+    isContainer: true
+    hideawayCapacityLbs: 10
+    key: items_19
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Jetty toolbelt.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 38
+      - id: weightLbs
+        op: constant
+        value: 1.4
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.19
+    source: LCQO items.19
+  - name: Salvage apron
+    category: armor
+    weightLbs: 2.9
+    cost: 58
+    isArmor: true
+    armor:
+      dr: 2
+      locations:
+      - torso
+      - groin
+      frontOnly: true
+      typedDr:
+        corr: 3
+    key: items_20
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: 'Original Lantern Coast item fixture: Salvage apron.'
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 58
+      - id: weightLbs
+        op: constant
+        value: 2.9
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+    sourceLocator: items.20
+    source: LCQO items.20
+  sources:
+  - name: Greyhaven Lives and Vows
+    key: lantern_lives
+    abbreviation: LCGV
+    edition: Synthetic playtest 1
+    priority: 0
+    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
+      are fixture identifiers, not real page citations.
+  - name: The Shoalwatch Training Almanac
+    key: lantern_training
+    abbreviation: LCST
+    edition: Synthetic playtest 1
+    priority: 1
+    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
+      are fixture identifiers, not real page citations.
+  - name: Tideglass Rites and Resonances
+    key: lantern_rites
+    abbreviation: LCTR
+    edition: Synthetic playtest 1
+    priority: 2
+    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
+      are fixture identifiers, not real page citations.
+  - name: The Quaywright’s Outfit Ledger
+    key: lantern_outfits
+    abbreviation: LCQO
+    edition: Synthetic playtest 1
+    priority: 3
+    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
+      are fixture identifiers, not real page citations.
+  modifiers:
+  - name: Only beneath a beacon
+    key: beneath_beacon
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    category: limitation
+    costType: percent
+    description: Narrative boundary agreed with the GM; no automatic location detection.
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: modifier
+        op: constant
+        value: -30
+      outputs:
+      - key: modifier
+        node: modifier
+        unit: percentage
+        rounding: exact
+        increment: 0.01
+        min: -200
+        max: 1000000
+    applicability:
+      universal: false
+      traitKinds:
+      - advantage
+      traitTags:
+      - beacon
+      traits: []
+    sourceLocator: modifiers.1
+    source: LCGV modifiers.1
