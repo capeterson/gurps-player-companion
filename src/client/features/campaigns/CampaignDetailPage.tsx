@@ -1,3 +1,4 @@
+import { MediaImage } from '../../components/MediaImage.tsx';
 /**
  * /campaigns/:id — campaign overview. The workspace header owns sibling
  * navigation; this page stays focused on campaign facts and its roster.
@@ -73,7 +74,16 @@ export function CampaignDetailPage() {
                   to={`/characters/${ch.id}`}
                   className="card block p-4 transition hover:border-border-strong"
                 >
-                  <p className="font-display text-xl">{ch.name}</p>
+                  <div className="font-display text-xl">
+                    <MediaImage
+                      targetType="character"
+                      targetId={ch.id}
+                      assetId={ch.portraitAssetId}
+                      name={ch.name}
+                      thumbnail
+                    />
+                    {ch.name}
+                  </div>
                 </Link>
               </li>
             ))}

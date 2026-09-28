@@ -8,7 +8,7 @@
     "dev:server-only": "bun run --hot src/server/index.ts",
     "build": "bun run build:client && bun run build:server && bun run build:migrate",
     "build:client": "vite build",
-    "build:server": "bun build src/server/index.ts --outdir dist/server --target bun --sourcemap=linked",
+    "build:server": "bun build src/server/index.ts --outdir dist/server --target bun --sourcemap=linked --external sharp --external @aws-sdk/client-s3",
     "build:migrate": "bun build src/server/db/migrate.ts --outdir dist/server --target bun --sourcemap=linked",
     "start": "bun run dist/server/index.js",
     "test": "bun test src/server src/shared",
@@ -33,6 +33,7 @@
     "check": "bun run lint && bun run typecheck && bun run test && bun run openapi:check && bun run mcp:check"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1141.0",
     "@fontsource-variable/cinzel": "^5.2.8",
     "@fontsource-variable/work-sans": "^5.2.8",
     "@fontsource/im-fell-english": "^5.2.6",
@@ -64,6 +65,7 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.1",
     "resend": "^6.12.4",
+    "sharp": "0.34.5",
     "tiptap-markdown": "^0.8.10",
     "unified": "^11.0.5",
     "yaml": "^2.6.0",

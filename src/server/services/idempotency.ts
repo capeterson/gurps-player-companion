@@ -79,6 +79,12 @@ async function permissionHash(userId: string): Promise<string> {
 }
 
 export const durableIdempotency: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // Media owns its durable upload identity and processing leases. Do not hold
+  // an outer transaction across object storage or buffer the source again.
+  if (c.req.path.startsWith('/api/v1/media/')) {
+    await next();
+    return;
+  }
   const key = c.req.header('idempotency-key');
   const policy = matchOperation(c.req.method, new URL(c.req.url).pathname);
   if (!key || !policy || policy.kind !== 'tool' || policy.method === 'GET') {

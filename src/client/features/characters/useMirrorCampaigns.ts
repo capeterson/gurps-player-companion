@@ -6,9 +6,8 @@
  * complete campaign mechanics projection in Dexie: replacing a cursor row
  * with a partial REST mirror makes known settings look unavailable offline.
  *
- * Campaigns have no outbox mutations, so a plain upsert can't clobber
- * pending local intent (rule S4): there's never a pending patch on a
- * campaign field to skip.
+ * Cover images are outbox-backed. Preserve pending cover intent and ignore
+ * responses older than the local cursor revision.
  */
 
 import { useEffect } from 'react';
@@ -21,15 +20,30 @@ export function useMirrorCampaigns(campaigns: CampaignOut[] | undefined): void {
     if (!campaigns || campaigns.length === 0) return;
     const db = getLocalDb();
     const viewerId = readUserIdFromToken();
-    void db.transaction('rw', db.campaigns, async () => {
+    void db.transaction('rw', [db.campaigns, db.outbox], async () => {
+      if (readUserIdFromToken() !== viewerId) return;
+      const pending = await db.outbox
+        .where('status')
+        .anyOf(['pending', 'in_flight', 'transient_retry'])
+        .toArray();
       const stored = await db.campaigns.bulkGet(campaigns.map((c) => c.id));
       await db.campaigns.bulkPut(
         campaigns.map((c, index) => {
+          const existing = stored[index];
+          if (existing && existing.revision > c.revision) return existing;
           const memberRole = c.members?.find((member) => member.userId === viewerId)?.role;
           return {
             ...(stored[index]?.activeEffectDefinitions
               ? { activeEffectDefinitions: stored[index].activeEffectDefinitions }
               : {}),
+            coverAssetId: pending.some(
+              (op) =>
+                op.entityClass === 'campaign' &&
+                op.entityId === c.id &&
+                op.fieldPath === 'coverAssetId',
+            )
+              ? (existing?.coverAssetId ?? null)
+              : (c.coverAssetId ?? null),
             id: c.id,
             name: c.name,
             description: c.description,

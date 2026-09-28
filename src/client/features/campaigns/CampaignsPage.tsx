@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campaign.ts';
+import { MediaImage } from '../../components/MediaImage.tsx';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
@@ -141,6 +142,13 @@ export function CampaignsPage() {
                 aria-label={c.name}
               />
               <div className="pointer-events-none min-w-0 flex-1">
+                <MediaImage
+                  targetType="campaign"
+                  targetId={c.id}
+                  assetId={c.coverAssetId}
+                  name={c.name}
+                  thumbnail
+                />
                 <div className="font-display text-lg font-semibold truncate">{c.name}</div>
                 <div className="mt-0.5 text-xs text-muted">
                   <span className="num">{c.members.length}</span> member

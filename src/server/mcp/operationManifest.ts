@@ -81,6 +81,24 @@ const excluded = (method: HttpMethod, path: string, reason: string): ExcludedOpe
 
 /** Exact raw-API coverage. There are deliberately no prefix or wildcard entries. */
 export const OPERATION_POLICY: readonly OperationPolicy[] = [
+  tool('GET', '/api/v1/media/capabilities', 'gpc_get_media_capabilities', 'gpc:read'),
+  tool('POST', '/api/v1/media/uploads', 'gpc_initialize_image_upload', 'gpc:write'),
+  tool('GET', '/api/v1/media/uploads/{id}', 'gpc_get_image_upload', 'gpc:read'),
+  tool('POST', '/api/v1/media/uploads/{id}/content', 'gpc_upload_image_content', 'gpc:write'),
+  tool('DELETE', '/api/v1/media/uploads/{id}', 'gpc_cancel_image_upload', 'gpc:write'),
+  excluded(
+    'POST',
+    '/api/v1/media/uploads/{id}/bytes',
+    'Binary transport; equivalent bounded JSON content operation is exposed',
+  ),
+  excluded(
+    'GET',
+    '/media/{token}/{variant}',
+    'Public immutable image delivery; authorized discovery through media and parent reads',
+  ),
+  excluded('GET', '/api/v1/admin/media', 'Instance administration'),
+  excluded('DELETE', '/api/v1/admin/media/{id}', 'Instance administration'),
+  excluded('PATCH', '/api/v1/admin/media/users/{id}', 'Instance administration'),
   excluded('GET', '/.well-known/oauth-protected-resource/mcp', 'OAuth discovery infrastructure'),
   excluded('GET', '/.well-known/oauth-authorization-server', 'OAuth discovery infrastructure'),
   excluded('POST', '/oauth/token', 'OAuth token infrastructure'),

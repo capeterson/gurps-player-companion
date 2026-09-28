@@ -22,6 +22,7 @@ import {
   TEMP_STAT_AXES,
   type TempStatAxis,
 } from '../../../shared/schemas/character.ts';
+import { MediaImage } from '../../components/MediaImage.tsx';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
@@ -606,6 +607,13 @@ function IdentityPanel({
   return (
     <section className="card p-5 space-y-3">
       <p className="label-eyebrow">Identity</p>
+      <MediaImage
+        targetType="character"
+        targetId={character.id}
+        assetId={character.portraitAssetId}
+        name={character.name}
+        editable={canWrite}
+      />
       {canWrite ? (
         <input
           aria-label="character name"
@@ -1574,6 +1582,7 @@ export function CharacterSheetPage() {
           // allow string|null).  Same coercion applies to the rest.
           campaignId: character.campaignId ?? null,
           name: character.name,
+          portraitAssetId: character.portraitAssetId ?? null,
           height: character.height ?? null,
           weight: character.weight ?? null,
           age: character.age ?? null,

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { expect, it, vi } from 'vitest';
 import { type CampaignOut, campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import { api } from '../../lib/api.ts';
+import { ToastProvider } from '../../lib/toast.tsx';
 import { CampaignsPage } from './CampaignsPage.tsx';
 
 vi.mock('../../lib/api.ts', async (original) => ({
@@ -39,9 +40,11 @@ it('lists real campaign information without implying cover-image support', async
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <CampaignsPage />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter>
+          <CampaignsPage />
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 

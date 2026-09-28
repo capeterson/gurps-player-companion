@@ -4,6 +4,7 @@ import type {
 } from '../../shared/schemas/activeEffects.ts';
 import type { PricingResolution } from '../../shared/schemas/calculation.ts';
 import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
+import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -66,6 +67,7 @@ import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaig
  * verbatim.  Numbers are stored as numbers; ISO strings remain strings.
  */
 export interface LocalCharacter {
+  portraitAssetId?: string | null | undefined;
   id: string;
   ownerId: string;
   campaignId: string | null;
@@ -243,6 +245,7 @@ export interface LocalCharacterCombat {
 }
 
 export interface LocalCampaign {
+  coverAssetId?: string | null | undefined;
   activeEffectDefinitions?: ActiveEffectDefinitionOut[];
   id: string;
   name: string;
@@ -346,6 +349,8 @@ export interface LocalCampaignTransferUndo {
 }
 
 export interface OutboxEntry {
+  localMediaUploadId?: string | undefined;
+  localMediaReady?: boolean | undefined;
   /** Create was queued under an optimistic campaign; wait for assignment settlement. Never sent. */
   localWaitForCampaignAssignment?: boolean;
   /** Legacy ordering lacked sufficient evidence. Retain until explicitly resolved. Never sent. */
@@ -572,7 +577,25 @@ export function migrateLegacyTempScalarsRow(row: Record<string, unknown>): void 
   }
 }
 
+export interface LocalMediaUpload {
+  id: string;
+  userId: string;
+  targetType: MediaTarget;
+  targetId: string;
+  blob: Blob;
+  byteLength: number;
+  sha256: string;
+  assetId?: string;
+  state: 'queued' | 'uploading' | 'ready' | 'failed';
+  reason?: string;
+  retryAt?: number;
+  attempts: number;
+  createdAt: string;
+}
+
 class LocalDb extends Dexie {
+  mediaUploads!: Table<LocalMediaUpload, string>;
+  mediaManifests!: Table<MediaManifest, string>;
   characters!: Table<LocalCharacter, string>;
   characterTraits!: Table<LocalCharacterTrait, string>;
   characterSkills!: Table<LocalCharacterSkill, string>;
@@ -603,6 +626,7 @@ class LocalDb extends Dexie {
 
   constructor() {
     super('gurps-pc-local');
+    this.version(14).stores({ mediaUploads: 'id, userId, targetId, state', mediaManifests: 'id' });
     this.version(1).stores({
       characters: 'id, ownerId, campaignId, updatedAt, revision',
       characterTraits: 'id, characterId, [characterId+kind], updatedAt, revision',
@@ -809,6 +833,8 @@ export const LIBRARY_STORE_NAMES = [
 
 /** All store names — handy for transactions that touch every table. */
 export const ALL_STORE_NAMES = [
+  'mediaUploads',
+  'mediaManifests',
   'characters',
   'characterTraits',
   'characterSkills',

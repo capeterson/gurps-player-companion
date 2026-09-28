@@ -703,3 +703,13 @@ Language/technique/style editors use the same whole-entry outbox
 validation as the other categories, disable edits while a submit is pending, and
 preserve commas inside newline-separated style component names. Styles remain
 reference packages: players learn constituent entries individually.
+
+## Image visibility
+
+A character portrait is part of the minimal campaign-member projection, including
+list and cursor reads when full-sheet sharing is disabled. Cover manifests are
+available to campaign readers. Portrait changes require character write permission;
+cover changes require campaign ownership. These checks control discovery and
+editing: published image URLs themselves grant public access and use long-lived
+public caching. Leaving a campaign does not revoke a previously learned image
+URL or cached copy. See [media-uploads.md](media-uploads.md).

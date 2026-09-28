@@ -138,6 +138,7 @@ export const users = pgTable(
     authVersion: integer('auth_version').notNull().default(0),
     displayName: varchar('display_name', { length: 80 }).notNull(),
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    mediaUploadsDisabled: boolean('media_uploads_disabled').notNull().default(false),
     /**
      * Instance-admin gate.  Set ONLY by direct DB edit; the admin router
      * is the only consumer.  Never exposed via the public auth/me payload.
@@ -446,6 +447,7 @@ export const campaigns = pgTable(
     id: id(),
     name: varchar('name', { length: 120 }).notNull(),
     description: text('description'),
+    coverAssetId: uuid('cover_asset_id'),
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
@@ -587,6 +589,7 @@ export const characters = pgTable(
     /** Free-form birthdate text (migration 0029). Non-mechanical metadata. */
     birthdate: varchar('birthdate', { length: 40 }),
     appearance: text('appearance'),
+    portraitAssetId: uuid('portrait_asset_id'),
 
     st: smallint('st').notNull().default(10),
     dx: smallint('dx').notNull().default(10),
@@ -1625,3 +1628,43 @@ export const campaignLibraryModifiers = pgTable(
     ),
   }),
 );
+
+// Upload bookkeeping is infrastructure, not a cursor entity. Attachments are
+// audited on their parent character/campaign; bytes only live in object storage.
+export const mediaAssets = pgTable(
+  'media_assets',
+  {
+    id: id(),
+    uploaderId: uuid('uploader_id').references(() => users.id, { onDelete: 'set null' }),
+    clientUploadId: uuid('client_upload_id').notNull(),
+    targetType: varchar('target_type', { length: 16 }).$type<'character' | 'campaign'>().notNull(),
+    targetId: uuid('target_id').notNull(),
+    inputBytes: integer('input_bytes').notNull(),
+    sha256: varchar('sha256', { length: 64 }).notNull(),
+    token: varchar('token', { length: 64 }).notNull(),
+    state: varchar('state', { length: 16 })
+      .$type<'pending' | 'processing' | 'ready' | 'cancelled' | 'deleting' | 'rejected'>()
+      .notNull()
+      .default('pending'),
+    objectPrefix: text('object_prefix'),
+    thumbBytes: integer('thumb_bytes').notNull().default(0),
+    displayBytes: integer('display_bytes').notNull().default(0),
+    width: integer('width'),
+    height: integer('height'),
+    reason: text('reason'),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    detachedAt: timestamp('detached_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    retry: uniqueIndex('media_assets_retry').on(t.uploaderId, t.clientUploadId),
+    token: uniqueIndex('media_assets_token').on(t.token),
+  }),
+);
+
+export const mediaCounters = pgTable('media_counters', {
+  key: text('key').primaryKey(),
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+});

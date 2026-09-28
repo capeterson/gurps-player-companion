@@ -20,6 +20,7 @@ function readRoute(rel: string): string {
 }
 
 const MUTATING_ROUTE_FILES = [
+  'src/server/routes/media.ts',
   'src/server/services/syncDispatch.ts',
   'src/server/routes/campaigns.ts',
   'src/server/routes/adventureLog.ts',

@@ -24,6 +24,7 @@ import { assertAttributeCaps, touchesAttributeCaps } from '../services/attribute
 import { resolveCharacterView } from '../services/characterAccess.ts';
 import { loadCharacterDetail } from '../services/characterSummary.ts';
 import { characterInsertValues } from '../services/entityWrites.ts';
+import { prepareMediaAttachment } from '../services/media/service.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { decideCharacterAccess } from './sync.ts';
@@ -60,6 +61,7 @@ async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
     age: c.age,
     birthdate: c.birthdate,
     appearance: c.appearance,
+    portraitAssetId: c.portraitAssetId,
     techLevel,
     updatedAt: c.updatedAt.toISOString(),
   };
@@ -101,6 +103,7 @@ router.openapi(
         ownerId: characters.ownerId,
         campaignId: characters.campaignId,
         name: characters.name,
+        portraitAssetId: characters.portraitAssetId,
         st: characters.st,
         dx: characters.dx,
         iq: characters.iq,
@@ -276,6 +279,11 @@ router.openapi(
     }
     const updates = buildPatchSet(body);
     await withAudit(user.id, undefined, async (tx) => {
+      await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.id, id))
+        .for('update');
       await prepareActiveEffects(
         tx,
         user.id,
@@ -283,6 +291,7 @@ router.openapi(
         body.campaignId === undefined ? access.character.campaignId : body.campaignId,
         updates,
       );
+      await prepareMediaAttachment(tx, 'character', id, updates);
       await detachLibraryReferencesForTransfer(tx, id, updates);
       await tx.update(characters).set(updates).where(eq(characters.id, id));
     });

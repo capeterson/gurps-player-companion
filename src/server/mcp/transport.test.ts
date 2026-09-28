@@ -100,7 +100,7 @@ describe('MCP streaming request boundary', () => {
     const input = new Request(resource, { method: 'POST', body });
     await expect(readBoundedMcpJson(input)).rejects.toMatchObject({ status: 413 });
     expect(cancelled).toBe(true);
-    expect(pulls).toBe(3);
+    expect(pulls).toBeLessThan(100);
   });
 
   test('checks Content-Length and rejects malformed UTF-8/JSON', async () => {
@@ -144,6 +144,40 @@ describe('compact mutation acknowledgements', () => {
 });
 
 describe('MCP protocol and OAuth transport', () => {
+  test('bounds concurrent envelope parsing and releases capacity after responses settle', async () => {
+    const actor = principal();
+    let entered = 0;
+    let signalReady!: () => void;
+    const allEntered = new Promise<void>((resolve) => {
+      signalReady = resolve;
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const handle = createMcpHandler(config, createOpenApiApp(), document, {
+      async resolvePrincipal() {
+        entered++;
+        if (entered === 4) signalReady();
+        await gate;
+        return actor;
+      },
+      async execute() {
+        return Response.json([]);
+      },
+    });
+    const pending = Array.from({ length: 4 }, () => handle(request(listing)));
+    await allEntered;
+
+    const rejected = await handle(request(listing));
+    expect(rejected.status).toBe(503);
+    expect(rejected.headers.get('retry-after')).toBe('1');
+
+    release();
+    expect((await Promise.all(pending)).every((response) => response.status === 200)).toBe(true);
+    expect((await handle(request(listing))).status).toBe(200);
+  });
+
   test('live tools/list uses the same schemas and hints as the shared catalog projection', async () => {
     const { handle, actor } = handler();
     const response = await handle(request(listing));

@@ -281,3 +281,13 @@ Adventure-log point awards share one server-generated audit batch across the ent
 and recipient character updates. Character history labels `earned_points` as Earned
 points; log entries retain concrete recipient snapshots. Editing or deleting an award
 records the corresponding point credit adjustment through the existing triggers.
+
+## Image references
+
+Portrait/cover replacement and removal update parent UUID fields through
+`withAudit`, so existing character/campaign history and revision triggers record
+the action. Summaries name the portrait or cover; bytes, source names and public
+URL tokens are not stored in parent history. Media asset/counter rows are internal
+upload infrastructure rather than new syncable entity classes. Detached images
+have bounded retention, so old history references are not a permanent photo
+archive. See [media-uploads.md](media-uploads.md).

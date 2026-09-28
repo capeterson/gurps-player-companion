@@ -6,6 +6,7 @@ import { type CampaignOut, campaignHouseRules } from '../../../shared/schemas/ca
 import { characterCreate } from '../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { api } from '../../lib/api.ts';
+import { ToastProvider } from '../../lib/toast.tsx';
 import { GmCampaignDashboardPage } from './GmCampaignDashboardPage.tsx';
 
 vi.mock('../../lib/api.ts', async (original) => ({
@@ -62,11 +63,13 @@ it('settles the GM party query without repeatedly rewriting its campaign mirror'
   });
   const { unmount } = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/campaigns/${campaign.id}/gm`]}>
-        <Routes>
-          <Route path="/campaigns/:id/gm" element={<GmCampaignDashboardPage />} />
-        </Routes>
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[`/campaigns/${campaign.id}/gm`]}>
+          <Routes>
+            <Route path="/campaigns/:id/gm" element={<GmCampaignDashboardPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
   try {

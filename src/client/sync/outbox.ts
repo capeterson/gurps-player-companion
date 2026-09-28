@@ -73,6 +73,7 @@ function wasGeneratedByBrokenUuidFallback(value: string | undefined): value is s
 }
 
 export interface EnqueueFieldPatchArgs {
+  readonly localMediaUploadId?: string;
   /** Internal retry metadata; never part of the wire value. */
   readonly localCampaignTransferUndo?: OutboxEntry['localCampaignTransferUndo'];
   /** Internal stale-base replay retains the current assignment generation. */
@@ -139,6 +140,8 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
     };
   }
   const db = getLocalDb();
+  if (args.entityClass === 'campaign' && args.fieldPath !== 'coverAssetId')
+    throw new Error('Only campaign cover images use the outbox');
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = await nextPatchTime(args.entityId);
   // 1. Find any pending/transient_retry op(s) for the same field so we
@@ -270,6 +273,8 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
     nextEarliestAttemptAt: args.nextEarliestAttemptAt,
     predecessorClientOpId,
     localCampaignTransferUndo,
+    localMediaUploadId: args.localMediaUploadId,
+    localMediaReady: false,
   };
   await db.outbox.add(op);
 }
@@ -432,6 +437,7 @@ function parentIdFor(
  * campaigns are cursor-only, so neither has a field-patch base here.
  */
 const FIELD_PATCH_CLASSES: ReadonlySet<EntityClass> = new Set([
+  'campaign',
   'character',
   'character_trait',
   'character_skill',
@@ -859,6 +865,7 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       libraryCampaignId = op.localRequiredCampaignId ?? campaignsByCharacter.get(op.parentId);
     }
     const dependencyHeld =
+      Boolean(op.localMediaUploadId && !op.localMediaReady) ||
       (libraryWrites.length > 0 && libraryDependencyHeld(op, libraryWrites, libraryCampaignId)) ||
       mixedPatchHeld ||
       (op.predecessorClientOpId !== undefined &&

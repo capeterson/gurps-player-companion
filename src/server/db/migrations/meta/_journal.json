@@ -414,6 +414,13 @@
       "when": 1800013000000,
       "tag": "0058_structured_weapon_range",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1800014000000,
+      "tag": "0059_media_uploads",
+      "breakpoints": true
     }
   ]
 }

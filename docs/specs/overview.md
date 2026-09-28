@@ -43,6 +43,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
 | [library-calculation-rules.md](library-calculation-rules.md) | Declarative pricing, source editions, completeness, snapshots, modifiers and item modes. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
+| [media-uploads.md](media-uploads.md) | Portraits, campaign covers, S3-compatible storage, public immutable caching and queued offline uploads. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
 | [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
@@ -54,6 +55,24 @@ checklists for extending sync/history) live in
 "Maintaining these docs" below.
 
 ---
+
+## Portraits and campaign covers
+
+With object storage configured in production (or automatic local storage in
+development/test), character editors can add portraits and campaign owners can
+add covers. Selections and replacements queue locally,
+including offline, and sync independently of text edits. Portraits also appear
+in minimal campaign views. Images are sanitized into two WebP sizes and served
+through public, unguessable, immutable URLs; browser caches may retain them after
+logout or removal. See [media-uploads.md](media-uploads.md) for access, limits and
+recovery, and [../media-storage.md](../media-storage.md) for Garage/Unraid setup.
+
+The subsystem lives in `src/server/services/media/`, `src/server/routes/media.ts`,
+`src/shared/schemas/media.ts`, `src/client/components/MediaImage.tsx`, and
+`src/client/sync/mediaUploads.ts` / `mediaRecovery.ts`. `/admin/media` is in the
+separate admin entry. `docker-compose.media.yml` adds optional Garage storage.
+Development/CI can use `services/media/localStorage.ts` without Garage; production
+rejects the filesystem backend. See the storage guide for environment selection.
 
 ## Delegated agent access
 
@@ -1218,7 +1237,7 @@ Things that repeatedly surprise people working in this repo:
    `character_combat`) and all eleven `campaign_library_*` classes flow through
    the outbox; library edits are whole-entry patches (`AGENTS.md` S13) and the
    library YAML import is the one online-only library action. Campaigns
-   are pulled **read-only** into Dexie; the adventure log, invitations, and
+   are pulled into Dexie and only `coverAssetId` writes use the outbox; the adventure log, invitations, and
    notifications are still **online-only** React-Query/HTTP surfaces. The `entityClass` enum lists more than the orchestrator pulls —
    that's headroom, not coverage. The authoritative list is `ALL_ENTITY_CLASSES`
    in `src/client/sync/orchestrator.ts`. Confirm before assuming offline

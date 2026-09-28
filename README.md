@@ -28,6 +28,7 @@ Build out attributes, advantages, disadvantages, quirks, skills, techniques, lan
 - **Skills with room for your campaign.** Specializations, defaults, prerequisites, contextual modifiers, and authored skill actions keep the relevant rules beside the roll.
 - **Magic with resources attached.** Track spell costs and maintenance, allocate casting energy, and manage powerstones and magic items.
 - **Equipment that matters.** Organize nested containers with drag-and-drop, filter your pack, and track weight, cost, encumbrance, weapon modes, armor, and mechanical enchantments.
+- **Portraits and campaign covers.** With optional object storage enabled, choose images online or offline; uploads queue on your device. Images use public links and persistent browser caching.
 - **Notes and a change history.** Keep character notes in a rich text or Markdown editor and review saved changes in the History tab.
 
 ![Desktop inventory with equipped weapons, worn armor, and supplies organized in a nested trail pack.](public/screenshots/inventory-desktop.png)
@@ -179,3 +180,15 @@ against the running dev app; set `PLAYWRIGHT_BASE_URL` to the URL printed by
 `info` and see [playwright.config.ts](playwright.config.ts).
 
 Start with the [application overview](docs/specs/overview.md) and [contribution rules](AGENTS.md) before changing code. Detailed implementation notes live in the [architecture](docs/specs/architecture.md), [offline sync](docs/specs/offline-sync.md), [campaign sharing](docs/specs/campaign-content-sharing.md), and [history](docs/specs/history-tracking.md) guides.
+
+### Optional photo storage
+
+Use S3-compatible object storage for character portraits and campaign covers.
+The [storage guide](docs/media-storage.md) includes a Garage-on-Unraid Compose
+overlay using your existing disks, provider configuration, quotas and off-host
+backup/restore procedures. Every app replica shares the bucket; image bytes never
+live in PostgreSQL or a production app-server directory. Development and tests
+automatically use ignored local storage when S3 is unconfigured; production
+rejects that backend. Public immutable URLs
+use native browser caching and bounded service-worker caches for offline viewing.
+Queued sources can be exported from the sync log before clearing local data.

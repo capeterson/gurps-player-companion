@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'bun:test';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { LibraryTraitEffect, TraitEffect } from '../../shared/schemas/effects.ts';
 import type { HistoryEventOut } from '../../shared/schemas/history.ts';
@@ -10,12 +11,40 @@ import type { AppConfig } from '../config.ts';
 import { closeDb, getDb, runInDbTransaction } from '../db/client.ts';
 import { oauthClients, oauthGrants } from '../db/schema.ts';
 import type { OAuthPrincipal } from '../oauth/service.ts';
+import type { MediaStorage } from '../services/media/storage.ts';
+import { setMediaStorageForTests } from '../services/media/storage.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { executeOperation } from './executor.ts';
 import { TOOLS } from './operationManifest.ts';
 import { createMcpHandler, mutationAcknowledgement } from './transport.ts';
 
 configureIntegrationTestEnvironment();
+process.env.MEDIA_S3_BUCKET = 'mcp-media-test';
+process.env.MEDIA_S3_ACCESS_KEY = 'mcp-media-access';
+process.env.MEDIA_S3_SECRET_KEY = 'mcp-media-secret';
+process.env.MEDIA_UPLOADS_ENABLED = 'true';
+
+const mediaObjects = new Map<string, Uint8Array>();
+const testMediaStorage: MediaStorage = {
+  async put(key, bytes) {
+    mediaObjects.set(key, Uint8Array.from(bytes));
+  },
+  async get(key) {
+    const bytes = mediaObjects.get(key);
+    if (!bytes) throw new Error('media test object missing');
+    return bytes;
+  },
+  async head(key) {
+    return mediaObjects.get(key)?.length ?? 0;
+  },
+  async remove(key) {
+    mediaObjects.delete(key);
+  },
+  async list(prefix) {
+    return { keys: [...mediaObjects.keys()].filter((key) => key.startsWith(prefix)) };
+  },
+};
+setMediaStorageForTests(testMediaStorage);
 
 const config: AppConfig = {
   ...integrationTestConfig,
@@ -323,7 +352,10 @@ function path(id: string, extra: Record<string, string> = {}) {
 }
 
 describe('delegated operation behavioral parity', () => {
-  afterAll(closeDb);
+  afterAll(() => {
+    setMediaStorageForTests(undefined);
+    closeDb();
+  });
 
   it('executes a successful behavioral fixture through the SDK and shared handler for every tool', async () => {
     const suffix = randomUUID();
@@ -340,6 +372,8 @@ describe('delegated operation behavioral parity', () => {
     const owner = await registerActor('owner', client.id);
     const member = await registerActor('member', client.id);
 
+    const mediaCapabilities = await call<{ enabled: boolean }>(owner, 'gpc_get_media_capabilities');
+    expect(mediaCapabilities.body.enabled).toBe(true);
     await call(owner, 'gpc_get_current_user');
     await call(owner, 'gpc_list_campaigns');
     const campaign = (
@@ -652,6 +686,62 @@ describe('delegated operation behavioral parity', () => {
     });
     expect(filteredCharacters.body).toEqual([expect.objectContaining({ id: characterId })]);
     await call(owner, 'gpc_get_character', path(characterId));
+    const mediaBytes = await sharp({
+      create: { width: 24, height: 16, channels: 3, background: { r: 75, g: 120, b: 165 } },
+    })
+      .png()
+      .toBuffer();
+    const mediaDeclaration = {
+      clientUploadId: randomUUID(),
+      targetType: 'character',
+      targetId: characterId,
+      byteLength: mediaBytes.length,
+      sha256: createHash('sha256').update(mediaBytes).digest('hex'),
+    };
+    const mediaReservation = await call<{ id: string; state: string }>(
+      owner,
+      'gpc_initialize_image_upload',
+      {
+        body: mediaDeclaration,
+      },
+    );
+    expect(mediaReservation.body.state).toBe('pending');
+    const mediaStatus = await call<{ id: string; state: string }>(
+      owner,
+      'gpc_get_image_upload',
+      path(mediaReservation.body.id),
+    );
+    expect(mediaStatus.body.state).toBe('pending');
+    const mediaReady = await call<{ id: string; state: string; thumbUrl: string | null }>(
+      owner,
+      'gpc_upload_image_content',
+      {
+        ...path(mediaReservation.body.id),
+        body: { base64: mediaBytes.toString('base64') },
+      },
+    );
+    expect(mediaReady.body.state).toBe('ready');
+    expect(mediaReady.body.thumbUrl).not.toBeNull();
+    await call(owner, 'gpc_update_character', {
+      ...path(characterId),
+      body: { portraitAssetId: mediaReady.body.id },
+    });
+    const cancelledReservation = await call<{ id: string; state: string }>(
+      owner,
+      'gpc_initialize_image_upload',
+      {
+        body: {
+          ...mediaDeclaration,
+          clientUploadId: randomUUID(),
+        },
+      },
+    );
+    const cancelled = await call<{ state: string }>(
+      owner,
+      'gpc_cancel_image_upload',
+      path(cancelledReservation.body.id),
+    );
+    expect(cancelled.body.state).toBe('cancelled');
     await call(owner, 'gpc_update_character', {
       ...path(characterId),
       body: { st: 11 },

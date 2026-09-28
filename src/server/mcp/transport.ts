@@ -13,7 +13,9 @@ import type { AppEnv } from '../openapi/app.ts';
 import { type RuntimeTool, buildToolCatalog } from './catalog.ts';
 import { type OperationInput, executeOperation } from './executor.ts';
 
-export const MAX_MCP_BODY_BYTES = 1024 * 1024;
+export const MAX_MCP_BODY_BYTES = 14 * 1024 * 1024;
+// Larger image envelopes need a process-wide bound, not only per-user rates.
+let activeMcpRequests = 0;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 120;
 const rate = new Map<string, { startedAt: number; count: number }>();
@@ -205,7 +207,7 @@ export function createMcpHandler(
   const tools = buildToolCatalog(openApiDocument, app.openAPIRegistry.definitions);
   const byName = new Map(tools.map((entry) => [entry.policy.tool, entry]));
 
-  return async (request, routeParsedBody) => {
+  const handle = async (request: Request, routeParsedBody?: unknown): Promise<Response> => {
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(resource).origin && !config.corsOrigins.includes(origin)) {
       return json({ error: 'invalid_origin' }, 403);
@@ -392,6 +394,16 @@ export function createMcpHandler(
       );
     } finally {
       await server.close();
+    }
+  };
+  return async (request, parsedBody) => {
+    if (activeMcpRequests >= 4)
+      return json({ error: 'temporarily_unavailable' }, 503, { 'retry-after': '1' });
+    activeMcpRequests++;
+    try {
+      return await handle(request, parsedBody);
+    } finally {
+      activeMcpRequests--;
     }
   };
 }

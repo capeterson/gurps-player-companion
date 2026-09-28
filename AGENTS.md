@@ -30,6 +30,7 @@ requirement — not optional documentation.**
   - `campaign-content-sharing.md` — roles, invitations, the share gate /
     minimal view, and the YAML library.
   - `history-tracking.md` — the append-only audit log.
+  - `media-uploads.md` — portraits, campaign covers, object storage, public caching and offline uploads.
   - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
   - `library-calculation-rules.md` — source editions, bounded declarative pricing, completeness, purchase snapshots and weapon modes.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
@@ -225,9 +226,9 @@ upsert/prune of up to 20 MB that stays an online-only REST call, followed by a
 cursor pull. (Broken once: the library shipped as an online-only React Query
 surface, so it was laggy, unavailable offline and outside the outbox.)
 
-Campaigns are pulled READ-ONLY through `/sync/cursor` (so the minimal-view
-sweep and offline campaign-name lookups have local rows to work with) but
-have no outbox path. Campaign settings/membership mutations, adventure log
+Campaigns are pulled through `/sync/cursor` for minimal-view sweeps and offline
+lookups. Their `coverAssetId` field is the sole campaign outbox mutation; all
+other campaign settings/membership mutations, adventure log
 entries, invitations, and notifications are still online-only
 HTTP/React-Query surfaces. The `entityClass` enum may list values the
 orchestrator does not pull; that is headroom, not a claim of coverage. The

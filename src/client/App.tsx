@@ -8,6 +8,7 @@ import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppIcon } from './components/ui/AppIcon.tsx';
 import { BrandMark } from './components/ui/BrandMark.tsx';
 import { clearAllTableFilters } from './components/ui/Table.tsx';
+import { getLocalDb } from './db/dexie.ts';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
@@ -98,6 +99,13 @@ export function App() {
   }, []);
 
   async function signOut() {
+    if (
+      (await getLocalDb().mediaUploads.count()) > 0 &&
+      !window.confirm(
+        'Signing out discards unsaved image files on this device. Cancel to sync them or export them from the sync log first. Sign out and discard them?',
+      )
+    )
+      return;
     const tokens = tokenStore.read();
     if (tokens) {
       // Best-effort: revoke the refresh token server-side so it can't be reused.

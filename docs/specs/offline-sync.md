@@ -8,9 +8,10 @@ README — this spec is the descriptive companion; read both.
 
 ## Service-worker boundary
 
-The service worker owns only the app-shell precache and navigation fallback; it
+The service worker owns the app-shell precache, navigation fallback and bounded
+CacheFirst caches for public immutable image variants (see [media-uploads.md](media-uploads.md)); it
 does not cache authenticated API data or replay the outbox. Its navigation
-fallback excludes `/api/*`, `/admin/*`, `/mcp`, `/.well-known/*`, and OAuth
+fallback excludes `/api/*`, `/admin/*`, `/media/*`, `/mcp`, `/.well-known/*`, and OAuth
 protocol endpoints so those requests always reach the Bun server. The mutable
 `sw.js`, registration bootstrap, manifest, HTML shells, and unversioned app-icon
 files are served with browser/CDN `no-store` headers, while content-hashed assets
@@ -36,11 +37,11 @@ campaign_library_active_effect  campaign_library_source  campaign_library_modifi
 
 Everything else is either read-only in the local store or fully online:
 
-- **Campaigns** are pulled **READ-ONLY** through `/sync/cursor` (rows land in
+- **Campaigns** are pulled through `/sync/cursor` (rows land in
   Dexie so the minimal-view sweep can evaluate `shareCharacterSheets` and
   character inputs can resolve campaign names and the default-on
-  `enforceAttributeCaps` rule offline) but have **no outbox path** — campaign
-  *mutations* go through REST.
+  `enforceAttributeCaps` rule offline). Only `coverAssetId` mutations go through
+  the outbox; other campaign settings and membership writes still use REST.
 - **Online-only** (HTTP + React Query, no offline support): adventure log,
   invitations, notifications, settings, admin, and the library **YAML
   import** (see [Campaign library](#campaign-library)).
@@ -891,3 +892,16 @@ route. Token changes are observed while the gate is closed; they no longer leave
 an unauthenticated first load on an indefinite spinner. The gate does not clear
 local data or change cursor/outbox recovery; previously bootstrapped offline views
 continue to render normally.
+
+## Image upload dependencies
+
+`mediaUploads` stores pending original Blobs and `mediaManifests` stores authorized
+URL metadata (Dexie v14). Downloaded image bodies use browser/Workbox caches, not
+Dexie. Selecting an image atomically queues a parent reference patch and source;
+`localMediaUploadId`/`localMediaReady` hold that operation until the separate media
+drain has uploaded/processed the source. Other fields keep syncing. Failed source
+bytes survive rejection for retry/export/discard and successful sources are removed
+only after attachment acknowledgement. Logout/resync abort media work before
+purging both account stores; public image caches deliberately survive. The sync
+log provides an explicit source export separate from shareable debug data. Full
+lifecycle, access and cache semantics are in [media-uploads.md](media-uploads.md).

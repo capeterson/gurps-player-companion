@@ -60,6 +60,10 @@ export async function executeOperation(
   });
   attachTrustedExecution(request, context);
   return runWithTrustedExecution(context, async () => {
+    // Uploads are a resumable multi-stage operation. Their audited reservations
+    // and leases must commit before object I/O, just as on the raw API path.
+    // No image bytes or storage requests belong in one outer DB transaction.
+    if (operation.path.startsWith('/api/v1/media/')) return Promise.resolve(app.fetch(request));
     try {
       return await runInDbTransaction(async () => {
         // PostgreSQL cancels the transaction itself at the execution deadline;

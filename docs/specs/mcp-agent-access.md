@@ -133,7 +133,7 @@ validated before projection.
 The complete generated input/output catalog has a regression budget of 550 KB;
 the current bounded calculator, source, and modifier contracts account for
 about 535 KB. Compact mutation acknowledgements remain independently capped at
-2 KB per tool and aggregate read outputs at 250 KB, so future schema growth
+2 KB per tool and aggregate outputs at 260 KB, so future schema growth
 must remain bounded and avoid duplicating shared definitions.
 Keep stable tool names; descriptions explain field meaning and effects. Successful
 calls keep the authoritative payload only in `structuredContent`; their text
@@ -204,7 +204,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 94 player-domain tools and gives each excluded
+method/path. It exposes 105 player-domain tools and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -215,7 +215,7 @@ executor. A private Request object-identity capability supplies the validated
 actor; no external header can forge it, and OAuth bearer tokens are rejected by
 `/api/v1/*`. The ambient context supplies OAuth client and grant IDs to
 `withAudit`, so history distinguishes direct edits from `Player via Client`.
-Mutation idempotency wraps the shared handler in an outer transaction, persists
+Except for staged media uploads, mutation idempotency wraps the shared handler in an outer transaction, persists
 its response for 24 hours, and rejects key reuse with changed input or authority.
 After a successful non-GET response passes the canonical OpenAPI and original
 Zod validators, the MCP adapter projects it to the compact mutation
@@ -404,3 +404,19 @@ a fixed-yard Max and optional 1/2D/minimum, or an ST multiplier with an explicit
 wielder/weapon strength source. Legacy notation is retained for repair after
 migration; the roll path does not parse it. MCP tool schemas and the checked-in catalog are generated from the
 same route schemas; old free-text Range writes are rejected.
+
+## Image upload tools
+
+Five shared-handler tools cover media capabilities, initialization, status,
+base64 content submission and cancellation. Normal character/campaign patch
+tools attach ready `portraitAssetId`/`coverAssetId` values, with the same scoped
+attachment guard as sync. Binary upload is explicitly excluded because the JSON
+equivalent supports MCP; public image delivery and admin moderation are exact
+transport/admin exclusions. Media owns short transactions and durable upload-key
+idempotency so reservations commit before storage I/O, avoiding the generic
+response journal’s outer transaction and duplicate request-body buffering. Delegated execution retains the trusted
+authority and audit context without an outer transaction around object I/O.
+The authenticated MCP envelope is bounded at 14 MiB to fit a 10 MiB base64 input;
+server image limits still apply and four in-flight requests per process bound
+aggregate envelope memory. Mutation acknowledgements stay compact, so read
+status to obtain the asset manifest. Full lifecycle: [media-uploads.md](media-uploads.md).

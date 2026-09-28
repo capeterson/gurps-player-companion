@@ -2,6 +2,116 @@
   "protocolVersion": "2025-11-25",
   "operations": [
     {
+      "kind": "tool",
+      "method": "GET",
+      "path": "/api/v1/media/capabilities",
+      "tool": "gpc_get_media_capabilities",
+      "scope": "gpc:read",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/media/uploads",
+      "tool": "gpc_initialize_image_upload",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "tool",
+      "method": "GET",
+      "path": "/api/v1/media/uploads/{id}",
+      "tool": "gpc_get_image_upload",
+      "scope": "gpc:read",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/media/uploads/{id}/content",
+      "tool": "gpc_upload_image_content",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "tool",
+      "method": "DELETE",
+      "path": "/api/v1/media/uploads/{id}",
+      "tool": "gpc_cancel_image_upload",
+      "scope": "gpc:write",
+      "destructive": true,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "excluded",
+      "method": "POST",
+      "path": "/api/v1/media/uploads/{id}/bytes",
+      "reason": "Binary transport; equivalent bounded JSON content operation is exposed"
+    },
+    {
+      "kind": "excluded",
+      "method": "GET",
+      "path": "/media/{token}/{variant}",
+      "reason": "Public immutable image delivery; authorized discovery through media and parent reads"
+    },
+    {
+      "kind": "excluded",
+      "method": "GET",
+      "path": "/api/v1/admin/media",
+      "reason": "Instance administration"
+    },
+    {
+      "kind": "excluded",
+      "method": "DELETE",
+      "path": "/api/v1/admin/media/{id}",
+      "reason": "Instance administration"
+    },
+    {
+      "kind": "excluded",
+      "method": "PATCH",
+      "path": "/api/v1/admin/media/users/{id}",
+      "reason": "Instance administration"
+    },
+    {
       "kind": "excluded",
       "method": "GET",
       "path": "/.well-known/oauth-protected-resource/mcp",
@@ -1858,6 +1968,794 @@
   ],
   "tools": [
     {
+      "name": "gpc_get_media_capabilities",
+      "description": "GET /api/v1/media/capabilities",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "const": 200
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "maxInputBytes": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "maxInputBytes"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:read",
+        "operation": "GET /api/v1/media/capabilities",
+        "resultMode": "canonical-read"
+      },
+      "operation": "GET /api/v1/media/capabilities",
+      "scope": "gpc:read",
+      "destructive": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "name": "gpc_initialize_image_upload",
+      "description": "POST /api/v1/media/uploads",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "object",
+            "properties": {
+              "clientUploadId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "targetType": {
+                "type": "string",
+                "enum": [
+                  "character",
+                  "campaign"
+                ]
+              },
+              "targetId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "byteLength": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10485760
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "clientUploadId",
+              "targetType",
+              "targetId",
+              "byteLength",
+              "sha256"
+            ],
+            "additionalProperties": false
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Stable mutation retry key. Reuse only with identical input."
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 299
+              },
+              "contentType": {
+                "const": "application/json"
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "acknowledged": {
+                    "const": true,
+                    "description": "The delegated mutation committed successfully."
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The most specific affected resource id, when one is available."
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The affected resource revision, when the REST result exposes one."
+                  }
+                },
+                "required": [
+                  "acknowledged"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:write",
+        "operation": "POST /api/v1/media/uploads",
+        "resultMode": "compact-mutation-ack"
+      },
+      "operation": "POST /api/v1/media/uploads",
+      "scope": "gpc:write",
+      "destructive": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "name": "gpc_get_image_upload",
+      "description": "GET /api/v1/media/uploads/{id}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "const": 200
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "processing",
+                      "ready",
+                      "cancelled",
+                      "deleting",
+                      "rejected"
+                    ]
+                  },
+                  "thumbUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "displayUrl": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "height": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "state",
+                  "thumbUrl",
+                  "displayUrl",
+                  "width",
+                  "height",
+                  "reason"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 403
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 404
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 422
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 429
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 503
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ],
+        "$defs": {
+          "ErrorBody": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:read",
+        "operation": "GET /api/v1/media/uploads/{id}",
+        "resultMode": "canonical-read"
+      },
+      "operation": "GET /api/v1/media/uploads/{id}",
+      "scope": "gpc:read",
+      "destructive": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "name": "gpc_upload_image_content",
+      "description": "POST /api/v1/media/uploads/{id}/content",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "body": {
+            "type": "object",
+            "properties": {
+              "base64": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 13981016,
+                "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+              }
+            },
+            "required": [
+              "base64"
+            ],
+            "additionalProperties": false
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Stable mutation retry key. Reuse only with identical input."
+          }
+        },
+        "required": [
+          "path",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 299
+              },
+              "contentType": {
+                "const": "application/json"
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "acknowledged": {
+                    "const": true,
+                    "description": "The delegated mutation committed successfully."
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The most specific affected resource id, when one is available."
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The affected resource revision, when the REST result exposes one."
+                  }
+                },
+                "required": [
+                  "acknowledged"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:write",
+        "operation": "POST /api/v1/media/uploads/{id}/content",
+        "resultMode": "compact-mutation-ack"
+      },
+      "operation": "POST /api/v1/media/uploads/{id}/content",
+      "scope": "gpc:write",
+      "destructive": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "name": "gpc_cancel_image_upload",
+      "description": "DELETE /api/v1/media/uploads/{id}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Stable mutation retry key. Reuse only with identical input."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 299
+              },
+              "contentType": {
+                "const": "application/json"
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "acknowledged": {
+                    "const": true,
+                    "description": "The delegated mutation committed successfully."
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The most specific affected resource id, when one is available."
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The affected resource revision, when the REST result exposes one."
+                  }
+                },
+                "required": [
+                  "acknowledged"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:write",
+        "operation": "DELETE /api/v1/media/uploads/{id}",
+        "resultMode": "compact-mutation-ack"
+      },
+      "operation": "DELETE /api/v1/media/uploads/{id}",
+      "scope": "gpc:write",
+      "destructive": true,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
       "name": "gpc_get_current_user",
       "description": "Return the authenticated user profile",
       "inputSchema": {
@@ -2085,6 +2983,17 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "coverAssetId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -2926,6 +3835,17 @@
               "body": {
                 "type": "object",
                 "properties": {
+                  "coverAssetId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "id": {
                     "type": "string",
                     "format": "uuid"
@@ -3480,6 +4400,17 @@
               },
               "experimentalTurnTracker": {
                 "type": "boolean"
+              },
+              "coverAssetId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           },
@@ -36576,6 +37507,17 @@
                 "items": {
                   "type": "object",
                   "properties": {
+                    "portraitAssetId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid"
@@ -37816,6 +38758,17 @@
                   {
                     "type": "object",
                     "properties": {
+                      "portraitAssetId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "capabilities": {
                         "type": "array",
                         "items": {
@@ -42410,6 +43363,17 @@
                   {
                     "type": "object",
                     "properties": {
+                      "portraitAssetId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "view": {
                         "type": "string",
                         "enum": [
@@ -45926,6 +46890,17 @@
                 },
                 "maxItems": 100,
                 "default": []
+              },
+              "portraitAssetId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             }
           },

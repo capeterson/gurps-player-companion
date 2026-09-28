@@ -1,3 +1,4 @@
+import { MediaPage } from './pages/MediaPage.tsx';
 /**
  * Admin app entry — separate Vite entrypoint at /admin.html that loads
  * only when an admin navigates to /admin/*.  Per AGENTS.md the admin
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
             element: <AdminLayout />,
             children: [
               { path: '/admin', element: <Navigate to="/admin/users" replace /> },
+              { path: '/admin/media', element: <MediaPage /> },
               { path: '/admin/users', element: <UsersPage /> },
               { path: '/admin/users/:id', element: <UserDetailPage /> },
               { path: '/admin/campaigns', element: <CampaignsPage /> },

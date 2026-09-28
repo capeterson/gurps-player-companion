@@ -149,6 +149,8 @@ async function runWithRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 export interface ApiOptions {
+  /** Binary upload body; mutually exclusive with JSON body. */
+  rawBody?: Blob;
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   headers?: Record<string, string>;
@@ -199,6 +201,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   const init: RequestInit = { method, headers };
   if (options.signal) init.signal = options.signal;
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
+  if (options.rawBody !== undefined) init.body = options.rawBody;
   const res = await fetch(`${API_ROOT}${path}`, init);
   if (
     options.authenticated !== false &&

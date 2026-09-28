@@ -76,6 +76,7 @@ import { normalizeWeaponData } from './weaponModes.ts';
  * strings + plain numbers.  The builder normalizes both.
  */
 export interface CharacterDetailInputCharacter {
+  portraitAssetId?: string | null | undefined;
   id: string;
   ownerId: string;
   campaignId: string | null;
@@ -902,6 +903,7 @@ export function buildCharacterDetail(
     age: character.age,
     birthdate: character.birthdate,
     appearance: character.appearance,
+    portraitAssetId: character.portraitAssetId ?? null,
     st: character.st,
     dx: character.dx,
     iq: character.iq,

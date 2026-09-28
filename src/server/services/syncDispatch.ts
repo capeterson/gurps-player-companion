@@ -1,5 +1,7 @@
+import { campaignMediaPatch } from '../../shared/schemas/media.ts';
 import { prepareActiveEffects } from './activeEffects.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
+import { prepareMediaAttachment } from './media/service.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
  *
@@ -102,6 +104,7 @@ const FIELD_VALIDATORS = {
   // patches dismissed warnings as a plain field through the outbox
   // (REST uses the dedicated /warnings/dismiss endpoint instead).
   character: characterSyncPatch,
+  campaign: campaignMediaPatch,
   character_trait: traitUpdate,
   character_skill: skillUpdate,
   character_spell: spellUpdate,
@@ -122,8 +125,8 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character_technique: Object.keys(techniqueUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
-  // Not exposed via /sync (campaign mutations are online-only REST).
-  campaign: null,
+  // Only the campaign cover is outbox-backed; other settings remain REST-only.
+  campaign: ['coverAssetId'],
   campaign_membership: null,
   // Library classes accept whole-entry patches only (AGENTS.md S13); their
   // body is validated by the entity's REST update schema in dispatchLibrary.
@@ -191,6 +194,7 @@ function loadChildParentAccess(
 /** Entity classes that have a write dispatcher below. */
 const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'character',
+  'campaign',
   'character_trait',
   'character_skill',
   'character_spell',
@@ -367,6 +371,14 @@ async function characterInvalidationRecipients(
   op: OperationEnvelope,
 ): Promise<Set<string>> {
   const recipients = new Set<string>([actorId]);
+  if (op.entityClass === 'campaign') {
+    try {
+      for (const id of await campaignRecipients(op.entityId)) recipients.add(id);
+    } catch {
+      // A failed post-commit nudge must not turn an applied cover edit into rejection.
+    }
+    return recipients;
+  }
   if (DISPATCHABLE_CLASSES.has(op.entityClass)) {
     try {
       const characterId = op.entityClass === 'character' ? op.entityId : requireParentId(op);
@@ -537,6 +549,23 @@ async function dispatchOperationInner(
   tx: AuditTx,
 ): Promise<OperationOutcome> {
   switch (op.entityClass) {
+    case 'campaign':
+      await requireCampaignOwner(op.entityId, ctx.userId);
+      if (op.command !== 'patch')
+        return {
+          clientOpId: op.clientOpId,
+          status: 'rejected',
+          reason: 'Only campaign cover patches are supported',
+        };
+      return patchEntity({
+        op,
+        userId: ctx.userId,
+        entityClass: 'campaign',
+        tx,
+        table: campaigns,
+        childWhere: () => eq(campaigns.id, op.entityId),
+        prepareUpdates: (updates) => prepareMediaAttachment(tx, 'campaign', op.entityId, updates),
+      });
     case 'character':
       return dispatchCharacter(ctx, op, tx);
     case 'character_trait':
@@ -640,6 +669,7 @@ async function dispatchCharacter(
     tx,
     table: characters,
     prepareUpdates: async (updates) => {
+      await prepareMediaAttachment(tx, 'character', op.entityId, updates);
       await prepareActiveEffects(
         tx,
         ctx.userId,
