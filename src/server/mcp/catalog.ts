@@ -373,7 +373,9 @@ export function buildToolCatalog(
 /** Hoist canonical refs: refs inside anyOf still resolve against the root. */
 function schemaUnion(schemas: readonly JsonSchema[]): JsonSchema {
   const definitions: JsonSchema = {};
-  const anyOf = schemas.map(({ $defs, ...schema }) => {
+  const unique = [...new Map(schemas.map((schema) => [JSON.stringify(schema), schema])).values()];
+  if (unique.length === 1 && unique[0]) return unique[0];
+  const anyOf = unique.map(({ $defs, ...schema }) => {
     Object.assign(definitions, $defs);
     return schema;
   });

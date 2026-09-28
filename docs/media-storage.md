@@ -116,7 +116,7 @@ local default-bucket bootstrap key is convenient for a dedicated Garage service;
 use a scoped key for shared storage. No browser bucket CORS or presigned upload
 configuration is required. The app accepts and sanitizes the bytes itself. Each upload sends metadata and
 bytes in one request; retries reuse the same client-generated upload ID. MCP
-exposes one `gpc_media` tool with typed capabilities/upload/status/cancel actions.
+exposes one `media` tool with typed capabilities/upload/status/cancel actions.
 Migration to S3, R2, B2 or another compatible provider consists of copying the
 objects with exact keys, preserving the DB and changing app connection settings;
 exercise provider compatibility before production cutover. Native Azure/GCS APIs

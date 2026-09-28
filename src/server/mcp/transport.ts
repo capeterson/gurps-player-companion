@@ -17,6 +17,7 @@ import {
   toolsForScopes,
 } from './catalog.ts';
 import { type OperationInput, executeOperation } from './executor.ts';
+import type { IncludedOperation } from './operationManifest.ts';
 
 export const MAX_MCP_BODY_BYTES = 14 * 1024 * 1024;
 // Larger image envelopes need a process-wide bound, not only per-user rates.
@@ -177,6 +178,7 @@ function record(value: unknown): Record<string, unknown> | null {
 export function mutationAcknowledgement(
   body: unknown,
   input: OperationInput,
+  operation: Pick<IncludedOperation, 'method' | 'path'>,
 ): MutationAcknowledgement {
   const root = record(body);
   let resource = root;
@@ -191,18 +193,25 @@ export function mutationAcknowledgement(
     }
   }
 
-  let resourceId = resource && typeof resource.id === 'string' ? resource.id : undefined;
-  if (!resourceId) {
-    const pathEntries = Object.entries(input.path ?? {});
-    for (let index = pathEntries.length - 1; index >= 0; index--) {
-      const [key, value] = pathEntries[index] ?? [];
-      if (key && /id$/i.test(key) && typeof value === 'string') {
-        resourceId = value;
-        break;
-      }
+  // Caller property order has no meaning. The canonical route determines the
+  // most specific target, including deletes that return a refreshed parent.
+  // Media lookup can address an upload by its retry alias. That alias is never
+  // an asset ID; only the validated manifest identifies the affected asset.
+  const uploadAlias =
+    operation.path === '/api/v1/media/uploads/{id}' && input.query?.lookup === 'clientUploadId';
+  let targetId: string | undefined;
+  for (const match of operation.path.matchAll(/\{([^}]+)\}/g)) {
+    const name = match[1];
+    const value = name ? input.path?.[name] : undefined;
+    if (!uploadAlias && name && /id$/i.test(name) && typeof value === 'string') {
+      targetId = value;
     }
   }
-  const revision = resource?.revision;
+  const returnedId = resource && typeof resource.id === 'string' ? resource.id : undefined;
+  const resourceId =
+    operation.method === 'DELETE' ? (targetId ?? returnedId) : (returnedId ?? targetId);
+  // A parent's revision must never be attributed to a deleted child.
+  const revision = returnedId === resourceId ? resource?.revision : undefined;
   return {
     acknowledged: true,
     ...(resourceId ? { resourceId } : {}),
@@ -362,7 +371,7 @@ export function createMcpHandler(
           );
         const mutationBody =
           response.ok && runtime.policy.method !== 'GET'
-            ? mutationAcknowledgement(body, input)
+            ? mutationAcknowledgement(body, input, runtime.policy)
             : body;
         const resultContentType =
           response.ok && runtime.policy.method !== 'GET' ? 'application/json' : contentType || null;

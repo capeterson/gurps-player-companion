@@ -92,8 +92,10 @@ describe('MCP canonical schema conversion', () => {
     const tools = buildToolCatalog(snapshot);
     expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
     expect(TOOLS.length).toBe(104);
-    expect(tools.length).toBeGreaterThan(80);
+    expect(tools.length).toBe(49);
     for (const tool of tools) {
+      expect(tool.policy.tool).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
+      expect(tool.policy.tool.startsWith('gpc_')).toBe(false);
       expect(tool.inputSchema.type).toBe('object');
       expect(tool.outputSchema.type).toBe('object');
     }
@@ -101,9 +103,9 @@ describe('MCP canonical schema conversion', () => {
 
   test('groups media actions while keeping scope, strict input, and response contracts per operation', async () => {
     const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
-    const media = tools.find((entry) => entry.policy.tool === 'gpc_media');
+    const media = tools.find((entry) => entry.policy.tool === 'media');
     expect(media).toBeDefined();
-    if (!media) throw new Error('missing gpc_media tool');
+    if (!media) throw new Error('missing media tool');
     expect(media?.operations.map((entry) => entry.policy.action)).toEqual([
       'capabilities',
       'upload',
@@ -117,7 +119,7 @@ describe('MCP canonical schema conversion', () => {
     );
 
     const readOnlyMedia = toolsForScopes(tools, ['gpc:read']).find(
-      (entry) => entry.policy.tool === 'gpc_media',
+      (entry) => entry.policy.tool === 'media',
     );
     expect(readOnlyMedia?.operations.map((entry) => entry.policy.action)).toEqual([
       'capabilities',
@@ -154,6 +156,66 @@ describe('MCP canonical schema conversion', () => {
     );
   });
 
+  test('groups related writes with strict action inputs and scope-filtered schemas and hints', () => {
+    const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
+    const id = '0198aa77-1111-7111-8111-111111111111';
+    const skill = tools.find((entry) => entry.policy.tool === 'character_skill');
+    if (!skill) throw new Error('missing character_skill');
+    expect(skill.operations.map((entry) => entry.policy.action).sort()).toEqual([
+      'create',
+      'delete',
+      'update',
+    ]);
+    expect(
+      skill.validateInput({
+        action: 'create',
+        path: { id },
+        body: {
+          name: 'Stealth',
+          attribute: 'DX',
+          difficulty: 'A',
+          points: 1,
+        },
+      }),
+    ).toBe(true);
+    expect(skill.validateInput({ action: 'create', path: { id }, body: {} })).toBe(false);
+    expect(skill.validateInput({ action: 'delete', path: { id, skillId: id }, body: {} })).toBe(
+      false,
+    );
+    expect(skill.validateInput({ path: { id, skillId: id } })).toBe(false);
+    expect(skill.validateInput({ action: 'unknown' })).toBe(false);
+
+    for (const tool of tools.filter(
+      (entry) => entry.policy.action && entry.policy.tool !== 'media',
+    )) {
+      expect(
+        tool.operations.every((entry) => entry.policy.method !== 'GET'),
+        tool.policy.tool,
+      ).toBe(true);
+      // All related writes share exactly one compact acknowledgement definition.
+      expect(tool.outputSchema).not.toHaveProperty('$defs');
+      expect((tool.outputSchema.anyOf as unknown[]).length, tool.policy.tool).toBe(2);
+    }
+    for (const name of ['library_source', 'library_modifier', 'character_skill']) {
+      const write = toolsForScopes(tools, ['gpc:read', 'gpc:write']).find(
+        (entry) => entry.policy.tool === name,
+      );
+      if (!write) throw new Error(`missing ${name}`);
+      expect(write.operations.map((entry) => entry.policy.action).sort()).toEqual([
+        'create',
+        'update',
+      ]);
+      expect(write.validateInput({ action: 'delete', path: { id, sourceId: id } })).toBe(false);
+      const managed = toolsForScopes(tools, ['gpc:manage']).find(
+        (entry) => entry.policy.tool === name,
+      );
+      expect(managed?.operations.map((entry) => entry.policy.action)).toEqual(['delete']);
+    }
+    expect(
+      toolsForScopes(tools, ['gpc:read']).some((entry) => entry.policy.tool === 'character_skill'),
+    ).toBe(false);
+  });
+
   test('advertises weapon selectors and owned custom effects on the existing authoring tools', () => {
     const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
     const id = '0198aa77-1111-7111-8111-111111111111';
@@ -165,11 +227,12 @@ describe('MCP canonical schema conversion', () => {
     ];
     for (const kind of ['trait', 'skill'] as const) {
       for (const command of ['create', 'update'] as const) {
-        const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_library_${kind}`);
+        const tool = tools.find((entry) => entry.policy.tool === `library_${kind}`);
         if (!tool) throw new Error(`missing library ${kind} ${command} tool`);
         for (const weaponSelector of selectors.slice(0, 3)) {
           expect(
             tool.validateInput({
+              action: command,
               path: { id, ...(command === 'update' ? { [`${kind}Id`]: id } : {}) },
               body: {
                 name: 'Mechanics',
@@ -191,10 +254,11 @@ describe('MCP canonical schema conversion', () => {
       }
     }
     for (const command of ['create', 'update'] as const) {
-      const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_character_trait`);
+      const tool = tools.find((entry) => entry.policy.tool === 'character_trait');
       if (!tool) throw new Error(`missing character trait ${command} tool`);
       for (const weaponSelector of selectors) {
         const input = {
+          action: command,
           path: { id, ...(command === 'update' ? { traitId: id } : {}) },
           body: {
             name: 'Owned mastery',
@@ -226,10 +290,11 @@ describe('MCP canonical schema conversion', () => {
     const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
     const id = '0198aa77-1111-7111-8111-111111111111';
     for (const command of ['create', 'update'] as const) {
-      const tool = tools.find((entry) => entry.policy.tool === `gpc_${command}_library_skill`);
+      const tool = tools.find((entry) => entry.policy.tool === 'library_skill');
       if (!tool) throw new Error(`missing library skill ${command} tool`);
       expect(
         tool.validateInput({
+          action: command,
           path: { id, ...(command === 'update' ? { skillId: id } : {}) },
           body: {
             ...(command === 'create' ? { name: 'Armoury', attribute: 'IQ', difficulty: 'A' } : {}),
@@ -253,6 +318,7 @@ describe('MCP canonical schema conversion', () => {
         }),
       ).toBe(true);
       const base = {
+        action: command,
         path: { id, ...(command === 'update' ? { skillId: id } : {}) },
         body: {
           ...(command === 'create' ? { name: 'Rules', attribute: 'IQ', difficulty: 'A' } : {}),
@@ -280,28 +346,28 @@ describe('MCP canonical schema conversion', () => {
     const tools = buildToolCatalog(JSON.parse(readFileSync('docs/openapi.json', 'utf8')));
     const id = '0198aa77-1111-7111-8111-111111111111';
     for (const name of [
-      'gpc_list_characters',
-      'gpc_list_campaigns',
-      'gpc_list_adventure_log',
-      'gpc_list_encounters',
+      'list_characters',
+      'list_campaigns',
+      'list_adventure_log',
+      'list_encounters',
     ]) {
       const tool = tools.find((entry) => entry.policy.tool === name);
       if (!tool) throw new Error(`missing ${name}`);
       const path =
-        name === 'gpc_list_adventure_log' || name === 'gpc_list_encounters' ? { path: { id } } : {};
+        name === 'list_adventure_log' || name === 'list_encounters' ? { path: { id } } : {};
       expect(
         tool.validateInput({ ...path, query: { search: 'dragon', limit: 25, offset: 50 } }),
         name,
       ).toBe(true);
       expect(tool.validateInput({ ...path, query: { limit: 0 } }), name).toBe(false);
     }
-    const notifications = tools.find((entry) => entry.policy.tool === 'gpc_list_notifications');
-    if (!notifications) throw new Error('missing gpc_list_notifications');
+    const notifications = tools.find((entry) => entry.policy.tool === 'list_notifications');
+    if (!notifications) throw new Error('missing list_notifications');
     expect(
       notifications.validateInput({ query: { unreadOnly: 'true', limit: 25, offset: 50 } }),
     ).toBe(true);
-    const library = tools.find((entry) => entry.policy.tool === 'gpc_get_campaign_library');
-    if (!library) throw new Error('missing gpc_get_campaign_library');
+    const library = tools.find((entry) => entry.policy.tool === 'get_campaign_library');
+    if (!library) throw new Error('missing get_campaign_library');
     expect(
       library.validateInput({
         path: { id },
@@ -309,9 +375,11 @@ describe('MCP canonical schema conversion', () => {
       }),
     ).toBe(true);
     expect(library.inputSchema.properties).not.toHaveProperty('idempotencyKey');
-    const create = tools.find((entry) => entry.policy.tool === 'gpc_create_character');
-    if (!create) throw new Error('missing gpc_create_character');
-    expect(create.inputSchema.properties).toHaveProperty('idempotencyKey');
+    const create = tools.find((entry) => entry.policy.tool === 'character');
+    if (!create) throw new Error('missing create_character');
+    expect(operationForInput(create, { action: 'create' })?.inputSchema.properties).toHaveProperty(
+      'idempotencyKey',
+    );
   });
 
   test('preserves nullable refs, unconstrained values, enums and exclusive numeric bounds', () => {
@@ -417,7 +485,7 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     const mutations = tools.filter((tool) => tool.policy.method !== 'GET');
-    expect(mutations.length).toBeGreaterThan(70);
+    expect(mutations.length).toBe(33);
     for (const tool of mutations) {
       const output = JSON.stringify(tool.outputSchema);
       expect(tool.policy.resultMode, tool.policy.tool).toBe('compact-mutation-ack');

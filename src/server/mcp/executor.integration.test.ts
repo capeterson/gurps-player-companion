@@ -12,7 +12,7 @@ const operation: IncludedOperation = {
   kind: 'tool',
   method: 'POST',
   path: '/api/v1/test-operation',
-  tool: 'gpc_test_operation',
+  tool: 'test_operation',
   scope: 'gpc:write',
   destructive: false,
   openWorld: false,

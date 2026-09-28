@@ -86,6 +86,9 @@ then resumes the complete consent request after login.
 Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
 Claude-compatible Dynamic Client Registration, so supported public clients need
 no per-client server configuration or shared secret.
+The 49 tools use server-local names such as `list_characters` and `character_skill`,
+without an application prefix. Related writes share entity tools with explicit
+actions; reads remain separate. Clients refresh tool discovery after the rename.
 Every player-domain raw API operation has an exact tool/action mapping; typed
 media actions share one tool with action-specific schemas and permissions. Security, administration,
 replication, and transport endpoints have exact checked-in exclusions. MCP commits

@@ -262,7 +262,7 @@ async function call<T = unknown>(
   actor: Actor,
   name: string,
   args: OperationArgs = {},
-): Promise<{ status: number; body: T; contentType: string | null }> {
+): Promise<{ status: number; body: T; contentType: string | null; acknowledgement?: unknown }> {
   rememberIds(actor.principal.user.id);
   rememberIds(args);
   const operation = policyFor(name, args);
@@ -297,15 +297,19 @@ async function call<T = unknown>(
     );
   } else {
     expect(result.structured.body, `${name} compact mutation acknowledgement`).toEqual(
-      mutationAcknowledgement(result.raw.body, args),
+      mutationAcknowledgement(result.raw.body, args, operation),
     );
   }
   rememberIds(result.raw.body);
   exercised.add(operation.action ? `${name}#${operation.action}` : name);
-  return (operation.method === 'GET' ? result.structured : result.raw) as {
+  return {
+    ...(operation.method === 'GET' ? result.structured : result.raw),
+    ...(operation.method === 'GET' ? {} : { acknowledgement: result.structured.body }),
+  } as {
     status: number;
     body: T;
     contentType: string | null;
+    acknowledgement?: unknown;
   };
 }
 
@@ -389,128 +393,134 @@ describe('delegated operation behavioral parity', () => {
 
     const mediaCapabilities = await call<{ enabled: boolean; maxInputBytes: number }>(
       owner,
-      'gpc_media',
+      'media',
       { action: 'capabilities' },
     );
     expect(mediaCapabilities.body.enabled).toBe(true);
-    await call(owner, 'gpc_get_current_user');
-    await call(owner, 'gpc_list_campaigns');
+    await call(owner, 'get_current_user');
+    await call(owner, 'list_campaigns');
     const campaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Matrix ${suffix}` },
       })
     ).body;
     const campaignId = campaign.id as string;
-    const filteredCampaigns = await call<Array<{ id: string }>>(owner, 'gpc_list_campaigns', {
+    const filteredCampaigns = await call<Array<{ id: string }>>(owner, 'list_campaigns', {
       query: { search: suffix, limit: 1, offset: 0 },
     });
     expect(filteredCampaigns.body).toEqual([expect.objectContaining({ id: campaignId })]);
-    await call(owner, 'gpc_get_campaign', path(campaignId));
-    await call(owner, 'gpc_update_campaign', {
+    await call(owner, 'get_campaign', path(campaignId));
+    await call(owner, 'campaign', {
+      action: 'update',
       ...path(campaignId),
       body: { description: 'updated' },
     });
-    await call(owner, 'gpc_add_campaign_member', {
+    await call(owner, 'campaign_member', {
+      action: 'add',
       ...path(campaignId),
       body: { email: member.email },
     });
-    await call(owner, 'gpc_update_campaign_member', {
+    await call(owner, 'campaign_member', {
+      action: 'update',
       ...path(campaignId, { userId: member.principal.user.id }),
       body: { role: 'manager' },
     });
-    await call(
-      owner,
-      'gpc_remove_campaign_member',
-      path(campaignId, { userId: member.principal.user.id }),
-    );
+    await call(owner, 'campaign_member', {
+      action: 'remove',
+      ...path(campaignId, { userId: member.principal.user.id }),
+    });
 
     const transferCampaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Transfer ${suffix}` },
       })
     ).body;
-    await call(owner, 'gpc_add_campaign_member', {
+    await call(owner, 'campaign_member', {
+      action: 'add',
       ...path(transferCampaign.id),
       body: { email: member.email },
     });
-    await call(owner, 'gpc_transfer_campaign', {
+    await call(owner, 'transfer_campaign', {
       ...path(transferCampaign.id),
       body: { newOwnerId: member.principal.user.id },
     });
 
     const cancelledInvite = (
-      await call<{ id: string }>(owner, 'gpc_invite_campaign_member', {
+      await call<{ id: string }>(owner, 'invite_campaign_member', {
         ...path(campaignId),
         body: { handle: member.email },
       })
     ).body;
-    await call(owner, 'gpc_list_campaign_invitations', {
+    await call(owner, 'list_campaign_invitations', {
       ...path(campaignId),
       query: { limit: 1, offset: 0 },
     });
     await call(
       owner,
-      'gpc_cancel_campaign_invitation',
+      'cancel_campaign_invitation',
       path(campaignId, { invitationId: cancelledInvite.id }),
     );
 
     const acceptedCampaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Accept ${suffix}` },
       })
     ).body;
     const acceptedInvite = (
-      await call<{ id: string }>(owner, 'gpc_invite_campaign_member', {
+      await call<{ id: string }>(owner, 'invite_campaign_member', {
         ...path(acceptedCampaign.id),
         body: { handle: member.email },
       })
     ).body;
-    await call(member, 'gpc_list_invitations', { query: { limit: 1, offset: 0 } });
-    await call(member, 'gpc_accept_invitation', {
+    await call(member, 'list_invitations', { query: { limit: 1, offset: 0 } });
+    await call(member, 'invitation', {
+      action: 'accept',
       path: { invitationId: acceptedInvite.id },
     });
 
     const rejectedCampaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Reject ${suffix}` },
       })
     ).body;
     const rejectedInvite = (
-      await call<{ id: string }>(owner, 'gpc_invite_campaign_member', {
+      await call<{ id: string }>(owner, 'invite_campaign_member', {
         ...path(rejectedCampaign.id),
         body: { handle: member.email },
       })
     ).body;
-    await call(member, 'gpc_reject_invitation', {
+    await call(member, 'invitation', {
+      action: 'reject',
       path: { invitationId: rejectedInvite.id },
     });
 
     const notificationCampaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Notify ${suffix}` },
       })
     ).body;
-    await call(owner, 'gpc_invite_campaign_member', {
+    await call(owner, 'invite_campaign_member', {
       ...path(notificationCampaign.id),
       body: { handle: member.email },
     });
     const notificationList = (
-      await call(member, 'gpc_list_notifications', {
+      await call(member, 'list_notifications', {
         query: { unreadOnly: 'true', limit: 1, offset: 0 },
       })
     ).body as Array<{ id: string }>;
     expect(notificationList.length).toBeGreaterThan(0);
     const notification = notificationList[0];
     if (!notification) throw new Error('invitation did not create a notification');
-    await call(member, 'gpc_mark_notification_read', {
-      path: { id: notification.id },
-    });
-    await call(member, 'gpc_mark_all_notifications_read');
-    await call(member, 'gpc_delete_notification', {
-      path: { id: notification.id },
-    });
+    await call(member, 'notification', { action: 'mark_read', path: { id: notification.id } });
+    await call(member, 'notification', { action: 'mark_all_read' });
+    await call(member, 'notification', { action: 'delete', path: { id: notification.id } });
 
-    await call(owner, 'gpc_get_campaign_library', path(campaignId));
+    await call(owner, 'get_campaign_library', path(campaignId));
     const libraryKinds = [
       ['trait', { name: `Trait ${suffix}`, kind: 'advantage' }],
       ['skill', { name: `Skill ${suffix}`, attribute: 'DX', difficulty: 'A' }],
@@ -558,7 +568,8 @@ describe('delegated operation behavioral parity', () => {
     };
     for (const [kind, body] of libraryKinds) {
       const created = (
-        await call<{ id: string }>(owner, `gpc_create_library_${kind}`, {
+        await call<{ id: string }>(owner, `library_${kind}`, {
+          action: 'create',
           ...path(campaignId),
           body,
         })
@@ -566,7 +577,8 @@ describe('delegated operation behavioral parity', () => {
       const idKey = libraryPathKeys[kind];
       if (!idKey) throw new Error(`missing library path key for ${kind}`);
       const itemPath = path(campaignId, { [idKey]: created.id });
-      await call(owner, `gpc_update_library_${kind}`, {
+      await call(owner, `library_${kind}`, {
+        action: 'update',
         ...itemPath,
         body:
           kind === 'source'
@@ -578,7 +590,7 @@ describe('delegated operation behavioral parity', () => {
       if (kind === 'trait') {
         const narrowed = await call<{ traits: Array<{ id: string }>; skills: unknown[] }>(
           owner,
-          'gpc_get_campaign_library',
+          'get_campaign_library',
           {
             ...path(campaignId),
             query: { section: 'traits', search: suffix, limit: 1, offset: 0 },
@@ -587,34 +599,39 @@ describe('delegated operation behavioral parity', () => {
         expect(narrowed.body.traits).toEqual([expect.objectContaining({ id: created.id })]);
         expect(narrowed.body.skills).toEqual([]);
       }
-      await call(owner, `gpc_delete_library_${kind}`, itemPath);
+      await call(owner, `library_${kind}`, { action: 'delete', ...itemPath });
     }
-    const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaignId));
+    const exported = await call<string>(owner, 'export_campaign_library', path(campaignId));
     expect(typeof exported.body).toBe('string');
-    await call(owner, 'gpc_import_campaign_library', {
+    await call(owner, 'import_campaign_library', {
       ...path(campaignId),
       body: { yaml: exported.body, mode: 'merge' },
     });
 
-    await call(owner, 'gpc_list_adventure_log', path(campaignId));
+    await call(owner, 'list_adventure_log', path(campaignId));
     const logEntry = (
-      await call<{ id: string }>(owner, 'gpc_create_adventure_log_entry', {
+      await call<{ id: string }>(owner, 'adventure_log_entry', {
+        action: 'create',
         ...path(campaignId),
         body: { sessionDate: '2026-09-12', title: 'Matrix session' },
       })
     ).body;
-    const filteredLog = await call<Array<{ id: string }>>(owner, 'gpc_list_adventure_log', {
+    const filteredLog = await call<Array<{ id: string }>>(owner, 'list_adventure_log', {
       ...path(campaignId),
       query: { search: 'Matrix', limit: 1, offset: 0 },
     });
     expect(filteredLog.body).toEqual([expect.objectContaining({ id: logEntry.id })]);
-    await call(owner, 'gpc_update_adventure_log_entry', {
+    await call(owner, 'adventure_log_entry', {
+      action: 'update',
       ...path(campaignId, { entryId: logEntry.id }),
       body: { title: 'Matrix session updated' },
     });
-    await call(owner, 'gpc_delete_adventure_log_entry', path(campaignId, { entryId: logEntry.id }));
+    await call(owner, 'adventure_log_entry', {
+      action: 'delete',
+      ...path(campaignId, { entryId: logEntry.id }),
+    });
 
-    await call(owner, 'gpc_list_encounters', path(campaignId));
+    await call(owner, 'list_encounters', path(campaignId));
     const encounter = (
       await call<{
         id: string;
@@ -622,7 +639,8 @@ describe('delegated operation behavioral parity', () => {
         activeCombatantId: string | null;
         version: number;
         combatants: Array<{ id: string }>;
-      }>(owner, 'gpc_create_encounter', {
+      }>(owner, 'encounter', {
+        action: 'create',
         ...path(campaignId),
         body: {
           name: 'Matrix encounter',
@@ -630,20 +648,22 @@ describe('delegated operation behavioral parity', () => {
         },
       })
     ).body;
-    const filteredEncounters = await call<Array<{ id: string }>>(owner, 'gpc_list_encounters', {
+    const filteredEncounters = await call<Array<{ id: string }>>(owner, 'list_encounters', {
       ...path(campaignId),
       query: { search: 'Matrix', limit: 1, offset: 0 },
     });
     expect(filteredEncounters.body).toEqual([expect.objectContaining({ id: encounter.id })]);
     const encounterPath = path(campaignId, { encounterId: encounter.id });
-    await call(owner, 'gpc_get_encounter', encounterPath);
-    await call(owner, 'gpc_update_encounter', {
+    await call(owner, 'get_encounter', encounterPath);
+    await call(owner, 'encounter', {
+      action: 'update',
       ...encounterPath,
       body: { name: 'Matrix encounter updated' },
     });
     const initialCombatant = encounter.combatants[0];
     if (!initialCombatant) throw new Error('encounter fixture omitted its initial combatant');
-    await call(owner, 'gpc_advance_encounter_turn', {
+    await call(owner, 'encounter', {
+      action: 'advance_turn',
       ...encounterPath,
       body: {
         direction: 'next',
@@ -653,7 +673,8 @@ describe('delegated operation behavioral parity', () => {
       },
     });
     const combatant = (
-      await call<{ id: string }>(owner, 'gpc_create_encounter_combatant', {
+      await call<{ id: string }>(owner, 'encounter_combatant', {
+        action: 'create',
         ...encounterPath,
         body: {
           kind: 'npc',
@@ -668,12 +689,14 @@ describe('delegated operation behavioral parity', () => {
       encounterId: encounter.id,
       combatantId: combatant.id,
     });
-    await call(owner, 'gpc_update_encounter_combatant', {
+    await call(owner, 'encounter_combatant', {
+      action: 'update',
       ...combatantPath,
       body: { currentHp: 7 },
     });
     const effect = (
-      await call<{ id: string }>(owner, 'gpc_create_encounter_effect', {
+      await call<{ id: string }>(owner, 'encounter_effect', {
+        action: 'create',
         ...encounterPath,
         body: {
           targetCombatantId: initialCombatant.id,
@@ -686,25 +709,27 @@ describe('delegated operation behavioral parity', () => {
       encounterId: encounter.id,
       effectId: effect.id,
     });
-    await call(owner, 'gpc_update_encounter_effect', {
+    await call(owner, 'encounter_effect', {
+      action: 'update',
       ...effectPath,
       body: { notes: 'updated' },
     });
-    await call(owner, 'gpc_delete_encounter_effect', effectPath);
-    await call(owner, 'gpc_delete_encounter_combatant', combatantPath);
+    await call(owner, 'encounter_effect', { action: 'delete', ...effectPath });
+    await call(owner, 'encounter_combatant', { action: 'delete', ...combatantPath });
 
-    await call(owner, 'gpc_list_characters');
+    await call(owner, 'list_characters');
     const character = (
-      await call<{ id: string }>(owner, 'gpc_create_character', {
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
         body: { name: `Character ${suffix}`, campaignId },
       })
     ).body;
     const characterId = character.id as string;
-    const filteredCharacters = await call<Array<{ id: string }>>(owner, 'gpc_list_characters', {
+    const filteredCharacters = await call<Array<{ id: string }>>(owner, 'list_characters', {
       query: { search: suffix, limit: 1, offset: 0 },
     });
     expect(filteredCharacters.body).toEqual([expect.objectContaining({ id: characterId })]);
-    await call(owner, 'gpc_get_character', path(characterId));
+    await call(owner, 'get_character', path(characterId));
     const mediaBytes = await sharp({
       create: { width: 24, height: 16, channels: 3, background: { r: 75, g: 120, b: 165 } },
     })
@@ -720,31 +745,32 @@ describe('delegated operation behavioral parity', () => {
     };
     const mediaReady = await call<{ id: string; state: string; thumbUrl: string | null }>(
       owner,
-      'gpc_media',
+      'media',
       {
         action: 'upload',
         body: mediaDeclaration,
       },
     );
-    const mediaStatus = await call<{ id: string; state: string }>(owner, 'gpc_media', {
+    const mediaStatus = await call<{ id: string; state: string }>(owner, 'media', {
       action: 'status',
       ...path(mediaDeclaration.clientUploadId),
       query: { lookup: 'clientUploadId' },
     });
     expect(mediaStatus.body).toMatchObject({ id: mediaReady.body.id, state: 'ready' });
-    const mediaRetry = await call<{ id: string; state: string }>(owner, 'gpc_media', {
+    const mediaRetry = await call<{ id: string; state: string }>(owner, 'media', {
       action: 'upload',
       body: mediaDeclaration,
     });
     expect(mediaRetry.body).toMatchObject({ id: mediaReady.body.id, state: 'ready' });
     expect(mediaReady.body.thumbUrl).not.toBeNull();
-    await call(owner, 'gpc_update_character', {
+    await call(owner, 'character', {
+      action: 'update',
       ...path(characterId),
       body: { portraitAssetId: mediaReady.body.id },
     });
     const cancelClientUploadId = randomUUID();
     failNextMediaPut = true;
-    const failed = await callAny(owner, 'gpc_media', {
+    const failed = await callAny(owner, 'media', {
       action: 'upload',
       body: {
         ...mediaDeclaration,
@@ -752,17 +778,14 @@ describe('delegated operation behavioral parity', () => {
       },
     });
     expect(failed.structured.status).toBe(503);
-    const cancelled = await call<{ state: string }>(owner, 'gpc_media', {
+    const cancelled = await call<{ state: string }>(owner, 'media', {
       action: 'cancel',
       ...path(cancelClientUploadId),
       query: { lookup: 'clientUploadId' },
     });
     expect(cancelled.body.state).toBe('cancelled');
-    await call(owner, 'gpc_update_character', {
-      ...path(characterId),
-      body: { st: 11 },
-    });
-    await call(owner, 'gpc_dismiss_character_warning', {
+    await call(owner, 'character', { action: 'update', ...path(characterId), body: { st: 11 } });
+    await call(owner, 'dismiss_character_warning', {
       ...path(characterId),
       body: { code: 'matrix_warning', dismissed: true },
     });
@@ -794,7 +817,8 @@ describe('delegated operation behavioral parity', () => {
     ] as const;
     for (const [kind, idKey, body, update] of characterKinds) {
       const created = (
-        await call<Record<string, { id: string }>>(owner, `gpc_create_character_${kind}`, {
+        await call<Record<string, { id: string }>>(owner, `character_${kind}`, {
+          action: 'create',
           ...path(characterId),
           body,
         })
@@ -802,40 +826,47 @@ describe('delegated operation behavioral parity', () => {
       const child = created[kind];
       if (!child) throw new Error(`character ${kind} response omitted its row`);
       const childPath = path(characterId, { [idKey]: child.id });
-      await call(owner, `gpc_update_character_${kind}`, {
-        ...childPath,
-        body: update,
-      });
-      await call(owner, `gpc_delete_character_${kind}`, childPath);
+      await call(owner, `character_${kind}`, { action: 'update', ...childPath, body: update });
+      const deleted = await call(owner, `character_${kind}`, { action: 'delete', ...childPath });
+      expect(deleted.acknowledgement).toEqual({ acknowledged: true, resourceId: child.id });
     }
     const inventory = (
-      await call<{ item: { id: string } }>(owner, 'gpc_create_inventory_item', {
+      await call<{ item: { id: string } }>(owner, 'character_inventory', {
+        action: 'create',
         ...path(characterId),
         body: { name: `Pack ${suffix}` },
       })
     ).body;
     const inventoryPath = path(characterId, { itemId: inventory.item.id });
-    await call(owner, 'gpc_update_inventory_item', {
+    await call(owner, 'character_inventory', {
+      action: 'update',
       ...inventoryPath,
       body: { quantity: 2 },
     });
-    await call(owner, 'gpc_delete_inventory_item', inventoryPath);
-    await call(owner, 'gpc_update_character_combat', {
+    await call(owner, 'character_inventory', { action: 'delete', ...inventoryPath });
+    await call(owner, 'update_character_combat', {
       ...path(characterId),
       body: { currentHp: 9 },
     });
-    await call(owner, 'gpc_activate_condition_group', path(characterId, { group: 'matrix' }));
-    await call(owner, 'gpc_deactivate_condition_group', path(characterId, { group: 'matrix' }));
-    await call(owner, 'gpc_get_character_history', path(characterId));
-    await call(owner, 'gpc_get_campaign_history', path(campaignId));
-    await call(owner, 'gpc_delete_character', path(characterId));
+    await call(owner, 'character_condition_group', {
+      action: 'activate',
+      ...path(characterId, { group: 'matrix' }),
+    });
+    await call(owner, 'character_condition_group', {
+      action: 'deactivate',
+      ...path(characterId, { group: 'matrix' }),
+    });
+    await call(owner, 'get_character_history', path(characterId));
+    await call(owner, 'get_campaign_history', path(campaignId));
+    await call(owner, 'character', { action: 'delete', ...path(characterId) });
 
     const deleteCampaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: `Delete ${suffix}` },
       })
     ).body;
-    await call(owner, 'gpc_delete_campaign', path(deleteCampaign.id));
+    await call(owner, 'campaign', { action: 'delete', ...path(deleteCampaign.id) });
 
     expect([...exercised].sort()).toEqual(
       TOOLS.map((tool) => (tool.action ? `${tool.tool}#${tool.action}` : tool.tool)).sort(),
@@ -905,7 +936,8 @@ describe('delegated operation behavioral parity', () => {
     const owner = await registerActor('access-owner', client.id);
     const viewer = await registerActor('access-viewer', client.id);
     const campaign = (
-      await call<{ id: string }>(gm, 'gpc_create_campaign', {
+      await call<{ id: string }>(gm, 'campaign', {
+        action: 'create',
         body: {
           name: `Private ${suffix}`,
           shareCharacterSheets: false,
@@ -914,13 +946,15 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     for (const actor of [owner, viewer]) {
-      await call(gm, 'gpc_add_campaign_member', {
+      await call(gm, 'campaign_member', {
+        action: 'add',
         ...path(campaign.id),
         body: { email: actor.email },
       });
     }
     const character = (
-      await call<{ id: string }>(owner, 'gpc_create_character', {
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
         body: { name: 'Private sheet', campaignId: campaign.id, st: 14 },
       })
     ).body;
@@ -930,7 +964,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const mcpRead = await call<Record<string, unknown>>(
       viewer,
-      'gpc_get_character',
+      'get_character',
       path(character.id),
     );
     expect(restRead.status).toBe(200);
@@ -951,7 +985,8 @@ describe('delegated operation behavioral parity', () => {
       },
       body: JSON.stringify(updateBody),
     });
-    const mcpDenied = await callAny(viewer, 'gpc_update_character', {
+    const mcpDenied = await callAny(viewer, 'character', {
+      action: 'update',
       ...path(character.id),
       body: updateBody,
     });
@@ -984,7 +1019,8 @@ describe('delegated operation behavioral parity', () => {
           protectNaturalDr: boolean;
           eyeMissHitsFace: boolean;
         };
-      }>(owner, 'gpc_create_campaign', {
+      }>(owner, 'campaign', {
+        action: 'create',
         body: {
           name: `Campaign rules ${suffix}`,
           enforceAttributeCaps: true,
@@ -1006,7 +1042,8 @@ describe('delegated operation behavioral parity', () => {
     });
 
     const preset = (
-      await call<typeof campaign>(owner, 'gpc_update_campaign', {
+      await call<typeof campaign>(owner, 'campaign', {
+        action: 'update',
         ...path(campaign.id),
         body: {
           enforceAttributeCaps: true,
@@ -1024,13 +1061,14 @@ describe('delegated operation behavioral parity', () => {
     });
 
     const character = (
-      await call<{ id: string; dx: number }>(owner, 'gpc_create_character', {
+      await call<{ id: string; dx: number }>(owner, 'character', {
+        action: 'create',
         body: { name: `Capped ${suffix}`, campaignId: campaign.id, dx: 20 },
       })
     ).body;
     const updateArgs = { ...path(character.id), body: { dx: 21 } };
-    const restRejected = await previewRest(owner, 'gpc_update_character', updateArgs);
-    const mcpRejected = await callAny(owner, 'gpc_update_character', updateArgs);
+    const restRejected = await previewRest(owner, 'character', { action: 'update', ...updateArgs });
+    const mcpRejected = await callAny(owner, 'character', { action: 'update', ...updateArgs });
     expect(restRejected.status).toBe(422);
     expect(mcpRejected.isError).toBe(true);
     expect(mcpRejected.structured.status).toBe(restRejected.status);
@@ -1042,7 +1080,7 @@ describe('delegated operation behavioral parity', () => {
       error: expect.stringContaining('DX'),
     });
 
-    const unchanged = await call<{ dx: number }>(owner, 'gpc_get_character', path(character.id));
+    const unchanged = await call<{ dx: number }>(owner, 'get_character', path(character.id));
     expect(unchanged.body.dx).toBe(20);
   });
 
@@ -1061,16 +1099,19 @@ describe('delegated operation behavioral parity', () => {
     const owner = await registerActor('effects-owner', client.id);
     const member = await registerActor('effects-member', client.id);
     const campaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: 'Effects parity', shareCharacterSheets: false },
       })
     ).body;
-    await call(owner, 'gpc_add_campaign_member', {
+    await call(owner, 'campaign_member', {
+      action: 'add',
       ...path(campaign.id),
       body: { email: member.email },
     });
     const sourceItem = (
-      await call<{ id: string }>(owner, 'gpc_create_library_item', {
+      await call<{ id: string }>(owner, 'library_item', {
+        action: 'create',
         ...path(campaign.id),
         body: {
           name: 'Spear',
@@ -1100,7 +1141,8 @@ describe('delegated operation behavioral parity', () => {
       },
     ];
     const libraryTrait = (
-      await call<{ id: string; effects: unknown[] }>(owner, 'gpc_create_library_trait', {
+      await call<{ id: string; effects: unknown[] }>(owner, 'library_trait', {
+        action: 'create',
         ...path(campaign.id),
         body: {
           name: 'Spear Mastery',
@@ -1110,7 +1152,8 @@ describe('delegated operation behavioral parity', () => {
       })
     ).body;
     expect(libraryTrait.effects).toEqual(portableEffects);
-    await call(owner, 'gpc_update_library_trait', {
+    await call(owner, 'library_trait', {
+      action: 'update',
       ...path(campaign.id, { traitId: libraryTrait.id }),
       body: { effects: [...portableEffects].reverse() },
     });
@@ -1123,7 +1166,8 @@ describe('delegated operation behavioral parity', () => {
       },
     ];
     const librarySkill = (
-      await call<{ id: string }>(owner, 'gpc_create_library_skill', {
+      await call<{ id: string }>(owner, 'library_skill', {
+        action: 'create',
         ...path(campaign.id),
         body: {
           name: 'Spear',
@@ -1163,11 +1207,12 @@ describe('delegated operation behavioral parity', () => {
         },
       })
     ).body;
-    await call(owner, 'gpc_update_library_skill', {
+    await call(owner, 'library_skill', {
+      action: 'update',
       ...path(campaign.id, { skillId: librarySkill.id }),
       body: { effects: skillEffects },
     });
-    const exported = await call<string>(owner, 'gpc_export_campaign_library', path(campaign.id));
+    const exported = await call<string>(owner, 'export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
     expect(yaml.version).toBe(13);
     expect(exported.body).not.toContain('libraryItemId');
@@ -1217,15 +1262,18 @@ describe('delegated operation behavioral parity', () => {
       body: { yaml: exported.body, mode: 'merge' },
       idempotencyKey: randomUUID(),
     };
-    const imported = await call(owner, 'gpc_import_campaign_library', importArgs);
-    expect(
-      (await callAny(owner, 'gpc_import_campaign_library', importArgs)).structured.body,
-    ).toEqual(mutationAcknowledgement(imported.body, importArgs));
+    const imported = await call(owner, 'import_campaign_library', importArgs);
+    expect((await callAny(owner, 'import_campaign_library', importArgs)).structured.body).toEqual(
+      mutationAcknowledgement(imported.body, importArgs, {
+        method: 'POST',
+        path: '/api/v1/campaigns/{id}/library/import',
+      }),
+    );
     const library = (
       await call<{
         traits: Array<{ effects: unknown[] }>;
         skills: Array<{ effects: unknown[]; specializationPolicy: unknown }>;
-      }>(owner, 'gpc_get_campaign_library', path(campaign.id))
+      }>(owner, 'get_campaign_library', path(campaign.id))
     ).body;
     expect(library.traits[0]?.effects).toEqual(yaml.library.traits[0]?.effects);
     expect(library.skills[0]?.effects).toEqual(skillEffects);
@@ -1234,14 +1282,16 @@ describe('delegated operation behavioral parity', () => {
     );
 
     const character = (
-      await call<{ id: string }>(owner, 'gpc_create_character', {
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
         body: { name: 'Owned effects', campaignId: campaign.id },
       })
     ).body;
     const learnedSkill = (
       await call<{
         skill: { id: string; specialization: string; defaults: unknown };
-      }>(owner, 'gpc_create_character_skill', {
+      }>(owner, 'character_skill', {
+        action: 'create',
         ...path(character.id),
         body: {
           name: 'Spear',
@@ -1262,7 +1312,8 @@ describe('delegated operation behavioral parity', () => {
       },
     ]);
     const inventory = (
-      await call<{ item: { id: string } }>(owner, 'gpc_create_inventory_item', {
+      await call<{ item: { id: string } }>(owner, 'character_inventory', {
+        action: 'create',
         ...path(character.id),
         body: {
           name: 'Spear',
@@ -1289,20 +1340,25 @@ describe('delegated operation behavioral parity', () => {
       idempotencyKey: randomUUID(),
     };
     const created = (
-      await call<{ trait: { id: string; customEffects: unknown[] } }>(
-        owner,
-        'gpc_create_character_trait',
-        createArgs,
-      )
+      await call<{ trait: { id: string; customEffects: unknown[] } }>(owner, 'character_trait', {
+        action: 'create',
+        ...createArgs,
+      })
     ).body;
     expect(created.trait.customEffects).toEqual(customEffects);
     expect(
-      (await callAny(owner, 'gpc_create_character_trait', createArgs)).structured.body,
-    ).toEqual(mutationAcknowledgement(created, createArgs));
+      (await callAny(owner, 'character_trait', { action: 'create', ...createArgs })).structured
+        .body,
+    ).toEqual(
+      mutationAcknowledgement(created, createArgs, {
+        method: 'POST',
+        path: '/api/v1/characters/{id}/traits',
+      }),
+    );
     const detail = (
       await call<{ traits: unknown[]; effects: unknown[] }>(
         owner,
-        'gpc_get_character',
+        'get_character',
         path(character.id),
       )
     ).body;
@@ -1317,7 +1373,7 @@ describe('delegated operation behavioral parity', () => {
       }),
     );
     const history = (
-      await call<HistoryEventOut[]>(owner, 'gpc_get_character_history', {
+      await call<HistoryEventOut[]>(owner, 'get_character_history', {
         ...path(character.id),
         query: { detail: '1' },
       })
@@ -1335,16 +1391,18 @@ describe('delegated operation behavioral parity', () => {
     // delegated handler must preserve REST's field-specific failures.
     for (const [name, args, status] of [
       [
-        'gpc_create_library_trait',
+        'library_trait',
         {
+          action: 'create',
           ...path(campaign.id),
           body: { name: 'Invalid', kind: 'advantage', effects: customEffects },
         },
         422,
       ],
       [
-        'gpc_create_library_skill',
+        'library_skill',
         {
+          action: 'create',
           ...path(campaign.id),
           body: {
             name: 'Invalid',
@@ -1356,16 +1414,18 @@ describe('delegated operation behavioral parity', () => {
         422,
       ],
       [
-        'gpc_update_character_trait',
+        'character_trait',
         {
+          action: 'update',
           ...path(character.id, { traitId: created.trait.id }),
           body: { customEffects: [{ target: 'weapon_damage', value: 1 }] },
         },
         422,
       ],
       [
-        'gpc_update_character_trait',
+        'character_trait',
         {
+          action: 'update',
           ...path(character.id, { traitId: created.trait.id }),
           body: {
             customEffects: [{ ...customEffects[0], target: 'weapon_parry' }],
@@ -1383,27 +1443,27 @@ describe('delegated operation behavioral parity', () => {
     }
     const traitPath = path(character.id, { traitId: created.trait.id });
     const deniedArgs = { ...traitPath, body: { customEffects: [] } };
-    const deniedRest = await previewRest(member, 'gpc_update_character_trait', deniedArgs);
-    const deniedMcp = await callAny(member, 'gpc_update_character_trait', deniedArgs);
+    const deniedRest = await previewRest(member, 'character_trait', {
+      action: 'update',
+      ...deniedArgs,
+    });
+    const deniedMcp = await callAny(member, 'character_trait', { action: 'update', ...deniedArgs });
     expect(deniedRest.status).toBe(403);
     expect(deniedMcp.structured.body).toEqual(deniedRest.body);
     const privateRead = await call<Record<string, unknown>>(
       member,
-      'gpc_get_character',
+      'get_character',
       path(character.id),
     );
     expect(privateRead.body).toMatchObject({ view: 'minimal' });
     expect(privateRead.body).not.toHaveProperty('effects');
     expect(privateRead.body).not.toHaveProperty('traits');
-    await call(owner, 'gpc_update_character_trait', {
+    await call(owner, 'character_trait', {
+      action: 'update',
       ...traitPath,
       body: { customEffects: [] },
     });
-    const cleared = await call<{ effects: unknown[] }>(
-      owner,
-      'gpc_get_character',
-      path(character.id),
-    );
+    const cleared = await call<{ effects: unknown[] }>(owner, 'get_character', path(character.id));
     expect(cleared.body.effects).not.toContainEqual(
       expect.objectContaining({
         target: 'weapon_attack',
@@ -1431,22 +1491,26 @@ describe('delegated operation behavioral parity', () => {
     if (!client) throw new Error('client insert failed');
     const owner = await registerActor('points-owner', client.id);
     const campaign = (
-      await call<{ id: string }>(owner, 'gpc_create_campaign', {
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
         body: { name: 'Award parity campaign', pointTarget: 150 },
       })
     ).body;
     const first = (
-      await call<{ id: string }>(owner, 'gpc_create_character', {
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
         body: { name: 'Awarded PC', campaignId: campaign.id },
       })
     ).body;
     const second = (
-      await call<{ id: string }>(owner, 'gpc_create_character', {
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
         body: { name: 'Absent PC', campaignId: campaign.id },
       })
     ).body;
     const entry = (
-      await call<{ id: string; xpAwards: unknown[] }>(owner, 'gpc_create_adventure_log_entry', {
+      await call<{ id: string; xpAwards: unknown[] }>(owner, 'adventure_log_entry', {
+        action: 'create',
         ...path(campaign.id),
         body: { sessionDate: '2026-09-12', title: 'Award session', pointsGained: 3 },
       })
@@ -1456,20 +1520,24 @@ describe('delegated operation behavioral parity', () => {
       (
         await call<{ earnedPoints: number; points: { unspent: number } }>(
           owner,
-          'gpc_get_character',
+          'get_character',
           path(id),
         )
       ).body;
     expect((await read(first.id)).earnedPoints).toBe(3);
     expect((await read(second.id)).earnedPoints).toBe(3);
-    await call(owner, 'gpc_update_adventure_log_entry', {
+    await call(owner, 'adventure_log_entry', {
+      action: 'update',
       ...path(campaign.id, { entryId: entry.id }),
       body: { pointsGained: 6, awardCharacterIds: [first.id] },
     });
     expect((await read(first.id)).earnedPoints).toBe(6);
     expect((await read(first.id)).points.unspent).toBe(156);
     expect((await read(second.id)).earnedPoints).toBe(0);
-    await call(owner, 'gpc_delete_adventure_log_entry', path(campaign.id, { entryId: entry.id }));
+    await call(owner, 'adventure_log_entry', {
+      action: 'delete',
+      ...path(campaign.id, { entryId: entry.id }),
+    });
     expect((await read(first.id)).earnedPoints).toBe(0);
   });
 });

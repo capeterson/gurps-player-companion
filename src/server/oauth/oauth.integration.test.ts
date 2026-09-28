@@ -453,13 +453,13 @@ describe('delegated OAuth and MCP', () => {
       error?: unknown;
     };
     expect(payload.error).toBeUndefined();
-    expect(payload.result?.tools.some((tool) => tool.name === 'gpc_get_current_user')).toBe(true);
-    expect(payload.result?.tools.some((tool) => tool.name === 'gpc_create_character')).toBe(false);
+    expect(payload.result?.tools.some((tool) => tool.name === 'get_current_user')).toBe(true);
+    expect(payload.result?.tools.some((tool) => tool.name === 'character')).toBe(false);
     const called = await call({
       jsonrpc: '2.0',
       id: 3,
       method: 'tools/call',
-      params: { name: 'gpc_get_current_user', arguments: {} },
+      params: { name: 'get_current_user', arguments: {} },
     });
     expect(called.status).toBe(200);
     const callPayload = (await called.json()) as {
@@ -492,7 +492,8 @@ describe('delegated OAuth and MCP', () => {
       }>;
     };
     const idempotencyKey = randomUUID();
-    const created = await callTool('gpc_create_character', {
+    const created = await callTool('character', {
+      action: 'create',
       body: { name: 'Agent Character' },
       idempotencyKey,
     });
@@ -502,12 +503,14 @@ describe('delegated OAuth and MCP', () => {
       resourceId: string;
       revision: number;
     };
-    const replayed = await callTool('gpc_create_character', {
+    const replayed = await callTool('character', {
+      action: 'create',
       body: { name: 'Agent Character' },
       idempotencyKey,
     });
     expect(replayed.result.structuredContent.body).toEqual(createdBody);
-    const conflict = await callTool('gpc_create_character', {
+    const conflict = await callTool('character', {
+      action: 'create',
       body: { name: 'Different Character' },
       idempotencyKey,
     });

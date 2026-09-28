@@ -153,10 +153,8 @@ describe('independent delegated-access boundary review', () => {
     expect(newResponse.status).toBe(200);
     const oldCatalog = (await oldResponse.json()) as { result: { tools: Array<{ name: string }> } };
     const newCatalog = (await newResponse.json()) as { result: { tools: Array<{ name: string }> } };
-    expect(oldCatalog.result.tools.some((tool) => tool.name === 'gpc_create_character')).toBe(
-      false,
-    );
-    expect(newCatalog.result.tools.some((tool) => tool.name === 'gpc_create_character')).toBe(true);
+    expect(oldCatalog.result.tools.some((tool) => tool.name === 'character')).toBe(false);
+    expect(newCatalog.result.tools.some((tool) => tool.name === 'character')).toBe(true);
   });
 
   test('password change invalidates delegated tokens and reapproval never resurrects them', async () => {

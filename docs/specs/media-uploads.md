@@ -135,7 +135,7 @@ callers must still settle/check an uncertain in-flight upload before discarding
 its identity. Repeated uploads with altered target or content fail rather than
 allocating another asset under the same key.
 
-One typed `gpc_media` task tool groups capabilities/upload/status/cancel, with
+One typed `media` task tool groups capabilities/upload/status/cancel, with
 per-action OAuth scopes, canonical schemas, shared handlers and exact parity
 coverage. Mutation results are compact acknowledgements; status reads return the
 manifest. Existing parent update tools attach/remove images. Media uses its bound
