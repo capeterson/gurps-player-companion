@@ -19,6 +19,7 @@ const pointsGained = z.number().int().min(0).max(1000).nullable();
 export const adventureLogOut = z.object({
   id: uuid,
   campaignId: uuid,
+  characterId: uuid.nullable().optional(),
   authorId: uuid,
   authorDisplayName: z.string(),
   sessionDate: isoDate,
@@ -34,6 +35,12 @@ export const adventureLogOut = z.object({
 });
 
 export const adventureLogCreate = z.object({
+  characterId: uuid
+    .nullable()
+    .optional()
+    .describe(
+      'Attach to an owned character for a private entry; null attaches to Campaign (shared). Omit on update to retain the attachment.',
+    ),
   sessionDate: isoDate,
   sessionNumber: z.number().int().min(0).nullable().optional(),
   title: z.string().min(1).max(200).trim(),

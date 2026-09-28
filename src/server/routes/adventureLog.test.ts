@@ -642,3 +642,119 @@ it('locks transferred historical and new recipients together without cross-campa
   expect(await earnedPoints(accessToken, x.id)).toBe(9);
   expect(await earnedPoints(accessToken, y.id)).toBe(7);
 }, 10000);
+
+describe('adventure-log character attachments', () => {
+  it('defaults to Campaign, supports any owned character, guards ownership, and keeps private history hidden', async () => {
+    const owner = await registerUser('attachment-owner');
+    const author = await registerUser('attachment-author');
+    const campaignId = await createCampaign(owner.accessToken);
+    const otherCampaign = await createCampaign(author.accessToken);
+    expect(
+      (
+        await app.request(`/api/v1/campaigns/${campaignId}/members`, {
+          method: 'POST',
+          headers: jsonHeaders(owner.accessToken),
+          body: JSON.stringify({ email: author.email }),
+        })
+      ).status,
+    ).toBe(200);
+    const own = await createCharacter(author.accessToken, otherCampaign, 'Owned elsewhere');
+    const foreign = await createCharacter(owner.accessToken, campaignId, 'Foreign');
+    const shared = await createEntry(author.accessToken, campaignId);
+    expect(shared.characterId).toBeNull();
+    expect(shared.visibility).toBe('campaign');
+    const entry = await createEntry(author.accessToken, campaignId, {
+      characterId: own.id,
+      title: 'Hidden secret',
+    });
+    expect(entry.characterId).toBe(own.id);
+    expect(entry.visibility).toBe('private');
+    const list = async (token: string) =>
+      (await (
+        await app.request(`/api/v1/campaigns/${campaignId}/log`, { headers: jsonHeaders(token) })
+      ).json()) as Array<{ id: string }>;
+    expect((await list(author.accessToken)).some((row) => row.id === entry.id)).toBe(true);
+    expect((await list(owner.accessToken)).some((row) => row.id === entry.id)).toBe(false);
+    const history = await app.request(`/api/v1/campaigns/${campaignId}/history?detail=1`, {
+      headers: jsonHeaders(owner.accessToken),
+    });
+    expect(history.status).toBe(200);
+    expect(JSON.stringify(await history.json())).not.toContain('Hidden secret');
+    const entryPath = `/api/v1/campaigns/${campaignId}/log/${entry.id}`;
+    for (const characterId of [foreign.id, '11111111-1111-4111-8111-111111111111']) {
+      expect(
+        (
+          await app.request(`/api/v1/campaigns/${campaignId}/log`, {
+            method: 'POST',
+            headers: jsonHeaders(author.accessToken),
+            body: JSON.stringify({ sessionDate: '2026-01-15', title: 'Forged', characterId }),
+          })
+        ).status,
+      ).toBe(403);
+      expect(
+        (
+          await app.request(entryPath, {
+            method: 'PATCH',
+            headers: jsonHeaders(author.accessToken),
+            body: JSON.stringify({ characterId }),
+          })
+        ).status,
+      ).toBe(403);
+    }
+    const preserved = await app.request(entryPath, {
+      method: 'PATCH',
+      headers: jsonHeaders(author.accessToken),
+      body: JSON.stringify({ body: 'More secret notes' }),
+    });
+    expect(preserved.status).toBe(200);
+    expect(((await preserved.json()) as { characterId: string }).characterId).toBe(own.id);
+    const published = await app.request(entryPath, {
+      method: 'PATCH',
+      headers: jsonHeaders(author.accessToken),
+      body: JSON.stringify({ characterId: null }),
+    });
+    expect(published.status).toBe(200);
+    expect(((await published.json()) as { visibility: string }).visibility).toBe('campaign');
+    expect((await list(owner.accessToken)).some((row) => row.id === entry.id)).toBe(true);
+    // Publishing does not expose the old private snapshot through detailed history.
+    const afterHistory = await app.request(`/api/v1/campaigns/${campaignId}/history?detail=1`, {
+      headers: jsonHeaders(owner.accessToken),
+    });
+    expect(JSON.stringify(await afterHistory.json())).not.toContain('More secret notes');
+    expect(
+      (
+        await app.request(`/api/v1/campaigns/${campaignId}/log`, {
+          method: 'POST',
+          headers: jsonHeaders(author.accessToken),
+          body: JSON.stringify({
+            sessionDate: '2026-01-15',
+            title: 'Unattached',
+            visibility: 'private',
+          }),
+        })
+      ).status,
+    ).toBe(422);
+  });
+
+  it('preserves legacy and deleted-character private notes without publishing them', async () => {
+    const author = await registerUser('attachment-legacy');
+    const campaignId = await createCampaign(author.accessToken);
+    const own = await createCharacter(author.accessToken, campaignId, 'Deleted later');
+    const entry = await createEntry(author.accessToken, campaignId, { characterId: own.id });
+    expect(
+      (
+        await app.request(`/api/v1/characters/${own.id}`, {
+          method: 'DELETE',
+          headers: jsonHeaders(author.accessToken),
+        })
+      ).status,
+    ).toBe(204);
+    const edited = await app.request(`/api/v1/campaigns/${campaignId}/log/${entry.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(author.accessToken),
+      body: JSON.stringify({ body: 'Still private' }),
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ characterId: null, visibility: 'private' });
+  });
+});

@@ -490,3 +490,7 @@ because account creation is deliberately outside the delegated tool surface.
 
 The operational `/api/v1/readyz` probe is an explicit service-infrastructure
 exclusion alongside `/api/v1/healthz`; both report the running release.
+
+Adventure-log create/edit actions accept nullable `characterId`: selecting an owned
+character makes the entry private; null attaches to Campaign and shares it. Attachment
+ownership, legacy-private preservation, and history privacy use the shared REST handler.

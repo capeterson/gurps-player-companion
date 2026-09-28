@@ -176,6 +176,7 @@ export async function populateLanternCoast({
       sessionNumber: 4,
       title: `${fixture.character.name}: a promise unspoken`,
       visibility: 'private',
+      characterId: character.id,
       body: `A private note by **${fixture.displayName}**.\n\nI have not told the others what the beacon showed me.`,
     });
   }

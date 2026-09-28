@@ -528,10 +528,13 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
 
 - **Use a low-cost test subagent for test work.** Always delegate test
   execution and test-failure triage to a subagent to reduce token cost.
-  `gpt-5.6-luna` and Claude Sonnet are equivalent for this: use whichever the
+  Latest Luna and latest Claude Sonnet are equivalent for this: use whichever the
   current harness offers (Luna under Codex, a Sonnet subagent under Claude
-  Code), without needing to justify the choice. The primary agent still selects
-  the applicable tests, reviews the evidence, applies fixes, and owns final
+  Code), without needing to justify the choice. Use the latest available Sol,
+  Terra, and Luna versions (GPT 6.0 or newer where available), rather than
+  pinning an iteration. Latest Claude Opus is equivalent to latest Sol/Terra.
+  The primary agent still selects the applicable tests, reviews the evidence,
+  applies fixes, and owns final
   verification and PR readiness. If neither is available, state that explicitly
   and use the best available subagent rather than silently skipping delegation.
 - **Minimize public-auth registrations in browser tests.** Durable source rate

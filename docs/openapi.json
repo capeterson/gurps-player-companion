@@ -27331,6 +27331,11 @@
                         "type": "string",
                         "format": "uuid"
                       },
+                      "characterId": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uuid"
+                      },
                       "authorId": {
                         "type": "string",
                         "format": "uuid"
@@ -27473,6 +27478,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "characterId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid",
+                    "description": "Attach to an owned character for a private entry; null attaches to Campaign (shared). Omit on update to retain the attachment."
+                  },
                   "sessionDate": {
                     "type": "string",
                     "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
@@ -27568,6 +27579,11 @@
                     },
                     "campaignId": {
                       "type": "string",
+                      "format": "uuid"
+                    },
+                    "characterId": {
+                      "type": "string",
+                      "nullable": true,
                       "format": "uuid"
                     },
                     "authorId": {
@@ -27732,6 +27748,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "characterId": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "uuid",
+                    "description": "Attach to an owned character for a private entry; null attaches to Campaign (shared). Omit on update to retain the attachment."
+                  },
                   "sessionDate": {
                     "type": "string",
                     "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
@@ -27823,6 +27845,11 @@
                     },
                     "campaignId": {
                       "type": "string",
+                      "format": "uuid"
+                    },
+                    "characterId": {
+                      "type": "string",
+                      "nullable": true,
                       "format": "uuid"
                     },
                     "authorId": {
