@@ -39,8 +39,10 @@ and OAuth endpoints, while MCP tool schemas describe the JSON-RPC operations.
 
 `auth/session.ts` resolves app JWTs and API keys, while `oauth/service.ts`
 resolves a separate grant-backed OAuth principal. The delegated executor creates
-an in-memory Request and runs it through the same registered Hono/OpenAPI handler
-chain as REST. A private WeakMap keyed by Request identity supplies the actor;
+an in-memory HTTPS Request and runs it through the same registered Hono/OpenAPI
+handler chain as REST. The synthetic HTTPS URL avoids the production HTTP redirect
+boundary; dispatch stays in process and makes no TLS or network connection.
+A private WeakMap keyed by Request identity supplies the actor;
 external headers and bodies cannot enter that map. The executor never mints an
 app JWT, forwards a bearer token, or makes a network loopback.
 
