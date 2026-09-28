@@ -5,9 +5,10 @@ import { uuid } from '../../shared/schemas/common.ts';
 import {
   MEDIA_INPUT_BYTES,
   mediaCapabilities,
-  mediaContent,
-  mediaInitialize,
+  mediaLookup,
   mediaManifest,
+  mediaUpload,
+  mediaUploadQuery,
 } from '../../shared/schemas/media.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireSuperuser } from '../auth/permissions.ts';
@@ -21,11 +22,10 @@ import { mediaConfig } from '../services/media/config.ts';
 import {
   assetManifest,
   cancelMedia,
-  initializeMedia,
   publicMedia,
   readMediaAsset,
+  receiveMedia,
   takeDownMedia,
-  uploadMedia,
 } from '../services/media/service.ts';
 
 const router = createOpenApiApp();
@@ -54,6 +54,7 @@ router.openapi(
   createRoute({
     method: 'get',
     path: '/api/v1/media/capabilities',
+    summary: 'Check whether image uploads are enabled and read their size limit.',
     security,
     responses: {
       200: {
@@ -68,65 +69,76 @@ router.openapi(
   createRoute({
     method: 'post',
     path: '/api/v1/media/uploads',
+    summary:
+      'Upload an image with a stable clientUploadId; retry identical input after a lost response. Attach the returned asset using the character or campaign update.',
     security,
     request: {
-      body: { required: true, content: { 'application/json': { schema: mediaInitialize } } },
+      body: { required: true, content: { 'application/json': { schema: mediaUpload } } },
     },
     responses,
   }),
-  async (c) =>
-    c.json(
-      await initializeMedia(c.get('user').id, requestSource(c, loadConfig()), c.req.valid('json')),
+  async (c) => {
+    const input = c.req.valid('json');
+    const bytes = Buffer.from(input.base64, 'base64');
+    if (bytes.toString('base64') !== input.base64)
+      throw new HTTPException(422, { message: 'Invalid base64 image' });
+    return c.json(
+      await receiveMedia(c.get('user').id, requestSource(c, loadConfig()), input, bytes),
       200,
-    ),
+    );
+  },
 );
 router.openapi(
   createRoute({
     method: 'get',
     path: '/api/v1/media/uploads/{id}',
+    summary:
+      'Read image status and URLs by asset ID, or by the caller’s clientUploadId after a lost response.',
     security,
-    request: { params },
+    request: { params, query: mediaLookup },
     responses,
   }),
   async (c) =>
-    c.json(assetManifest(await readMediaAsset(c.get('user').id, c.req.valid('param').id)), 200),
+    c.json(
+      assetManifest(
+        await readMediaAsset(
+          c.get('user').id,
+          c.req.valid('param').id,
+          false,
+          c.req.valid('query').lookup === 'clientUploadId',
+        ),
+      ),
+      200,
+    ),
 );
 router.openapi(
   createRoute({
     method: 'delete',
     path: '/api/v1/media/uploads/{id}',
+    summary:
+      'Cancel an unattached image by asset ID or the caller’s clientUploadId. Remove attached images through character or campaign updates.',
     security,
-    request: { params },
+    request: { params, query: mediaLookup },
     responses,
   }),
-  async (c) => c.json(await cancelMedia(c.get('user').id, c.req.valid('param').id), 200),
+  async (c) =>
+    c.json(
+      await cancelMedia(
+        c.get('user').id,
+        c.req.valid('param').id,
+        c.req.valid('query').lookup === 'clientUploadId',
+      ),
+      200,
+    ),
 );
 router.openapi(
   createRoute({
     method: 'post',
-    path: '/api/v1/media/uploads/{id}/content',
+    path: '/api/v1/media/uploads/bytes',
+    summary: 'Binary form of the single-request image upload; metadata travels in the query.',
     security,
     request: {
-      params,
-      body: { required: true, content: { 'application/json': { schema: mediaContent } } },
-    },
-    responses,
-  }),
-  async (c) => {
-    const input = c.req.valid('json').base64;
-    const bytes = Buffer.from(input, 'base64');
-    if (bytes.toString('base64') !== input)
-      throw new HTTPException(422, { message: 'Invalid base64 image' });
-    return c.json(await uploadMedia(c.get('user').id, c.req.valid('param').id, bytes), 200);
-  },
-);
-router.openapi(
-  createRoute({
-    method: 'post',
-    path: '/api/v1/media/uploads/{id}/bytes',
-    security,
-    request: {
-      params,
+      query: mediaUploadQuery,
       body: {
         required: true,
         content: {
@@ -140,7 +152,15 @@ router.openapi(
     const bytes = new Uint8Array(await c.req.arrayBuffer());
     if (bytes.length > MEDIA_INPUT_BYTES)
       throw new HTTPException(413, { message: 'Image exceeds 10 MiB' });
-    return c.json(await uploadMedia(c.get('user').id, c.req.valid('param').id, bytes), 200);
+    return c.json(
+      await receiveMedia(
+        c.get('user').id,
+        requestSource(c, loadConfig()),
+        c.req.valid('query'),
+        bytes,
+      ),
+      200,
+    );
   },
 );
 

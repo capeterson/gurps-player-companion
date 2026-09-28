@@ -80,15 +80,27 @@ export function assetManifest(asset: Asset) {
   });
 }
 
-export async function readMediaAsset(userId: string, id: string, write = false): Promise<Asset> {
-  const [asset] = await getDb().select().from(mediaAssets).where(eq(mediaAssets.id, id));
+export async function readMediaAsset(
+  userId: string,
+  id: string,
+  write = false,
+  byClientUploadId = false,
+): Promise<Asset> {
+  const [asset] = await getDb()
+    .select()
+    .from(mediaAssets)
+    .where(
+      byClientUploadId
+        ? and(eq(mediaAssets.uploaderId, userId), eq(mediaAssets.clientUploadId, id))
+        : eq(mediaAssets.id, id),
+    );
   if (!asset) return fail(404, 'Image upload not found');
   await authorizeMediaTarget(userId, asset.targetType, asset.targetId, write);
   if (write && asset.uploaderId !== userId) fail(403, 'This upload belongs to another account');
   return asset;
 }
 
-export async function initializeMedia(
+async function initializeMedia(
   userId: string,
   source: string,
   body: z.infer<typeof mediaInitialize>,
@@ -153,7 +165,22 @@ export async function initializeMedia(
   });
 }
 
-export async function uploadMedia(userId: string, id: string, bytes: Uint8Array) {
+/** One public operation; its short reservation/processing transactions remain internal. */
+export async function receiveMedia(
+  userId: string,
+  source: string,
+  declaration: z.infer<typeof mediaInitialize>,
+  bytes: Uint8Array,
+) {
+  // Validate before reserving storage. A retry must carry the same bytes even
+  // when the previous response was lost after the asset became ready.
+  if (declaration.byteLength !== bytes.length || mediaDigest(bytes) !== declaration.sha256)
+    fail(422, 'Image bytes do not match the upload declaration');
+  const asset = await initializeMedia(userId, source, declaration);
+  return uploadMedia(userId, asset.id, bytes);
+}
+
+async function uploadMedia(userId: string, id: string, bytes: Uint8Array) {
   await assertUploadsEnabled(userId);
   const asset = await readMediaAsset(userId, id, true);
   if (asset.inputBytes !== bytes.length || mediaDigest(bytes) !== asset.sha256)
@@ -174,7 +201,8 @@ export async function uploadMedia(userId: string, id: string, bytes: Uint8Array)
       fail(409, 'Upload changed; reload its status');
     if (current.leased) fail(503, 'Image is already being processed');
     const count = await tx.execute<{ n: string }>(
-      sql`select count(*) as n from media_assets where state='processing' and lease_until>now()`,
+      // Cancelled writers retain a lease until their bounded I/O can settle.
+      sql`select count(*) as n from media_assets where lease_until>now()`,
     );
     if (Number(count.rows[0]?.n) >= mediaConfig().MEDIA_PROCESSING_CONCURRENCY)
       fail(503, 'Image processor is busy; retry shortly');
@@ -278,20 +306,22 @@ export async function prepareMediaAttachment(
     .where(eq(mediaAssets.id, asset.id));
 }
 
-export async function cancelMedia(userId: string, id: string) {
-  const asset = await readMediaAsset(userId, id, true);
+export async function cancelMedia(userId: string, id: string, byClientUploadId = false) {
+  const asset = await readMediaAsset(userId, id, true, byClientUploadId);
   return withAudit(userId, asset.clientUploadId, async (tx) => {
     const [locked] = await tx
       .select()
       .from(mediaAssets)
-      .where(eq(mediaAssets.id, id))
+      .where(eq(mediaAssets.id, asset.id))
       .for('update');
     if (!locked || locked.publishedAt)
       fail(409, 'Remove the image from its character or campaign instead');
     const [row] = await tx
       .update(mediaAssets)
-      .set({ state: 'cancelled', leaseUntil: null, reason: 'Upload cancelled' })
-      .where(eq(mediaAssets.id, id))
+      // A receiver may still be writing objects. Preserve its lease so cleanup
+      // waits for the writer plus the sweep's grace period before deleting.
+      .set({ state: 'cancelled', reason: 'Upload cancelled' })
+      .where(eq(mediaAssets.id, asset.id))
       .returning();
     if (!row) fail(404, 'Image upload not found');
     return assetManifest(row);

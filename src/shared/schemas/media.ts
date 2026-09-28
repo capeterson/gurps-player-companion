@@ -26,6 +26,17 @@ export const mediaContent = z
       .regex(/^[A-Za-z0-9+/]*={0,2}$/),
   })
   .strict();
+// One upload request binds the retry identity, target, declaration and bytes.
+export const mediaUpload = mediaInitialize.extend(mediaContent.shape).strict();
+export const mediaUploadQuery = mediaInitialize.extend({
+  byteLength: z.coerce.number().int().min(1).max(MEDIA_INPUT_BYTES),
+});
+export const mediaLookup = z.object({
+  lookup: z
+    .enum(['assetId', 'clientUploadId'])
+    .optional()
+    .describe('Defaults to assetId. clientUploadId looks up only the caller’s upload.'),
+});
 export const mediaManifest = z.object({
   id: uuid,
   state: z.enum(['pending', 'processing', 'ready', 'cancelled', 'deleting', 'rejected']),

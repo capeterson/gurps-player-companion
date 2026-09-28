@@ -86,7 +86,8 @@ then resumes the complete consent request after login.
 Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
 Claude-compatible Dynamic Client Registration, so supported public clients need
 no per-client server configuration or shared secret.
-Every player-domain raw API operation has a stable tool; security, administration,
+Every player-domain raw API operation has an exact tool/action mapping; typed
+media actions share one tool with action-specific schemas and permissions. Security, administration,
 replication, and transport endpoints have exact checked-in exclusions. MCP commits
 use the same route graph, validation, authorization, audit, revisions, and
 invalidation behavior as REST. Successful mutations return a compact

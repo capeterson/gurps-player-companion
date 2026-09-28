@@ -10,6 +10,7 @@ import {
 import type { IncludedOperation } from './operationManifest.ts';
 
 export interface OperationInput {
+  action?: string;
   path?: Record<string, unknown>;
   query?: Record<string, unknown>;
   body?: unknown;

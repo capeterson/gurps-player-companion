@@ -5313,6 +5313,7 @@
     },
     "/api/v1/media/capabilities": {
       "get": {
+        "summary": "Check whether image uploads are enabled and read their size limit.",
         "security": [
           {
             "bearerAuth": []
@@ -5346,6 +5347,7 @@
     },
     "/api/v1/media/uploads": {
       "post": {
+        "summary": "Upload an image with a stable clientUploadId; retry identical input after a lost response. Attach the returned asset using the character or campaign update.",
         "security": [
           {
             "bearerAuth": []
@@ -5381,6 +5383,12 @@
                   "sha256": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "base64": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 13981016,
+                    "pattern": "^[A-Za-z0-9+/]*={0,2}$"
                   }
                 },
                 "required": [
@@ -5388,7 +5396,8 @@
                   "targetType",
                   "targetId",
                   "byteLength",
-                  "sha256"
+                  "sha256",
+                  "base64"
                 ],
                 "additionalProperties": false
               }
@@ -5517,6 +5526,7 @@
     },
     "/api/v1/media/uploads/{id}": {
       "get": {
+        "summary": "Read image status and URLs by asset ID, or by the caller’s clientUploadId after a lost response.",
         "security": [
           {
             "bearerAuth": []
@@ -5531,6 +5541,20 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assetId",
+                "clientUploadId"
+              ],
+              "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+            },
+            "required": false,
+            "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload.",
+            "name": "lookup",
+            "in": "query"
           }
         ],
         "responses": {
@@ -5653,6 +5677,7 @@
         }
       },
       "delete": {
+        "summary": "Cancel an unattached image by asset ID or the caller’s clientUploadId. Remove attached images through character or campaign updates.",
         "security": [
           {
             "bearerAuth": []
@@ -5667,6 +5692,20 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "assetId",
+                "clientUploadId"
+              ],
+              "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+            },
+            "required": false,
+            "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload.",
+            "name": "lookup",
+            "in": "query"
           }
         ],
         "responses": {
@@ -5789,8 +5828,9 @@
         }
       }
     },
-    "/api/v1/media/uploads/{id}/content": {
+    "/api/v1/media/uploads/bytes": {
       "post": {
+        "summary": "Binary form of the single-request image upload; metadata travels in the query.",
         "security": [
           {
             "bearerAuth": []
@@ -5803,168 +5843,48 @@
               "format": "uuid"
             },
             "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "base64": {
-                    "type": "string",
-                    "minLength": 4,
-                    "maxLength": 13981016,
-                    "pattern": "^[A-Za-z0-9+/]*={0,2}$"
-                  }
-                },
-                "required": [
-                  "base64"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Image upload status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "state": {
-                      "type": "string",
-                      "enum": [
-                        "pending",
-                        "processing",
-                        "ready",
-                        "cancelled",
-                        "deleting",
-                        "rejected"
-                      ]
-                    },
-                    "thumbUrl": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "displayUrl": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "width": {
-                      "type": "integer",
-                      "nullable": true
-                    },
-                    "height": {
-                      "type": "integer",
-                      "nullable": true
-                    },
-                    "reason": {
-                      "type": "string",
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "state",
-                    "thumbUrl",
-                    "displayUrl",
-                    "width",
-                    "height",
-                    "reason"
-                  ]
-                }
-              }
-            }
+            "name": "clientUploadId",
+            "in": "query"
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Upload changed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Invalid image",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Quota exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Media temporarily unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorBody"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/media/uploads/{id}/bytes": {
-      "post": {
-        "security": [
           {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
+            "schema": {
+              "type": "string",
+              "enum": [
+                "character",
+                "campaign"
+              ]
+            },
+            "required": true,
+            "name": "targetType",
+            "in": "query"
+          },
           {
             "schema": {
               "type": "string",
               "format": "uuid"
             },
             "required": true,
-            "name": "id",
-            "in": "path"
+            "name": "targetId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10485760
+            },
+            "required": true,
+            "name": "byteLength",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "required": true,
+            "name": "sha256",
+            "in": "query"
           }
         ],
         "requestBody": {

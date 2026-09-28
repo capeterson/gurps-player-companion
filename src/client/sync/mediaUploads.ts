@@ -1,7 +1,6 @@
 import {
   MEDIA_INPUT_BYTES,
   MEDIA_LOCAL_BYTES,
-  type MediaManifest,
   type MediaTarget,
   mediaField,
   mediaManifest,
@@ -138,41 +137,26 @@ export async function drainOneImage(userId: string, signal: AbortSignal, reject:
       if (!parent || parent.accessRevoked)
         throw new ApiError(403, 'The character or campaign is no longer accessible');
       await db.mediaUploads.update(upload.id, { state: 'uploading' });
-      let manifest: MediaManifest;
-      if (upload.assetId)
-        manifest = mediaManifest.parse(await api(`/media/uploads/${upload.assetId}`, { signal }));
-      else
-        manifest = mediaManifest.parse(
-          await api('/media/uploads', {
-            method: 'POST',
-            body: {
-              clientUploadId: upload.id,
-              targetType: upload.targetType,
-              targetId: upload.targetId,
-              byteLength: upload.byteLength,
-              sha256: upload.sha256,
-            },
-            signal,
-          }),
-        );
+      const metadata = new URLSearchParams({
+        clientUploadId: upload.id,
+        targetType: upload.targetType,
+        targetId: upload.targetId,
+        byteLength: String(upload.byteLength),
+        sha256: upload.sha256,
+      });
+      // Repeat this same upload on every retry, including after a lost reply.
+      // The server binds clientUploadId to the target and content declaration.
+      const manifest = mediaManifest.parse(
+        await api(`/media/uploads/bytes?${metadata}`, {
+          method: 'POST',
+          rawBody: upload.blob,
+          headers: { 'content-type': 'application/octet-stream' },
+          signal,
+        }),
+      );
       if (signal.aborted) return;
-      await db.mediaUploads.update(upload.id, { assetId: manifest.id });
-      if (
-        manifest.state === 'rejected' ||
-        manifest.state === 'cancelled' ||
-        manifest.state === 'deleting'
-      )
-        throw new ApiError(422, manifest.reason ?? 'Upload is no longer available');
       if (manifest.state !== 'ready')
-        manifest = mediaManifest.parse(
-          await api(`/media/uploads/${manifest.id}/bytes`, {
-            method: 'POST',
-            rawBody: upload.blob,
-            headers: { 'content-type': 'application/octet-stream' },
-            signal,
-          }),
-        );
-      if (signal.aborted) return;
+        throw new ApiError(422, manifest.reason ?? 'Upload is no longer available');
       await db.transaction('rw', ALL_STORE_NAMES, async () => {
         if (signal.aborted) return;
         const current = await db.outbox.get(op.clientOpId);

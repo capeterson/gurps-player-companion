@@ -25,8 +25,13 @@ process.env.MEDIA_S3_SECRET_KEY = 'mcp-media-secret';
 process.env.MEDIA_UPLOADS_ENABLED = 'true';
 
 const mediaObjects = new Map<string, Uint8Array>();
+let failNextMediaPut = false;
 const testMediaStorage: MediaStorage = {
   async put(key, bytes) {
+    if (failNextMediaPut) {
+      failNextMediaPut = false;
+      throw new Error('injected storage outage');
+    }
     mediaObjects.set(key, Uint8Array.from(bytes));
   },
   async get(key) {
@@ -84,14 +89,20 @@ const handleMcp = createMcpHandler(config, app, document, {
     return response;
   },
 });
-const toolByName = new Map(TOOLS.map((tool) => [tool.tool, tool]));
 const stableIds = new Set<string>();
 
 interface OperationArgs {
+  action?: string;
   path?: Record<string, unknown>;
   query?: Record<string, unknown>;
   body?: unknown;
   idempotencyKey?: string;
+}
+
+function policyFor(name: string, args: OperationArgs) {
+  return TOOLS.find(
+    (entry) => entry.tool === name && (entry.action ? entry.action === args.action : !args.action),
+  );
 }
 
 class RestPreview extends Error {
@@ -126,6 +137,8 @@ function rememberIds(value: unknown): void {
 
 function normalizeParity(value: unknown, key = ''): unknown {
   if (typeof value === 'string') {
+    if (value.startsWith('/media/'))
+      return value.replace(/\/media\/[a-f0-9]{64}\//, '/media/<token>/');
     if (isUuid(value)) return stableIds.has(value) ? value : '<new-uuid>';
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)) return '<timestamp>';
     return value;
@@ -148,9 +161,9 @@ async function previewRest(
   name: string,
   args: OperationArgs,
 ): Promise<{ status: number; body: unknown; contentType: string | null }> {
-  const tool = toolByName.get(name);
-  if (!tool) throw new Error(`missing manifest tool ${name}`);
-  let pathname = tool.path;
+  const operation = policyFor(name, args);
+  if (!operation) throw new Error(`missing manifest operation ${name} action=${args.action ?? ''}`);
+  let pathname = operation.path;
   for (const [param, value] of Object.entries(args.path ?? {})) {
     pathname = pathname.replace(`{${param}}`, encodeURIComponent(String(value)));
   }
@@ -165,7 +178,7 @@ async function previewRest(
     await runInDbTransaction(async () => {
       const response = await app.fetch(
         new Request(url, {
-          method: tool.method,
+          method: operation.method,
           headers: {
             authorization: `Bearer ${actor.accessToken}`,
             accept: 'application/json, application/yaml, text/yaml',
@@ -252,8 +265,8 @@ async function call<T = unknown>(
 ): Promise<{ status: number; body: T; contentType: string | null }> {
   rememberIds(actor.principal.user.id);
   rememberIds(args);
-  const tool = toolByName.get(name);
-  if (!tool) throw new Error(`missing manifest tool ${name}`);
+  const operation = policyFor(name, args);
+  if (!operation) throw new Error(`missing manifest operation ${name} action=${args.action ?? ''}`);
   const rest = await previewRest(actor, name, args);
   const result = await callAny(actor, name, args);
   expect(
@@ -275,8 +288,10 @@ async function call<T = unknown>(
   expect(
     result.structured.contentType?.split(';', 1)[0] ?? null,
     `${name} REST content-type parity`,
-  ).toBe(tool.method === 'GET' ? (rest.contentType?.split(';', 1)[0] ?? null) : 'application/json');
-  if (tool.method === 'GET') {
+  ).toBe(
+    operation.method === 'GET' ? (rest.contentType?.split(';', 1)[0] ?? null) : 'application/json',
+  );
+  if (operation.method === 'GET') {
     expect(normalizeParity(result.structured.body), `${name} REST body parity`).toEqual(
       normalizeParity(rest.body),
     );
@@ -286,8 +301,8 @@ async function call<T = unknown>(
     );
   }
   rememberIds(result.raw.body);
-  exercised.add(name);
-  return (tool.method === 'GET' ? result.structured : result.raw) as {
+  exercised.add(operation.action ? `${name}#${operation.action}` : name);
+  return (operation.method === 'GET' ? result.structured : result.raw) as {
     status: number;
     body: T;
     contentType: string | null;
@@ -372,7 +387,11 @@ describe('delegated operation behavioral parity', () => {
     const owner = await registerActor('owner', client.id);
     const member = await registerActor('member', client.id);
 
-    const mediaCapabilities = await call<{ enabled: boolean }>(owner, 'gpc_get_media_capabilities');
+    const mediaCapabilities = await call<{ enabled: boolean; maxInputBytes: number }>(
+      owner,
+      'gpc_media',
+      { action: 'capabilities' },
+    );
     expect(mediaCapabilities.body.enabled).toBe(true);
     await call(owner, 'gpc_get_current_user');
     await call(owner, 'gpc_list_campaigns');
@@ -697,50 +716,47 @@ describe('delegated operation behavioral parity', () => {
       targetId: characterId,
       byteLength: mediaBytes.length,
       sha256: createHash('sha256').update(mediaBytes).digest('hex'),
+      base64: mediaBytes.toString('base64'),
     };
-    const mediaReservation = await call<{ id: string; state: string }>(
+    const mediaReady = await call<{ id: string; state: string; thumbUrl: string | null }>(
       owner,
-      'gpc_initialize_image_upload',
+      'gpc_media',
       {
+        action: 'upload',
         body: mediaDeclaration,
       },
     );
-    expect(mediaReservation.body.state).toBe('pending');
-    const mediaStatus = await call<{ id: string; state: string }>(
-      owner,
-      'gpc_get_image_upload',
-      path(mediaReservation.body.id),
-    );
-    expect(mediaStatus.body.state).toBe('pending');
-    const mediaReady = await call<{ id: string; state: string; thumbUrl: string | null }>(
-      owner,
-      'gpc_upload_image_content',
-      {
-        ...path(mediaReservation.body.id),
-        body: { base64: mediaBytes.toString('base64') },
-      },
-    );
-    expect(mediaReady.body.state).toBe('ready');
+    const mediaStatus = await call<{ id: string; state: string }>(owner, 'gpc_media', {
+      action: 'status',
+      ...path(mediaDeclaration.clientUploadId),
+      query: { lookup: 'clientUploadId' },
+    });
+    expect(mediaStatus.body).toMatchObject({ id: mediaReady.body.id, state: 'ready' });
+    const mediaRetry = await call<{ id: string; state: string }>(owner, 'gpc_media', {
+      action: 'upload',
+      body: mediaDeclaration,
+    });
+    expect(mediaRetry.body).toMatchObject({ id: mediaReady.body.id, state: 'ready' });
     expect(mediaReady.body.thumbUrl).not.toBeNull();
     await call(owner, 'gpc_update_character', {
       ...path(characterId),
       body: { portraitAssetId: mediaReady.body.id },
     });
-    const cancelledReservation = await call<{ id: string; state: string }>(
-      owner,
-      'gpc_initialize_image_upload',
-      {
-        body: {
-          ...mediaDeclaration,
-          clientUploadId: randomUUID(),
-        },
+    const cancelClientUploadId = randomUUID();
+    failNextMediaPut = true;
+    const failed = await callAny(owner, 'gpc_media', {
+      action: 'upload',
+      body: {
+        ...mediaDeclaration,
+        clientUploadId: cancelClientUploadId,
       },
-    );
-    const cancelled = await call<{ state: string }>(
-      owner,
-      'gpc_cancel_image_upload',
-      path(cancelledReservation.body.id),
-    );
+    });
+    expect(failed.structured.status).toBe(503);
+    const cancelled = await call<{ state: string }>(owner, 'gpc_media', {
+      action: 'cancel',
+      ...path(cancelClientUploadId),
+      query: { lookup: 'clientUploadId' },
+    });
     expect(cancelled.body.state).toBe('cancelled');
     await call(owner, 'gpc_update_character', {
       ...path(characterId),
@@ -821,7 +837,9 @@ describe('delegated operation behavioral parity', () => {
     ).body;
     await call(owner, 'gpc_delete_campaign', path(deleteCampaign.id));
 
-    expect([...exercised].sort()).toEqual(TOOLS.map((tool) => tool.tool).sort());
+    expect([...exercised].sort()).toEqual(
+      TOOLS.map((tool) => (tool.action ? `${tool.tool}#${tool.action}` : tool.tool)).sort(),
+    );
   });
 
   it('enforces the declared OAuth scope before dispatch for every tool', async () => {
@@ -857,7 +875,10 @@ describe('delegated operation behavioral parity', () => {
             jsonrpc: '2.0',
             id: ++requestId,
             method: 'tools/call',
-            params: { name: tool.tool, arguments: {} },
+            params: {
+              name: tool.tool,
+              arguments: tool.action ? { action: tool.action } : {},
+            },
           }),
         }),
       );

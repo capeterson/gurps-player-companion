@@ -121,6 +121,12 @@ and normalized path (or stable unique operationId once assigned). Each entry
 names the tool, schemas, handler, required scopes, mutation/destructive hints,
 and parity tests, or an exact exclusion with a reason. Do not use a catch-all
 HTTP/URL/SQL tool or wildcard exclusions that silently swallow new routes.
+Several exact operations may share a task tool only with distinct, explicit
+`action` discriminants. Generate each action branch from its canonical route
+schema, enforce its own OAuth scope, and test coverage per method/path/action.
+Discovery filters action branches and their schemas to the caller’s scopes;
+aggregate tool hints reflect all remaining actions. Dispatch validates the
+response against the selected operation before projecting an acknowledgement.
 
 Generate tool inputs and read outputs from the canonical shared schemas and
 validate every raw handler output as well as every input. Preserve required
@@ -133,7 +139,7 @@ validated before projection.
 The complete generated input/output catalog has a regression budget of 550 KB;
 the current bounded calculator, source, and modifier contracts account for
 about 535 KB. Compact mutation acknowledgements remain independently capped at
-2 KB per tool and aggregate outputs at 260 KB, so future schema growth
+2 KB per mutation operation (including grouped actions) and aggregate outputs at 260 KB, so future schema growth
 must remain bounded and avoid duplicating shared definitions.
 Keep stable tool names; descriptions explain field meaning and effects. Successful
 calls keep the authoritative payload only in `structuredContent`; their text
@@ -153,7 +159,8 @@ See [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/
 The normal `check` gate fails when:
 
 1. An emitted OpenAPI method/path has no exact mapping or justified exclusion,
-   a mapping references a removed operation, or tool names collide.
+   a mapping references a removed operation, or tool/action names collide. Repeated
+   tool names require distinct explicit actions; mixed grouped/ungrouped entries fail.
 2. The live `tools/list` catalog differs from the checked-in generated catalog,
    schemas, scope metadata, or operation mapping.
 3. REST and MCP executions from equivalent seeded DB states disagree on GET
@@ -194,8 +201,9 @@ MCP request IDs are not mutation deduplication keys. Define a shared mutation
 idempotency contract for REST and MCP: persist the key, actor/client, operation,
 input fingerprint, and outcome transactionally; identical retries replay the
 outcome, differing input rejects key reuse. Set a documented retention window.
-Only mutation tools advertise the optional `idempotencyKey` input; read tools do
-not expose a meaningless retry field.
+Only non-media mutation operations advertise the optional `idempotencyKey` input;
+read actions do not expose it. Image uploads instead require `clientUploadId`
+and identical metadata/content on retry; cancellation repeats against the same ID.
 Test lost-response retries for create, import, XP awards, and turn advancement.
 Use existing revision/turn checks; any added precondition must be shared by REST
 and MCP. Never silently retry a conflict with freshly fetched values. Return a
@@ -204,7 +212,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 105 player-domain tools and gives each excluded
+method/path. It exposes 101 player-domain tools and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -241,9 +249,9 @@ Non-development `/mcp` JSON responses use gzip compression when the client
 advertises it. Vite's development adapter remains uncompressed. This improves
 discovery transfer and startup latency but does not
 claim to reduce model tokens. Catalog order remains deterministic for client and
-prompt-cache stability. Scope filtering remains the standards-compatible tool
-surface reduction: the server does not hide authorized tools behind a catch-all
-executor or a non-standard per-request profile.
+prompt-cache stability. Scope filtering also applies within typed task tools: read-only delegates see
+only read actions, schemas, descriptions and hints. The server does not hide
+authorized operations behind a catch-all executor or a non-standard profile.
 
 Successful read payloads likewise appear only in `structuredContent`, avoiding
 the former JSON-in-text duplicate. This intentionally relies on structured-output
@@ -405,18 +413,29 @@ wielder/weapon strength source. Legacy notation is retained for repair after
 migration; the roll path does not parse it. MCP tool schemas and the checked-in catalog are generated from the
 same route schemas; old free-text Range writes are rejected.
 
-## Image upload tools
+## Image upload task tool
 
-Five shared-handler tools cover media capabilities, initialization, status,
-base64 content submission and cancellation. Normal character/campaign patch
-tools attach ready `portraitAssetId`/`coverAssetId` values, with the same scoped
-attachment guard as sync. Binary upload is explicitly excluded because the JSON
-equivalent supports MCP; public image delivery and admin moderation are exact
-transport/admin exclusions. Media owns short transactions and durable upload-key
-idempotency so reservations commit before storage I/O, avoiding the generic
-response journal’s outer transaction and duplicate request-body buffering. Delegated execution retains the trusted
-authority and audit context without an outer transaction around object I/O.
-The authenticated MCP envelope is bounded at 14 MiB to fit a 10 MiB base64 input;
-server image limits still apply and four in-flight requests per process bound
-aggregate envelope memory. Mutation acknowledgements stay compact, so read
-status to obtain the asset manifest. Full lifecycle: [media-uploads.md](media-uploads.md).
+One `gpc_media` tool exposes four explicit actions: `capabilities` and `status`
+require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 101-tool catalog
+maps 104 player operations; each action retains an exact method/path mapping,
+canonical request/response validators and REST parity coverage. An unknown
+action, a mixed-action payload or insufficient scope cannot dispatch a request.
+
+`upload` submits metadata and canonical base64 content together, with a stable
+`clientUploadId` binding retries to the same uploader, target, digest and size.
+It returns the ordinary compact acknowledgement containing the server asset ID.
+Normal character/campaign update tools attach that ID as `portraitAssetId` or
+`coverAssetId`. `status` returns the manifest; `status` and `cancel` accept either
+an asset ID or `query.lookup: "clientUploadId"` for the caller’s own retry ID,
+including when an upload response was lost or processing is still in flight.
+There is no public initialization-only or separate content-submission operation.
+Media uses `clientUploadId`, not the generic `idempotencyKey` argument.
+
+Binary upload is exactly excluded because the JSON form is equivalent; public
+image delivery and admin moderation remain exact transport/admin exclusions.
+Media owns short audited reservations and processing leases before storage I/O,
+avoiding the generic response journal’s outer transaction and duplicate body
+buffering. Delegated execution retains trusted authority and audit context.
+The authenticated MCP envelope remains bounded at 14 MiB to fit a 10 MiB base64
+input; four in-flight requests per process bound aggregate memory. Full lifecycle:
+[media-uploads.md](media-uploads.md).

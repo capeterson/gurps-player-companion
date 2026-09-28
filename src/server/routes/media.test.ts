@@ -24,6 +24,7 @@ const mediaEnvironment = {
   MEDIA_UPLOADS_PER_DAY: '100',
   MEDIA_UPLOADS_PER_IP_HOUR: '1000',
   MEDIA_UPLOADS_PER_HOUR_TOTAL: '1000',
+  MEDIA_PROCESSING_CONCURRENCY: '1',
   MEDIA_READS_PER_IP_HOUR: '10000',
   MEDIA_READ_BYTES_PER_HOUR: String(100 * 1024 * 1024),
 };
@@ -36,8 +37,15 @@ const app = createApp(integrationTestConfig);
 const objects = new Map<string, Uint8Array>();
 let failRemovePrefix: string | undefined;
 let failedRemovals = 0;
+let putGate: { started: () => void; release: Promise<void> } | undefined;
 const storage: MediaStorage = {
   async put(key, bytes) {
+    const gate = putGate;
+    if (gate) {
+      putGate = undefined;
+      gate.started();
+      await gate.release;
+    }
     objects.set(key, Uint8Array.from(bytes));
   },
   async get(key) {
@@ -64,6 +72,7 @@ beforeEach(() => {
   objects.clear();
   failRemovePrefix = undefined;
   failedRemovals = 0;
+  putGate = undefined;
   setMediaStorageForTests(storage);
 });
 
@@ -113,9 +122,9 @@ async function createCampaign(token: string) {
   return (await response.json()) as { id: string; coverAssetId: string | null };
 }
 
-async function png() {
+async function png(background = { r: 80, g: 120, b: 160 }) {
   return sharp({
-    create: { width: 32, height: 24, channels: 3, background: { r: 80, g: 120, b: 160 } },
+    create: { width: 32, height: 24, channels: 3, background },
   })
     .png()
     .toBuffer();
@@ -126,8 +135,8 @@ async function initialize(
   targetType: 'character' | 'campaign',
   targetId: string,
   bytes: Uint8Array,
+  clientUploadId = randomUUID(),
 ) {
-  const clientUploadId = randomUUID();
   const response = await app.request('/api/v1/media/uploads', {
     method: 'POST',
     headers: jsonHeaders(token),
@@ -137,6 +146,7 @@ async function initialize(
       targetId,
       byteLength: bytes.length,
       sha256: createHash('sha256').update(bytes).digest('hex'),
+      base64: Buffer.from(bytes).toString('base64'),
     }),
   });
   return { response, clientUploadId };
@@ -150,19 +160,7 @@ async function upload(
 ) {
   const { response, clientUploadId } = await initialize(token, targetType, targetId, bytes);
   expect(response.status).toBe(200);
-  const initialized = (await response.json()) as {
-    id: string;
-    state: string;
-    thumbUrl: string | null;
-  };
-  expect(initialized.state).toBe('pending');
-  const content = await app.request(`/api/v1/media/uploads/${initialized.id}/bytes`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/octet-stream' },
-    body: Buffer.from(bytes),
-  });
-  expect(content.status).toBe(200);
-  const ready = (await content.json()) as {
+  const ready = (await response.json()) as {
     id: string;
     state: string;
     thumbUrl: string | null;
@@ -268,6 +266,11 @@ describe('media upload and public image routes', () => {
       headers: { authorization: `Bearer ${member.accessToken}` },
     });
     expect(memberStatus.status).toBe(200);
+    const memberClientUploadLookup = await app.request(
+      `/api/v1/media/uploads/${cover.clientUploadId}?lookup=clientUploadId`,
+      { headers: { authorization: `Bearer ${member.accessToken}` } },
+    );
+    expect(memberClientUploadLookup.status).toBe(404);
     const memberPatch = await app.request(`/api/v1/campaigns/${campaign.id}`, {
       method: 'PATCH',
       headers: jsonHeaders(member.accessToken),
@@ -287,36 +290,40 @@ describe('media upload and public image routes', () => {
     const owner = await register('idempotent');
     const character = await createCharacter(owner.accessToken);
     const bytes = await png();
-    const first = await initialize(owner.accessToken, 'character', character.id, bytes);
-    const firstBody = (await first.response.json()) as { id: string };
+    const firstClientUploadId = randomUUID();
+    const first = await initialize(
+      owner.accessToken,
+      'character',
+      character.id,
+      bytes,
+      firstClientUploadId,
+    );
+    const firstBody = (await first.response.json()) as { id: string; state: string };
     expect(first.response.status).toBe(200);
+    expect(firstBody.state).toBe('ready');
 
-    const retry = await app.request('/api/v1/media/uploads', {
-      method: 'POST',
-      headers: jsonHeaders(owner.accessToken),
-      body: JSON.stringify({
-        clientUploadId: first.clientUploadId,
-        targetType: 'character',
-        targetId: character.id,
-        byteLength: bytes.length,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-      }),
+    const retry = await initialize(
+      owner.accessToken,
+      'character',
+      character.id,
+      bytes,
+      first.clientUploadId,
+    );
+    expect(retry.response.status).toBe(200);
+    expect((await retry.response.json()) as { id: string; state: string }).toMatchObject({
+      id: firstBody.id,
+      state: 'ready',
     });
-    expect(retry.status).toBe(200);
-    expect(((await retry.json()) as { id: string }).id).toBe(firstBody.id);
 
-    const conflict = await app.request('/api/v1/media/uploads', {
-      method: 'POST',
-      headers: jsonHeaders(owner.accessToken),
-      body: JSON.stringify({
-        clientUploadId: first.clientUploadId,
-        targetType: 'character',
-        targetId: character.id,
-        byteLength: bytes.length,
-        sha256: 'f'.repeat(64),
-      }),
-    });
-    expect(conflict.status).toBe(409);
+    const changedBytes = await png({ r: 12, g: 34, b: 56 });
+    const conflict = await initialize(
+      owner.accessToken,
+      'character',
+      character.id,
+      changedBytes,
+      first.clientUploadId,
+    );
+    expect(conflict.response.status).toBe(409);
   });
 
   it('applies transactional per-account quotas across upload reservations', async () => {
@@ -337,6 +344,88 @@ describe('media upload and public image routes', () => {
         delete process.env.MEDIA_USER_BYTES;
       } else process.env.MEDIA_USER_BYTES = previous;
     }
+  });
+
+  it('cancels by clientUploadId while storage is blocked and cleanup honors the live writer lease', async () => {
+    const owner = await register('cancel-client-id');
+    const character = await createCharacter(owner.accessToken);
+    const bytes = await png();
+    const clientUploadId = randomUUID();
+    let started!: () => void;
+    let release!: () => void;
+    const putStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const putRelease = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    putGate = { started, release: putRelease };
+
+    const uploadRequest = initialize(
+      owner.accessToken,
+      'character',
+      character.id,
+      bytes,
+      clientUploadId,
+    );
+    await putStarted;
+
+    const cancelled = await app.request(
+      `/api/v1/media/uploads/${clientUploadId}?lookup=clientUploadId`,
+      { method: 'DELETE', headers: { authorization: `Bearer ${owner.accessToken}` } },
+    );
+    expect(cancelled.status).toBe(200);
+    expect(((await cancelled.json()) as { state: string }).state).toBe('cancelled');
+
+    await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'maintenance'));
+    await sweepMedia();
+    const [stillLeased] = await getDb()
+      .select()
+      .from(mediaAssets)
+      .where(eq(mediaAssets.clientUploadId, clientUploadId));
+    expect(stillLeased?.state).toBe('cancelled');
+    expect(stillLeased?.leaseUntil?.getTime()).toBeGreaterThan(Date.now());
+
+    const blockedClientUploadId = randomUUID();
+    const blockedByRetainedLease = await initialize(
+      owner.accessToken,
+      'character',
+      character.id,
+      bytes,
+      blockedClientUploadId,
+    );
+    expect(blockedByRetainedLease.response.status).toBe(503);
+    await app.request(`/api/v1/media/uploads/${blockedClientUploadId}?lookup=clientUploadId`, {
+      method: 'DELETE',
+      headers: { authorization: `Bearer ${owner.accessToken}` },
+    });
+
+    release();
+    expect((await uploadRequest).response.status).toBe(409);
+    await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'maintenance'));
+    await sweepMedia();
+    expect(
+      await getDb()
+        .select()
+        .from(mediaAssets)
+        .where(eq(mediaAssets.clientUploadId, clientUploadId)),
+    ).toHaveLength(1);
+
+    await getDb()
+      .update(mediaAssets)
+      .set({ leaseUntil: new Date(Date.now() - 10 * 60_000) })
+      .where(eq(mediaAssets.clientUploadId, clientUploadId));
+    await getDb().delete(mediaCounters).where(eq(mediaCounters.key, 'maintenance'));
+    await sweepMedia();
+    expect(
+      await getDb()
+        .select()
+        .from(mediaAssets)
+        .where(eq(mediaAssets.clientUploadId, clientUploadId)),
+    ).toHaveLength(0);
+    expect([...objects.keys()].some((key) => key.startsWith(`images/${stillLeased?.id}/`))).toBe(
+      false,
+    );
   });
 
   it('takes down a published asset, clears its reference, and prevents further origin reads', async () => {

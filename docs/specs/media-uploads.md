@@ -48,11 +48,14 @@ Configure proxy access logs to redact `/media/` tokens as the app's error logs d
    50 MiB aggregate pending-source limit. Object URLs provide immediate previews.
 2. A separate cross-tab media lock drains uploads without blocking ordinary
    text edits. It waits for speculative character creation to be acknowledged.
-   Initialization binds the client upload UUID to the uploader, target, SHA-256
-   and exact byte length. Retrying that declaration returns the same server asset.
+   One request carries bytes plus the client upload UUID, target, SHA-256 and
+   exact byte length. Retrying the identical request returns the same server
+   asset, including after a lost success response. No initialization round trip
+   or status-before-upload request is needed.
 3. The authenticated binary endpoint streams through a bounded body reader;
-   JSON/base64 is an equivalent endpoint for MCP clients. The server checks the
-   declaration, takes a PostgreSQL processing lease, decodes, rotates, strips
+   JSON/base64 is an equivalent endpoint for MCP clients. The server checks bytes against the
+   declaration before allocating storage, reserves quota internally, takes a
+   PostgreSQL processing lease, decodes, rotates, strips
    metadata and re-encodes to sRGB WebP. Only sanitized variants enter S3.
 4. Two immutable variants are generated, without enlargement: portrait 256/1024
    pixels and cover 640/1920 pixels (longest side). Thumbnails are limited to
@@ -121,16 +124,25 @@ History retains reference UUIDs, not an indefinite archive of old photographs.
 
 ## API, MCP and code map
 
-Authenticated `/api/v1/media`: `GET /capabilities`, `POST /uploads`,
-`GET|DELETE /uploads/{id}`, `POST /uploads/{id}/bytes` (binary) and
-`POST /uploads/{id}/content` (canonical base64 JSON). Initialization/content/status
-return the manifest; clients explicitly re-read after compact MCP mutation acks.
-Media uses its bound upload UUID and processing state for idempotency, avoiding
-the generic response journal’s outer transaction and duplicate body buffering. MCP uses the same handlers,
-authority, validation and audit context; media manages its own short transactions
-so database reservations commit before object I/O. Binary transport is exactly
-excluded as a tool because the JSON equivalent is available; public delivery and
-admin routes have explicit exclusions.
+Authenticated `/api/v1/media`: `GET /capabilities`, `POST /uploads` (metadata plus
+canonical base64 JSON), `POST /uploads/bytes` (binary with metadata in query),
+and `GET|DELETE /uploads/{id}`. Status/cancellation default to server asset IDs;
+`?lookup=clientUploadId` uses the caller’s retry UUID, scoped to that uploader.
+This permits recovery and cancellation during processing without a separate
+initialization endpoint. A cancelled active writer retains its lease so cleanup
+cannot race object writes. Cancellation before allocation may return 404;
+callers must still settle/check an uncertain in-flight upload before discarding
+its identity. Repeated uploads with altered target or content fail rather than
+allocating another asset under the same key.
+
+One typed `gpc_media` task tool groups capabilities/upload/status/cancel, with
+per-action OAuth scopes, canonical schemas, shared handlers and exact parity
+coverage. Mutation results are compact acknowledgements; status reads return the
+manifest. Existing parent update tools attach/remove images. Media uses its bound
+client UUID and processing state for idempotency, avoiding the generic response
+journal’s outer transaction and duplicate body buffering. Binary transport,
+public delivery and admin routes have explicit exclusions. Reservation and lease
+transactions commit before object I/O on both REST and MCP paths.
 
 - Shared contract: `src/shared/schemas/media.ts`.
 - Server: `src/server/routes/media.ts`, `src/server/services/media/`;

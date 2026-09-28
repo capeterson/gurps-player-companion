@@ -5,7 +5,7 @@
       "kind": "tool",
       "method": "GET",
       "path": "/api/v1/media/capabilities",
-      "tool": "gpc_get_media_capabilities",
+      "tool": "gpc_media",
       "scope": "gpc:read",
       "destructive": false,
       "openWorld": false,
@@ -15,13 +15,14 @@
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "action": "capabilities"
     },
     {
       "kind": "tool",
       "method": "POST",
       "path": "/api/v1/media/uploads",
-      "tool": "gpc_initialize_image_upload",
+      "tool": "gpc_media",
       "scope": "gpc:write",
       "destructive": false,
       "openWorld": false,
@@ -31,13 +32,14 @@
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "action": "upload"
     },
     {
       "kind": "tool",
       "method": "GET",
       "path": "/api/v1/media/uploads/{id}",
-      "tool": "gpc_get_image_upload",
+      "tool": "gpc_media",
       "scope": "gpc:read",
       "destructive": false,
       "openWorld": false,
@@ -47,29 +49,14 @@
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
-    },
-    {
-      "kind": "tool",
-      "method": "POST",
-      "path": "/api/v1/media/uploads/{id}/content",
-      "tool": "gpc_upload_image_content",
-      "scope": "gpc:write",
-      "destructive": false,
-      "openWorld": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "compact-mutation-ack",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "action": "status"
     },
     {
       "kind": "tool",
       "method": "DELETE",
       "path": "/api/v1/media/uploads/{id}",
-      "tool": "gpc_cancel_image_upload",
+      "tool": "gpc_media",
       "scope": "gpc:write",
       "destructive": true,
       "openWorld": false,
@@ -79,12 +66,13 @@
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "action": "cancel"
     },
     {
       "kind": "excluded",
       "method": "POST",
-      "path": "/api/v1/media/uploads/{id}/bytes",
+      "path": "/api/v1/media/uploads/bytes",
       "reason": "Binary transport; equivalent bounded JSON content operation is exposed"
     },
     {
@@ -1968,473 +1956,588 @@
   ],
   "tools": [
     {
-      "name": "gpc_get_media_capabilities",
-      "description": "GET /api/v1/media/capabilities",
+      "name": "gpc_media",
+      "description": "capabilities: Check whether image uploads are enabled and read their size limit.\nupload: Upload an image with a stable clientUploadId; retry identical input after a lost response. Attach the returned asset using the character or campaign update.\nstatus: Read image status and URLs by asset ID, or by the caller’s clientUploadId after a lost response.\ncancel: Cancel an unattached image by asset ID or the caller’s clientUploadId. Remove attached images through character or campaign updates.",
       "inputSchema": {
         "type": "object",
-        "properties": {},
-        "required": [],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "minimum": 100,
-            "maximum": 599
-          },
-          "contentType": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "body": {}
-        },
-        "required": [
-          "status",
-          "contentType",
-          "body"
-        ],
-        "additionalProperties": false,
         "anyOf": [
           {
-            "properties": {
-              "status": {
-                "const": 200
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "enabled": {
-                    "type": "boolean"
-                  },
-                  "maxInputBytes": {
-                    "type": "number"
-                  }
-                },
-                "required": [
-                  "enabled",
-                  "maxInputBytes"
-                ]
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "error": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "error"
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "requiredScope": "gpc:read",
-        "operation": "GET /api/v1/media/capabilities",
-        "resultMode": "canonical-read"
-      },
-      "operation": "GET /api/v1/media/capabilities",
-      "scope": "gpc:read",
-      "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "canonical-read",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
-    },
-    {
-      "name": "gpc_initialize_image_upload",
-      "description": "POST /api/v1/media/uploads",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "body": {
             "type": "object",
             "properties": {
-              "clientUploadId": {
+              "action": {
                 "type": "string",
-                "format": "uuid"
-              },
-              "targetType": {
-                "type": "string",
-                "enum": [
-                  "character",
-                  "campaign"
-                ]
-              },
-              "targetId": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "byteLength": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 10485760
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
+                "const": "capabilities"
               }
             },
             "required": [
-              "clientUploadId",
-              "targetType",
-              "targetId",
-              "byteLength",
-              "sha256"
+              "action"
             ],
             "additionalProperties": false
           },
-          "idempotencyKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "description": "Stable mutation retry key. Reuse only with identical input."
-          }
-        },
-        "required": [
-          "body"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "minimum": 100,
-            "maximum": 599
-          },
-          "contentType": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "body": {}
-        },
-        "required": [
-          "status",
-          "contentType",
-          "body"
-        ],
-        "additionalProperties": false,
-        "anyOf": [
           {
+            "type": "object",
             "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 200,
-                "maximum": 299
-              },
-              "contentType": {
-                "const": "application/json"
+              "action": {
+                "type": "string",
+                "const": "upload"
               },
               "body": {
                 "type": "object",
                 "properties": {
-                  "acknowledged": {
-                    "const": true,
-                    "description": "The delegated mutation committed successfully."
-                  },
-                  "resourceId": {
+                  "clientUploadId": {
                     "type": "string",
-                    "format": "uuid",
-                    "description": "The most specific affected resource id, when one is available."
+                    "format": "uuid"
                   },
-                  "revision": {
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "character",
+                      "campaign"
+                    ]
+                  },
+                  "targetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "byteLength": {
                     "type": "integer",
-                    "minimum": 0,
-                    "description": "The affected resource revision, when the REST result exposes one."
+                    "minimum": 1,
+                    "maximum": 10485760
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "base64": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 13981016,
+                    "pattern": "^[A-Za-z0-9+/]*={0,2}$"
                   }
                 },
                 "required": [
-                  "acknowledged"
+                  "clientUploadId",
+                  "targetType",
+                  "targetId",
+                  "byteLength",
+                  "sha256",
+                  "base64"
                 ],
                 "additionalProperties": false
               }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "error": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "error"
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "requiredScope": "gpc:write",
-        "operation": "POST /api/v1/media/uploads",
-        "resultMode": "compact-mutation-ack"
-      },
-      "operation": "POST /api/v1/media/uploads",
-      "scope": "gpc:write",
-      "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "compact-mutation-ack",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
-    },
-    {
-      "name": "gpc_get_image_upload",
-      "description": "GET /api/v1/media/uploads/{id}",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              }
             },
             "required": [
-              "id"
+              "action",
+              "body"
             ],
             "additionalProperties": false
-          }
-        },
-        "required": [
-          "path"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "minimum": 100,
-            "maximum": 599
           },
-          "contentType": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "body": {}
-        },
-        "required": [
-          "status",
-          "contentType",
-          "body"
-        ],
-        "additionalProperties": false,
-        "anyOf": [
           {
+            "type": "object",
             "properties": {
-              "status": {
-                "const": 200
+              "action": {
+                "type": "string",
+                "const": "status"
               },
-              "body": {
+              "path": {
                 "type": "object",
                 "properties": {
                   "id": {
                     "type": "string",
                     "format": "uuid"
-                  },
-                  "state": {
-                    "type": "string",
-                    "enum": [
-                      "pending",
-                      "processing",
-                      "ready",
-                      "cancelled",
-                      "deleting",
-                      "rejected"
-                    ]
-                  },
-                  "thumbUrl": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "displayUrl": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "width": {
-                    "anyOf": [
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "height": {
-                    "anyOf": [
-                      {
-                        "type": "integer"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "reason": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
                   }
                 },
                 "required": [
-                  "id",
-                  "state",
-                  "thumbUrl",
-                  "displayUrl",
-                  "width",
-                  "height",
-                  "reason"
-                ]
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "const": 403
+                  "id"
+                ],
+                "additionalProperties": false
               },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
+              "query": {
+                "type": "object",
+                "properties": {
+                  "lookup": {
+                    "type": "string",
+                    "enum": [
+                      "assetId",
+                      "clientUploadId"
+                    ],
+                    "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
               }
-            }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
           },
           {
+            "type": "object",
             "properties": {
-              "status": {
-                "const": 404
+              "action": {
+                "type": "string",
+                "const": "cancel"
               },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "const": 409
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
               },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
+              "query": {
+                "type": "object",
+                "properties": {
+                  "lookup": {
+                    "type": "string",
+                    "enum": [
+                      "assetId",
+                      "clientUploadId"
+                    ],
+                    "description": "Defaults to assetId. clientUploadId looks up only the caller’s upload."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
               }
-            }
-          },
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "anyOf": [
           {
-            "properties": {
-              "status": {
-                "const": 422
-              },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "const": 429
-              },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "const": 503
-              },
-              "body": {
-                "$ref": "#/$defs/ErrorBody"
-              }
-            }
-          },
-          {
+            "type": "object",
             "properties": {
               "status": {
                 "type": "integer",
-                "minimum": 400,
+                "minimum": 100,
                 "maximum": 599
               },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "error": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "error"
+              "contentType": {
+                "type": [
+                  "string",
+                  "null"
                 ]
+              },
+              "body": {}
+            },
+            "required": [
+              "status",
+              "contentType",
+              "body"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "status": {
+                    "const": 200
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "maxInputBytes": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "maxInputBytes"
+                    ]
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ]
+                  }
+                }
               }
-            }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "contentType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body": {}
+            },
+            "required": [
+              "status",
+              "contentType",
+              "body"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 200,
+                    "maximum": 299
+                  },
+                  "contentType": {
+                    "const": "application/json"
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "acknowledged": {
+                        "const": true,
+                        "description": "The delegated mutation committed successfully."
+                      },
+                      "resourceId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The most specific affected resource id, when one is available."
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The affected resource revision, when the REST result exposes one."
+                      }
+                    },
+                    "required": [
+                      "acknowledged"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "contentType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body": {}
+            },
+            "required": [
+              "status",
+              "contentType",
+              "body"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "status": {
+                    "const": 200
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "processing",
+                          "ready",
+                          "cancelled",
+                          "deleting",
+                          "rejected"
+                        ]
+                      },
+                      "thumbUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "displayUrl": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "width": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "height": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "reason": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "state",
+                      "thumbUrl",
+                      "displayUrl",
+                      "width",
+                      "height",
+                      "reason"
+                    ]
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 403
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 404
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 409
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 422
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 429
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "const": 503
+                  },
+                  "body": {
+                    "$ref": "#/$defs/ErrorBody"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              "contentType": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "body": {}
+            },
+            "required": [
+              "status",
+              "contentType",
+              "body"
+            ],
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 200,
+                    "maximum": 299
+                  },
+                  "contentType": {
+                    "const": "application/json"
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "acknowledged": {
+                        "const": true,
+                        "description": "The delegated mutation committed successfully."
+                      },
+                      "resourceId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "The most specific affected resource id, when one is available."
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "The affected resource revision, when the REST result exposes one."
+                      }
+                    },
+                    "required": [
+                      "acknowledged"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "status": {
+                    "type": "integer",
+                    "minimum": 400,
+                    "maximum": 599
+                  },
+                  "body": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "error"
+                    ]
+                  }
+                }
+              }
+            ]
           }
         ],
         "$defs": {
@@ -2452,308 +2555,87 @@
         }
       },
       "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "requiredScope": "gpc:read",
-        "operation": "GET /api/v1/media/uploads/{id}",
-        "resultMode": "canonical-read"
-      },
-      "operation": "GET /api/v1/media/uploads/{id}",
-      "scope": "gpc:read",
-      "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "canonical-read",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
-    },
-    {
-      "name": "gpc_upload_image_content",
-      "description": "POST /api/v1/media/uploads/{id}/content",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "additionalProperties": false
-          },
-          "body": {
-            "type": "object",
-            "properties": {
-              "base64": {
-                "type": "string",
-                "minLength": 4,
-                "maxLength": 13981016,
-                "pattern": "^[A-Za-z0-9+/]*={0,2}$"
-              }
-            },
-            "required": [
-              "base64"
-            ],
-            "additionalProperties": false
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "description": "Stable mutation retry key. Reuse only with identical input."
-          }
-        },
-        "required": [
-          "path",
-          "body"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "minimum": 100,
-            "maximum": 599
-          },
-          "contentType": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "body": {}
-        },
-        "required": [
-          "status",
-          "contentType",
-          "body"
-        ],
-        "additionalProperties": false,
-        "anyOf": [
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 200,
-                "maximum": 299
-              },
-              "contentType": {
-                "const": "application/json"
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "acknowledged": {
-                    "const": true,
-                    "description": "The delegated mutation committed successfully."
-                  },
-                  "resourceId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "The most specific affected resource id, when one is available."
-                  },
-                  "revision": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "The affected resource revision, when the REST result exposes one."
-                  }
-                },
-                "required": [
-                  "acknowledged"
-                ],
-                "additionalProperties": false
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "error": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "error"
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false,
-        "openWorldHint": false
-      },
-      "_meta": {
-        "requiredScope": "gpc:write",
-        "operation": "POST /api/v1/media/uploads/{id}/content",
-        "resultMode": "compact-mutation-ack"
-      },
-      "operation": "POST /api/v1/media/uploads/{id}/content",
-      "scope": "gpc:write",
-      "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "compact-mutation-ack",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
-    },
-    {
-      "name": "gpc_cancel_image_upload",
-      "description": "DELETE /api/v1/media/uploads/{id}",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "path": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "format": "uuid"
-              }
-            },
-            "required": [
-              "id"
-            ],
-            "additionalProperties": false
-          },
-          "idempotencyKey": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200,
-            "description": "Stable mutation retry key. Reuse only with identical input."
-          }
-        },
-        "required": [
-          "path"
-        ],
-        "additionalProperties": false
-      },
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "minimum": 100,
-            "maximum": 599
-          },
-          "contentType": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "body": {}
-        },
-        "required": [
-          "status",
-          "contentType",
-          "body"
-        ],
-        "additionalProperties": false,
-        "anyOf": [
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 200,
-                "maximum": 299
-              },
-              "contentType": {
-                "const": "application/json"
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "acknowledged": {
-                    "const": true,
-                    "description": "The delegated mutation committed successfully."
-                  },
-                  "resourceId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "description": "The most specific affected resource id, when one is available."
-                  },
-                  "revision": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "description": "The affected resource revision, when the REST result exposes one."
-                  }
-                },
-                "required": [
-                  "acknowledged"
-                ],
-                "additionalProperties": false
-              }
-            }
-          },
-          {
-            "properties": {
-              "status": {
-                "type": "integer",
-                "minimum": 400,
-                "maximum": 599
-              },
-              "body": {
-                "type": "object",
-                "properties": {
-                  "error": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "error"
-                ]
-              }
-            }
-          }
-        ]
-      },
-      "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
         "idempotentHint": false,
         "openWorldHint": false
       },
       "_meta": {
-        "requiredScope": "gpc:write",
-        "operation": "DELETE /api/v1/media/uploads/{id}",
-        "resultMode": "compact-mutation-ack"
+        "actions": [
+          {
+            "action": "capabilities",
+            "requiredScope": "gpc:read",
+            "operation": "GET /api/v1/media/capabilities",
+            "resultMode": "canonical-read"
+          },
+          {
+            "action": "upload",
+            "requiredScope": "gpc:write",
+            "operation": "POST /api/v1/media/uploads",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
+            "action": "status",
+            "requiredScope": "gpc:read",
+            "operation": "GET /api/v1/media/uploads/{id}",
+            "resultMode": "canonical-read"
+          },
+          {
+            "action": "cancel",
+            "requiredScope": "gpc:write",
+            "operation": "DELETE /api/v1/media/uploads/{id}",
+            "resultMode": "compact-mutation-ack"
+          }
+        ]
       },
-      "operation": "DELETE /api/v1/media/uploads/{id}",
-      "scope": "gpc:write",
-      "destructive": true,
+      "actions": [
+        {
+          "action": "capabilities",
+          "operation": "GET /api/v1/media/capabilities",
+          "scope": "gpc:read",
+          "destructive": false,
+          "resultMode": "canonical-read",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "upload",
+          "operation": "POST /api/v1/media/uploads",
+          "scope": "gpc:write",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "status",
+          "operation": "GET /api/v1/media/uploads/{id}",
+          "scope": "gpc:read",
+          "destructive": false,
+          "resultMode": "canonical-read",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "cancel",
+          "operation": "DELETE /api/v1/media/uploads/{id}",
+          "scope": "gpc:write",
+          "destructive": true,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        }
+      ],
       "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
-      "resultMode": "compact-mutation-ack",
-      "parityTests": [
-        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
-        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_current_user",
@@ -2898,13 +2780,13 @@
       "operation": "GET /api/v1/auth/me",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_campaigns",
@@ -3318,13 +3200,13 @@
       "operation": "GET /api/v1/campaigns",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_campaign",
@@ -3638,13 +3520,13 @@
       "operation": "POST /api/v1/campaigns",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_campaign",
@@ -3771,13 +3653,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_campaign",
@@ -4179,13 +4061,13 @@
       "operation": "GET /api/v1/campaigns/{id}",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_campaign",
@@ -4521,13 +4403,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_add_campaign_member",
@@ -4668,13 +4550,13 @@
       "operation": "POST /api/v1/campaigns/{id}/members",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_remove_campaign_member",
@@ -4806,13 +4688,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/members/{userId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_campaign_member",
@@ -4960,13 +4842,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/members/{userId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_transfer_campaign",
@@ -5106,13 +4988,13 @@
       "operation": "POST /api/v1/campaigns/{id}/transfer",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_campaign_invitations",
@@ -5350,13 +5232,13 @@
       "operation": "GET /api/v1/campaigns/{id}/invitations",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_invite_campaign_member",
@@ -5505,13 +5387,13 @@
       "operation": "POST /api/v1/campaigns/{id}/invitations",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_cancel_campaign_invitation",
@@ -5643,13 +5525,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/invitations/{invitationId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_invitations",
@@ -5839,13 +5721,13 @@
       "operation": "GET /api/v1/invitations",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_accept_invitation",
@@ -5972,13 +5854,13 @@
       "operation": "POST /api/v1/invitations/{invitationId}/accept",
       "scope": "gpc:manage",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_reject_invitation",
@@ -6105,13 +5987,13 @@
       "operation": "POST /api/v1/invitations/{invitationId}/reject",
       "scope": "gpc:manage",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_notifications",
@@ -6285,13 +6167,13 @@
       "operation": "GET /api/v1/notifications",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_mark_notification_read",
@@ -6418,13 +6300,13 @@
       "operation": "POST /api/v1/notifications/{id}/read",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_mark_all_notifications_read",
@@ -6536,13 +6418,13 @@
       "operation": "POST /api/v1/notifications/read-all",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_notification",
@@ -6669,13 +6551,13 @@
       "operation": "DELETE /api/v1/notifications/{id}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_source",
@@ -6863,13 +6745,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/sources",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_source",
@@ -7057,13 +6939,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/sources/{sourceId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_source",
@@ -7195,13 +7077,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/sources/{sourceId}",
       "scope": "gpc:write",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_modifier",
@@ -8153,13 +8035,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/modifiers",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_modifier",
@@ -9111,13 +8993,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/modifiers/{modifierId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_modifier",
@@ -9249,13 +9131,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/modifiers/{modifierId}",
       "scope": "gpc:write",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_campaign_library",
@@ -15729,14 +15611,14 @@
       "operation": "GET /api/v1/campaigns/{id}/library",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_trait",
@@ -17004,14 +16886,14 @@
       "operation": "POST /api/v1/campaigns/{id}/library/traits",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_trait",
@@ -17143,13 +17025,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/traits/{traitId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_trait",
@@ -18418,14 +18300,14 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/traits/{traitId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_skill",
@@ -20812,14 +20694,14 @@
       "operation": "POST /api/v1/campaigns/{id}/library/skills",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_skill",
@@ -20951,13 +20833,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/skills/{skillId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_skill",
@@ -23344,14 +23226,14 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/skills/{skillId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_spell",
@@ -23663,13 +23545,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/spells",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_spell",
@@ -23801,13 +23683,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/spells/{spellId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_spell",
@@ -24121,13 +24003,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/spells/{spellId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_item",
@@ -26259,13 +26141,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/items",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_item",
@@ -26397,13 +26279,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/items/{itemId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_item",
@@ -28537,13 +28419,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/items/{itemId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_active_effect",
@@ -29204,14 +29086,14 @@
       "operation": "POST /api/v1/campaigns/{id}/library/active-effects",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_active_effect",
@@ -29343,13 +29225,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/active-effects/{effectId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_active_effect",
@@ -30010,14 +29892,14 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/active-effects/{effectId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_enchantment",
@@ -30426,14 +30308,14 @@
       "operation": "POST /api/v1/campaigns/{id}/library/enchantments",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_enchantment",
@@ -30565,13 +30447,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/enchantments/{enchantmentId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_enchantment",
@@ -30982,14 +30864,14 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/enchantments/{enchantmentId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_language",
@@ -31235,13 +31117,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/languages",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_language",
@@ -31373,13 +31255,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/languages/{languageId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_language",
@@ -31627,13 +31509,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/languages/{languageId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_technique",
@@ -31918,13 +31800,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/techniques",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_technique",
@@ -32056,13 +31938,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/techniques/{techniqueId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_technique",
@@ -32348,13 +32230,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/techniques/{techniqueId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_library_style",
@@ -32667,13 +32549,13 @@
       "operation": "POST /api/v1/campaigns/{id}/library/styles",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_library_style",
@@ -32805,13 +32687,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/library/styles/{styleId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_library_style",
@@ -33126,13 +33008,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/library/styles/{styleId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_export_campaign_library",
@@ -33271,14 +33153,14 @@
       "operation": "GET /api/v1/campaigns/{id}/library/export",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_import_campaign_library",
@@ -33431,14 +33313,14 @@
       "operation": "POST /api/v1/campaigns/{id}/library/import",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_adventure_log",
@@ -33718,13 +33600,13 @@
       "operation": "GET /api/v1/campaigns/{id}/log",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_adventure_log_entry",
@@ -33957,13 +33839,13 @@
       "operation": "POST /api/v1/campaigns/{id}/log",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_adventure_log_entry",
@@ -34095,13 +33977,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/log/{entryId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_adventure_log_entry",
@@ -34335,13 +34217,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/log/{entryId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_encounters",
@@ -34944,13 +34826,13 @@
       "operation": "GET /api/v1/campaigns/{id}/encounters",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_encounter",
@@ -35184,13 +35066,13 @@
       "operation": "POST /api/v1/campaigns/{id}/encounters",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_encounter",
@@ -35761,13 +35643,13 @@
       "operation": "GET /api/v1/campaigns/{id}/encounters/{encounterId}",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_encounter",
@@ -35932,13 +35814,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/encounters/{encounterId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_advance_encounter_turn",
@@ -36108,13 +35990,13 @@
       "operation": "POST /api/v1/campaigns/{id}/encounters/{encounterId}/advance",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_encounter_combatant",
@@ -36338,13 +36220,13 @@
       "operation": "POST /api/v1/campaigns/{id}/encounters/{encounterId}/combatants",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_encounter_combatant",
@@ -36481,13 +36363,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/encounters/{encounterId}/combatants/{combatantId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_encounter_combatant",
@@ -36718,13 +36600,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/encounters/{encounterId}/combatants/{combatantId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_encounter_effect",
@@ -36972,13 +36854,13 @@
       "operation": "POST /api/v1/campaigns/{id}/encounters/{encounterId}/effects",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_encounter_effect",
@@ -37115,13 +36997,13 @@
       "operation": "DELETE /api/v1/campaigns/{id}/encounters/{encounterId}/effects/{effectId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_encounter_effect",
@@ -37422,13 +37304,13 @@
       "operation": "PATCH /api/v1/campaigns/{id}/encounters/{encounterId}/effects/{effectId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_list_characters",
@@ -37636,13 +37518,13 @@
       "operation": "GET /api/v1/characters",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character",
@@ -38559,13 +38441,13 @@
       "operation": "POST /api/v1/characters",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character",
@@ -38692,13 +38574,13 @@
       "operation": "DELETE /api/v1/characters/{id}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_character",
@@ -46634,14 +46516,14 @@
       "operation": "GET /api/v1/characters/{id}",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character",
@@ -47580,13 +47462,13 @@
       "operation": "PATCH /api/v1/characters/{id}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_dismiss_character_warning",
@@ -47731,13 +47613,13 @@
       "operation": "POST /api/v1/characters/{id}/warnings/dismiss",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character_trait",
@@ -48931,14 +48813,14 @@
       "operation": "POST /api/v1/characters/{id}/traits",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character_trait",
@@ -49070,13 +48952,13 @@
       "operation": "DELETE /api/v1/characters/{id}/traits/{traitId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_trait",
@@ -50271,14 +50153,14 @@
       "operation": "PATCH /api/v1/characters/{id}/traits/{traitId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope",
         "src/server/mcp/parity.integration.test.ts#effects-authoring-parity"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character_skill",
@@ -50831,13 +50713,13 @@
       "operation": "POST /api/v1/characters/{id}/skills",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character_skill",
@@ -50969,13 +50851,13 @@
       "operation": "DELETE /api/v1/characters/{id}/skills/{skillId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_skill",
@@ -51528,13 +51410,13 @@
       "operation": "PATCH /api/v1/characters/{id}/skills/{skillId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character_spell",
@@ -51773,13 +51655,13 @@
       "operation": "POST /api/v1/characters/{id}/spells",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character_spell",
@@ -51911,13 +51793,13 @@
       "operation": "DELETE /api/v1/characters/{id}/spells/{spellId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_spell",
@@ -52158,13 +52040,13 @@
       "operation": "PATCH /api/v1/characters/{id}/spells/{spellId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character_language",
@@ -52355,13 +52237,13 @@
       "operation": "POST /api/v1/characters/{id}/languages",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character_language",
@@ -52493,13 +52375,13 @@
       "operation": "DELETE /api/v1/characters/{id}/languages/{languageId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_language",
@@ -52692,13 +52574,13 @@
       "operation": "PATCH /api/v1/characters/{id}/languages/{languageId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_character_technique",
@@ -52899,13 +52781,13 @@
       "operation": "POST /api/v1/characters/{id}/techniques",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_character_technique",
@@ -53037,13 +52919,13 @@
       "operation": "DELETE /api/v1/characters/{id}/techniques/{techniqueId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_technique",
@@ -53245,13 +53127,13 @@
       "operation": "PATCH /api/v1/characters/{id}/techniques/{techniqueId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_create_inventory_item",
@@ -55423,13 +55305,13 @@
       "operation": "POST /api/v1/characters/{id}/inventory",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_delete_inventory_item",
@@ -55561,13 +55443,13 @@
       "operation": "DELETE /api/v1/characters/{id}/inventory/{itemId}",
       "scope": "gpc:manage",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_inventory_item",
@@ -57741,13 +57623,13 @@
       "operation": "PATCH /api/v1/characters/{id}/inventory/{itemId}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_update_character_combat",
@@ -57922,13 +57804,13 @@
       "operation": "PATCH /api/v1/characters/{id}/combat",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_deactivate_condition_group",
@@ -58062,13 +57944,13 @@
       "operation": "DELETE /api/v1/characters/{id}/conditions/{group}",
       "scope": "gpc:write",
       "destructive": true,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_activate_condition_group",
@@ -58202,13 +58084,13 @@
       "operation": "POST /api/v1/characters/{id}/conditions/{group}",
       "scope": "gpc:write",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_character_history",
@@ -58580,13 +58462,13 @@
       "operation": "GET /api/v1/characters/{id}/history",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     },
     {
       "name": "gpc_get_campaign_history",
@@ -58958,13 +58840,13 @@
       "operation": "GET /api/v1/campaigns/{id}/history",
       "scope": "gpc:read",
       "destructive": false,
-      "handler": "shared-openapi-handler",
-      "schemaSource": "openapi-zod-registry",
       "resultMode": "canonical-read",
       "parityTests": [
         "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
-      ]
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
     }
   ]
 }

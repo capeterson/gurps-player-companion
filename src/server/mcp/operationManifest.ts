@@ -7,6 +7,8 @@ export interface IncludedOperation {
   method: HttpMethod;
   path: string;
   tool: string;
+  /** Explicit discriminant when several exact operations share one task tool. */
+  action?: string;
   scope: OAuthScope;
   destructive: boolean;
   openWorld: boolean;
@@ -81,14 +83,13 @@ const excluded = (method: HttpMethod, path: string, reason: string): ExcludedOpe
 
 /** Exact raw-API coverage. There are deliberately no prefix or wildcard entries. */
 export const OPERATION_POLICY: readonly OperationPolicy[] = [
-  tool('GET', '/api/v1/media/capabilities', 'gpc_get_media_capabilities', 'gpc:read'),
-  tool('POST', '/api/v1/media/uploads', 'gpc_initialize_image_upload', 'gpc:write'),
-  tool('GET', '/api/v1/media/uploads/{id}', 'gpc_get_image_upload', 'gpc:read'),
-  tool('POST', '/api/v1/media/uploads/{id}/content', 'gpc_upload_image_content', 'gpc:write'),
-  tool('DELETE', '/api/v1/media/uploads/{id}', 'gpc_cancel_image_upload', 'gpc:write'),
+  { ...tool('GET', '/api/v1/media/capabilities', 'gpc_media', 'gpc:read'), action: 'capabilities' },
+  { ...tool('POST', '/api/v1/media/uploads', 'gpc_media', 'gpc:write'), action: 'upload' },
+  { ...tool('GET', '/api/v1/media/uploads/{id}', 'gpc_media', 'gpc:read'), action: 'status' },
+  { ...tool('DELETE', '/api/v1/media/uploads/{id}', 'gpc_media', 'gpc:write'), action: 'cancel' },
   excluded(
     'POST',
-    '/api/v1/media/uploads/{id}/bytes',
+    '/api/v1/media/uploads/bytes',
     'Binary transport; equivalent bounded JSON content operation is exposed',
   ),
   excluded(
@@ -538,6 +539,7 @@ export function operationKey(method: string, path: string): string {
   return `${method.toUpperCase()} ${path}`;
 }
 
+/** Tool-backed operations; explicit actions may share one discovered tool. */
 export const TOOLS = OPERATION_POLICY.filter(
   (entry): entry is IncludedOperation => entry.kind === 'tool',
 );

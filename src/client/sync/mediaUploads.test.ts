@@ -151,6 +151,24 @@ describe('media upload outbox', () => {
     const controller = new AbortController();
     const draining = drainOneImage(USER_ID, controller.signal, vi.fn());
     await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    const [requestPath, requestOptions] = vi.mocked(api).mock.calls[0] ?? [];
+    expect(requestPath).toMatch(/^\/media\/uploads\/bytes\?/);
+    expect(requestOptions).toMatchObject({
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+    });
+    expect(requestOptions?.rawBody).toBeInstanceOf(NodeBlob);
+    if (!(requestOptions?.rawBody instanceof NodeBlob))
+      throw new Error('Expected the raw upload request to contain a Blob');
+    expect(await requestOptions.rawBody.text()).toBe('first portrait');
+    const requestUrl = new URL(requestPath ?? '', 'https://example.test');
+    expect(Object.fromEntries(requestUrl.searchParams)).toEqual({
+      clientUploadId: first.id,
+      targetType: 'character',
+      targetId: CHARACTER_ID,
+      byteLength: String(first.byteLength),
+      sha256: first.sha256,
+    });
 
     await enqueueImage('character', CHARACTER_ID, image('new portrait'));
     const replacement = await getLocalDb().mediaUploads.toCollection().first();
@@ -173,6 +191,59 @@ describe('media upload outbox', () => {
       (await db.outbox.toArray()).find((op) => op.fieldPath === 'portraitAssetId')?.attemptedValue,
     ).toBe(replacement.id);
     expect((await readDrainableOps(10)).map((op) => op.fieldPath)).toContain('st');
+  });
+
+  it('retries a lost upload reply with the identical idempotency key and bytes', async () => {
+    await login();
+    await seedCharacter();
+    await enqueueImage('character', CHARACTER_ID, image('possibly stored already'));
+    const original = await getLocalDb().mediaUploads.toCollection().first();
+    if (!original) throw new Error('Expected the original portrait upload');
+
+    vi.mocked(api)
+      .mockRejectedValueOnce(new Error('response connection lost'))
+      .mockResolvedValueOnce(manifest() as never);
+    const controller = new AbortController();
+    await drainOneImage(USER_ID, controller.signal, vi.fn());
+
+    const afterLostReply = await getLocalDb().mediaUploads.get(original.id);
+    expect(afterLostReply).toMatchObject({ state: 'queued', attempts: 1 });
+    if (!afterLostReply) throw new Error('Expected the upload to remain queued after a lost reply');
+
+    // fake-indexeddb loses Node's Blob prototype when a row is updated, unlike
+    // browser IndexedDB. Reinsert the original body while clearing backoff.
+    await getLocalDb().mediaUploads.put({ ...afterLostReply, blob: original.blob, retryAt: 0 });
+    await drainOneImage(USER_ID, controller.signal, vi.fn());
+
+    const calls = vi.mocked(api).mock.calls;
+    expect(calls).toHaveLength(2);
+    const [firstPath, firstOptions] = calls[0] ?? [];
+    const [retryPath, retryOptions] = calls[1] ?? [];
+    expect(retryPath).toBe(firstPath);
+    expect(retryOptions).toMatchObject({
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+    });
+    if (
+      !(firstOptions?.rawBody instanceof NodeBlob) ||
+      !(retryOptions?.rawBody instanceof NodeBlob)
+    )
+      throw new Error('Expected both upload attempts to contain raw Blob bodies');
+    expect(retryOptions.rawBody.type).toBe(firstOptions.rawBody.type);
+    expect(retryOptions.rawBody.size).toBe(firstOptions.rawBody.size);
+    expect(await retryOptions.rawBody.arrayBuffer()).toEqual(
+      await firstOptions.rawBody.arrayBuffer(),
+    );
+
+    const local = await getLocalDb().characters.get(CHARACTER_ID);
+    expect(local?.portraitAssetId).toBe(ASSET_ID);
+    expect(await getLocalDb().mediaUploads.get(original.id)).toMatchObject({
+      state: 'ready',
+      assetId: ASSET_ID,
+    });
+    expect(
+      (await getLocalDb().outbox.toArray()).find((op) => op.localMediaUploadId === original.id),
+    ).toMatchObject({ attemptedValue: ASSET_ID, localMediaReady: true });
   });
 
   it('preserves a pending local portrait when a newer cursor row arrives', async () => {
@@ -307,7 +378,7 @@ describe('media upload outbox', () => {
     expect(op?.localMediaUploadId).toBeUndefined();
   });
 
-  it('stops a session-fenced upload after cancellation during initialization', async () => {
+  it('stops a session-fenced upload after cancellation during the byte request', async () => {
     await login();
     await seedCharacter();
     await enqueueImage('character', CHARACTER_ID, image('abort me'));

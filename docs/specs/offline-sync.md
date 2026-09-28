@@ -899,7 +899,9 @@ continue to render normally.
 URL metadata (Dexie v14). Downloaded image bodies use browser/Workbox caches, not
 Dexie. Selecting an image atomically queues a parent reference patch and source;
 `localMediaUploadId`/`localMediaReady` hold that operation until the separate media
-drain has uploaded/processed the source. Other fields keep syncing. Failed source
+drain has uploaded/processed the source. Other fields keep syncing. Transient
+failures and lost replies retry one binary request with the same client upload ID, target,
+digest and length; there is no separate initialization/status round trip. Source
 bytes survive rejection for retry/export/discard and successful sources are removed
 only after attachment acknowledgement. Logout/resync abort media work before
 purging both account stores; public image caches deliberately survive. The sync
