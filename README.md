@@ -100,7 +100,7 @@ volume persists the database, and `bun_modules` holds dependencies.
 Useful commands:
 
 ```sh
-# Seed Sample plus The Lantern Coast and its three playable demo characters.
+# Seed Sample plus The Lantern Coast and its six playable demo characters.
 docker compose -f docker-compose.dev.yml run --rm migrate bun run db:seed
 
 # Follow app logs.

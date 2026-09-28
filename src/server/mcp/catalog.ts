@@ -60,6 +60,21 @@ export function toJsonSchema(value: unknown): unknown {
     if ((key === 'exclusiveMinimum' || key === 'exclusiveMaximum') && typeof child === 'boolean') {
       continue;
     }
+    if ((key === 'oneOf' || key === 'anyOf') && Array.isArray(child)) {
+      // zod-openapi appends { nullable: true } for a null-only union
+      // alternative. At this position it is not an unconstrained nullable
+      // field: treating it as {} makes every valid oneOf value match twice.
+      converted[key] = child.map((branch) =>
+        branch &&
+        typeof branch === 'object' &&
+        !Array.isArray(branch) &&
+        Object.keys(branch).length === 1 &&
+        branch.nullable === true
+          ? { type: 'null' }
+          : toJsonSchema(branch),
+      );
+      continue;
+    }
     converted[key] =
       key === '$ref' && typeof child === 'string'
         ? child.replace(/^#\/components\/schemas\//, '#/$defs/')

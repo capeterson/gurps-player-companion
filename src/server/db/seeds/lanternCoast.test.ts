@@ -61,8 +61,8 @@ describe('Lantern Coast standard seed', () => {
       const { campaignId, created } = await seedLanternCoast(ownerId);
       expect(created).toBe(true);
       const roster = await rows(campaignId);
-      expect(roster).toHaveLength(3);
-      expect(new Set(roster.map((row) => row.ownerId)).size).toBe(3);
+      expect(roster).toHaveLength(6);
+      expect(new Set(roster.map((row) => row.ownerId)).size).toBe(6);
       const details = [];
       for (const row of roster) details.push(await loadCharacterDetail(row.id));
       const kestrel = details.find((row) => row.name === 'Kestrel Vale');
@@ -79,9 +79,9 @@ describe('Lantern Coast standard seed', () => {
         expect(detail.skills.every((skill) => skill.effectiveLevel != null)).toBe(true);
         expect(detail.languages).toHaveLength(2);
       }
-      expect(kestrel.skills.filter((skill) => skill.name === 'Survival')).toHaveLength(2);
-      expect(kestrel.skills.find((skill) => skill.name === 'Merchant')?.points).toBe(0);
-      const stealth = kestrel.skills.find((skill) => skill.name === 'Stealth');
+      expect(kestrel.skills.filter((skill) => skill.name === 'Coastal Foraging')).toHaveLength(2);
+      expect(kestrel.skills.find((skill) => skill.name === 'Quayside Barter')?.points).toBe(0);
+      const stealth = kestrel.skills.find((skill) => skill.name === 'Shingle Ghosting');
       expect(stealth?.libraryMechanics?.skillRules?.procedures?.actions[0]?.id).toBe('slip_past');
       expect(stealth?.benefitStatus?.[0]?.unlocked).toBe(true);
       const compass = kestrel.inventory.find((item) => item.name === 'Brass compass');
@@ -95,7 +95,37 @@ describe('Lantern Coast standard seed', () => {
       ).toBe('weapon_damage');
       expect(kestrel.techniques[0]?.level).toBeGreaterThan(10);
       expect(mira.spells).toHaveLength(6);
-      expect(mira.spells.find((spell) => spell.name === 'Light')?.effectiveCost).toBe(0);
+      expect(details.map((row) => row.name).sort()).toEqual([
+        'Bram Stonebridge',
+        'Iona Reedwake',
+        'Kestrel Vale',
+        'Mira Ashfall',
+        'Orin Bellstrand',
+        'Sable Fenwick',
+      ]);
+      for (const detail of details) {
+        expect(
+          detail.traits.every((trait) => trait.pricingResolution?.outputs.points != null),
+        ).toBe(true);
+        expect(
+          detail.inventory
+            .filter((item) => item.libraryItemId)
+            .every((item) => item.pricingResolution?.outputs.weightLbs != null),
+        ).toBe(true);
+      }
+      const bow = kestrel.inventory.find((item) => item.name === 'Reedglass bow');
+      expect(bow?.baseWeaponData?.modes?.[0]?.ranged?.range?.kind).toBe('st_multiplier');
+      expect(bow?.enchantments[0]?.mechanics?.effects[0]?.target).toBe('weapon_accuracy');
+      const sable = details.find((row) => row.name === 'Sable Fenwick');
+      expect(sable?.spells).toHaveLength(4);
+      const orin = details.find((row) => row.name === 'Orin Bellstrand');
+      expect(orin?.inventory.find((item) => item.name === 'Salvage apron')?.armor?.frontOnly).toBe(
+        true,
+      );
+      expect(
+        orin?.skills.find((skill) => skill.name === 'Signal Weaving')?.effectiveLevel,
+      ).toBeGreaterThan(orin?.iq ?? 0);
+      expect(mira.spells.find((spell) => spell.name === 'Glimmer Shoal')?.effectiveCost).toBe(1);
       expect(
         mira.inventory.find((item) => item.name === 'Focus crystal')?.powerstoneData?.currentEnergy,
       ).toBe(5);
@@ -111,7 +141,7 @@ describe('Lantern Coast standard seed', () => {
       const events = await history(campaignId);
       expect(events.length).toBeGreaterThan(100);
       expect(events.every((event) => event.actorUserId != null)).toBe(true);
-      expect(new Set(events.map((event) => event.actorUserId)).size).toBe(4);
+      expect(new Set(events.map((event) => event.actorUserId)).size).toBe(7);
       const logs = adventureLogOut
         .array()
         .parse(await get(kestrel.ownerId, `/campaigns/${campaignId}/log`));
@@ -127,8 +157,8 @@ describe('Lantern Coast standard seed', () => {
       const path = `/campaigns/${campaignId}/encounters/${encounter.id}`;
       const gmView = encounterOut.parse(await get(ownerId, path));
       const playerView = encounterOut.parse(await get(kestrel.ownerId, path));
-      expect(gmView.combatants).toHaveLength(5);
-      expect(playerView.combatants).toHaveLength(4);
+      expect(gmView.combatants).toHaveLength(8);
+      expect(playerView.combatants).toHaveLength(7);
       expect(playerView.combatants.some((entry) => entry.name === 'Hidden lantern keeper')).toBe(
         false,
       );
@@ -173,7 +203,7 @@ describe('Lantern Coast standard seed', () => {
       expect(detail.name).toBe('Player renamed this character');
       expect(detail.combat?.currentHp).toBe(1);
       expect(detail.skills).toHaveLength(0);
-      expect(await rows(first.campaignId)).toHaveLength(3);
+      expect(await rows(first.campaignId)).toHaveLength(6);
       const [campaign] = await getDb()
         .select()
         .from(campaigns)
@@ -192,9 +222,11 @@ describe('Lantern Coast standard seed', () => {
       const document = parseLibraryYaml(text);
       // Valid YAML, but the missing weapon is discovered after characters and
       // child rows have already been inserted: this exercises the atomic boundary.
-      document.library.items = document.library.items.filter((item) => item.name !== 'Coastal bow');
+      document.library.items = document.library.items.filter(
+        (item) => item.name !== 'Reedglass bow',
+      );
       await expect(seedLanternCoast(ownerId, stringify(document))).rejects.toThrow(
-        'Missing Lantern fixture items: Coastal bow',
+        'Missing Lantern fixture items: Reedglass bow',
       );
       const db = getDb();
       expect(
@@ -208,7 +240,7 @@ describe('Lantern Coast standard seed', () => {
       ).toHaveLength(0);
       const repaired = await seedLanternCoast(ownerId);
       expect(repaired.created).toBe(true);
-      expect(await rows(repaired.campaignId)).toHaveLength(3);
+      expect(await rows(repaired.campaignId)).toHaveLength(6);
     });
   }, 30000);
 });

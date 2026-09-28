@@ -1028,7 +1028,7 @@ src/
                  characterChildren (per-class configs plus insert/update/
                  delete for library-linked character children and the
                  child-table map used by the cursor and replay lookups)
-    db/          schema.ts (Drizzle), seeds/ (Lantern Coast fixture/data/accounts/tests),
+    db/          schema.ts (Drizzle), seeds/ (Lantern Coast recipe, REST/MCP adapters, data/accounts/tests),
                  migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
@@ -1167,9 +1167,10 @@ public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
   capture-screenshots.mjs  Refresh canonical captures from a seeded local app
+  seed-lantern-mcp.ts  NDJSON connector bridge for the shared Lantern recipe (one existing owner)
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
-  lantern_coast.yaml    Rich Lantern Coast library; bootstrap/README.md lists demo accounts
+  lantern_coast.yaml    Synthetic Lantern Coast library and four fictional sourcebooks; bootstrap/README.md lists seven demo accounts
 ```
 
 Read the top-of-file doc comments — most load-bearing modules
@@ -1207,7 +1208,8 @@ Full detail: [architecture.md](architecture.md).
 ## Orientation notes for future sessions
 
 The standard `bun run db:seed` refreshes the Sample library and creates a populated
-Lantern Coast campaign with three player-owned characters, nine library categories,
+Lantern Coast campaign with six separately owned characters, eleven library categories,
+four fictional sourcebooks with distinct abbreviations, current pricing snapshots,
 shared/private adventure logs, and an experimental encounter. See the
 [seed guide](../../bootstrap/README.md) for credentials and test cases. Creation is
 transactional and serialized; existing Lantern campaigns are skipped by owner/name

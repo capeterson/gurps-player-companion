@@ -53,6 +53,40 @@ function runtime(schema: unknown) {
 }
 
 describe('MCP canonical schema conversion', () => {
+  test('keeps the canonical nullable Range union null-only and accepts its real weapon values', async () => {
+    const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
+    const tool = runtime({
+      type: 'object',
+      properties: { range: snapshot.components.schemas.RangedRange },
+      required: ['range'],
+      additionalProperties: false,
+    });
+    for (const range of [
+      { kind: 'fixed', halfDamageYards: null, maxYards: 18, minimumYards: 2 },
+      { kind: 'st_multiplier', halfDamageFactor: 9, maxFactor: 14, strengthSource: 'wielder' },
+      { kind: 'legacy', notation: 'unresolved' },
+      null,
+    ]) {
+      expect(
+        tool.validateInput({
+          path: { id: '0198aa77-1111-7111-8111-111111111111' },
+          body: { range },
+        }),
+      ).toBe(true);
+      expect(await tool.validateResponse(200, 'application/json', { range })).toBeNull();
+    }
+    for (const range of [
+      {},
+      'anything',
+      { kind: 'fixed', maxYards: 18 },
+      { kind: 'fixed', halfDamageYards: null, maxYards: 0 },
+      { kind: 'st_multiplier', halfDamageFactor: 9, maxFactor: 14 },
+      { kind: 'fixed', halfDamageYards: null, maxYards: 18, strengthSource: 'wielder' },
+    ]) {
+      expect(await tool.validateResponse(200, 'application/json', { range })).not.toBeNull();
+    }
+  });
+
   test('compiles the complete committed player API catalog, including unconstrained nullable history values', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
