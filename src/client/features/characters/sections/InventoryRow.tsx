@@ -135,14 +135,14 @@ export function InventoryRow(props: InventoryRowProps) {
     triggerRef.current?.focus();
   }
   function categoryChip(category: ItemCategory, children: ReactNode) {
-    if (!canEdit) return <span className="badge badge-sm badge-ghost">{children}</span>;
+    if (!canEdit) return <span className="inventory-chip badge badge-sm badge-ghost">{children}</span>;
     return (
       <button
         type="button"
         aria-label={`${CATEGORY_LABELS[category]} settings for ${item.name}`}
         aria-expanded={section === category}
         aria-controls={editorId}
-        className={`badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
+        className={`inventory-chip badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
         onClick={(event) => {
           event.stopPropagation();
           toggleSection(category, event.currentTarget);
@@ -271,11 +271,11 @@ export function InventoryRow(props: InventoryRowProps) {
                   <AppIcon name={contentsOpen ? 'chevronDown' : 'chevronRight'} size={15} />
                 </button>
               ) : hasChildren ? (
-                <span className="inventory-slot text-base-content/40" aria-hidden>
+                <span className="inventory-slot text-base-content/60" aria-hidden>
                   <AppIcon name="chevronDown" size={15} />
                 </span>
               ) : (
-                <span className="inventory-slot text-base-content/40" aria-hidden>
+                <span className="inventory-slot text-base-content/60" aria-hidden>
                   <AppIcon name={itemIcon} size={15} />
                 </span>
               )}
@@ -292,7 +292,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   <>
                     Container
                     {isRoot && item.worn && reductionLabel && (
-                      <span className="text-base-content/50 text-[10px] ml-1">
+                      <span className="text-base-content/70 text-[10px] ml-1">
                         {reductionLabel}
                       </span>
                     )}
@@ -312,7 +312,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'armor',
                   <>
                     Armor DR {item.armor.dr}
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {locationSummary(item.armor.locations)}
                     </span>
                   </>,
@@ -324,7 +324,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       <>
                         Shield DB {item.weaponData.db}
                         {item.weaponData.skill && (
-                          <span className="text-base-content/50 text-[10px] ml-1">
+                          <span className="text-base-content/70 text-[10px] ml-1">
                             {item.weaponData.skill}
                           </span>
                         )}
@@ -337,7 +337,7 @@ export function InventoryRow(props: InventoryRowProps) {
                         {(item.weaponData.damage ||
                           item.weaponData.skill ||
                           item.weaponData.ranged != null) && (
-                          <span className="text-base-content/50 text-[10px] ml-1">
+                          <span className="text-base-content/70 text-[10px] ml-1">
                             {[
                               item.weaponData.damage || null,
                               item.weaponData.ranged != null ? 'ranged' : null,
@@ -354,7 +354,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'powerstone',
                   <>
                     Powerstone
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {item.powerstoneData.currentEnergy}/{item.powerstoneData.maxEnergy}
                     </span>
                   </>,
@@ -364,7 +364,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   'magicItem',
                   <>
                     Magic
-                    <span className="text-base-content/50 text-[10px] ml-1">
+                    <span className="text-base-content/70 text-[10px] ml-1">
                       {item.magicItemData.spellName}
                       {item.magicItemData.mode === 'charged' &&
                         item.magicItemData.chargesCurrent != null &&
@@ -439,7 +439,7 @@ export function InventoryRow(props: InventoryRowProps) {
         </td>
         <td
           data-label="Cost"
-          className="inventory-cost num text-right text-base-content/60 align-top sm:align-middle"
+          className="inventory-cost num text-right text-base-content/75 align-top sm:align-middle"
         >
           {item.cost.toFixed(0)}
         </td>
