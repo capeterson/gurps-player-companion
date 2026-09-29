@@ -49,7 +49,12 @@ export function GmCampaignDashboardPage() {
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {characters?.map((character) => (
-              <GmCharacterCard key={character.id} character={character} lookup={lookup} />
+              <GmCharacterCard
+                key={character.id}
+                character={character}
+                campaignName={c.name}
+                lookup={lookup}
+              />
             ))}
           </div>
         </section>

@@ -1,4 +1,5 @@
 import { effectiveDodge } from '../../../shared/domain/defenseCalc.ts';
+import { CharacterCard } from '../characters/CharacterCard.tsx';
 import { MechanicsUnavailable } from '../characters/MechanicsUnavailable.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../characters/useCharacterDetail.ts';
 import { resolveSkillLookup } from './skillLookup.ts';
@@ -7,18 +8,15 @@ interface Props {
   character: CharacterDetail;
   /** Name of the skill or stat currently selected via the GM skill lookup, if any. */
   lookup?: string | null;
+  campaignName?: string;
 }
 
-export function GmCharacterCard({ character, lookup }: Props) {
+export function GmCharacterCard({ character, lookup, campaignName }: Props) {
   if (character.libraryEffectsKnown === false)
     return (
-      <article className="card p-4 gap-3">
-        <h2 className="font-display text-xl">{character.name}</h2>
+      <CharacterCard character={{ ...character, campaignName }} hideAttributes openInNewTab>
         <MechanicsUnavailable />
-        <a href={`/characters/${character.id}`} className="link">
-          Open sheet
-        </a>
-      </article>
+      </CharacterCard>
     );
   const { derived, combat, encumbrance } = character;
   const currentHp = combat?.currentHp ?? derived.hp;
@@ -28,24 +26,20 @@ export function GmCharacterCard({ character, lookup }: Props) {
   const lookupResult = lookup ? resolveSkillLookup(character, lookup) : null;
 
   return (
-    <article className="card gap-3 border border-base-300 bg-base-100 p-4">
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display text-xl font-semibold truncate">{character.name}</h2>
-          {character.techLevel != null && (
-            <p className="text-xs text-base-content/60 truncate">TL{character.techLevel}</p>
-          )}
-        </div>
-        <a
-          href={`/characters/${character.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn btn-ghost btn-xs shrink-0"
-          aria-label={`Open ${character.name} in a new tab`}
-        >
-          Open ↗
-        </a>
-      </header>
+    <CharacterCard
+      character={{
+        ...character,
+        campaignName,
+        st: derived.effectiveSt,
+        dx: derived.effectiveDx,
+        iq: derived.effectiveIq,
+        ht: derived.effectiveHt,
+      }}
+      openInNewTab
+    >
+      {character.techLevel != null && (
+        <p className="text-xs text-base-content/60">TL{character.techLevel}</p>
+      )}
 
       {lookup && (
         <div className="flex items-center justify-between rounded-md bg-primary/10 px-2 py-1.5 text-xs">
@@ -57,22 +51,6 @@ export function GmCharacterCard({ character, lookup }: Props) {
           )}
         </div>
       )}
-
-      <div className="grid grid-cols-4 gap-1 text-center">
-        {[
-          ['ST', derived.effectiveSt],
-          ['DX', derived.effectiveDx],
-          ['IQ', derived.effectiveIq],
-          ['HT', derived.effectiveHt],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-md bg-base-200 px-1 py-1.5">
-            <span className="block text-[10px] uppercase tracking-wider text-base-content/50">
-              {label}
-            </span>
-            <strong className="num text-base">{value}</strong>
-          </div>
-        ))}
-      </div>
 
       <div className="grid grid-cols-2 gap-3 text-xs">
         <Pool
@@ -112,7 +90,7 @@ export function GmCharacterCard({ character, lookup }: Props) {
           <span className="text-xs text-base-content/40">No active conditions</span>
         )}
       </div>
-    </article>
+    </CharacterCard>
   );
 }
 

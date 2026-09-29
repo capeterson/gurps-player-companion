@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { MediaImage } from '../../components/MediaImage.tsx';
+import { useNavigate } from 'react-router-dom';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
+import { CharacterCard } from './CharacterCard.tsx';
 import { useCharactersList } from './useCharacterDetail.ts';
 
 export function CharactersPage() {
@@ -101,34 +101,8 @@ export function CharactersPage() {
 
       <ul className="grid md:grid-cols-2 gap-3">
         {(characters ?? []).map((c) => (
-          <li key={c.id}>
-            <article className="card block p-4 transition hover:border-border-strong">
-              <Link
-                to={`/characters/${c.id}`}
-                className="link link-hover font-display text-xl font-semibold"
-              >
-                <MediaImage
-                  targetType="character"
-                  targetId={c.id}
-                  assetId={c.portraitAssetId}
-                  name={c.name}
-                  thumbnail
-                />
-                {c.name}
-              </Link>
-              {c.campaignId && c.campaignName && (
-                <p className="mt-0.5 text-sm text-base-content/70">
-                  Campaign:{' '}
-                  <Link to={`/campaigns/${c.campaignId}`} className="link link-hover font-medium">
-                    {c.campaignName}
-                  </Link>
-                </p>
-              )}
-              <p className="text-sm text-base-content/70">
-                <span className="num">ST {c.st}</span> · <span className="num">DX {c.dx}</span> ·{' '}
-                <span className="num">IQ {c.iq}</span> · <span className="num">HT {c.ht}</span>
-              </p>
-            </article>
+          <li key={c.id} className="min-w-0">
+            <CharacterCard character={c} />
           </li>
         ))}
         {characters && characters.length === 0 && (

@@ -185,7 +185,11 @@ character in that campaign. Clicking a row opens the existing
 `/characters/:id` route which renders `CharacterMinimalView` for minimal
 viewers. This keeps the player's "your characters" page uncluttered with
 other players' sheets while still letting a campaign member browse the party
-roster from the campaign itself.
+roster from the campaign itself. Roster cards use the same `CharacterCard` as
+Home and the Characters listing, with portrait/name and campaign links. A full
+viewer also sees ST/DX/IQ/HT. The roster checks the local share decision before
+rendering that line, even before cached values are masked by the sweep; masked
+rows awaiting rehydration continue to hide attributes.
 
 The local-first character row stays in IndexedDB so the minimal-view detail
 page can render offline; the Characters page filters it with the same local
@@ -287,7 +291,10 @@ builds compact character summaries from the existing Dexie character-family
 stores via `buildCharacterDetail`; there is no bespoke dashboard character
 payload and no WebSocket row streaming. The activity rail polls the existing
 campaign character-history endpoint every five seconds and visually fades newly
-observed events over 30 seconds.
+observed events over 30 seconds. GM summaries extend the shared `CharacterCard`
+shell with pools, secondary stats, conditions and lookup results. The common
+attribute line uses effective values, the campaign name links to its overview,
+and the character name opens the sheet in a new tab.
 
 Player sheets and GM cards share `joinCharacterMechanics`, reading the validated
 source/version declarations on synced trait/skill rows. The GM dashboard uses its

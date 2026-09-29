@@ -1,11 +1,11 @@
-import { MediaImage } from '../../components/MediaImage.tsx';
 /**
  * /campaigns/:id — campaign overview. The workspace header owns sibling
  * navigation; this page stays focused on campaign facts and its roster.
  */
 
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { MANA_LEVEL_LABELS } from '../../../shared/constants/magic.ts';
+import { CharacterCard } from '../characters/CharacterCard.tsx';
 import { useCampaignCharactersList } from '../characters/useCharacterDetail.ts';
 import { CampaignPageHeading, CampaignWorkspaceHeader } from './CampaignWorkspaceHeader.tsx';
 import { useCampaignWorkspace } from './useCampaignWorkspace.ts';
@@ -69,22 +69,8 @@ export function CampaignDetailPage() {
         ) : (
           <ul className="grid md:grid-cols-2 gap-3">
             {roster.map((ch) => (
-              <li key={ch.id}>
-                <Link
-                  to={`/characters/${ch.id}`}
-                  className="card block p-4 transition hover:border-border-strong"
-                >
-                  <div className="font-display text-xl">
-                    <MediaImage
-                      targetType="character"
-                      targetId={ch.id}
-                      assetId={ch.portraitAssetId}
-                      name={ch.name}
-                      thumbnail
-                    />
-                    {ch.name}
-                  </div>
-                </Link>
+              <li key={ch.id} className="min-w-0">
+                <CharacterCard character={ch} hideAttributes={ch.minimal} />
               </li>
             ))}
           </ul>

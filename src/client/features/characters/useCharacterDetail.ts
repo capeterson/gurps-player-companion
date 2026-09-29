@@ -101,14 +101,14 @@ export function useCharacterDetail(
   return result;
 }
 
-export type CharacterListResult = CharacterListItem[] | undefined;
-
 export type CharacterHomeListItem = CharacterListItem & {
   /** Resolved from the synced local campaign mirror for offline navigation. */
   campaignName: string | null;
 };
 
 export type CharacterHomeListResult = CharacterHomeListItem[] | undefined;
+
+export type CharacterRosterListItem = CharacterHomeListItem & { minimal: boolean };
 
 export function useCharactersList(): CharacterHomeListResult {
   return useLiveQuery(async () => {
@@ -164,16 +164,33 @@ export function useCharactersList(): CharacterHomeListResult {
  * simply don't appear until the next cursor pull — same trade-off as
  * `useCharactersList`.
  */
-export function useCampaignCharactersList(campaignId: string | undefined): CharacterListResult {
+export function useCampaignCharactersList(
+  campaignId: string | undefined,
+): CharacterRosterListItem[] | undefined {
   return useLiveQuery(async () => {
     if (!campaignId) return [];
     const db = getLocalDb();
-    const rows = await db.characters
-      .where('campaignId')
-      .equals(campaignId)
-      .reverse()
-      .sortBy('updatedAt');
-    return rows.map<CharacterListItem>((r) => ({
+    const [rows, campaign] = await Promise.all([
+      db.characters.where('campaignId').equals(campaignId).reverse().sortBy('updatedAt'),
+      db.campaigns.get(campaignId),
+    ]);
+    const viewerId = readUserIdFromToken();
+    if (!viewerId) return [];
+    const minimalIds = characterIdsToMinimize({
+      viewerId,
+      characters: rows,
+      campaigns: campaign ? [campaign] : [],
+    });
+    return rows.map<CharacterRosterListItem>((r) => ({
+      campaignName: campaign?.name ?? null,
+      // Hide attributes immediately on a share-gate change, even before
+      // the privacy sweep masks cached values. Masked rows awaiting full
+      // rehydration must not present their placeholder zeroes as stats.
+      minimal:
+        !campaign ||
+        minimalIds.has(r.id) ||
+        r.minimalViewMasked === true ||
+        r.accessRevoked === true,
       id: r.id,
       ownerId: r.ownerId,
       campaignId: r.campaignId,

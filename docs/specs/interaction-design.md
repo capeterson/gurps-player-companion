@@ -6,6 +6,21 @@ character sheet. It is a companion to [architecture.md](architecture.md) and
 data, while the local mirror and outbox remain the data path. Languages and
 Techniques apply these patterns alongside the Skills and Traits tables.
 
+## Character cards
+
+Home, the Characters listing, campaign overview roster, and GM dashboard use
+`features/characters/CharacterCard.tsx`. Its shared shell matches the Characters
+listing: portrait/name linked to the sheet, a separate campaign link, and a
+single compact ST/DX/IQ/HT line. Long character and campaign names wrap inside
+the card. Grid breakpoints remain appropriate to each surrounding page.
+
+The roster evaluates the local share gate before displaying attributes, so
+minimal viewers keep an identity-only card even before the masking sweep runs.
+Masked rows awaiting rehydration also omit attribute placeholders. The GM
+wrapper supplies effective attributes and appends pools, secondary stats,
+conditions and lookup results inside the same shell. Its name link opens a new
+tab; missing mechanics show the existing unavailable notice and hide numbers.
+
 ## Read first, edit on demand
 
 A sheet collection shows its owned entries before asking the player to create
@@ -162,6 +177,7 @@ are inspected alongside bounding-box and overlap assertions.
 
 | Primitive or surface | Implementation |
 |---|---|
+| Character cards across home, listing and campaign views | `src/client/features/characters/CharacterCard.tsx`, `src/client/features/campaigns/GmCharacterCard.tsx` |
 | Sheet composition and panel folds | `src/client/features/characters/CharacterSheetPage.tsx`, `src/client/components/ui/FoldSection.tsx` |
 | Table filters and grouped row lifetime | `src/client/components/ui/Table.tsx` |
 | Skill/trait summary and editor references | `src/client/features/characters/sections/SkillsPanel.tsx`, `TraitsPanel.tsx` |

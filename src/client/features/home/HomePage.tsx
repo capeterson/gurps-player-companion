@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { MediaImage } from '../../components/MediaImage.tsx';
 import { api } from '../../lib/api.ts';
+import { CharacterCard } from '../characters/CharacterCard.tsx';
 import { useCharactersList } from '../characters/useCharacterDetail.ts';
 
 interface MeResponse {
@@ -51,34 +51,7 @@ export function HomePage() {
           <p className="label-eyebrow">Recent characters</p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {recent.map((c) => (
-              <div
-                key={c.id}
-                className="card flex min-w-0 flex-col gap-1 p-card transition hover:border-border-strong"
-              >
-                <Link to={`/characters/${c.id}`} className="min-w-0">
-                  <div className="font-display text-lg font-semibold leading-tight truncate">
-                    <MediaImage
-                      targetType="character"
-                      targetId={c.id}
-                      assetId={c.portraitAssetId}
-                      name={c.name}
-                      thumbnail
-                    />
-                    {c.name}
-                  </div>
-                  <p className="text-xs text-muted">
-                    ST {c.st} · DX {c.dx} · IQ {c.iq} · HT {c.ht}
-                  </p>
-                </Link>
-                {c.campaignId && c.campaignName && (
-                  <Link
-                    to={`/campaigns/${c.campaignId}`}
-                    className="link link-hover mt-1 truncate text-xs font-medium text-base-content/70"
-                  >
-                    {c.campaignName}
-                  </Link>
-                )}
-              </div>
+              <CharacterCard key={c.id} character={c} />
             ))}
           </div>
         </section>
