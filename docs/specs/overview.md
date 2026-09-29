@@ -198,9 +198,14 @@ campaign-invitation guidance instead of returning-user copy. Character creation 
 names, prevents duplicate pending submits, and preserves a new draft typed while an
 earlier creation finishes.
 
-The home page's recent-character cards and the `/characters` listing resolve
-from the local mirror. Each card links to its character and, when assigned,
-shows the synced campaign name as a separate link to that campaign.
+The home page's recent characters, `/characters` listing, campaign overview
+roster, and GM dashboard use the shared `CharacterCard` presentation. Each card
+shows its portrait/name as a sheet link, the synced campaign name as a separate
+campaign link when assigned, and one ST/DX/IQ/HT summary. All read from the local
+mirror. Minimal campaign viewers see identity without attributes; masked rows
+awaiting full rehydration also hide the attribute line. GM cards use effective
+attributes and append live pools, secondary stats, conditions and skill lookup;
+unavailable mechanics hide their numbers. GM name links open the sheet in a new tab.
 
 - **Sheet navigation and icons.** A floating bottom daisyUI dock at widths of
   768px and above replaces the sheet tab bar, with etched outline icons, labels,
@@ -1130,6 +1135,7 @@ src/
                  character-owned trait mechanics, and LibraryFormFooter
                  (the Cancel/Add-or-Save actions every entry form shares)
       help/      CampaignLibraryHelpPage and campaign-library.md (in-app authoring guide)
+      characters/CharacterCard.tsx  Shared character cards for home, listing, campaign roster and GM dashboard
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
       characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
