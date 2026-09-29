@@ -269,8 +269,10 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
 surfaces together: `decideCharacterAccess` + `projectCharacterRow` (server
 sync emission), `characterIdsToMinimize` + the orchestrator's character-row
 rewrite (local purge), and the list-filter / campaign-browse UI (discovery).
-History-detail redaction follows the same gate — `minimal` viewers get no
-character-history detail (see history-tracking.md Risks).
+History delivery follows the same gate — `minimal` viewers get no character
+events, including summaries, details and batch counts through campaign roll-up.
+The roll-up retains the event's recorded campaign/owner context for deleted
+characters and departure mirrors (see history-tracking.md).
 
 Both `/sync/cursor` campaign rows and the authenticated `/campaigns` response
 are mirrored into Dexie with the current viewer's role. This lets

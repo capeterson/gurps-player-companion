@@ -44,7 +44,10 @@ log rather than being rendered to the player.
 
 The static handler marks `sw.js`, its registration bootstrap, the manifest, and
 both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
-remain cacheable. The service worker's navigation fallback excludes `/api/*`,
+under `/assets/` use `Cache-Control: public, max-age=31536000, immutable`.
+Only existing files with Vite's content-hash naming pattern get this policy;
+missing assets and SPA fallbacks remain `no-store`. The service worker's
+navigation fallback excludes `/api/*`,
 `/admin/*`, `/mcp`, `/.well-known/*`, and the OAuth protocol endpoints. This is
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
@@ -63,6 +66,9 @@ secure responses include HSTS. Forwarded protocol headers are honored only when
 `TRUST_PROXY` is enabled. Health probes remain available over HTTP: `/api/v1/healthz`
 checks process liveness, while `/api/v1/readyz` verifies PostgreSQL 18 and the image's
 latest migration. Both expose the optional `APP_RELEASE` image identifier.
+The Bun HTTP app sets `Content-Security-Policy: frame-ancestors 'none'` and
+`X-Frame-Options: DENY`, including HTML entrypoints, SPA fallbacks and errors,
+so the production app cannot be embedded in a frame.
 
 **Graceful shutdown.** On `SIGTERM`/`SIGINT`, `src/server/index.ts` calls
 `shutdownServer`: it flips the draining flag in `src/server/lifecycle.ts` (so
@@ -81,6 +87,12 @@ dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
 `migrate`, and `app`. `app` waits for `migrate` to exit 0. In dev, Vite (via
 `@hono/vite-dev-server`) owns the SPA and HMR; the same Bun process serves the
 Hono API on the same port — see `dev-entry.ts` and `vite.config.ts`.
+The production Dockerfile installs the frozen lockfile twice in isolated stages:
+all dependencies for building, and `--production` dependencies for runtime.
+The final image copies only the production dependency tree plus built output
+and migrations; development/test tools such as happy-dom, Vite and Playwright
+are absent. The image's health probe uses IPv4 loopback to match the default
+`0.0.0.0` server listener, avoiding IPv6 `localhost` resolution failures.
 
 ## MCP and delegated authorization
 
@@ -408,6 +420,11 @@ Key PG18 / trigger machinery, layered by migration:
   mandatory named-image promotion gate: it runs against the selected source
   image and must pass before any version tag, image alias, or GitHub Release is
   created.
+  `scripts/release-image.sh` resolves the source once to a SHA-256 digest, pulls
+  that digest and checks its OCI revision label against the release checkout.
+  Migration, the candidate server and image alias publication all use the same
+  pinned reference. Promotion currently accepts only one linux/amd64 runnable
+  image (plus attestations); additional platforms need their own acceptance.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in

@@ -69,6 +69,12 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     if (isDraining()) c.res.headers.set('connection', 'close');
   });
 
+  app.use('*', async (c, next) => {
+    await next();
+    // Apply to final responses too, including static HTML and SPA fallbacks.
+    c.res.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+    c.res.headers.set('X-Frame-Options', 'DENY');
+  });
   app.use('*', productionHttps(config));
 
   app.use('/api/v1/media/*', requireActiveUser);

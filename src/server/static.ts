@@ -36,10 +36,20 @@ export function shouldRevalidateStaticPath(pathname: string): boolean {
   return REVALIDATED_STATIC_PATHS.has(pathname);
 }
 
-function staticResponse(file: ReturnType<typeof Bun.file>, revalidate: boolean): Response {
+/** Vite's default output names include an eight-character content hash. */
+export function isHashedStaticAsset(pathname: string): boolean {
+  return /^\/assets\/[^/]+-[A-Za-z0-9_-]{8}\.[A-Za-z0-9.]+$/.test(pathname);
+}
+
+function staticResponse(
+  file: ReturnType<typeof Bun.file>,
+  policy: 'revalidate' | 'immutable' | 'default',
+): Response {
   const headers = new Headers({ 'content-type': file.type });
-  if (revalidate) {
+  if (policy === 'revalidate') {
     for (const [name, value] of Object.entries(REVALIDATION_HEADERS)) headers.set(name, value);
+  } else if (policy === 'immutable') {
+    headers.set('cache-control', 'public, max-age=31536000, immutable');
   }
   return new Response(file, { headers });
 }
@@ -64,7 +74,11 @@ export function safeJoin(base: string, requestPath: string): string | null {
   return joined;
 }
 
-export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEnv> {
+export function attachStaticHandler(
+  app: OpenAPIHono<AppEnv>,
+  clientRoot = ROOT,
+): OpenAPIHono<AppEnv> {
+  const root = resolve(clientRoot);
   app.get('*', async (c) => {
     const url = new URL(c.req.url);
     // API routes that didn't match anything earlier are 404s, regardless
@@ -79,19 +93,22 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     if (url.pathname.startsWith('/api/') || protocolPath) {
       return c.json({ error: 'not_found' }, 404);
     }
-    if (!existsSync(ROOT)) {
+    if (!existsSync(root)) {
       return c.text(
         'client bundle missing — run `bun run build:client` (or use `bun run dev` for the Vite dev server)',
         503,
       );
     }
-    const asFile = safeJoin(ROOT, url.pathname);
+    const asFile = safeJoin(root, url.pathname);
     if (asFile) {
       try {
         const s = await stat(asFile);
         if (s.isFile()) {
           const file = Bun.file(asFile);
-          return staticResponse(file, shouldRevalidateStaticPath(url.pathname));
+          let policy: 'revalidate' | 'immutable' | 'default' = 'default';
+          if (shouldRevalidateStaticPath(url.pathname)) policy = 'revalidate';
+          else if (isHashedStaticAsset(url.pathname)) policy = 'immutable';
+          return staticResponse(file, policy);
         }
       } catch {
         // fall through to index.html
@@ -100,8 +117,8 @@ export function attachStaticHandler(app: OpenAPIHono<AppEnv>): OpenAPIHono<AppEn
     // Per AGENTS.md, /admin/* is served by a separate Vite entry
     // (admin.html) so the regular client bundle stays admin-free.
     const isAdmin = url.pathname === '/admin' || url.pathname.startsWith('/admin/');
-    const fallbackPath = join(ROOT, isAdmin ? 'admin.html' : 'index.html');
-    return staticResponse(Bun.file(fallbackPath), true);
+    const fallbackPath = join(root, isAdmin ? 'admin.html' : 'index.html');
+    return staticResponse(Bun.file(fallbackPath), 'revalidate');
   });
   return app;
 }

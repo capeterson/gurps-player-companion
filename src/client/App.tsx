@@ -8,13 +8,13 @@ import { SyncStatusIndicator } from './components/SyncStatusIndicator.tsx';
 import { AppIcon } from './components/ui/AppIcon.tsx';
 import { BrandMark } from './components/ui/BrandMark.tsx';
 import { clearAllTableFilters } from './components/ui/Table.tsx';
-import { getLocalDb } from './db/dexie.ts';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { clearAllSkillTablePreferences } from './features/characters/sections/skillTablePreferences.ts';
 import { clearAllTraitTablePreferences } from './features/characters/sections/traitTablePreferences.ts';
 import { clearAllLibraryTablePreferences } from './features/library/libraryTablePreferences.ts';
+import { useUnsyncedChangesGuard } from './hooks/useUnsyncedChangesGuard.tsx';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
@@ -61,6 +61,7 @@ export function App() {
   });
 
   useThemePreferenceSync();
+  const discardGuard = useUnsyncedChangesGuard();
 
   // Close header dropdowns when the route changes — the <details> element
   // doesn't auto-close, so navigating from a menu item leaves it open otherwise.
@@ -99,13 +100,6 @@ export function App() {
   }, []);
 
   async function signOut() {
-    if (
-      (await getLocalDb().mediaUploads.count()) > 0 &&
-      !window.confirm(
-        'Signing out discards unsaved image files on this device. Cancel to sync them or export them from the sync log first. Sign out and discard them?',
-      )
-    )
-      return;
     const tokens = tokenStore.read();
     if (tokens) {
       // Best-effort: revoke the refresh token server-side so it can't be reused.
@@ -195,7 +189,7 @@ export function App() {
             </>
           )}
           <li>
-            <button type="button" onClick={() => void signOut()}>
+            <button type="button" onClick={() => void discardGuard.guard('signOut', signOut)}>
               Logout
             </button>
           </li>
@@ -371,7 +365,7 @@ export function App() {
                   </>
                 )}
                 <li>
-                  <button type="button" onClick={() => void signOut()}>
+                  <button type="button" onClick={() => void discardGuard.guard('signOut', signOut)}>
                     Logout
                   </button>
                 </li>
@@ -386,6 +380,7 @@ export function App() {
         <main className="relative z-0 mx-auto w-full max-w-[80rem] p-4 sm:p-7">
           <Outlet />
         </main>
+        {discardGuard.dialog}
       </div>
     </CharacterHeaderChromeContext.Provider>
   );
