@@ -909,7 +909,11 @@ there is no decorative cover slot or implied image-upload feature.
   The body is **markdown** (CommonMark + GFM) rendered through a sanitized
   pipeline that never interprets raw HTML or scripts. The create/edit form
   offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
-  can be **edited or deleted** by their author or the campaign owner. See
+  can be **edited or deleted** by their author or the campaign owner. Editing
+  replaces the selected card in place, with Save changes and Cancel beside the draft.
+  Award summaries show the points per recipient (or the total for varied legacy awards);
+  the character count opens a bounded, scrollable tooltip of the saved recipients
+  and their amounts. Private badges name the attached character when available. See
   campaign-content-sharing.md.
   Campaign/library/log/history reads show a retryable error when their request
   fails, rather than presenting a failed request as an empty collection.

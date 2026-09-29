@@ -145,6 +145,12 @@ form or folded section must not leave an autocomplete floating over the page.
 See the overlay rules in [AGENTS.md](../../AGENTS.md): dynamic viewport size
 limits alone do not establish containment.
 
+The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
+award summaries. These tooltips retain horizontal collision handling, constrain
+height and vertical position to the visual viewport below the sticky app header,
+and allow pointer and keyboard scrolling. Hover, focus, or tap opens the list;
+Escape dismisses it.
+
 ## Verification and file map
 
 Panel tests assert visible summaries, Add/Edit disclosures, preserved drafts,
