@@ -22,6 +22,11 @@ in production and HTTP with `PORT` in development/test for all public app URLs.
 Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
+The production image ships only production dependencies. The HTTP app denies
+framing, caches content-hashed assets immutably, and keeps HTML and service-worker
+entrypoints uncached so releases remain discoverable (see
+[architecture.md](architecture.md)).
+
 A first download that fails displays its reason and a retry action; an ended session
 before that download completes offers sign-in instead of an indefinite loading state.
 

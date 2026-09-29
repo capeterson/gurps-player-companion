@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { safeJoin, shouldRevalidateStaticPath } from './static.ts';
+import { afterAll, describe, expect, it } from 'bun:test';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { createApp } from './app.ts';
+import { attachStaticHandler, safeJoin, shouldRevalidateStaticPath } from './static.ts';
+import { integrationTestConfig } from './testConfig.ts';
 
 const BASE = resolve('/srv/dist/client');
 
@@ -78,6 +81,74 @@ describe('static cache policy', () => {
 
   it('leaves content-hashed assets cacheable', () => {
     expect(shouldRevalidateStaticPath('/assets/main-QpTixWqe.js')).toBe(false);
+  });
+});
+
+describe('static HTTP response security and cache headers', () => {
+  const clientRoot = mkdtempSync(join(tmpdir(), 'gpc-static-http-'));
+  mkdirSync(join(clientRoot, 'assets'));
+  writeFileSync(join(clientRoot, 'index.html'), '<!doctype html><main>shell</main>');
+  writeFileSync(join(clientRoot, 'admin.html'), '<!doctype html><main>admin shell</main>');
+  writeFileSync(join(clientRoot, 'sw.js'), 'self.addEventListener("fetch", () => {});');
+  writeFileSync(join(clientRoot, 'assets', 'main-Ab1Cd2Ef.js'), 'export const build = 1;');
+  writeFileSync(join(clientRoot, 'assets', 'helper.js'), 'export const helper = true;');
+
+  const app = createApp({ ...integrationTestConfig, environment: 'development' });
+  app.get('/__test/error', () => {
+    throw new Error('test error');
+  });
+  attachStaticHandler(app, clientRoot);
+
+  afterAll(() => rmSync(clientRoot, { recursive: true, force: true }));
+
+  function expectFramingBlocked(response: Response) {
+    expect(response.headers.get('content-security-policy')).toBe("frame-ancestors 'none'");
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+  }
+
+  it('sets frame protection on API success, API errors, and handled server errors', async () => {
+    const success = await app.request('/api/v1/healthz');
+    expect(success.status).toBe(200);
+    expectFramingBlocked(success);
+
+    const apiError = await app.request('/api/v1/not-a-route');
+    expect(apiError.status).toBe(404);
+    expect(await apiError.json()).toEqual({ error: 'not_found' });
+    expectFramingBlocked(apiError);
+
+    const serverError = await app.request('/__test/error');
+    expect(serverError.status).toBe(500);
+    expect(await serverError.json()).toEqual({ error: 'internal_error' });
+    expectFramingBlocked(serverError);
+  });
+
+  it('serves a real hashed asset as immutable while shell, worker, and SPA fallback revalidate', async () => {
+    const asset = await app.request('/assets/main-Ab1Cd2Ef.js');
+    expect(asset.status).toBe(200);
+    expect(await asset.text()).toBe('export const build = 1;');
+    expect(asset.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+    expectFramingBlocked(asset);
+
+    const unhashedAsset = await app.request('/assets/helper.js');
+    expect(unhashedAsset.status).toBe(200);
+    expect(await unhashedAsset.text()).toBe('export const helper = true;');
+    expect(unhashedAsset.headers.get('cache-control')).toBeNull();
+    expectFramingBlocked(unhashedAsset);
+
+    for (const [path, content] of [
+      ['/index.html', '<!doctype html><main>shell</main>'],
+      ['/sw.js', 'self.addEventListener("fetch", () => {});'],
+      ['/assets/missing-Ab1Cd2Ef.js', '<!doctype html><main>shell</main>'],
+      ['/characters/01a0ea9d-0000-7000-8000-000000000001', '<!doctype html><main>shell</main>'],
+      ['/admin/people', '<!doctype html><main>admin shell</main>'],
+    ] as const) {
+      const response = await app.request(path);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe(content);
+      expect(response.headers.get('cache-control')).toBe('no-store, no-cache, must-revalidate');
+      expect(response.headers.get('cdn-cache-control')).toBe('no-store');
+      expectFramingBlocked(response);
+    }
   });
 });
 

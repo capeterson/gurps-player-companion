@@ -5,7 +5,9 @@ const PASSWORD = 'CorrectHorseBatteryStaple1';
 
 async function register(page: Page, email: string) {
   await page.goto('/register');
-  await page.getByLabel(/email/i).fill(email);
+  const emailField = page.getByLabel(/email/i);
+  await expect(emailField).toBeVisible({ timeout: 15_000 });
+  await emailField.fill(email);
   await page.getByLabel(/display name/i).fill('Unsynced logout QA');
   await page.getByLabel(/^password\b/i).fill(PASSWORD);
   await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
@@ -95,7 +97,6 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
 }, testInfo) => {
   test.setTimeout(120_000);
   const email = `logout-unsynced-${suffix()}@example.com`;
-  await page.setViewportSize({ width: 1280, height: 900 });
   await register(page, email);
 
   await page.goto('/characters');
@@ -114,6 +115,17 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   // Open the database before taking the page offline, so the native IndexedDB
   // assertions below need no app or module network requests.
   await localSnapshot(page, characterId);
+  // Settings is a lazy route chunk. Visit it through SPA navigation so the
+  // offline password change cancellation exercises the guard rather than an
+  // uncached development chunk.
+  await page.getByLabel('Open user menu').click();
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 15_000 });
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/characters/${characterId}$`));
+  await expect(page.getByRole('textbox', { name: 'character name' }).first()).toBeVisible({
+    timeout: 15_000,
+  });
 
   const firstEdit = `${originalName} kept offline`;
   await setOnline(page, false);
