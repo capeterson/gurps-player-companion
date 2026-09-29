@@ -1,4 +1,4 @@
-import { type Page, expect, test } from '@playwright/test';
+import { type Locator, type Page, expect, test } from '@playwright/test';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 const PASSWORD = 'CorrectHorseBatteryStaple1';
@@ -70,12 +70,31 @@ async function openLogoutDialog(page: Page, width: number) {
   return page.getByRole('dialog', { name: 'Discard unsaved changes and sign out?' });
 }
 
+async function expectOpaqueDialogSurface(dialog: Locator) {
+  const surface = dialog.locator('.modal-box');
+  await expect(dialog).toHaveCSS('opacity', '1');
+  await expect(surface).toHaveCSS('opacity', '1');
+  const backgroundAlpha = await surface.evaluate((element) => {
+    const backgroundColor = getComputedStyle(element).backgroundColor;
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not create a canvas to inspect dialog opacity');
+    context.fillStyle = backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return context.getImageData(0, 0, 1, 1).data[3] / 255;
+  });
+  expect(backgroundAlpha).toBe(1);
+}
+
 async function expectDialogInsideViewport(page: Page, width: number, height: number) {
   const dialog = page.getByRole('dialog', { name: 'Discard unsaved changes and sign out?' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText(/changes that have not been saved to the server/i)).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Keep editing' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Discard and sign out' })).toBeVisible();
+  await expectOpaqueDialogSurface(dialog);
   const visibleBoxes = await Promise.all([
     dialog.locator('.modal-box').boundingBox(),
     dialog.getByRole('button', { name: 'Keep editing' }).boundingBox(),
@@ -141,9 +160,13 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   for (const width of [390, 320]) {
     const height = 844;
     await page.setViewportSize({ width, height });
-    await openLogoutDialog(page, width);
+    const dialog = await openLogoutDialog(page, width);
+    await expect(dialog).toBeVisible();
+    await page.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath(`logout-confirm-${width}.png`),
+    });
     await expectDialogInsideViewport(page, width, height);
-    await page.screenshot({ path: testInfo.outputPath(`logout-confirm-${width}.png`) });
     if (width === 390) {
       await page.keyboard.press('Escape');
     } else {
@@ -171,7 +194,7 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   await mobileNavigation.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/\/settings$/);
   await page.getByLabel('Current password').fill(PASSWORD);
-  await page.getByLabel('New password').fill('AnotherCorrectHorseBattery2');
+  await page.getByLabel('New password', { exact: true }).fill('AnotherCorrectHorseBattery2');
   await page.getByLabel('Confirm new password').fill('AnotherCorrectHorseBattery2');
   await page.getByRole('button', { name: 'Change password', exact: true }).click();
   const passwordDialog = page.getByRole('dialog', {
@@ -185,6 +208,11 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   await expect(
     passwordDialog.getByRole('button', { name: 'Discard and change password' }),
   ).toBeVisible();
+  await page.screenshot({
+    animations: 'disabled',
+    path: testInfo.outputPath('password-confirm-320.png'),
+  });
+  await expectOpaqueDialogSurface(passwordDialog);
   const passwordDialogBoxes = await Promise.all([
     passwordDialog.locator('.modal-box').boundingBox(),
     passwordDialog.getByRole('button', { name: 'Keep editing' }).boundingBox(),
@@ -199,7 +227,6 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
       expect(box.y + box.height).toBeLessThanOrEqual(845);
     }
   }
-  await page.screenshot({ path: testInfo.outputPath('password-confirm-320.png') });
   await page.keyboard.press('Escape');
   await expect(passwordDialog).toBeHidden();
   expect(passwordRequests).toBe(0);
@@ -245,9 +272,13 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   for (const width of [1279, 1280, 1281]) {
     const height = 900;
     await page.setViewportSize({ width, height });
-    await openLogoutDialog(page, width);
+    const dialog = await openLogoutDialog(page, width);
+    await expect(dialog).toBeVisible();
+    await page.screenshot({
+      animations: 'disabled',
+      path: testInfo.outputPath(`logout-confirm-${width}.png`),
+    });
     await expectDialogInsideViewport(page, width, height);
-    await page.screenshot({ path: testInfo.outputPath(`logout-confirm-${width}.png`) });
     if (width < 1281) {
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toBeHidden();
