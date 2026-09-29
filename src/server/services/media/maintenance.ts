@@ -62,12 +62,25 @@ export async function sweepMedia(): Promise<void> {
 }
 
 let timer: ReturnType<typeof setInterval> | undefined;
+let activeSweep: Promise<void> | undefined;
 export function startMediaMaintenance() {
   if (timer || !mediaConfig().configured || process.env.ENVIRONMENT === 'test') return;
   const tick = () => {
-    void sweepMedia().catch(() => console.error('media cleanup failed; will retry'));
+    if (activeSweep) return;
+    activeSweep = sweepMedia()
+      .catch(() => console.error('media cleanup failed; will retry'))
+      .finally(() => {
+        activeSweep = undefined;
+      });
   };
   timer = setInterval(tick, 60 * 60_000);
   timer.unref();
   tick();
+}
+
+/** Graceful shutdown: schedule no more sweeps and wait for the running one. */
+export async function stopMediaMaintenance(): Promise<void> {
+  if (timer) clearInterval(timer);
+  timer = undefined;
+  await activeSweep;
 }

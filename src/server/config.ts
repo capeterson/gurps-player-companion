@@ -69,6 +69,7 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_REGISTER_MAX: z.coerce.number().int().positive().default(5),
   AUTH_RATE_LIMIT_RESET_MAX: z.coerce.number().int().positive().default(3),
   AUTH_RATE_LIMIT_CHALLENGE_MAX: z.coerce.number().int().positive().default(10),
+  SHUTDOWN_GRACE_SECONDS: z.coerce.number().int().min(0).max(120).default(15),
   CORS_ORIGINS: z
     .string()
     .default('[]')
@@ -116,6 +117,8 @@ export type AppConfig = {
   authRateLimitRegisterMax: number;
   authRateLimitResetMax: number;
   authRateLimitChallengeMax: number;
+  /** How long SIGTERM/SIGINT waits for in-flight requests before forcing shutdown. */
+  shutdownGraceSeconds: number;
 };
 
 let cached: AppConfig | undefined;
@@ -142,6 +145,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     AUTH_RATE_LIMIT_REGISTER_MAX: env.AUTH_RATE_LIMIT_REGISTER_MAX,
     AUTH_RATE_LIMIT_RESET_MAX: env.AUTH_RATE_LIMIT_RESET_MAX,
     AUTH_RATE_LIMIT_CHALLENGE_MAX: env.AUTH_RATE_LIMIT_CHALLENGE_MAX,
+    SHUTDOWN_GRACE_SECONDS: env.SHUTDOWN_GRACE_SECONDS,
   });
   if (parsed.ENVIRONMENT === 'production' && !parsed.APP_BASE_URL) {
     throw new Error('APP_BASE_URL is required in production for OAuth');
@@ -185,6 +189,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     authRateLimitRegisterMax: parsed.AUTH_RATE_LIMIT_REGISTER_MAX,
     authRateLimitResetMax: parsed.AUTH_RATE_LIMIT_RESET_MAX,
     authRateLimitChallengeMax: parsed.AUTH_RATE_LIMIT_CHALLENGE_MAX,
+    shutdownGraceSeconds: parsed.SHUTDOWN_GRACE_SECONDS,
   };
   return cached;
 }

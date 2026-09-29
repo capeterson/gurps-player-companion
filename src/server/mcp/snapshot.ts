@@ -24,6 +24,7 @@ export const snapshotConfig: AppConfig = {
   authRateLimitRegisterMax: 5,
   authRateLimitResetMax: 3,
   authRateLimitChallengeMax: 10,
+  shutdownGraceSeconds: 15,
 };
 
 export function generateMcpSnapshot() {

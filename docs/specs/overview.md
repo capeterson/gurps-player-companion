@@ -1018,6 +1018,8 @@ player client.
 ```
 src/
   server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
+    index.ts     Bun.serve entrypoint; SIGTERM/SIGINT graceful drain (`shutdownServer`)
+    lifecycle.ts Draining flag (readiness 503, `Connection: close`) during shutdown
     https.ts     Production HTTPS redirects and HSTS
     routes/health.ts  Liveness, database/migration readiness and release probes
     routes/      One file per resource group (auth, characters, campaigns,
@@ -1142,6 +1144,8 @@ src/
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
                  libraryMechanics.ts validates synced character-owned declarations)
+    syncProtocol.ts  Sync protocol version + header; `/sync/*` answers 426 to
+                 an outdated build, which then force-reloads onto the current one
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text

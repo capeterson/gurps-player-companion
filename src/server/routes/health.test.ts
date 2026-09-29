@@ -37,3 +37,19 @@ describe('readiness', () => {
     ).rejects.toBe(rollback);
   });
 });
+
+describe('readiness while draining', () => {
+  it('fails readiness and asks clients to reconnect, while liveness stays up', async () => {
+    const { _resetDrainingForTests, beginDraining } = await import('../lifecycle.ts');
+    beginDraining();
+    try {
+      const response = await app.request('/api/v1/readyz');
+      expect(response.status).toBe(503);
+      expect((await response.json()).ok).toBe(false);
+      expect(response.headers.get('connection')).toBe('close');
+      expect((await app.request('/api/v1/healthz')).status).toBe(200);
+    } finally {
+      _resetDrainingForTests();
+    }
+  });
+});

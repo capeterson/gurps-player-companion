@@ -161,6 +161,7 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `AUTH_RATE_LIMIT_REGISTER_MAX` | `5` | Registration-attempt limit per source IP per window. |
 | `AUTH_RATE_LIMIT_RESET_MAX` | `3` | Password-recovery attempt limit per window. |
 | `AUTH_RATE_LIMIT_CHALLENGE_MAX` | `10` | Passkey-challenge attempt limit per window. |
+| `SHUTDOWN_GRACE_SECONDS` | `15` | On `SIGTERM`/`SIGINT`, how long (0–120) to let in-flight requests finish before forcing shutdown. Keep the orchestrator's stop timeout longer; Compose uses a 25 s `stop_grace_period`. |
 
 Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (default `3000`, set to `3001` by dev Compose), and `VITE_HMR_PROTOCOL` (`ws`, or `wss` for TLS). These control the browser’s hot-reload connection, not the public application URL. Test-runner overrides are documented in [playwright.config.ts](playwright.config.ts).
 

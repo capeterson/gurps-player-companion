@@ -35,6 +35,7 @@ import {
   type SyncOperationsResponse,
   isLibraryEntityClass,
 } from '../../shared/schemas/sync.ts';
+import { requestClientUpdate } from '../../sw/registerSW.ts';
 import {
   ALL_STORE_NAMES,
   LIBRARY_STORE_NAMES,
@@ -297,6 +298,12 @@ class SyncOrchestrator {
    * cycle that actually succeeds -- see `refreshIndicator`.
    */
   private syncHealthy = true;
+  /**
+   * Set when the server answered 426: this build's sync protocol is too old.
+   * Sync pauses (queued operations stay untouched) until the app reloads onto
+   * the current build, or the forced-reload guard window passes.
+   */
+  private clientOutdatedUntil = 0;
   /** Invalidates every response that originated before logout/account switch. */
   private sessionGeneration = 0;
   private sessionAbort = new AbortController();
@@ -438,6 +445,7 @@ class SyncOrchestrator {
   private async pullInner(force: boolean, generation = this.sessionGeneration): Promise<boolean> {
     if (!this.sessionIsCurrent(generation)) return false;
     if (this.recoveryInProgress && !force) return false;
+    if (this.isClientOutdated()) return false;
     if (!tokenStore.read()) {
       // A session that vanished *after* bootstrap wasn't a sign-out --
       // something invalidated it underneath the user (see the refresh
@@ -519,6 +527,10 @@ class SyncOrchestrator {
       return true;
     } catch (err) {
       if (!this.sessionIsCurrent(generation)) return false;
+      if (isClientOutdatedError(err)) {
+        await this.handleClientOutdated(err);
+        return false;
+      }
       // Leave a trace.  A failing pull produces no outbox row, no
       // rejection record and no toast, so before this the only symptom
       // was a red badge telling the user to go read a toast that never
@@ -875,6 +887,7 @@ class SyncOrchestrator {
     const generation = this.sessionGeneration;
     if (!this.sessionIsCurrent(generation)) return;
     if (this.recoveryInProgress) return;
+    if (this.isClientOutdated()) return;
     if (!tokenStore.read()) {
       if (this.currentUserId !== null) this.reportSessionLost();
       return;
@@ -927,6 +940,16 @@ class SyncOrchestrator {
         if (!this.sessionIsCurrent(generation)) return;
         outcomes = res.outcomes ?? [];
       } catch (err) {
+        if (isClientOutdatedError(err)) {
+          // The server refused the whole batch before reading it: nothing
+          // was delivered, so restore each claim exactly (no attempt, no
+          // delivery uncertainty) and let the current build send it.
+          for (const op of ops) {
+            await setOutboxStatus(op.clientOpId, op.status, { attemptCount: op.attemptCount });
+          }
+          await this.handleClientOutdated(err);
+          return;
+        }
         // Network or server error covering the whole batch.  Revert
         // status so the loop retries with backoff.
         for (const op of ops) {
@@ -2391,6 +2414,33 @@ class SyncOrchestrator {
   private markCycleFailed(): void {
     this.syncHealthy = false;
   }
+
+  private isClientOutdated(): boolean {
+    // Skip the clock read in the common case; scheduling snapshots elsewhere
+    // depend on the order of Date.now() calls.
+    return this.clientOutdatedUntil !== 0 && Date.now() < this.clientOutdatedUntil;
+  }
+
+  /**
+   * The server no longer accepts this build's sync protocol. Queued edits
+   * stay in the outbox; the page reloads onto the current build, whose Dexie
+   * upgrades migrate them before they are sent.
+   */
+  private async handleClientOutdated(err: unknown): Promise<void> {
+    const alreadyReported = this.isClientOutdated();
+    this.clientOutdatedUntil = Date.now() + CLIENT_OUTDATED_PAUSE_MS;
+    this.markCycleFailed();
+    if (alreadyReported) return;
+    const reason = 'App update required — reloading to sync your changes';
+    await appendSyncLog({
+      direction: 'local',
+      result: 'failed',
+      reason,
+      details: snapshotValue({ error: errorDetails(err) }),
+    });
+    syncStateStore.setError(reason);
+    requestClientUpdate();
+  }
 }
 
 function toEnvelope(op: OutboxEntry): OperationEnvelope {
@@ -2473,6 +2523,13 @@ async function reportCycleFailure(
  * is down" and "my edit was rejected" -- and the user is the one who
  * has to tell those apart when the badge goes red.
  */
+/** Matches the forced-reload guard window in `requestClientUpdate`. */
+const CLIENT_OUTDATED_PAUSE_MS = 60_000;
+
+function isClientOutdatedError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 426;
+}
+
 function failureReason(err: unknown, prefix: string): string {
   if (err instanceof ApiError) {
     const detail = err.message === `HTTP ${err.status}` ? '' : ` — ${err.message}`;
