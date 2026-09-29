@@ -5,6 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
 import { createApp } from '../../app.ts';
 import { signAccessToken } from '../../auth/jwt.ts';
+import { mcpResource } from '../../oauth/service.ts';
 import { DEFAULT_CAMPAIGN_SOURCES } from '../../services/defaultCampaignSources.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../../testConfig.ts';
 import { withAudit } from '../auditContext.ts';
@@ -26,9 +27,9 @@ import { lanternMcpRequest } from './lanternCoastMcp.ts';
 
 configureIntegrationTestEnvironment();
 afterAll(closeDb);
-const config = { ...integrationTestConfig, appBaseUrl: 'http://localhost:3001' };
+const config = { ...integrationTestConfig, appHostname: 'localhost', port: 3001 };
 const app = createApp(config);
-const resource = `${config.appBaseUrl}/mcp`;
+const resource = mcpResource(config);
 
 async function restRequest(userId: string): Promise<LanternRequest> {
   const { token } = await signAccessToken(userId);

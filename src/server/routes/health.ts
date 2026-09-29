@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { sql } from 'drizzle-orm';
 import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { getDb } from '../db/client.ts';
+import { isDraining } from '../lifecycle.ts';
 import { createOpenApiApp } from '../openapi/app.ts';
 
 const healthSchema = z.object({ ok: z.boolean(), release: z.string() }).openapi('Health');
@@ -36,7 +37,8 @@ const readyRoute = createRoute({
       content: { 'application/json': { schema: healthSchema } },
     },
     503: {
-      description: 'Database unavailable or required migrations missing',
+      description:
+        'Database unavailable, required migrations missing, or the process is shutting down',
       content: { 'application/json': { schema: healthSchema } },
     },
   },
@@ -46,6 +48,8 @@ let requiredMigrationHash: string | undefined;
 healthRouter.openapi(readyRoute, async (c) => {
   c.header('Cache-Control', 'no-store');
   const release = process.env.APP_RELEASE ?? 'development';
+  // Stop receiving traffic while in-flight requests drain.
+  if (isDraining()) return c.json({ ok: false, release }, 503);
   try {
     requiredMigrationHash ??= readMigrationFiles({
       migrationsFolder: 'src/server/db/migrations',

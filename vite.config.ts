@@ -89,7 +89,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: Number(process.env.PORT ?? 3000),
     host: true,
     strictPort: true,
     hmr: {
@@ -100,7 +100,7 @@ export default defineConfig({
       // can't reach. A custom path avoids the @hono/vite-dev-server
       // middleware intercepting the WS upgrade at `/`.
       host: process.env.VITE_HMR_HOST ?? 'localhost',
-      port: Number(process.env.VITE_HMR_PORT ?? 3000),
+      port: Number(process.env.VITE_HMR_PORT ?? process.env.PORT ?? 3000),
       protocol: process.env.VITE_HMR_PROTOCOL === 'wss' ? 'wss' : 'ws',
       path: '/vite-hmr',
     },

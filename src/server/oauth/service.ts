@@ -8,7 +8,7 @@ import {
   parseOAuthScopes,
 } from '../../shared/schemas/oauth.ts';
 import { type AuthenticatedUser, hasRecentAuthentication } from '../auth/session.ts';
-import type { AppConfig } from '../config.ts';
+import { type AppConfig, appUrl } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import {
   oauthAccessTokens,
@@ -93,8 +93,7 @@ function equalText(left: string, right: string): boolean {
 }
 
 export function publicOrigin(config: AppConfig): string {
-  const value = config.appBaseUrl ?? `http://localhost:${config.port}`;
-  return value.replace(/\/$/, '');
+  return appUrl(config);
 }
 
 export function mcpResource(config: AppConfig): string {

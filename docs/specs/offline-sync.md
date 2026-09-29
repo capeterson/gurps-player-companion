@@ -352,6 +352,34 @@ into the same chain before selection. This prevents an older retry from replayin
 over a newer value. It is a client replay-order guarantee, not server exactly-once
 execution: `/sync/operations` does not persist outcome receipts by `clientOpId`.
 
+### Sync protocol version
+
+An installed PWA can stay offline across several deploys and return with outbox
+operations, and a Dexie layout, written by an older build. `src/shared/syncProtocol.ts`
+defines `SYNC_PROTOCOL_VERSION` (currently 1) and `MIN_SUPPORTED_SYNC_PROTOCOL`.
+`lib/api.ts` sends `X-GPC-Sync-Protocol` on every request; a missing header counts
+as protocol 1 because clients before the header spoke it.
+
+A middleware in `routes/sync.ts` checks the header on every `/sync/*` route
+**before** authentication or body parsing, and echoes the server version:
+
+- older than the minimum, or malformed → **426** `{ error: 'client_outdated', … }`.
+  No operation is read, applied or rejected. The orchestrator restores each
+  claimed op's pre-claim status and attempt count (no delivery uncertainty, no
+  rollback, no rejection toast), journals the reason, shows it on the indicator,
+  pauses drain and pull for 60 s, and calls `requestClientUpdate()` to activate
+  the newest service worker and reload (see
+  [architecture.md](architecture.md#stale-build-discovery)). The current build
+  then sends the preserved ops.
+- newer than the server (a rolling deploy or rollback reached an older replica)
+  → **503** with `Retry-After: 5`, handled as an ordinary whole-batch failure.
+
+Bump `SYNC_PROTOCOL_VERSION` whenever the envelope, a sync-backed field's value
+shape or the cursor row shape changes. Raise `MIN_SUPPORTED_SYNC_PROTOCOL` when
+the server can no longer interpret the old shape, and ship a Dexie version upgrade
+in the same change that rewrites queued `outbox` rows (and stored rows) into the
+new shape; the reloaded build runs that upgrade before it sends anything.
+
 ### Outcome → local effect
 
 | Outcome | Local effect |
@@ -364,6 +392,7 @@ execution: `/sync/operations` does not persist outcome receipts by `clientOpId`.
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch reverts to `transient_retry`; loop retries, and a `failed` journal entry + a named indicator error record why. |
+| HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and the page force-updates (see *Sync protocol version*). |
 
 ## The session must survive a server outage
 

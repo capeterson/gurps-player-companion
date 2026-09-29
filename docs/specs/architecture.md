@@ -49,11 +49,32 @@ remain cacheable. The service worker's navigation fallback excludes `/api/*`,
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
 
-In production mode, insecure requests redirect to the HTTPS `APP_BASE_URL`, and
+The sole public-address setting is a bare `APP_HOSTNAME` (no scheme, port, or URL
+components), required in production and defaulting to `localhost` otherwise.
+`config.ts` validates it and `appUrl()` derives `https://<hostname>` in production
+or `http://<hostname>:<PORT>` in development/test. OAuth metadata/audiences,
+passkeys, email links, and HTTPS redirects all use this helper. Production ignores
+the internal listening port in public URLs; local Compose binds and publishes the
+same port so its derived origin matches the browser. Vite also honors `PORT`
+for its listener and default HMR port.
+
+In production mode, insecure requests redirect to that derived HTTPS origin, and
 secure responses include HSTS. Forwarded protocol headers are honored only when
 `TRUST_PROXY` is enabled. Health probes remain available over HTTP: `/api/v1/healthz`
 checks process liveness, while `/api/v1/readyz` verifies PostgreSQL 18 and the image's
 latest migration. Both expose the optional `APP_RELEASE` image identifier.
+
+**Graceful shutdown.** On `SIGTERM`/`SIGINT`, `src/server/index.ts` calls
+`shutdownServer`: it flips the draining flag in `src/server/lifecycle.ts` (so
+`/readyz` returns 503 while `/healthz` stays 200, and every response carries
+`Connection: close`), closes all `/sync/ws` sockets with code 1012 so clients
+reconnect to the replacement, stops accepting connections, and waits up to
+`SHUTDOWN_GRACE_SECONDS` (default 15) for in-flight requests — sync batches and
+in-request media processing — and any running media-cleanup sweep. Whatever is
+still running at the deadline is force-closed (the outbox replays it), then the
+database pool closes and the process exits. A second signal exits immediately.
+Compose files give the app a 25 s `stop_grace_period` so Docker does not
+`SIGKILL` it before the drain finishes.
 
 Deployment is Docker Compose (`docker-compose.yml` for prod; `.dev.yml` for
 dev; unraid variants included). Three services: `db` (Postgres 18), a one-shot
@@ -186,6 +207,18 @@ while one is pending, so without this a single dismissal would latch the tab
 closed against every future release. The *announced worker* is remembered
 separately, so polling won't re-nag about the same build while a genuinely
 newer one still gets through.
+
+**Forced update for an incompatible build.** The prompt above stays optional
+because an old build still syncs correctly. When the server refuses the build's
+sync protocol (HTTP 426 from `/sync/*`, see [offline-sync.md](offline-sync.md#sync-protocol-version)),
+the orchestrator calls `requestClientUpdate()`: it dispatches
+`gpc:client-outdated` (which `SwUpdatePrompt` shows as a persistent
+"Updating the app…" toast with **Reload now**), runs `registration.update()`,
+activates the newest worker with `SKIP_WAITING`, waits until no input, select,
+textarea or contenteditable element has focus (so a `useDraftField` blur commit
+reaches the outbox first), and reloads. A sessionStorage timestamp limits forced
+reloads to one per `FORCED_RELOAD_MIN_INTERVAL_MS` (60 s) per tab, so a server
+still mid-deploy cannot cause a reload loop.
 
 ## Request lifecycle
 
@@ -396,7 +429,8 @@ the nightly run; overdue accounts run on the next night after startup.
 ## Configuration
 
 - `src/server/config.ts` reads env (JWT secret ≥ 32 chars, DB URL, CORS
-  origins, Resend key, environment). `.env.example` documents the surface.
+  origins, Resend key, environment, shutdown grace period). `.env.example`
+  documents the surface.
 - Seed: `bun run db:seed` (`src/server/db/seed.ts`) refreshes the Sample
   campaign library and creates the populated Lantern Coast fixture once.
   `seeds/lanternCoast.ts` uses the normal in-process API handlers for validated,

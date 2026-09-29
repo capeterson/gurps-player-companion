@@ -35,6 +35,7 @@
 
 const UPDATE_READY_EVENT = 'gpc:sw-update-ready';
 const CONTROLLER_CHANGED_EVENT = 'gpc:sw-controller-changed';
+const CLIENT_OUTDATED_EVENT = 'gpc:client-outdated';
 
 /** How often a foreground tab re-checks for a new build. */
 export const SW_UPDATE_POLL_MS = 60 * 60 * 1000;
@@ -252,7 +253,146 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   };
 }
 
+/*
+ * # Forced update
+ *
+ * The prompt above leaves reloading to the user because nothing breaks while
+ * they wait. A server that refuses this build's sync protocol (HTTP 426, see
+ * `shared/syncProtocol.ts`) is different: queued edits cannot be sent until
+ * the page runs the current build, so the update is no longer optional.
+ */
+
+/** sessionStorage key: when this tab last forced a reload for a 426. */
+const FORCED_RELOAD_KEY = 'gpc:forced-update-reload-at';
+/** A tab that is still outdated right after a forced reload waits this long before trying again. */
+export const FORCED_RELOAD_MIN_INTERVAL_MS = 60_000;
+const SW_STEP_TIMEOUT_MS = 10_000;
+/** Pause after the user leaves an input so its blur commit reaches the outbox. */
+const EDIT_SETTLE_MS = 500;
+
+export interface ForcedUpdateOptions {
+  reload?: () => void;
+  now?: () => number;
+}
+
+let forcedUpdateStarted = false;
+
+/** Test seam. */
+export function resetForcedUpdateForTests(): void {
+  forcedUpdateStarted = false;
+}
+
+function readForcedReloadAt(): number {
+  try {
+    return Number(window.sessionStorage.getItem(FORCED_RELOAD_KEY) ?? 0) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeForcedReloadAt(at: number): void {
+  try {
+    window.sessionStorage.setItem(FORCED_RELOAD_KEY, String(at));
+  } catch {
+    // Storage unavailable: the in-memory latch still prevents repeats in this page.
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([
+    promise,
+    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+  ]);
+}
+
+function waitForActivation(worker: ServiceWorker): Promise<void> {
+  return new Promise((resolve) => {
+    if (worker.state === 'activated' || worker.state === 'redundant') return resolve();
+    const onChange = () => {
+      if (worker.state === 'activated' || worker.state === 'redundant') {
+        worker.removeEventListener('statechange', onChange);
+        resolve();
+      }
+    };
+    worker.addEventListener('statechange', onChange);
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  });
+}
+
+/** Fetch and activate the newest worker so the reload runs the current build. */
+async function activateLatestWorker(): Promise<void> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  const registration = await navigator.serviceWorker.getRegistration();
+  if (!registration) return;
+  await withTimeout(
+    registration.update().catch(() => undefined),
+    SW_STEP_TIMEOUT_MS,
+  );
+  const worker = registration.installing ?? registration.waiting;
+  if (worker) await withTimeout(waitForActivation(worker), SW_STEP_TIMEOUT_MS);
+}
+
+function editingElement(): Element | null {
+  const active = typeof document === 'undefined' ? null : document.activeElement;
+  if (!active) return null;
+  if (active instanceof HTMLElement && active.isContentEditable) return active;
+  return active.matches('input, textarea, select') ? active : null;
+}
+
+/**
+ * Resolve once no input has focus. An uncommitted draft only reaches the
+ * outbox on blur (`useDraftField`), so reloading under a focused input would
+ * discard what the user is typing.
+ */
+function waitUntilNotEditing(): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (editingElement()) return;
+      document.removeEventListener('focusout', onFocusOut, true);
+      setTimeout(() => (editingElement() ? arm() : resolve()), EDIT_SETTLE_MS);
+    };
+    const onFocusOut = () => setTimeout(check, 0);
+    const arm = () => document.addEventListener('focusout', onFocusOut, true);
+    if (!editingElement()) {
+      setTimeout(() => (editingElement() ? arm() : resolve()), 0);
+      return;
+    }
+    arm();
+  });
+}
+
+/**
+ * Force this tab onto the current build: announce it, activate the newest
+ * service worker, wait until the user is not mid-edit, then reload. Queued
+ * outbox operations stay in IndexedDB and are sent by the new build.
+ *
+ * Returns false without reloading when this tab already force-reloaded within
+ * `FORCED_RELOAD_MIN_INTERVAL_MS` (the server may still be mid-deploy), which
+ * prevents a reload loop; the caller retries after that window.
+ */
+export function requestClientUpdate(options: ForcedUpdateOptions = {}): boolean {
+  if (typeof window === 'undefined') return false;
+  if (forcedUpdateStarted) return true;
+  const now = options.now ?? Date.now;
+  window.dispatchEvent(new CustomEvent(CLIENT_OUTDATED_EVENT));
+  if (now() - readForcedReloadAt() < FORCED_RELOAD_MIN_INTERVAL_MS) return false;
+  forcedUpdateStarted = true;
+  const reload = options.reload ?? (() => window.location.reload());
+  void (async () => {
+    try {
+      await activateLatestWorker();
+    } catch {
+      // The reload still fetches the newest shell when the network allows.
+    }
+    await waitUntilNotEditing();
+    writeForcedReloadAt(now());
+    reload();
+  })();
+  return true;
+}
+
 export const swEvents = {
   UPDATE_READY: UPDATE_READY_EVENT,
   CONTROLLER_CHANGED: CONTROLLER_CHANGED_EVENT,
+  CLIENT_OUTDATED: CLIENT_OUTDATED_EVENT,
 } as const;

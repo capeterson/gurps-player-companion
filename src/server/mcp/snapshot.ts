@@ -16,7 +16,7 @@ export const snapshotConfig: AppConfig = {
   corsOrigins: [],
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  appBaseUrl: undefined,
+  appHostname: 'localhost',
   oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
@@ -24,6 +24,7 @@ export const snapshotConfig: AppConfig = {
   authRateLimitRegisterMax: 5,
   authRateLimitResetMax: 3,
   authRateLimitChallengeMax: 10,
+  shutdownGraceSeconds: 15,
 };
 
 export function generateMcpSnapshot() {

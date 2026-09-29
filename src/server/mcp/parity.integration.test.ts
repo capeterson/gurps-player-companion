@@ -53,7 +53,8 @@ setMediaStorageForTests(testMediaStorage);
 
 const config: AppConfig = {
   ...integrationTestConfig,
-  appBaseUrl: 'http://localhost:3001',
+  appHostname: 'localhost',
+  port: 3001,
   authRateLimitRegisterMax: 10_000,
   oauthClients: [],
 };

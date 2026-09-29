@@ -15,7 +15,7 @@ export const integrationTestConfig: AppConfig = {
   corsOrigins: [],
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  appBaseUrl: undefined,
+  appHostname: 'localhost',
   oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
@@ -25,6 +25,7 @@ export const integrationTestConfig: AppConfig = {
   authRateLimitRegisterMax: 10_000,
   authRateLimitResetMax: 10_000,
   authRateLimitChallengeMax: 10_000,
+  shutdownGraceSeconds: 15,
 };
 
 export function configureIntegrationTestEnvironment(): void {

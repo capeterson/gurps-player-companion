@@ -14,7 +14,7 @@ const testConfig: AppConfig = {
   corsOrigins: [],
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  appBaseUrl: undefined,
+  appHostname: 'localhost',
   oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,
@@ -22,6 +22,7 @@ const testConfig: AppConfig = {
   authRateLimitRegisterMax: 5,
   authRateLimitResetMax: 3,
   authRateLimitChallengeMax: 10,
+  shutdownGraceSeconds: 15,
 };
 
 describe('healthz', () => {
@@ -119,4 +120,44 @@ describe('configured browser OAuth CORS', () => {
       expect(response.headers.get('access-control-allow-credentials')).toBeNull();
     });
   }
+});
+
+describe('/sync/* protocol gate', () => {
+  const app = createApp(testConfig);
+  const post = (path: string, headers: Record<string, string> = {}) =>
+    app.request(`/api/v1/sync/${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ operations: [] }),
+    });
+
+  it('refuses an outdated client with 426 before authentication or validation', async () => {
+    for (const path of ['operations', 'cursor']) {
+      const res = await post(path, { 'x-gpc-sync-protocol': '0' });
+      expect(res.status).toBe(426);
+      expect(res.headers.get('x-gpc-sync-protocol')).toBe('1');
+      expect(await res.json()).toEqual({
+        error: 'client_outdated',
+        clientProtocol: 0,
+        minProtocol: 1,
+        serverProtocol: 1,
+      });
+    }
+  });
+
+  it('treats a malformed protocol header as outdated', async () => {
+    expect((await post('operations', { 'x-gpc-sync-protocol': 'v1' })).status).toBe(426);
+  });
+
+  it('asks a client newer than this server to retry', async () => {
+    const res = await post('operations', { 'x-gpc-sync-protocol': '2' });
+    expect(res.status).toBe(503);
+    expect(res.headers.get('retry-after')).toBe('5');
+    expect(await res.json()).toEqual({ error: 'server_outdated' });
+  });
+
+  it('passes current and pre-header clients through to authentication', async () => {
+    expect((await post('operations', { 'x-gpc-sync-protocol': '1' })).status).toBe(401);
+    expect((await post('operations')).status).toBe(401);
+  });
 });
