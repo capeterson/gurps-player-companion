@@ -393,9 +393,7 @@ Key PG18 / trigger machinery, layered by migration:
   PWA"). Header links to `/admin/*` are hard `<a>` anchors, not SPA `Link`s, to
   cross the bundle boundary.
   `AdminRequireAuth` subscribes to session changes and redirects signed-out users
-  to `/admin/login`; sign-in restores the requested admin route. It keeps session
-  presence in component state and rechecks storage after subscribing so a session
-  change during mount is observed. It does not mount
+  to `/admin/login`; sign-in restores the requested admin route. It does not mount
   the player's `SyncProvider` or `SyncBootstrapGate`, so admin access never waits
   for a player-data download or starts the outbox/cursor/WebSocket subsystem.
 
