@@ -1,9 +1,0 @@
-{
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-  "mcpServers": {
-    "gurps-player-companion-dev": {
-      "type": "streamable-http",
-      "url": "https://gurps-dev.abundant.zip/mcp"
-    }
-  }
-}

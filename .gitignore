@@ -127,6 +127,11 @@ dist
 # Local YAML fixtures (gitignored; generate from yaml-export skill)
 *.yaml.local
 
+# Private dev plugin registration and one-off character replication artifacts
+/plugins/gurps-player-companion-dev/
+/replicate_veteran_character.py
+/veteran-replication-manifest.json
+
 # Sourcebook content extracted from copyrighted PDFs (personal/local use only)
 bootstrap/sourcebook_library.yaml
 bootstrap/_sourcebook_chunks/

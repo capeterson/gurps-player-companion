@@ -20,4 +20,8 @@ test-results
 .pw-tmp
 artifacts
 
+plugins/gurps-player-companion-dev
+replicate_veteran_character.py
+veteran-replication-manifest.json
+
 .tmp

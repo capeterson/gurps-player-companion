@@ -153,7 +153,7 @@ describe('static HTTP response security and cache headers', () => {
 });
 
 describe('app icon assets', () => {
-  it('ships opaque PWA sizes and the exact compact plugin icon', () => {
+  it('ships opaque PWA icon sizes with a compact 256px asset', () => {
     for (const size of [192, 256, 512]) {
       const icon = pngMetadata(resolve(`public/icon-${size}.png`));
       expect(icon.width).toBe(size);
@@ -162,10 +162,6 @@ describe('app icon assets', () => {
     }
 
     const publicIcon = pngMetadata(resolve('public/icon-256.png')).bytes;
-    const pluginIcon = pngMetadata(
-      resolve('plugins/gurps-player-companion-dev/assets/icon-256.png'),
-    ).bytes;
     expect(publicIcon.byteLength).toBeLessThan(10_000);
-    expect(pluginIcon.equals(publicIcon)).toBe(true);
   });
 });

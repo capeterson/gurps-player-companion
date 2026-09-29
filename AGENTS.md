@@ -12,6 +12,13 @@ uncommitted edits block the update, resolve that explicitly without resetting,
 discarding, or automatically stashing the user's work. Re-read any project
 instructions and relevant specs changed by the update.
 
+## Keep private task artifacts local
+
+Do not commit private plugin registrations, user-supplied character data,
+one-off replication scripts, or generated replication manifests. Keep these
+local and excluded from Git and Docker build contexts. Reusable regression
+coverage uses synthetic fixtures without private data or environment-specific IDs.
+
 ## Design specs are a maintained requirement
 
 `docs/specs/` holds the living description of this application's current
