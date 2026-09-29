@@ -49,7 +49,16 @@ remain cacheable. The service worker's navigation fallback excludes `/api/*`,
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
 
-In production mode, insecure requests redirect to the HTTPS `APP_BASE_URL`, and
+The sole public-address setting is a bare `APP_HOSTNAME` (no scheme, port, or URL
+components), required in production and defaulting to `localhost` otherwise.
+`config.ts` validates it and `appUrl()` derives `https://<hostname>` in production
+or `http://<hostname>:<PORT>` in development/test. OAuth metadata/audiences,
+passkeys, email links, and HTTPS redirects all use this helper. Production ignores
+the internal listening port in public URLs; local Compose binds and publishes the
+same port so its derived origin matches the browser. Vite also honors `PORT`
+for its listener and default HMR port.
+
+In production mode, insecure requests redirect to that derived HTTPS origin, and
 secure responses include HSTS. Forwarded protocol headers are honored only when
 `TRUST_PROXY` is enabled. Health probes remain available over HTTP: `/api/v1/healthz`
 checks process liveness, while `/api/v1/readyz` verifies PostgreSQL 18 and the image's

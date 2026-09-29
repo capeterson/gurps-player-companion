@@ -15,7 +15,7 @@ function appFor(
       ...integrationTestConfig,
       environment,
       trustProxy,
-      appBaseUrl: 'https://gpc.example',
+      appHostname: 'gpc.example',
     }),
   );
   app.all('*', (c) =>

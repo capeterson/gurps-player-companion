@@ -16,7 +16,7 @@ export const snapshotConfig: AppConfig = {
   corsOrigins: [],
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  appBaseUrl: undefined,
+  appHostname: 'localhost',
   oauthClients: [],
   trustProxy: false,
   authRateLimitWindowSeconds: 600,

@@ -41,7 +41,7 @@ jobs:
       JWT_SECRET: release-gate-secret-which-is-deliberately-long-and-not-a-placeholder
       CORS_ORIGINS: '[]'
       PLAYWRIGHT_BASE_URL: http://localhost:3000
-      APP_BASE_URL: http://localhost:3000
+      APP_HOSTNAME: localhost
       PORT: '3000'
       OAUTH_CLIENTS: '[{"clientId":"playwright-mcp","name":"Playwright MCP Agent","redirectUris":["http://localhost:3000/oauth/callback"],"scopes":["gpc:read","gpc:write","gpc:manage"]}]'
     steps:
@@ -97,7 +97,7 @@ jobs:
             --env DATABASE_URL \
             --env JWT_SECRET \
             --env CORS_ORIGINS \
-            --env APP_BASE_URL \
+            --env APP_HOSTNAME \
             --env PORT \
             --env OAUTH_CLIENTS \
             "$IMAGE:$SRC" bun run dist/server/migrate.js
@@ -106,7 +106,7 @@ jobs:
             --env DATABASE_URL \
             --env JWT_SECRET \
             --env CORS_ORIGINS \
-            --env APP_BASE_URL \
+            --env APP_HOSTNAME \
             --env PORT \
             --env OAUTH_CLIENTS \
             "$IMAGE:$SRC"
