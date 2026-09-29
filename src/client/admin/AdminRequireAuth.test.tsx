@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import { StrictMode, type ReactNode, useLayoutEffect } from 'react';
+import { type ReactNode, StrictMode, useLayoutEffect } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { tokenStore } from '../lib/tokenStore.ts';
