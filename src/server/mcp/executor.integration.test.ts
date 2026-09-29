@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { closeDb, getDb } from '../db/client.ts';
 import { oauthClients } from '../db/schema.ts';
+import { productionHttps } from '../https.ts';
 import { createOpenApiApp } from '../openapi/app.ts';
 import type { TrustedExecutionContext } from '../services/executionContext.ts';
+import { integrationTestConfig } from '../testConfig.ts';
 import { executeOperation } from './executor.ts';
 import type { IncludedOperation } from './operationManifest.ts';
 
@@ -42,6 +44,42 @@ const context: TrustedExecutionContext = {
 
 describe('delegated executor transaction settlement', () => {
   afterAll(closeDb);
+
+  it('commits a database-backed operation through the production HTTPS boundary', async () => {
+    const clientId = `executor-production-${randomUUID()}`;
+    const app = createOpenApiApp();
+    app.use(
+      '*',
+      productionHttps({
+        ...integrationTestConfig,
+        environment: 'production',
+        trustProxy: false,
+        appBaseUrl: 'https://gpc.example',
+      }),
+    );
+    app.post(operation.path, async (c) => {
+      await getDb()
+        .insert(oauthClients)
+        .values({
+          clientId,
+          name: 'Production dispatch fixture',
+          redirectUris: ['http://127.0.0.1/callback'],
+          allowedScopes: ['gpc:read'],
+        });
+      return c.json({ ok: true }, 201);
+    });
+
+    try {
+      const response = await executeOperation(app, context, operation, {});
+      expect(response.status).toBe(201);
+      expect(await response.json()).toEqual({ ok: true });
+      expect(
+        await getDb().select().from(oauthClients).where(eq(oauthClients.clientId, clientId)),
+      ).toHaveLength(1);
+    } finally {
+      await getDb().delete(oauthClients).where(eq(oauthClients.clientId, clientId));
+    }
+  });
 
   for (const status of [422, 500] as const) {
     it(`rolls back writes when the shared handler returns ${status}`, async () => {
