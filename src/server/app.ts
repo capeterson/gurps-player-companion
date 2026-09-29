@@ -72,8 +72,8 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.use('*', async (c, next) => {
     await next();
     // Apply to final responses too, including static HTML and SPA fallbacks.
-    c.header('Content-Security-Policy', "frame-ancestors 'none'");
-    c.header('X-Frame-Options', 'DENY');
+    c.res.headers.set('Content-Security-Policy', "frame-ancestors 'none'");
+    c.res.headers.set('X-Frame-Options', 'DENY');
   });
   app.use('*', productionHttps(config));
 
