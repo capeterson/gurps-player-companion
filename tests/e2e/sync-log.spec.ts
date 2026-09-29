@@ -88,9 +88,10 @@ test('a synced edit and its revision response share one item with Request and Re
       expect((await manualPull).ok()).toBe(true);
       await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
       await expect(
-        dialog.getByRole('region', { name: 'Connection status' }).getByText('just now', {
-          exact: true,
-        }),
+        dialog
+          .getByText('Last successful sync', { exact: true })
+          .locator('..')
+          .getByText('just now', { exact: true }),
       ).toBeVisible();
     }
     const recent = dialog
@@ -367,7 +368,12 @@ test('a synced edit and its revision response share one item with Request and Re
   await disconnectedDialog.getByRole('button', { name: 'Sync now' }).click();
   expect((await manualPull).ok()).toBe(true);
   await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
-  await expect(disconnectedDialog.getByText('just now', { exact: true })).toBeVisible();
+  await expect(
+    disconnectedDialog
+      .getByText('Last successful sync', { exact: true })
+      .locator('..')
+      .getByText('just now', { exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath('sync-log-websocket-disconnected.png'),
     animations: 'disabled',
