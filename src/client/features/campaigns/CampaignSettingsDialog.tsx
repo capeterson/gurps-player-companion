@@ -31,6 +31,7 @@ import { useDialogState } from '../../hooks/useDialogState.ts';
 import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { CampaignInvitePanel } from './CampaignInvitePanel.tsx';
 import { CampaignMembersPanel } from './CampaignMembersPanel.tsx';
 import { DeleteCampaignDialog } from './DeleteCampaignDialog.tsx';
@@ -115,7 +116,19 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
 
   const update = useMutation({
     mutationFn: (body: CampaignUpdate) =>
-      api<CampaignOut>(`/campaigns/${campaign.id}`, { method: 'PATCH', body }),
+      journalCampaignMutation(
+        {
+          entityId: campaign.id,
+          command: 'patch',
+          method: 'PATCH',
+          path: `/campaigns/${campaign.id}`,
+          body,
+          before: { ...campaign },
+          source: 'Campaign settings',
+          humanName: 'campaign rules updated',
+        },
+        () => api<CampaignOut>(`/campaigns/${campaign.id}`, { method: 'PATCH', body }),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       toasts.push('Settings saved', { kind: 'success' });
@@ -128,10 +141,23 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
 
   const transfer = useMutation({
     mutationFn: (newOwnerId: string) =>
-      api<CampaignOut>(`/campaigns/${campaign.id}/transfer`, {
-        method: 'POST',
-        body: { newOwnerId } satisfies TransferOwnershipRequest,
-      }),
+      journalCampaignMutation(
+        {
+          entityId: campaign.id,
+          command: 'patch',
+          method: 'POST',
+          path: `/campaigns/${campaign.id}/transfer`,
+          body: { newOwnerId },
+          before: { ...campaign },
+          source: 'Campaign ownership',
+          humanName: 'ownership transferred',
+        },
+        () =>
+          api<CampaignOut>(`/campaigns/${campaign.id}/transfer`, {
+            method: 'POST',
+            body: { newOwnerId } satisfies TransferOwnershipRequest,
+          }),
+      ),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       setTransferTarget(null);
@@ -146,7 +172,19 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   });
 
   const remove = useMutation({
-    mutationFn: () => api<void>(`/campaigns/${campaign.id}`, { method: 'DELETE' }),
+    mutationFn: () =>
+      journalCampaignMutation(
+        {
+          entityId: campaign.id,
+          command: 'delete',
+          method: 'DELETE',
+          path: `/campaigns/${campaign.id}`,
+          before: { ...campaign },
+          source: 'Campaign deletion',
+          humanName: 'campaign deleted',
+        },
+        () => api<void>(`/campaigns/${campaign.id}`, { method: 'DELETE' }),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       setConfirmDelete(false);

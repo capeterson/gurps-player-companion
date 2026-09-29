@@ -3,6 +3,7 @@ import { ALL_STORE_NAMES, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
 import { syncStateStore } from './state.ts';
+import { lastSuccessfulSyncKey } from './syncLog.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -126,7 +127,8 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
     expect(counts.campaigns).toBe(0);
     expect(counts.outbox).toBe(0);
     expect(counts.syncCursors).toBe(1);
-    expect(counts.syncMeta).toBe(1);
+    expect(counts.syncMeta).toBe(2);
+    expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(expect.any(String));
     expect(counts.tombstones).toBe(0);
     expect(counts.rejectionToasts).toBe(0);
     expect(counts.syncLog).toBe(1);
@@ -433,11 +435,11 @@ describe('SyncOrchestrator.revertFailedOperation', () => {
     });
 
     // The journal has to agree with what the field visibly shows. The
-    // row kept the newer edit, so claiming it went back to the old
-    // server value would contradict the sheet.
+    // row kept the newer edit without movement, so both snapshots must
+    // reflect the value that stayed visible on the sheet.
     const reverted = (await db.syncLog.toArray()).find((e) => e.result === 'reverted');
     expect(reverted).toMatchObject({
-      previousValue: 'Older local',
+      previousValue: 'Newest local',
       newValue: 'Newest local',
     });
     expect(reverted?.reason).toMatch(/newer local edit was kept/i);

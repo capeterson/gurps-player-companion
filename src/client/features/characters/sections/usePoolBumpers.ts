@@ -4,19 +4,29 @@ import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
 import { bumpPool } from '../../../../shared/domain/poolBump.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { useToasts } from '../../../lib/toast.tsx';
+import { tokenStore } from '../../../lib/tokenStore.ts';
 import { flashBus, makeFlashKey } from '../../../sync/flashBus.ts';
+import { createGestureBatcher } from '../../../sync/gestureBatch.ts';
 import type { CombatPatch, CombatUpdate } from './useCombatPatch.ts';
+
+export interface PoolGestureOptions {
+  /** Damage application is one action, even beside a rapid quick-adjustment burst. */
+  readonly separateGesture?: boolean;
+}
 
 export interface PoolBumpers {
   readonly hp: number;
   readonly fp: number;
   readonly hpMax: number;
   readonly fpMax: number;
-  readonly bumpHp: (d: number) => void;
+  readonly bumpHp: (d: number, options?: PoolGestureOptions) => void;
   readonly bumpFp: (d: number) => void;
   readonly setHp: (value: number) => void;
   readonly setFp: (value: number) => void;
-  readonly commitHpDeltas: (gestures: readonly PoolDeltaGesture[]) => Promise<number | undefined>;
+  readonly commitHpDeltas: (
+    gestures: readonly PoolDeltaGesture[],
+    options?: PoolGestureOptions,
+  ) => Promise<number | undefined>;
   readonly commitFpDeltas: (gestures: readonly PoolDeltaGesture[]) => Promise<number | undefined>;
   readonly resetHp: () => void;
   readonly resetFp: () => void;
@@ -46,6 +56,11 @@ export function usePoolBumpers(
   const fpBlockedAtRef = useRef<number | null>(null);
   const [flashHp, setFlashHp] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gestureBatcher = useRef(createGestureBatcher(POOL_SYNC_DEBOUNCE_MS));
+  function batch(scope: string, at: number, separateGesture = false): string {
+    const identity = JSON.stringify([tokenStore.read()?.sessionId ?? null, character.id]);
+    return gestureBatcher.current.next(identity, scope, at, separateGesture);
+  }
   useEffect(
     () => () => {
       if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -56,6 +71,7 @@ export function usePoolBumpers(
   async function commit(
     update: CombatUpdate,
     affected: string[],
+    batchId: string,
     drainDelayMs = POOL_SYNC_DEBOUNCE_MS,
   ): Promise<boolean> {
     let keys = affected;
@@ -69,7 +85,7 @@ export function usePoolBumpers(
           return fields;
         },
         undefined,
-        undefined,
+        batchId,
         { drainDelayMs },
       );
       if (hpDamage) {
@@ -98,8 +114,10 @@ export function usePoolBumpers(
 
   async function commitHpDeltas(
     gestures: readonly PoolDeltaGesture[],
+    options?: PoolGestureOptions,
   ): Promise<number | undefined> {
     if (!canWrite || hpMax <= 0 || gestures.length === 0) return undefined;
+    const batchId = batch('hp-step', gestures.at(-1)?.at ?? Date.now(), options?.separateGesture);
     let committed: number | undefined;
     let nextBlockedAt: number | null = null;
     let savedBlockedAt: number | null | undefined;
@@ -120,6 +138,7 @@ export function usePoolBumpers(
         return next === current.currentHp ? {} : { currentHp: next };
       },
       ['currentHp'],
+      batchId,
     );
     if (!saved) {
       if (hpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
@@ -134,6 +153,7 @@ export function usePoolBumpers(
     gestures: readonly PoolDeltaGesture[],
   ): Promise<number | undefined> {
     if (!canWrite || fpMax <= 0 || gestures.length === 0) return undefined;
+    const batchId = batch('fp-step', gestures.at(-1)?.at ?? Date.now());
     let committed: number | undefined;
     let nextBlockedAt: number | null = null;
     let savedBlockedAt: number | null | undefined;
@@ -164,6 +184,7 @@ export function usePoolBumpers(
         return fields;
       },
       gestures.some((gesture) => gesture.delta < 0) ? ['currentFp', 'currentHp'] : ['currentFp'],
+      batchId,
     );
     if (!saved) {
       if (fpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
@@ -174,8 +195,8 @@ export function usePoolBumpers(
     return committed;
   }
 
-  function bumpHp(d: number) {
-    void commitHpDeltas([{ delta: d, at: Date.now() }]);
+  function bumpHp(d: number, options?: PoolGestureOptions) {
+    void commitHpDeltas([{ delta: d, at: Date.now() }], options);
   }
 
   function bumpFp(d: number) {
@@ -189,6 +210,7 @@ export function usePoolBumpers(
   }
 
   async function commitHpTarget(value: number, at: number): Promise<number | undefined> {
+    const batchId = batch('hp-slider', at);
     let committed: number | undefined;
     let nextBlockedAt: number | null = null;
     let savedBlockedAt: number | null | undefined;
@@ -208,6 +230,7 @@ export function usePoolBumpers(
         return committed === current.currentHp ? {} : { currentHp: committed };
       },
       ['currentHp'],
+      batchId,
     );
     if (!saved) {
       if (hpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
@@ -225,6 +248,7 @@ export function usePoolBumpers(
   }
 
   async function commitFpTarget(value: number, at: number): Promise<number | undefined> {
+    const batchId = batch('fp-slider', at);
     let committed: number | undefined;
     let nextBlockedAt: number | null = null;
     let savedBlockedAt: number | null | undefined;
@@ -251,6 +275,7 @@ export function usePoolBumpers(
         return fields;
       },
       value < fp ? ['currentFp', 'currentHp'] : ['currentFp'],
+      batchId,
     );
     if (!saved) {
       if (fpBlockedAtRef.current === nextBlockedAt && savedBlockedAt !== undefined) {
@@ -262,10 +287,12 @@ export function usePoolBumpers(
   }
 
   function resetHp() {
-    if (canWrite) void commit(() => ({ currentHp: hpMax }), ['currentHp']);
+    if (canWrite)
+      void commit(() => ({ currentHp: hpMax }), ['currentHp'], batch('hp-reset', Date.now(), true));
   }
   function resetFp() {
-    if (canWrite) void commit(() => ({ currentFp: fpMax }), ['currentFp']);
+    if (canWrite)
+      void commit(() => ({ currentFp: fpMax }), ['currentFp'], batch('fp-reset', Date.now(), true));
   }
 
   return {

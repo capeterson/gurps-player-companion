@@ -1,12 +1,16 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { SYNCED_ENTITY_CLASSES, getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { syncEntityTable } from '../db/syncEntityStore.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { readDrainableOps } from '../sync/outbox.ts';
 import { syncStateStore } from '../sync/state.ts';
 import { appendSyncLog, redactSyncLogForCharacters } from '../sync/syncLog.ts';
 import { SyncLogView } from './SyncLogView.tsx';
+
+const wsStatus = vi.hoisted(() => ({ state: 'connected', lastConnectedAt: null as string | null }));
+vi.mock('../sync/useSyncWsStatus.ts', () => ({ useSyncWsStatus: () => wsStatus }));
 
 const clearLocalAndFullResync = vi.fn();
 const revertFailedOperation = vi.fn();
@@ -44,6 +48,8 @@ function renderView() {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  wsStatus.state = 'connected';
+  wsStatus.lastConnectedAt = null;
   syncStateStore.reset('synced');
   await resetLocalDb();
 });
@@ -185,7 +191,7 @@ describe('SyncLogView event details', () => {
     const getBody = vi.spyOn(db.syncLogBodies, 'get');
     const user = userEvent.setup();
     renderView();
-    const title = await screen.findByText('Appearance');
+    const title = await screen.findByRole('link', { name: 'Character: Hero · Description' });
     expect(getBody).not.toHaveBeenCalled();
     expect(screen.queryByText('character patch')).not.toBeInTheDocument();
     expect(screen.queryByText(after)).not.toBeInTheDocument();
@@ -211,6 +217,7 @@ describe('SyncLogView event details', () => {
     await db.characters.put({ id: 'hero', ownerId: 'me', name: 'Hero', revision: 42 } as never);
     await appendSyncLog({
       id: 'missing-body',
+      fieldPath: 'appearance',
       direction: 'push',
       result: 'synced',
       entityClass: 'character',
@@ -221,7 +228,7 @@ describe('SyncLogView event details', () => {
     });
     await db.syncLogBodies.delete('missing-body');
     renderView();
-    const title = await screen.findByText('Appearance');
+    const title = await screen.findByRole('link', { name: 'Character: Hero · Description' });
     await userEvent.setup().click(title.closest('summary') as HTMLElement);
     expect(
       await screen.findByText(
@@ -406,7 +413,7 @@ describe('SyncLogView event details', () => {
     expect(detail.getByText('2')).toBeInTheDocument();
     expect(detail.getByText('After')).toBeInTheDocument();
     expect(detail.getByText('5')).toBeInTheDocument();
-    expect(detail.getByText('quantity')).toBeInTheDocument();
+    expect(detail.getByText('Quantity')).toBeInTheDocument();
   });
 
   it('says when a pulled row changed no local data fields', async () => {
@@ -545,7 +552,7 @@ describe('SyncLogView event details', () => {
 
     renderView();
 
-    const title = await screen.findByText('ST base');
+    const title = await screen.findByRole('link', { name: 'Character: Mine · ST' });
     await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(detail.getByText('Before')).toBeInTheDocument();
@@ -588,3 +595,295 @@ describe('SyncLogView event details', () => {
     expect(screen.getAllByText(/HTTP 530/).length).toBeGreaterThan(0);
   });
 });
+
+it.each(SYNCED_ENTITY_CLASSES)(
+  'shows focused values, entity destination and upload diagnostics for %s',
+  async (entityClass) => {
+    const db = getLocalDb();
+    await db.characters.put({ id: 'parent', ownerId: 'me', name: 'Parent', revision: 1 } as never);
+    await db.campaigns.put({ id: 'campaign', name: 'Lantern Coast', revision: 1 } as never);
+    const id = entityClass === 'character_combat' ? 'parent' : 'entity';
+    const row = {
+      id,
+      characterId: 'parent',
+      campaignId: 'campaign',
+      name: 'Visible entity',
+      revision: 42,
+    };
+    await syncEntityTable(entityClass)?.put(row);
+    await appendSyncLog({
+      id: 'visible-event',
+      entityClass,
+      entityId: id,
+      parentId: entityClass.startsWith('campaign_library_')
+        ? 'campaign'
+        : entityClass.startsWith('character_')
+          ? 'parent'
+          : undefined,
+      entityName: 'Visible entity',
+      direction: 'push',
+      result: 'synced',
+      command: 'patch',
+      previousValue: { points: 1, name: 'Unchanged name' },
+      newValue: { points: 2, name: 'Unchanged name' },
+      request: {
+        method: 'POST',
+        path: '/api/v1/sync/operations',
+        operation: { attemptedValue: { points: 2, name: 'Unchanged name' }, baseRevision: 41 },
+      },
+      details: { status: 'applied', newRevision: 42 },
+    });
+    renderView();
+    const link = await screen.findByRole('link', { name: /Visible entity/ });
+    expect(link.getAttribute('href')).toMatch(
+      entityClass.startsWith('campaign') ? /^\/campaigns\// : /^\/characters\//,
+    );
+    const change = link.closest('details') as HTMLDetailsElement;
+    await userEvent.setup().click(change.querySelector('summary') as HTMLElement);
+    const detail = within(change);
+    expect(detail.getByText('Before')).toBeVisible();
+    expect(detail.getByText('After')).toBeVisible();
+    expect(detail.getByText('Points')).toBeVisible();
+    expect(detail.getByText('Pushed', { exact: false })).toBeVisible();
+    expect(detail.queryByText(/Unchanged name/)).not.toBeInTheDocument();
+    await userEvent.setup().click(detail.getByText('Request', { exact: true }));
+    await waitFor(() => expect(change.textContent).toContain('"baseRevision": 41'));
+    expect(change.textContent).toContain('Unchanged name');
+    await userEvent.setup().click(detail.getByText('Response', { exact: true }));
+    await waitFor(() => expect(change.textContent).toContain('"status": "applied"'));
+  },
+);
+
+it('keeps a settings upload as Pushed when its cursor refresh changes fields or arrives first', async () => {
+  const db = getLocalDb();
+  await db.campaigns.put({ id: 'campaign', name: 'Lantern Coast', revision: 42 } as never);
+  await db.syncLog.bulkPut([
+    {
+      id: 'save',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'campaign',
+      entityId: 'campaign',
+      command: 'patch',
+      source: 'Campaign settings',
+      humanName: 'campaign rules updated',
+      entityName: 'Lantern Coast',
+      previousValue: { skillPrerequisitePolicy: 'block' },
+      newValue: { skillPrerequisitePolicy: 'warn' },
+      request: { method: 'PATCH', body: { skillPrerequisitePolicy: 'warn' } },
+      details: { newRevision: 42 },
+      occurredAt: '2026-09-29T12:00:01Z',
+    },
+    {
+      id: 'refresh',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'campaign',
+      entityId: 'campaign',
+      command: 'patch',
+      previousValue: { skillPrerequisitePolicy: 'block', activeEffectDefinitions: [] },
+      newValue: {
+        skillPrerequisitePolicy: 'warn',
+        activeEffectDefinitions: [{ name: 'Test Ward' }],
+      },
+      details: {
+        revision: 42,
+        appliedFields: ['skillPrerequisitePolicy', 'activeEffectDefinitions'],
+      },
+      occurredAt: '2026-09-29T12:00:00Z',
+    },
+  ]);
+  renderView();
+  const link = await screen.findByRole('link', { name: /Lantern Coast/ });
+  expect(screen.getAllByText(/Pushed/)).toHaveLength(1);
+  expect(screen.queryByText(/Pulled/)).not.toBeInTheDocument();
+  const change = link.closest('details') as HTMLDetailsElement;
+  await userEvent.setup().click(change.querySelector('summary') as HTMLElement);
+  expect(within(change).getByText('Before')).toBeVisible();
+  expect(within(change).getByText(/Active effect definitions.*details in Response/)).toBeVisible();
+  await userEvent.setup().click(within(change).getByText('Response', { exact: true }));
+  await waitFor(() => expect(change.textContent).toContain('Test Ward'));
+  expect(change.textContent).toContain('"previousValue"');
+});
+
+it('shows standalone downloads without a Request and deleted subjects without a link', async () => {
+  await getLocalDb().syncLog.put({
+    id: 'deleted',
+    entityClass: 'campaign_library_spell',
+    entityId: 'missing',
+    parentId: 'campaign',
+    entityName: 'Sample Storm Spell',
+    direction: 'pull',
+    result: 'synced',
+    command: 'delete',
+    previousValue: { name: 'Sample Storm Spell' },
+    details: { revision: 42, appliedFields: ['name'] },
+    occurredAt: new Date().toISOString(),
+  });
+  renderView();
+  const title = await screen.findByText('Library spell: Sample Storm Spell · Deleted');
+  expect(title.closest('a')).toBeNull();
+  const change = title.closest('details') as HTMLDetailsElement;
+  await userEvent.setup().click(change.querySelector('summary') as HTMLElement);
+  expect(within(change).queryByText('Request')).not.toBeInTheDocument();
+  expect(within(change).getByText('Removed', { exact: true })).toBeVisible();
+  expect(within(change).getByText('Response')).toBeVisible();
+});
+
+it('shows independent WebSocket status and the last successful changed operation as relative times', async () => {
+  const now = Date.now();
+  wsStatus.state = 'reconnecting';
+  wsStatus.lastConnectedAt = new Date(now - 10 * 60_000).toISOString();
+  await appendSyncLog({
+    id: 'success',
+    direction: 'push',
+    result: 'synced',
+    entityClass: 'campaign',
+    entityId: 'campaign',
+    command: 'patch',
+    occurredAt: new Date(now - 2 * 60_000).toISOString(),
+  });
+  await appendSyncLog({
+    id: 'poll',
+    direction: 'pull',
+    result: 'synced',
+    entityClass: 'campaign',
+    entityId: 'campaign',
+    details: { revision: 42, appliedFields: [] },
+    occurredAt: new Date(now).toISOString(),
+  });
+  renderView();
+  const connection = await screen.findByRole('region', { name: 'Connection status' });
+  expect(within(connection).getByText('WebSocket')).toBeVisible();
+  expect(within(connection).getByText('Disconnected · Reconnecting')).toBeVisible();
+  expect(within(connection).getByText('10 minutes ago')).toBeVisible();
+  expect(await within(connection).findByText('2 minutes ago')).toBeVisible();
+  expect(
+    within(connection).getByText('HTTP sync continues while WebSocket reconnects.'),
+  ).toBeVisible();
+  expect(screen.queryByText("Sync isn't currently working")).not.toBeInTheDocument();
+});
+
+it('shows unknown connection and sync times without fabricating timestamps', async () => {
+  wsStatus.state = 'connecting';
+  renderView();
+  const connection = await screen.findByRole('region', { name: 'Connection status' });
+  expect(within(connection).getByText('Connecting')).toBeVisible();
+  expect(within(connection).getByText('Not yet connected')).toBeVisible();
+  expect(within(connection).getByText('No successful sync recorded')).toBeVisible();
+});
+
+it('shows one net HP change for a continuous burst while retaining each compressed request and response', async () => {
+  for (const [id, before, after, second] of [
+    ['first', 10, 9, 0],
+    ['second', 9, 8, 1],
+  ] as const) {
+    await appendSyncLog({
+      id,
+      batchId: 'hp-burst',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'character_combat',
+      entityId: 'combat',
+      fieldPath: 'currentHp',
+      command: 'patch',
+      humanName: 'HP',
+      previousValue: before,
+      newValue: after,
+      occurredAt: `2026-09-29T12:00:0${second}Z`,
+      request: {
+        clientOpId: id,
+        attemptedValue: after,
+        diagnostic: 'bounded request '.repeat(150),
+      },
+      details: { newRevision: 40 + second },
+    });
+  }
+  renderView();
+  const title = await screen.findByText('HP', { exact: true });
+  expect(screen.getAllByText('HP', { exact: true })).toHaveLength(1);
+  const change = title.closest('details') as HTMLDetailsElement;
+  await userEvent.setup().click(change.querySelector('summary') as HTMLElement);
+  expect(await within(change).findByText('2 rapid adjustments · net change -2')).toBeVisible();
+  expect(within(change).getByText('10', { exact: true })).toBeVisible();
+  expect(within(change).getByText('8', { exact: true })).toBeVisible();
+  await userEvent.setup().click(within(change).getByText('Request', { exact: true }));
+  await waitFor(() => {
+    expect(change.textContent).toContain('"clientOpId": "first"');
+    expect(change.textContent).toContain('"clientOpId": "second"');
+  });
+  await userEvent.setup().click(within(change).getByText('Response', { exact: true }));
+  await waitFor(() => {
+    expect(change.textContent).toContain('"newRevision": 40');
+    expect(change.textContent).toContain('"newRevision": 41');
+  });
+});
+
+it.each(['different burst', 'discontinuous values', 'failed operation', 'remote change'])(
+  'keeps %s separate from an HP burst',
+  async (boundary) => {
+    const base = {
+      entityClass: 'character_combat' as const,
+      entityId: 'combat',
+      fieldPath: 'currentHp',
+      command: 'patch' as const,
+      humanName: 'HP',
+      batchId: 'burst',
+    };
+    await getLocalDb().syncLog.bulkPut([
+      {
+        ...base,
+        id: 'old',
+        direction: 'push',
+        result: 'synced',
+        previousValue: 10,
+        newValue: 9,
+        occurredAt: '2026-09-29T12:00:00Z',
+      },
+      {
+        ...base,
+        id: 'new',
+        direction: boundary === 'remote change' ? 'pull' : 'push',
+        result: boundary === 'failed operation' ? 'failed' : 'synced',
+        batchId: boundary === 'different burst' ? 'other' : 'burst',
+        previousValue: boundary === 'discontinuous values' ? 7 : 9,
+        newValue: 8,
+        occurredAt: '2026-09-29T12:00:01Z',
+      },
+    ]);
+    renderView();
+    await waitFor(() => expect(screen.getAllByText('HP', { exact: true })).toHaveLength(2));
+  },
+);
+
+it.each(['whole-row pull', 'whole-row failure', 'cycle failure'])(
+  'does not fold HP uploads across an intervening %s',
+  async (boundary) => {
+    const base = {
+      entityClass: 'character_combat' as const,
+      entityId: 'combat',
+      command: 'patch' as const,
+      humanName: 'HP',
+      fieldPath: 'currentHp',
+      batchId: 'burst',
+      direction: 'push' as const,
+      result: 'synced' as const,
+    };
+    await getLocalDb().syncLog.bulkPut([
+      { ...base, id: 'old', previousValue: 10, newValue: 9, occurredAt: '2026-09-29T12:00:00Z' },
+      {
+        id: 'boundary',
+        direction: boundary === 'whole-row pull' ? 'pull' : 'local',
+        result: boundary === 'whole-row pull' ? 'synced' : 'failed',
+        ...(boundary !== 'cycle failure'
+          ? { entityClass: 'character_combat' as const, entityId: 'combat' }
+          : {}),
+        reason: 'intervening event',
+        occurredAt: '2026-09-29T12:00:01Z',
+      },
+      { ...base, id: 'new', previousValue: 9, newValue: 8, occurredAt: '2026-09-29T12:00:02Z' },
+    ]);
+    renderView();
+    await waitFor(() => expect(screen.getAllByText('HP', { exact: true })).toHaveLength(2));
+  },
+);

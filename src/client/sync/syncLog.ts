@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { newClientId } from './outbox.ts';
 import { packSyncLogEntry } from './syncLogPayload.ts';
 
@@ -44,14 +45,14 @@ export type NewSyncLogEntry = Omit<SyncLogEntry, 'id' | 'occurredAt'> & {
  * response carries a whole `latestEntity` row, so `details` is capped
  * through here too rather than stored verbatim.
  */
-export function snapshotValue(value: unknown): unknown {
+export function snapshotValue(value: unknown, maxChars = SYNC_LOG_VALUE_MAX_CHARS): unknown {
   if (value === undefined || value === null) return value;
   if (typeof value === 'string') {
-    return value.length <= SYNC_LOG_VALUE_MAX_CHARS
+    return value.length <= maxChars
       ? value
       : {
           truncated: true,
-          preview: value.slice(0, SYNC_LOG_VALUE_MAX_CHARS),
+          preview: value.slice(0, maxChars),
           length: value.length,
         };
   }
@@ -62,8 +63,8 @@ export function snapshotValue(value: unknown): unknown {
   } catch {
     return { truncated: true, note: 'value could not be serialized' };
   }
-  if (json.length <= SYNC_LOG_VALUE_MAX_CHARS) return value;
-  return { truncated: true, preview: json.slice(0, SYNC_LOG_VALUE_MAX_CHARS), length: json.length };
+  if (json.length <= maxChars) return value;
+  return { truncated: true, preview: json.slice(0, maxChars), length: json.length };
 }
 
 export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
@@ -79,7 +80,9 @@ export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
     // would auto-commit and could abort the enclosing outbox reconciliation.
     const packed = Dexie.currentTransaction ? { entry: row } : await packSyncLogEntry(row);
     if (generation !== journalGeneration) return;
-    await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+    await db.transaction('rw', db.syncLog, db.syncLogBodies, db.syncMeta, async () => {
+      if (generation !== journalGeneration) return;
+      await rememberSuccessfulOperations([row]);
       await db.syncLog.put(packed.entry);
       if (packed.body) await db.syncLogBodies.put(packed.body);
       else await db.syncLogBodies.delete(row.id);
@@ -119,7 +122,9 @@ export async function appendSyncLogEntries(entries: readonly NewSyncLogEntry[]):
       );
     }
     if (generation !== journalGeneration) return;
-    await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+    await db.transaction('rw', db.syncLog, db.syncLogBodies, db.syncMeta, async () => {
+      if (generation !== journalGeneration) return;
+      await rememberSuccessfulOperations(rows);
       await db.syncLog.bulkPut(packed.map(({ entry }) => entry));
       await db.syncLogBodies.bulkDelete(rows.map(({ id }) => id));
       const bodies = packed.flatMap(({ body }) => (body ? [body] : []));
@@ -217,6 +222,9 @@ export async function redactSyncLogForCharacters(characterIds: Iterable<string>)
             previousValue: undefined,
             newValue: undefined,
             details: undefined,
+            request: undefined,
+            entityName: undefined,
+            humanName: undefined,
             payloadStored: undefined,
             payloadMetadata: undefined,
             redacted: true,
@@ -278,9 +286,11 @@ export async function redactSyncLogForCampaigns(campaignIds: Iterable<string>): 
             previousValue: undefined,
             newValue: undefined,
             details: undefined,
+            request: undefined,
+            entityName: undefined,
+            humanName: undefined,
             payloadStored: undefined,
             payloadMetadata: undefined,
-            humanName: undefined,
             fieldPath: undefined,
             redacted: true,
           })),
@@ -408,5 +418,43 @@ export async function pruneRejectionToasts(now: number = Date.now()): Promise<vo
     }
   } catch {
     // Diagnostic housekeeping must never block a sync cycle.
+  }
+}
+
+/** Account-scoped metadata survives journal pruning and is purged with all local stores. */
+export function lastSuccessfulSyncKey(): string {
+  return `lastSuccessfulSyncOperation:${readUserIdFromToken() ?? 'session'}`;
+}
+
+export function isSuccessfulSyncOperation(entry: SyncLogEntry): boolean {
+  if (entry.result !== 'synced') return false;
+  if (entry.direction === 'push') return true;
+  if (entry.direction !== 'pull') return false;
+  const metadata = entry.payloadMetadata ?? entry.details;
+  const fields =
+    metadata && typeof metadata === 'object'
+      ? (metadata as Record<string, unknown>).appliedFields
+      : undefined;
+  return Array.isArray(fields)
+    ? fields.length > 0
+    : entry.previousValue !== undefined || entry.newValue !== undefined;
+}
+
+async function rememberSuccessfulOperations(entries: readonly SyncLogEntry[]): Promise<void> {
+  const latest = entries
+    .filter(isSuccessfulSyncOperation)
+    .map((entry) => entry.occurredAt)
+    .filter((at) => Number.isFinite(Date.parse(at)))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  if (!latest) return;
+  const db = getLocalDb();
+  const key = lastSuccessfulSyncKey();
+  const previous = (await db.syncMeta.get(key))?.value;
+  if (
+    typeof previous !== 'string' ||
+    !Number.isFinite(Date.parse(previous)) ||
+    Date.parse(previous) < Date.parse(latest)
+  ) {
+    await db.syncMeta.put({ key, value: latest });
   }
 }

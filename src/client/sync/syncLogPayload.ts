@@ -57,6 +57,7 @@ export async function packSyncLogEntry(
       previousValue: entry.previousValue,
       newValue: entry.newValue,
       details: entry.details,
+      request: entry.request,
     });
     const original = new TextEncoder().encode(JSON.stringify(payload));
     if (
@@ -76,6 +77,9 @@ export async function packSyncLogEntry(
       newRevision: details.newRevision,
       revision: details.revision,
       appliedFields: details.appliedFields,
+      ...(entry.request !== undefined ? { hasRequest: true } : {}),
+      ...(typeof entry.previousValue === 'number' ? { previousNumber: entry.previousValue } : {}),
+      ...(typeof entry.newValue === 'number' ? { newNumber: entry.newValue } : {}),
     });
     const referenceBytes = new TextEncoder().encode(
       JSON.stringify({ payloadStored: true, payloadMetadata: metadata }),
@@ -87,6 +91,7 @@ export async function packSyncLogEntry(
         previousValue: undefined,
         newValue: undefined,
         details: undefined,
+        request: undefined,
         payloadStored: true,
         payloadMetadata: metadata,
       },

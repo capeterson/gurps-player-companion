@@ -125,6 +125,7 @@ describe('applyOutcomes sync-log diagnostics', () => {
         characterId: CHAR_ID,
         fieldPath: 'armor',
         attemptedValue: armor,
+        batchId: '0193b3c0-f1f0-7000-8000-00000000b001',
       });
       let attempts = 0;
       vi.stubGlobal(
@@ -169,6 +170,11 @@ describe('applyOutcomes sync-log diagnostics', () => {
           foreignChange ? 1 : 2,
         );
         expect(logs.some((entry) => entry.result === 'rolled_back')).toBe(foreignChange);
+        for (const entry of logs.filter(
+          (entry) => entry.entityId === itemId && entry.direction !== 'pull',
+        )) {
+          expect(entry.batchId).toBe('0193b3c0-f1f0-7000-8000-00000000b001');
+        }
       } finally {
         getSyncOrchestrator().stop();
       }
@@ -997,4 +1003,98 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
       setRejectionNotifier(null);
     }
   });
+});
+
+it('does not repopulate private requests or diagnostic timestamps after logout aborts an upload', async () => {
+  await seedCharacter();
+  login();
+  await enqueueFieldPatch({
+    entityClass: 'character',
+    entityId: CHAR_ID,
+    fieldPath: 'st',
+    attemptedValue: 14,
+    humanName: 'ST base',
+  });
+  let uploadStarted = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (!url.includes('/sync/operations')) return cursorResponse();
+      uploadStarted = true;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true },
+        );
+      });
+    }),
+  );
+  const orchestrator = getSyncOrchestrator();
+  orchestrator.setCurrentUser(USER_ID);
+  orchestrator.start();
+  try {
+    await waitFor(() => expect(uploadStarted).toBe(true));
+    await orchestrator.purge();
+    tokenStore.clear();
+    expect(await getLocalDb().syncLog.count()).toBe(0);
+    expect(await getLocalDb().syncLogBodies.count()).toBe(0);
+    expect(await getLocalDb().syncMeta.count()).toBe(0);
+  } finally {
+    orchestrator.stop();
+  }
+});
+
+it('records the actual submitted operation independently of its focused values', async () => {
+  await seedCharacter();
+  login();
+  await enqueueFieldPatch({
+    entityClass: 'character',
+    entityId: CHAR_ID,
+    fieldPath: 'st',
+    attemptedValue: 14,
+    humanName: 'ST base',
+  });
+  let submitted: unknown;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (!url.includes('/sync/operations')) return cursorResponse();
+      const body = JSON.parse(String(init?.body));
+      submitted = body.operations[0];
+      return new Response(
+        JSON.stringify({
+          outcomes: body.operations.map((op: { clientOpId: string }) => ({
+            clientOpId: op.clientOpId,
+            status: 'applied',
+            newRevision: 42,
+          })),
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }),
+  );
+  const orchestrator = getSyncOrchestrator();
+  orchestrator.setCurrentUser(USER_ID);
+  orchestrator.start();
+  try {
+    await waitFor(async () =>
+      expect(
+        (await getLocalDb().syncLog.toArray()).find(
+          (entry) => entry.direction === 'push' && entry.result === 'synced',
+        ),
+      ).toBeDefined(),
+    );
+    const entry = (await getLocalDb().syncLog.toArray()).find(
+      (entry) => entry.direction === 'push' && entry.result === 'synced',
+    );
+    expect(entry?.request).toEqual({
+      method: 'POST',
+      path: '/api/v1/sync/operations',
+      operation: submitted,
+    });
+    expect(entry).toMatchObject({ entityName: 'Test', previousValue: 10, newValue: 14 });
+  } finally {
+    orchestrator.stop();
+  }
 });

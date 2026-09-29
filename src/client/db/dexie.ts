@@ -416,6 +416,8 @@ export interface OutboxEntry {
 
 export interface SyncLogEntry {
   id: string;
+  /** Explicit originating user gesture/burst; never inferred from event timestamps. */
+  batchId?: string | undefined;
   direction: 'push' | 'pull' | 'local';
   /**
    * `requeued` and `retrying` are diagnostics-only transitions logged by
@@ -447,6 +449,10 @@ export interface SyncLogEntry {
   command?: OperationCommand | undefined;
   fieldPath?: string | undefined;
   humanName?: string | undefined;
+  /** Subject name captured before bounded snapshots; protected like payload values. */
+  entityName?: string | undefined;
+  /** Which browser action sent an online-only mutation (outbox entries omit this). */
+  source?: string | undefined;
   occurredAt: string;
   /** One-line human-readable summary of a failure/rollback. */
   reason?: string | undefined;
@@ -463,6 +469,8 @@ export interface SyncLogEntry {
   previousValue?: unknown;
   newValue?: unknown;
   details?: unknown;
+  /** Actual submitted operation/body, without credentials; explicitly bounded. */
+  request?: unknown;
   /** A larger payload is stored as gzip bytes in syncLogBodies under this id. */
   payloadStored?: true | undefined;
   payloadMetadata?: SyncLogPayloadMetadata | undefined;

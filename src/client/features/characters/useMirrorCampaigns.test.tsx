@@ -45,7 +45,7 @@ describe('useMirrorCampaigns', () => {
       protectNaturalDr: true,
       enchantedItemPricing: true,
     });
-    const campaign = campaignRow({ houseRules, revision: 354 });
+    const campaign = campaignRow({ houseRules, skillPrerequisitePolicy: 'warn', revision: 354 });
 
     await getLocalDb().campaigns.put({
       ...campaign,
@@ -58,6 +58,7 @@ describe('useMirrorCampaigns', () => {
     await waitFor(async () => {
       expect((await getLocalDb().campaigns.get(CAMPAIGN_ID))?.houseRules).toEqual(houseRules);
       expect((await getLocalDb().campaigns.get(CAMPAIGN_ID))?.experimentalTurnTracker).toBe(true);
+      expect((await getLocalDb().campaigns.get(CAMPAIGN_ID))?.skillPrerequisitePolicy).toBe('warn');
     });
   });
 
