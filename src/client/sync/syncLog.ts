@@ -1,9 +1,17 @@
+import Dexie from 'dexie';
 import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { newClientId } from './outbox.ts';
+import { packSyncLogEntry } from './syncLogPayload.ts';
 
 export const SYNC_LOG_RETENTION = 1_000;
+let journalGeneration = 0;
+
+/** A delayed compression must not repopulate diagnostic stores after logout/resync. */
+export function invalidatePendingSyncLogWrites(): void {
+  journalGeneration++;
+}
 
 /**
  * Per-value ceiling for the `previousValue` / `newValue` snapshots.
@@ -60,11 +68,21 @@ export function snapshotValue(value: unknown): unknown {
 
 export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
   try {
+    const generation = journalGeneration;
     const db = getLocalDb();
-    await db.syncLog.put({
+    const row: SyncLogEntry = {
       ...entry,
       id: entry.id ?? newClientId(),
       occurredAt: entry.occurredAt ?? new Date().toISOString(),
+    };
+    // Never wait on compression streams inside a live IDB transaction: it
+    // would auto-commit and could abort the enclosing outbox reconciliation.
+    const packed = Dexie.currentTransaction ? { entry: row } : await packSyncLogEntry(row);
+    if (generation !== journalGeneration) return;
+    await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+      await db.syncLog.put(packed.entry);
+      if (packed.body) await db.syncLogBodies.put(packed.body);
+      else await db.syncLogBodies.delete(row.id);
     });
     scheduleSyncLogPrune();
   } catch {
@@ -80,15 +98,33 @@ export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
 export async function appendSyncLogEntries(entries: readonly NewSyncLogEntry[]): Promise<void> {
   if (entries.length === 0) return;
   try {
+    const generation = journalGeneration;
     const db = getLocalDb();
     const now = new Date().toISOString();
-    await db.syncLog.bulkPut(
-      entries.map((entry) => ({
-        ...entry,
-        id: entry.id ?? newClientId(),
-        occurredAt: entry.occurredAt ?? now,
-      })),
-    );
+    const rows: SyncLogEntry[] = entries.map((entry) => ({
+      ...entry,
+      id: entry.id ?? newClientId(),
+      occurredAt: entry.occurredAt ?? now,
+    }));
+    const packed: Awaited<ReturnType<typeof packSyncLogEntry>>[] = [];
+    // Bounded parallelism keeps large cursor pages from creating hundreds of
+    // streams at once, without introducing a transaction per compressed row.
+    for (let index = 0; index < rows.length; index += 8) {
+      packed.push(
+        ...(await Promise.all(
+          rows
+            .slice(index, index + 8)
+            .map((row) => (Dexie.currentTransaction ? { entry: row } : packSyncLogEntry(row))),
+        )),
+      );
+    }
+    if (generation !== journalGeneration) return;
+    await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+      await db.syncLog.bulkPut(packed.map(({ entry }) => entry));
+      await db.syncLogBodies.bulkDelete(rows.map(({ id }) => id));
+      const bodies = packed.flatMap(({ body }) => (body ? [body] : []));
+      if (bodies.length > 0) await db.syncLogBodies.bulkPut(bodies);
+    });
     scheduleSyncLogPrune();
   } catch {
     // Diagnostic persistence must never interrupt a cursor pull.
@@ -133,11 +169,13 @@ export async function flushSyncLogPrune(): Promise<void> {
 
 export async function pruneSyncLog(): Promise<void> {
   const db = getLocalDb();
-  const count = await db.syncLog.count();
-  const excess = count - SYNC_LOG_RETENTION;
-  if (excess <= 0) return;
-  const oldestIds = await db.syncLog.orderBy('occurredAt').limit(excess).primaryKeys();
-  await db.syncLog.bulkDelete(oldestIds);
+  await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+    const excess = (await db.syncLog.count()) - SYNC_LOG_RETENTION;
+    if (excess <= 0) return;
+    const oldestIds = await db.syncLog.orderBy('occurredAt').limit(excess).primaryKeys();
+    await db.syncLog.bulkDelete(oldestIds);
+    await db.syncLogBodies.bulkDelete(oldestIds);
+  });
 }
 
 /**
@@ -171,15 +209,20 @@ export async function redactSyncLogForCharacters(characterIds: Iterable<string>)
       )
       .toArray();
     if (affected.length > 0) {
-      await db.syncLog.bulkPut(
-        affected.map((entry) => ({
-          ...entry,
-          previousValue: undefined,
-          newValue: undefined,
-          details: undefined,
-          redacted: true,
-        })),
-      );
+      await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+        await db.syncLogBodies.bulkDelete(affected.map(({ id }) => id));
+        await db.syncLog.bulkPut(
+          affected.map((entry) => ({
+            ...entry,
+            previousValue: undefined,
+            newValue: undefined,
+            details: undefined,
+            payloadStored: undefined,
+            payloadMetadata: undefined,
+            redacted: true,
+          })),
+        );
+      });
     }
     // Rejection records carry private content too: `humanName` on a
     // child rejection reads `skill "Stealth"` / `item "..."`, and the
@@ -227,17 +270,22 @@ export async function redactSyncLogForCampaigns(campaignIds: Iterable<string>): 
       )
       .toArray();
     if (affected.length > 0) {
-      await db.syncLog.bulkPut(
-        affected.map((entry) => ({
-          ...entry,
-          previousValue: undefined,
-          newValue: undefined,
-          details: undefined,
-          humanName: undefined,
-          fieldPath: undefined,
-          redacted: true,
-        })),
-      );
+      await db.transaction('rw', db.syncLog, db.syncLogBodies, async () => {
+        await db.syncLogBodies.bulkDelete(affected.map(({ id }) => id));
+        await db.syncLog.bulkPut(
+          affected.map((entry) => ({
+            ...entry,
+            previousValue: undefined,
+            newValue: undefined,
+            details: undefined,
+            payloadStored: undefined,
+            payloadMetadata: undefined,
+            humanName: undefined,
+            fieldPath: undefined,
+            redacted: true,
+          })),
+        );
+      });
     }
     return affected.length;
   } catch {

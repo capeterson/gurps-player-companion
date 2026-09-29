@@ -1,10 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { readDrainableOps } from '../sync/outbox.ts';
 import { syncStateStore } from '../sync/state.ts';
+import { appendSyncLog, redactSyncLogForCharacters } from '../sync/syncLog.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 
 const clearLocalAndFullResync = vi.fn();
@@ -13,6 +14,25 @@ const revertFailedOperation = vi.fn();
 vi.mock('../sync/orchestrator.ts', () => ({
   getSyncOrchestrator: () => ({ clearLocalAndFullResync, revertFailedOperation }),
 }));
+
+beforeEach(() => {
+  // Happy DOM 15 activates every ancestor <details> when a nested summary
+  // bubbles. Match browser activation: only that summary's own details toggles.
+  const dispatch = HTMLDetailsElement.prototype.dispatchEvent;
+  vi.spyOn(HTMLDetailsElement.prototype, 'dispatchEvent').mockImplementation(function (
+    this: HTMLDetailsElement,
+    event: Event,
+  ) {
+    if (
+      event.type === 'click' &&
+      event.target instanceof HTMLElement &&
+      event.target.tagName === 'SUMMARY' &&
+      event.target.parentElement !== this
+    )
+      return HTMLElement.prototype.dispatchEvent.call(this, event);
+    return dispatch.call(this, event);
+  });
+});
 
 function renderView() {
   return render(
@@ -134,6 +154,227 @@ describe('SyncLogView download debug log', () => {
 });
 
 describe('SyncLogView event details', () => {
+  it('loads a compressed change only when opened and formats raw payloads only when requested', async () => {
+    const db = getLocalDb();
+    await db.characters.put({ id: 'hero', ownerId: 'me', name: 'Hero', revision: 42 } as never);
+    const after = 'New appearance notes. '.repeat(70).trim();
+    await appendSyncLog({
+      id: 'compressed-change',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'character',
+      entityId: 'hero',
+      command: 'patch',
+      fieldPath: 'appearance',
+      humanName: 'Appearance',
+      previousValue: 'Old appearance notes. '.repeat(70),
+      newValue: after,
+      details: { status: 'applied', newRevision: 42 },
+      occurredAt: '2026-09-29T00:00:00Z',
+    });
+    await appendSyncLog({
+      id: 'cursor-response',
+      direction: 'pull',
+      result: 'synced',
+      entityClass: 'character',
+      entityId: 'hero',
+      command: 'patch',
+      details: { revision: 42, appliedFields: [] },
+      occurredAt: '2026-09-29T00:00:01Z',
+    });
+    const getBody = vi.spyOn(db.syncLogBodies, 'get');
+    const user = userEvent.setup();
+    renderView();
+    const title = await screen.findByText('Appearance');
+    expect(getBody).not.toHaveBeenCalled();
+    expect(screen.queryByText('character patch')).not.toBeInTheDocument();
+    expect(screen.queryByText(after)).not.toBeInTheDocument();
+    await user.click(title.closest('summary') as HTMLElement);
+    expect(await screen.findByText(after)).toBeInTheDocument();
+    expect(getBody).toHaveBeenCalledOnce();
+    const change = title.closest('details') as HTMLDetailsElement;
+    expect(change.querySelector('pre')).toBeNull();
+    await user.click(within(change).getByText('Request'));
+    await waitFor(() => expect(change.querySelector('pre')?.textContent).toContain(after));
+    await user.click(within(change).getByText('Response'));
+    await waitFor(() => expect(change.textContent).toContain('"revision": 42'));
+    await redactSyncLogForCharacters(['hero']);
+    expect(
+      await screen.findByText('removed — you no longer have access to this character'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(after)).not.toBeInTheDocument();
+    expect(screen.queryByText('Request')).not.toBeInTheDocument();
+  });
+
+  it('explains a missing compressed body when the change is opened', async () => {
+    const db = getLocalDb();
+    await db.characters.put({ id: 'hero', ownerId: 'me', name: 'Hero', revision: 42 } as never);
+    await appendSyncLog({
+      id: 'missing-body',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'character',
+      entityId: 'hero',
+      command: 'patch',
+      humanName: 'Appearance',
+      newValue: 'Long appearance. '.repeat(90),
+    });
+    await db.syncLogBodies.delete('missing-body');
+    renderView();
+    const title = await screen.findByText('Appearance');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
+    expect(
+      await screen.findByText(
+        /Couldn't load change details — Recorded sync details are no longer available/,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('combines a change and its revision acknowledgement with folded Request and Response', async () => {
+    const db = getLocalDb();
+    await db.syncLog.bulkPut([
+      {
+        id: 'change',
+        direction: 'push',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        command: 'patch',
+        fieldPath: 'quantity',
+        humanName: 'Torch quantity',
+        previousValue: 2,
+        newValue: 5,
+        details: { clientOpId: 'quantity-op', status: 'applied', newRevision: 42 },
+        occurredAt: '2026-09-28T00:00:00Z',
+      },
+      {
+        id: 'acknowledgement',
+        direction: 'pull',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        command: 'patch',
+        details: { revision: 42, appliedFields: [] },
+        occurredAt: '2026-09-28T00:00:01Z',
+      },
+    ]);
+
+    renderView();
+    const user = userEvent.setup();
+    const title = await screen.findByText('Torch quantity');
+    const change = title.closest('details') as HTMLDetailsElement;
+    expect(screen.queryByText('character inventory patch')).not.toBeInTheDocument();
+    expect(change.open).toBe(false);
+    await user.click(title.closest('summary') as HTMLElement);
+    const request = within(change).getByText('Request').closest('details') as HTMLDetailsElement;
+    const response = within(change).getByText('Response').closest('details') as HTMLDetailsElement;
+    expect(request.open).toBe(false);
+    expect(response.open).toBe(false);
+    expect(screen.queryByText('Raw')).not.toBeInTheDocument();
+    await user.click(within(request).getByText('Request'));
+    expect(request.open).toBe(true);
+    await waitFor(() =>
+      expect(request.querySelector('pre')?.textContent).toContain('"attemptedValue": 5'),
+    );
+    expect(request.querySelector('pre')?.textContent).not.toContain('newRevision');
+    await user.click(within(response).getByText('Response'));
+    expect(response.open).toBe(true);
+    await waitFor(() =>
+      expect(response.querySelector('pre')?.textContent).toContain('"status": "applied"'),
+    );
+    expect(response.querySelector('pre')?.textContent).toContain('"newRevision": 42');
+    expect(response.querySelector('pre')?.textContent).toContain('"revision": 42');
+    expect(within(change).getByText('2')).toBeInTheDocument();
+    expect(within(change).getByText('5')).toBeInTheDocument();
+    // Grouping affects the view only; the debug journal keeps both records.
+    expect(await db.syncLog.count()).toBe(2);
+  });
+
+  it.each([
+    { entityId: 'another-torch', details: { revision: 42, appliedFields: [] } },
+    { entityClass: 'character_skill' as const, details: { revision: 42, appliedFields: [] } },
+    { details: { revision: 43, appliedFields: [] } },
+    { details: { revision: 42 } },
+    { details: { revision: 42, appliedFields: ['notes'] }, previousValue: 'old', newValue: 'new' },
+    { occurredAt: '2026-09-27T00:00:00Z', details: { revision: 42, appliedFields: [] } },
+  ])('keeps unrelated or data-changing downloads as separate items: %j', async (overrides) => {
+    await getLocalDb().syncLog.bulkPut([
+      {
+        id: 'change',
+        direction: 'push',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        command: 'patch',
+        humanName: 'Torch quantity',
+        details: { status: 'applied', newRevision: 42 },
+        occurredAt: '2026-09-28T00:00:00Z',
+      },
+      {
+        id: 'download',
+        direction: 'pull',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        command: 'patch',
+        humanName: 'Separate download',
+        occurredAt: '2026-09-28T00:00:01Z',
+        ...overrides,
+      },
+    ]);
+    renderView();
+    expect(await screen.findByText('Torch quantity')).toBeInTheDocument();
+    expect(await screen.findByText('Separate download')).toBeInTheDocument();
+  });
+
+  it('hides Request and Response payloads when access to the character is lost', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      id: 'masked-character',
+      ownerId: 'someone-else',
+      name: 'Masked',
+      minimalViewMasked: true,
+      revision: 42,
+    } as never);
+    await db.syncLog.bulkPut([
+      {
+        id: 'private-change',
+        direction: 'push',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        parentId: 'masked-character',
+        command: 'patch',
+        humanName: 'Private torch',
+        previousValue: 'private-before',
+        newValue: 'private-after',
+        details: { status: 'applied', newRevision: 42 },
+        occurredAt: '2026-09-28T00:00:00Z',
+      },
+      {
+        id: 'private-response',
+        direction: 'pull',
+        result: 'synced',
+        entityClass: 'character_inventory',
+        entityId: 'torch',
+        parentId: 'masked-character',
+        command: 'patch',
+        details: { revision: 42, appliedFields: [], secret: 'private-response' },
+        occurredAt: '2026-09-28T00:00:01Z',
+      },
+    ]);
+    renderView();
+    const title = await screen.findByText('character inventory patch');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
+    expect(
+      screen.getByText('removed — you no longer have access to this character'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Request')).not.toBeInTheDocument();
+    expect(screen.queryByText('Response')).not.toBeInTheDocument();
+    expect(screen.queryByText(/private-/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Private torch')).not.toBeInTheDocument();
+  });
+
   it('folds each synced event over its before/after values, collapsed by default', async () => {
     await getLocalDb().syncLog.put({
       id: 'log-1',
@@ -154,13 +395,13 @@ describe('SyncLogView event details', () => {
     const title = await screen.findByText('Torch quantity');
     const disclosure = title.closest('details') as HTMLDetailsElement;
     expect(disclosure).not.toBeNull();
-    // Collapsed by default: the history stays scannable. (jsdom renders
-    // a closed <details>' children, so this attribute — not DOM
-    // presence — is what says the detail starts hidden.)
+    // Collapsed rows don't mount their payloads until requested.
     expect(disclosure.open).toBe(false);
     expect(disclosure.querySelector('summary')).toContainElement(title);
 
     const detail = within(disclosure);
+    expect(detail.queryByText('Before')).not.toBeInTheDocument();
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     expect(detail.getByText('Before')).toBeInTheDocument();
     expect(detail.getByText('2')).toBeInTheDocument();
     expect(detail.getByText('After')).toBeInTheDocument();
@@ -183,6 +424,7 @@ describe('SyncLogView event details', () => {
     renderView();
 
     const title = await screen.findByText('character combat patch');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(detail.getByText('no data fields changed locally')).toBeInTheDocument();
   });
@@ -202,6 +444,7 @@ describe('SyncLogView event details', () => {
     renderView();
 
     const title = await screen.findByText('character skill patch');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(
       detail.getByText('not recorded by the app version that downloaded this change'),
@@ -223,6 +466,7 @@ describe('SyncLogView event details', () => {
     renderView();
 
     const title = await screen.findByText('campaign patch');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(
       detail.getByText('removed — you no longer have access to this campaign'),
@@ -265,6 +509,7 @@ describe('SyncLogView event details', () => {
     // visible row title.
     const title = await screen.findByText('character inventory patch');
     expect(screen.queryByText('Masked item notes')).toBeNull();
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(
       detail.getByText('hidden — you no longer have access to this character'),
@@ -301,6 +546,7 @@ describe('SyncLogView event details', () => {
     renderView();
 
     const title = await screen.findByText('ST base');
+    await userEvent.setup().click(title.closest('summary') as HTMLElement);
     const detail = within(title.closest('details') as HTMLDetailsElement);
     expect(detail.getByText('Before')).toBeInTheDocument();
     expect(detail.getByText('10')).toBeInTheDocument();

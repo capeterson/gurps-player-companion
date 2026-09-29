@@ -4,6 +4,7 @@ import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from './debugDump.ts';
 import { syncStateStore } from './state.ts';
+import { appendSyncLog } from './syncLog.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -18,6 +19,61 @@ afterEach(async () => {
 });
 
 describe('buildSyncDebugDump', () => {
+  it('exports gzip-backed records as readable JSON and masks them before decoding on access loss', async () => {
+    const db = getLocalDb();
+    await db.characters.put({ id: 'hero', ownerId: 'me', name: 'Hero', revision: 42 } as never);
+    const secret = 'Private appearance notes. '.repeat(60);
+    await appendSyncLog({
+      id: 'compressed',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'character',
+      entityId: 'hero',
+      command: 'patch',
+      previousValue: secret,
+      newValue: secret,
+      details: { status: 'applied', newRevision: 42 },
+    });
+    expect((await db.syncLog.get('compressed'))?.payloadStored).toBe(true);
+    const readable = await buildSyncDebugDump();
+    expect(readable.syncLog[0]?.newValue).toBe(secret);
+    expect(readable.syncLog[0]?.details).toEqual({ status: 'applied', newRevision: 42 });
+    expect(JSON.stringify(readable)).not.toContain('payloadStored');
+    // No sweep: read-time masking must protect the bytes and restored values.
+    await db.characters.update('hero', { minimalViewMasked: true });
+    const masked = await buildSyncDebugDump();
+    expect(masked.syncLog[0]?.redacted).toBe(true);
+    expect(masked.syncLog[0]?.newValue).toBeUndefined();
+    expect(JSON.stringify(masked)).not.toContain('Private appearance notes');
+  });
+
+  it('exports other entries when one compressed body is missing', async () => {
+    const db = getLocalDb();
+    await db.characters.put({ id: 'hero', ownerId: 'me', name: 'Hero', revision: 42 } as never);
+    await appendSyncLog({
+      id: 'missing',
+      direction: 'push',
+      result: 'synced',
+      entityClass: 'character',
+      entityId: 'hero',
+      command: 'patch',
+      newValue: 'Notes. '.repeat(200),
+    });
+    await db.syncLogBodies.delete('missing');
+    await appendSyncLog({
+      id: 'healthy',
+      direction: 'pull',
+      result: 'synced',
+      details: { revision: 43 },
+    });
+    const dump = await buildSyncDebugDump();
+    expect(dump.syncLog).toHaveLength(2);
+    expect(dump.syncLog.find(({ id }) => id === 'missing')?.details).toEqual({
+      unavailable: 'Recorded sync details are no longer available',
+    });
+    expect(dump.syncLog.find(({ id }) => id === 'healthy')?.details).toEqual({ revision: 43 });
+  });
+
   it('includes metadata, pending counts, and every diagnostic store', async () => {
     const db = getLocalDb();
     tokenStore.write({
