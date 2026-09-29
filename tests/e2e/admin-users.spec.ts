@@ -68,6 +68,8 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
       await page.getByRole('button', { name: 'Schedule purge (30 d)', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Schedule account purge?' });
       await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveAttribute('open', '');
+      await expect(dialog).toHaveCSS('opacity', '1');
       await expect(dialog).toContainText('After 30 days');
       await expect(dialog).toContainText(memberEmail);
       await expect(
@@ -79,7 +81,10 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
       expect(box?.y).toBeGreaterThanOrEqual(0);
       expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(900);
-      await page.screenshot({ path: `test-results/admin-purge-${width}.png` });
+      await page.screenshot({
+        path: `test-results/admin-purge-${width}.png`,
+        animations: 'disabled',
+      });
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
       await expect(dialog).not.toBeVisible();
     }
@@ -131,6 +136,7 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
       releaseSave();
     }
     await expect(page.getByText('suspended', { exact: true })).toBeVisible();
+    await page.unroute(`**/api/v1/admin/users/${member.user.id}/suspend`);
     await page.goto(`/admin/users/${admin.user.id}`);
     await expect(page.getByText('You cannot suspend or purge your own account.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Suspend', exact: true })).toBeDisabled();
@@ -152,7 +158,8 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     await page.getByLabel(/email/i).fill(adminEmail);
     await page.getByLabel(/^password$/i).fill(password);
     await page.getByRole('button', { name: /^sign in$/i }).click();
-    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/admin\/media$/);
+    await expect(page.getByRole('heading', { name: 'Uploaded images' })).toBeVisible();
     expect(syncRequests).toBe(0);
     expect(syncSockets).toBe(0);
   } finally {
