@@ -533,6 +533,16 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   server passes. Point `TMPDIR` at disk-backed storage for local Playwright
   runs (for example `TMPDIR=$HOME/.cache/pw-tmp`). Don't clear other people's
   or tools' files out of `/tmp` to make room.
+  In Docker, prefer a worktree-specific named volume mounted at `/pwtmp` with
+  mode `1777` and `TMPDIR=/pwtmp`; a host cache bind may be inaccessible to
+  Chromium even when the runner is root. The Playwright config checks this
+  before launch. On the first repeated browser timeout, inspect
+  `DEBUG=pw:browser` output and crash metadata before retrying or rebuilding.
+  A compositor `SIGTRAP` with `CoreDumping: 1` is a crash, not a stalled job;
+  use `--ulimit core=0:0` on local diagnostic runners to surface it promptly.
+  Do not overlap server/shared integration tests with OAuth/MCP browser tests
+  on the same database: configured-client reconciliation changes global OAuth
+  state. Run them serially. Never add cooldowns without evidence they help.
 
 ## Test discipline
 

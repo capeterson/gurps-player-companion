@@ -28,7 +28,7 @@ vi.mock('../../lib/tokenStore.ts', () => ({
   },
 }));
 
-function renderLogin(returnTo?: string, reason?: string) {
+function renderLogin(returnTo?: string, reason?: string, defaultReturnTo?: '/' | '/admin/users') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -37,7 +37,7 @@ function renderLogin(returnTo?: string, reason?: string) {
       <MemoryRouter
         initialEntries={[{ pathname: '/login', state: returnTo ? { returnTo, reason } : null }]}
       >
-        <LoginPage />
+        <LoginPage {...(defaultReturnTo ? { defaultReturnTo } : {})} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -135,6 +135,20 @@ describe('LoginPage', () => {
         replace: true,
       }),
     );
+  });
+
+  it.each([
+    [undefined, '/admin/users'],
+    ['/admin/users/account-id', '/admin/users/account-id'],
+    ['https://evil.example/steal', '/admin/users'],
+  ])('returns to a safe admin page after login (%s)', async (returnTo, expected) => {
+    vi.mocked(api).mockResolvedValue(fakeTokens);
+    const user = userEvent.setup();
+    renderLogin(returnTo, undefined, '/admin/users');
+    await user.type(screen.getByLabelText(/email/i), 'admin@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(expected, { replace: true }));
   });
 
   it('explains OAuth reauthentication before the consent screen is shown', () => {

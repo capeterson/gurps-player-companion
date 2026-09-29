@@ -52,7 +52,7 @@ export function AdminLayout() {
     clearSessionQueryCache(queryClient);
     clearAllTableFilters();
     tokenStore.clear();
-    navigate('/login', { replace: true });
+    navigate('/admin/login', { replace: true });
   }
 
   return (

@@ -4,6 +4,7 @@ import { type AppConfig, loadConfig } from './config.ts';
 import { closeDb } from './db/client.ts';
 import { beginDraining } from './lifecycle.ts';
 import { stopMediaMaintenance } from './services/media/maintenance.ts';
+import { stopUserPurgeMaintenance } from './services/userPurge.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
 
 export function startServer(config: AppConfig) {
@@ -28,11 +29,15 @@ export interface ShutdownDeps {
   closeDatabase?: () => Promise<void>;
 }
 
+async function stopBackgroundMaintenance(): Promise<void> {
+  await Promise.all([stopMediaMaintenance(), stopUserPurgeMaintenance()]);
+}
+
 /**
  * Drain and stop the server. Stops accepting connections, closes push
  * sockets so clients reconnect to the replacement, then waits up to
  * `graceMs` for in-flight requests (sync batches, media processing) and the
- * background media sweep before force-closing whatever remains. Clients
+ * background maintenance before force-closing whatever remains. Clients
  * recover anything cut off at the deadline through the outbox, but a normal
  * deploy should not need to.
  */
@@ -43,7 +48,7 @@ export async function shutdownServer(
 ): Promise<'drained' | 'forced'> {
   const {
     closeWebSockets = closeAllWebSockets,
-    stopBackgroundWork = stopMediaMaintenance,
+    stopBackgroundWork = stopBackgroundMaintenance,
     closeDatabase = closeDb,
   } = deps;
   beginDraining();

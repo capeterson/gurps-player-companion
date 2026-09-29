@@ -428,6 +428,13 @@
       "when": 1800015000000,
       "tag": "0060_log_character_attachment",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1800016000000,
+      "tag": "0061_refresh_token_expiry",
+      "breakpoints": true
     }
   ]
 }

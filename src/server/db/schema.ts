@@ -145,9 +145,8 @@ export const users = pgTable(
      */
     isSuperuser: boolean('is_superuser').notNull().default(false),
     /**
-     * 30-day soft-delete timer set by /admin/users/{id}/purge.  A future
-     * sweep job hard-deletes users whose timer has elapsed; for now the
-     * column itself is the contract.
+     * 30-day soft-delete timer set by /admin/users/{id}/purge. The nightly
+     * 03:00 UTC sweep hard-deletes suspended users whose timer has elapsed.
      */
     purgeScheduledAt: timestamp('purge_scheduled_at', { withTimezone: true }),
     /** Palette used in dark mode; CHECK-constrained to DARK_THEMES. */
@@ -229,6 +228,7 @@ export const refreshTokens = pgTable(
     jtiKey: uniqueIndex('refresh_tokens_jti_key').on(t.jti),
     userIdx: index('refresh_tokens_user_idx').on(t.userId),
     familyIdx: index('refresh_tokens_family_idx').on(t.familyId),
+    expiresAtIdx: index('refresh_tokens_expires_at_idx').on(t.expiresAt),
   }),
 );
 
