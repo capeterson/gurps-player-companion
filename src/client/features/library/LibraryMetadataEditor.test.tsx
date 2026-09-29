@@ -10,6 +10,14 @@ function Harness() {
 }
 
 describe('LibraryMetadataEditor validation', () => {
+  it('labels and toggles the GM-only restriction', () => {
+    render(<Harness />);
+    const restricted = screen.getByRole('checkbox', { name: 'Restricted (GM only)' });
+    expect(restricted).not.toBeChecked();
+    fireEvent.click(restricted);
+    expect(restricted).toBeChecked();
+  });
+
   it('opens and keeps the canonical-key correction visible for whitespace-only keys', async () => {
     render(<Harness />);
 

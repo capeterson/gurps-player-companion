@@ -31,6 +31,12 @@ export function CampaignWorkspaceHeader({ campaignId, workspace }: Props) {
       show: true,
     },
     { label: 'Library', to: `/campaigns/${campaignId}/library`, end: false, show: true },
+    {
+      label: 'Import & export',
+      to: `/campaigns/${campaignId}/library-transfer`,
+      end: true,
+      show: true,
+    },
     { label: 'History', to: `/campaigns/${campaignId}/history`, end: true, show: true },
     {
       label: 'Encounters',

@@ -648,7 +648,9 @@ async function fetchClassUpserts(args: {
         upsertChange('campaign', campaign.id, Number(campaign.revision), {
           ...campaign,
           activeEffectDefinitions: definitions
-            .filter((d) => d.campaignId === campaign.id)
+            .filter(
+              (d) => d.campaignId === campaign.id && (campaign.ownerId === userId || !d.restricted),
+            )
             .map((d) =>
               activeEffectDefinitionOut.parse({
                 ...d,
@@ -673,7 +675,13 @@ async function fetchClassUpserts(args: {
     case 'campaign_library_active_effect':
     case 'campaign_library_source':
     case 'campaign_library_modifier':
-      return await fetchLibraryClass(entityClass, sinceRevision, limit, accessibleCampaignIds);
+      return await fetchLibraryClass(
+        entityClass,
+        sinceRevision,
+        limit,
+        accessibleCampaignIds,
+        userId,
+      );
     default:
       // Other entity classes (campaign membership, adventure log) are not
       // synced through this endpoint.  Returning empty keeps the cursor
@@ -693,14 +701,16 @@ async function fetchLibraryClass(
   sinceRevision: number,
   limit: number,
   accessibleCampaignIds: string[],
+  userId: string,
 ): Promise<SyncCursorChange[]> {
   if (accessibleCampaignIds.length === 0) return [];
   const cfg = libraryEntityConfig(entityClass);
   // biome-ignore lint/suspicious/noExplicitAny: generic library table runtime object
   const table = cfg.table as any;
   const rows = (await getDb()
-    .select()
+    .select({ row: table, ownerId: campaigns.ownerId })
     .from(table)
+    .innerJoin(campaigns, eq(cfg.table.campaignId, campaigns.id))
     .where(
       and(
         gt(table.revision, sinceRevision),
@@ -708,9 +718,20 @@ async function fetchLibraryClass(
       ),
     )
     .orderBy(asc(table.revision))
-    .limit(limit)) as Array<{ id: string; revision: unknown }>;
-  return rows.map((row) =>
-    upsertChange(entityClass, row.id, Number(row.revision), libraryRowOut(cfg, row)),
+    .limit(limit)) as Array<{
+    row: { id: string; revision: unknown; restricted?: boolean };
+    ownerId: string;
+  }>;
+  return rows.map(({ row, ownerId }) =>
+    row.restricted && ownerId !== userId
+      ? {
+          entityClass,
+          entityId: row.id,
+          command: 'delete' as const,
+          revision: Number(row.revision),
+          deletedAt: new Date().toISOString(),
+        }
+      : upsertChange(entityClass, row.id, Number(row.revision), libraryRowOut(cfg, row)),
   );
 }
 

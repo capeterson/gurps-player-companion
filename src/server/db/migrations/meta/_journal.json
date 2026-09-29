@@ -435,6 +435,13 @@
       "when": 1800016000000,
       "tag": "0061_refresh_token_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1800017000000,
+      "tag": "0062_library_restrictions",
+      "breakpoints": true
     }
   ]
 }

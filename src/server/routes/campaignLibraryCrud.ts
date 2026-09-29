@@ -396,6 +396,7 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
   campaignId: string,
   incoming: readonly TCreate[] | undefined,
   mode: 'merge' | 'replace',
+  replaceScope?: (row: TTable['$inferSelect']) => boolean,
 ): Promise<UpsertCounts> {
   let created = 0;
   let updated = 0;
@@ -407,7 +408,16 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
   );
   const incomingKeys = new Set<string>();
 
-  for (const entry of incoming ?? []) {
+  for (const imported of incoming ?? []) {
+    const matched = existingByKey.get(cfg.keyOf(imported as { name: string; kind?: string }));
+    // A legacy YAML file has no restriction flag. Preserve a GM's local
+    // restriction when it updates an existing definition.
+    const entry = (
+      (imported as { restricted?: boolean }).restricted === undefined &&
+      (matched as { restricted?: boolean } | undefined)?.restricted
+        ? { ...imported, restricted: true }
+        : imported
+    ) as TCreate;
     cfg.validateCreate?.(entry);
     const key = cfg.keyOf(entry as { name: string; kind?: string });
     incomingKeys.add(key);
@@ -437,7 +447,10 @@ export async function upsertByKey<TTable extends LibraryTable, TCreate, TUpdate,
 
   if (mode === 'replace' && incoming !== undefined) {
     for (const row of existing) {
-      if (!incomingKeys.has(cfg.keyOf(row as { name: string; kind?: string }))) {
+      if (
+        (!replaceScope || replaceScope(row)) &&
+        !incomingKeys.has(cfg.keyOf(row as { name: string; kind?: string }))
+      ) {
         await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, String(row.id), true);
         await tx.delete(asTable(cfg.table)).where(eq(cfg.table.id, row.id));
         deleted++;

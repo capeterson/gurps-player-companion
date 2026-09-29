@@ -6618,6 +6618,9 @@
               "preferredEdition": {
                 "type": "boolean"
               },
+              "restricted": {
+                "type": "boolean"
+              },
               "extraction": {
                 "$ref": "#/$defs/LibraryExtractionRecord"
               },
@@ -7435,6 +7438,9 @@
                 ]
               },
               "preferredEdition": {
+                "type": "boolean"
+              },
+              "restricted": {
                 "type": "boolean"
               },
               "extraction": {
@@ -10871,6 +10877,9 @@
               "preferredEdition": {
                 "type": "boolean"
               },
+              "restricted": {
+                "type": "boolean"
+              },
               "extraction": {
                 "$ref": "#/$defs/LibraryExtractionRecord"
               },
@@ -11711,6 +11720,9 @@
                 ]
               },
               "preferredEdition": {
+                "type": "boolean"
+              },
+              "restricted": {
                 "type": "boolean"
               },
               "extraction": {
@@ -13614,6 +13626,9 @@
               "preferredEdition": {
                 "type": "boolean"
               },
+              "restricted": {
+                "type": "boolean"
+              },
               "extraction": {
                 "$ref": "#/$defs/LibraryExtractionRecord"
               },
@@ -14203,6 +14218,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -14684,6 +14702,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -16012,6 +16033,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -16691,6 +16715,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -19127,6 +19154,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -19359,6 +19389,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -19728,6 +19761,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -21041,6 +21077,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -23326,6 +23365,9 @@
               "preferredEdition": {
                 "type": "boolean"
               },
+              "restricted": {
+                "type": "boolean"
+              },
               "extraction": {
                 "$ref": "#/$defs/LibraryExtractionRecord"
               },
@@ -23854,6 +23896,9 @@
               "preferredEdition": {
                 "type": "boolean"
               },
+              "restricted": {
+                "type": "boolean"
+              },
               "extraction": {
                 "$ref": "#/$defs/LibraryExtractionRecord"
               },
@@ -24363,6 +24408,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -24692,6 +24740,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -25162,6 +25213,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -25328,6 +25382,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -25633,6 +25690,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -25838,6 +25898,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -26181,6 +26244,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/$defs/LibraryExtractionRecord"
                   },
@@ -26414,6 +26480,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -26727,6 +26796,18 @@
               "id"
             ],
             "additionalProperties": false
+          },
+          "query": {
+            "type": "object",
+            "properties": {
+              "sourceKeys": {
+                "type": "string",
+                "maxLength": 5000,
+                "description": "JSON array of source keys, URL encoded in the query string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -26889,6 +26970,16 @@
                   "replace"
                 ],
                 "default": "merge"
+              },
+              "sourceKeys": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "minItems": 1,
+                "maxItems": 30
               },
               "applyCampaignSettings": {
                 "type": "boolean",

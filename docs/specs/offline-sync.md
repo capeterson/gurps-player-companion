@@ -978,7 +978,13 @@ enqueueing, so a draft the client can already tell is invalid stays open in its
 form.
 
 The YAML import stays an online bulk REST operation (up to 20 MB, server-side
-upsert/prune in one transaction). On success the page triggers a cursor pull.
+upsert/prune in one transaction), on the campaign Import & export tab. Sourcebook
+replacement prunes only selected source-key entries. On success the page
+triggers a cursor pull. A GM restriction change sends a removal event to
+non-owner cursors; the client also purges cached restricted rows after an owner
+loses ownership. When a member becomes campaign owner, the client rewinds its
+library cursors once to backfill older Restricted rows that were previously
+hidden.
 
 ### Campaign house rules
 

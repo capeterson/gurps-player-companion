@@ -88,6 +88,15 @@ export function LibraryMetadataEditor({
             />{' '}
             Preferred edition
           </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm"
+              checked={value.restricted ?? false}
+              onChange={(e) => patch({ restricted: e.target.checked })}
+            />
+            Restricted (GM only)
+          </label>
         </div>
         <label>
           Original row or excerpt

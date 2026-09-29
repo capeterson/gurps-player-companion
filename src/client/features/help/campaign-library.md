@@ -155,14 +155,16 @@ Activating an expired or inactive effect starts its duration again. Advancing ef
 
 ## Import, export, and bulk maintenance
 
-Use **Export YAML** to keep a portable copy before a substantial change. The export contains library definitions; it is not a full character or campaign backup. The current format is version 13. Use an export as your starting template so field names and nested structures match the app.
+Open the campaign **Import & export** tab to transfer library content. Use **Export YAML** for a whole-library copy or select sourcebooks for packages containing their source records and every keyed entry. Legacy citation-only entries are excluded from sourcebook packages. The export is not a character or campaign backup. The current format is version 14.
 
-In **Import YAML**, choose the mode, select a file, inspect the preview, then confirm:
+In **Import YAML**, select a file, choose the entire file or specific sourcebooks, choose a mode, inspect the preview, then confirm:
 
 - **Merge** adds new identities and updates matching ones without deleting other entries. It can still overwrite matching definitions.
-- **Replace** also removes existing entries absent from the uploaded sections. Use it only when the file is intended to be authoritative. Optional omitted sections are preserved; explicitly empty arrays request an empty section.
+- **Replace** also removes existing entries absent from the uploaded sections. Use it only when the file is intended to be authoritative. A sourcebook Replace removes entries only from the selected books. Optional omitted sections are preserved; explicitly empty arrays request an empty section.
 
 Identity uses canonical key and source edition, plus kind for traits. Changing an explicit key is different from renaming an entry and can create a new identity. Read the preview rather than assuming names alone control replacement. Review the campaign-settings option before importing settings along with content.
+
+Mark a definition **Restricted** in its source and completeness editor to keep it GM-only. Players cannot browse, export or newly add it to characters; existing character copies continue to work. An older file that omits the restriction flag preserves existing restrictions on matching entries.
 
 Library browsing and ordinary entry edits work from the local copy, including offline. **YAML import requires a connection.** Wait for ordinary edits to sync before exporting a server copy or coordinating a bulk import with another editor. Do not interpret an unsynced indicator as proof that a second device has the new content.
 

@@ -1,4 +1,4 @@
-import { libraryEntryKey } from '../domain/libraryIdentity.ts';
+import { canonicalLibraryKey, libraryEntryKey } from '../domain/libraryIdentity.ts';
 import { upgradeLegacyWeaponRanges } from '../domain/rangedRange.ts';
 import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
 import type { LibraryModifierCreate, LibrarySourceCreate } from '../schemas/libraryMetadata.ts';
@@ -38,8 +38,9 @@ import {
  * v1-v12 docs (new fields absent). v11 adds active effects; v12 adds source
  * editions, standalone modifiers, calculation rules, and normalized weapon modes.
  * v13 replaces weapon Range text with structured fixed/ST-multiplier values.
+ * v14 adds GM restrictions and sourcebook-scoped packages.
  */
-export const LIBRARY_YAML_VERSION = 13 as const;
+export const LIBRARY_YAML_VERSION = 14 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -89,8 +90,38 @@ export function parseLibraryYaml(rawText: string): LibraryYamlDoc {
       result.error,
     );
   }
+  if (result.data.scope && result.data.version < 14)
+    throw new LibraryYamlError('Sourcebook scope requires YAML version 14');
   assertNoDuplicateKeys(result.data);
   return result.data;
+}
+
+/** Select sourcebook contents by first-class source keys, never legacy citation text. */
+export function sourceScopedLibrary(
+  library: LibraryYamlDoc['library'],
+  requestedKeys: readonly string[],
+): LibraryYamlDoc['library'] {
+  const keys = new Set(requestedKeys.map(canonicalLibraryKey));
+  if (keys.size === 0 || keys.size !== requestedKeys.length)
+    throw new LibraryYamlError('Select one or more distinct sourcebooks');
+  const sources = (library.sources ?? []).filter((row) => keys.has(canonicalLibraryKey(row.key)));
+  if (sources.length !== keys.size)
+    throw new LibraryYamlError('A selected sourcebook is missing its source record');
+  const selected = (row: { sourceKey?: string | null | undefined }) =>
+    !!row.sourceKey && keys.has(canonicalLibraryKey(row.sourceKey));
+  return {
+    sources,
+    modifiers: library.modifiers?.filter(selected),
+    traits: library.traits.filter(selected),
+    skills: library.skills.filter(selected),
+    spells: library.spells?.filter(selected),
+    items: library.items.filter(selected),
+    languages: library.languages?.filter(selected),
+    techniques: library.techniques?.filter(selected),
+    styles: library.styles?.filter(selected),
+    enchantments: library.enchantments?.filter(selected),
+    activeEffects: library.activeEffects?.filter(selected),
+  };
 }
 
 function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
@@ -162,6 +193,7 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
 }
 
 export interface LibraryYamlExportInput {
+  readonly scope?: LibraryYamlDoc['scope'];
   readonly sources?: readonly LibrarySourceCreate[];
   readonly modifiers?: readonly LibraryModifierCreate[];
   readonly campaign?: LibraryYamlDoc['campaign'];
@@ -243,6 +275,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
   const enchantments = sortedByName(input.enchantments ?? []).map((entry) => compact(entry));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };
+  if (input.scope) payload.scope = input.scope;
   if (input.campaign) payload.campaign = compactCampaign(input.campaign);
   payload.library = {
     sources: sortedByName(input.sources ?? []).map((entry) => compact(entry)),

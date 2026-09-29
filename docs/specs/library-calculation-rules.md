@@ -1,7 +1,7 @@
 # Library calculation rules and source editions
 
 This subsystem represents user-supplied material without supplying book content or
-extracting PDFs. YAML v13, REST, MCP and local-first authoring share the same
+extracting PDFs. YAML v14, REST, MCP and local-first authoring share the same
 schemas. Extraction, OCR and classification remain external responsibilities.
 
 ## Identity, sources and completeness
@@ -30,6 +30,10 @@ the library. Character pickers exclude them, and the server independently enforc
 the gate. Promotion is an explicit authoring operation, not an importer heuristic.
 Normal pickers show preferred adoptable editions; Other sources exposes alternatives
 within the same picker. Source changes never silently change a character's prices.
+The separate **Restricted** flag makes a definition GM-only. Player REST,
+MCP, YAML and sync reads exclude it; new player character links are rejected.
+Existing character snapshots remain usable. Restriction is independent of
+completeness, so internal pricing references still resolve.
 
 ## Modifiers
 
@@ -155,7 +159,7 @@ Migrations 0054–0056 add common metadata, sources/modifiers, typed JSON rules 
 snapshots, edition-qualified indexes, history/revision/tombstone triggers and
 compatibility backfills. Character paid values are not recalculated.
 
-YAML parsers accept v1–v13; exporters emit only canonical v13. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
+YAML parsers accept v1–v14; exporters emit only canonical v14. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
 modifiers are optional sections: omission preserves them even in replace mode;
 explicit empty arrays prune them. Merge/replace uses canonical edition identity.
 The final graph includes retained existing rows. It is validated under the

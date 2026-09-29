@@ -141,6 +141,13 @@ const router = createBrowserRouter([
                 ),
               },
               {
+                path: '/campaigns/:id/library-transfer',
+                element: page(
+                  () => import('./features/campaigns/CampaignLibraryTransferPage.tsx'),
+                  'CampaignLibraryTransferPage',
+                ),
+              },
+              {
                 path: '/campaigns/:id/history',
                 element: page(
                   () => import('./features/campaigns/CampaignHistoryPage.tsx'),

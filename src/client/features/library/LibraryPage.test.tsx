@@ -135,7 +135,7 @@ it('preserves excerpt punctuation and does not split a Unicode character at the 
   expect(plainExcerpt(`${'x'.repeat(299)}😀Z`)).toBe(`${'x'.repeat(299)}😀`);
 });
 
-function setup(initialEntry = '/') {
+function setup(initialEntry = '/', transferOnly = false) {
   return render(
     <QueryClientProvider
       client={
@@ -145,7 +145,7 @@ function setup(initialEntry = '/') {
       }
     >
       <MemoryRouter initialEntries={[initialEntry]}>
-        <LibraryPage campaignId={CAMPAIGN} />
+        <LibraryPage campaignId={CAMPAIGN} transferOnly={transferOnly} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -401,10 +401,8 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
     items: { created: 0, updated: 0, deleted: 0 },
     enchantments: { created: 0, updated: 0, deleted: 0 },
   });
-  setup();
-  await screen.findByRole('button', { name: 'Night Vision' });
-  fireEvent.click(screen.getByRole('button', { name: /Import YAML/ }));
-  expect(screen.getByText(/canonical key and source edition/)).toBeVisible();
+  setup('/', true);
+  expect(await screen.findByRole('heading', { name: 'Import YAML' })).toBeVisible();
   expect(screen.getByRole('option', { name: 'Merge (add/update)' })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'replace' } });
   const file = new File(
@@ -416,21 +414,51 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
     value: async () => 'version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n',
   });
   fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Review import' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
   const dialog = await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
   expect(dialog).toHaveTextContent('Traits: 0 in file · 2 to remove');
-  expect(dialog).toHaveTextContent('Omitted optional sections remain untouched');
+  expect(dialog).toHaveTextContent('The entire file will be imported');
   expect(api).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog', { name: 'Import empty.yaml?' })).toBeNull();
-  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
   await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
-  fireEvent.click(screen.getByRole('button', { name: 'Replace library' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Replace selected scope' }));
   await waitFor(() =>
     expect(api).toHaveBeenCalledWith(
       `/campaigns/${CAMPAIGN}/library/import`,
       expect.objectContaining({
         method: 'POST',
         body: expect.objectContaining({ mode: 'replace' }),
+      }),
+    ),
+  );
+});
+
+it('imports only the sourcebook selected from a full YAML file', async () => {
+  await seed();
+  vi.mocked(api).mockResolvedValue({ mode: 'merge' });
+  setup('/', true);
+  await screen.findByRole('heading', { name: 'Import YAML' });
+  const yaml =
+    'version: 14\nlibrary:\n  sources:\n    - key: alpha\n      name: Alpha\n      abbreviation: A\n  traits:\n    - name: Alpha Trait\n      kind: advantage\n      sourceKey: alpha\n  skills: []\n  items: []\n';
+  const file = new File([yaml], 'books.yaml', { type: 'text/yaml' });
+  Object.defineProperty(file, 'text', { value: async () => yaml });
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  const alpha = await screen.findByRole('checkbox', { name: 'A · Alpha' });
+  fireEvent.click(alpha);
+  expect(alpha).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Entire file' })).not.toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Import books.yaml?' });
+  expect(dialog).toHaveTextContent('Selected sourcebooks: alpha');
+  fireEvent.click(screen.getByRole('button', { name: 'Merge library' }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      `/campaigns/${CAMPAIGN}/library/import`,
+      expect.objectContaining({
+        body: expect.objectContaining({ sourceKeys: ['alpha'] }),
       }),
     ),
   );
@@ -452,12 +480,11 @@ it('discards a Replace preview when the selected campaign changes', async () => 
     >
       <MemoryRouter initialEntries={[`/?campaign=${CAMPAIGN}`]}>
         <SwitchCampaign />
-        <LibraryPage />
+        <LibraryPage transferOnly />
       </MemoryRouter>
     </QueryClientProvider>,
   );
-  await screen.findByRole('button', { name: 'Night Vision' });
-  fireEvent.click(screen.getByRole('button', { name: /Import YAML/ }));
+  await screen.findByRole('heading', { name: 'Import YAML' });
   fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'replace' } });
   const file = new File(
     ['version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n'],
@@ -467,6 +494,8 @@ it('discards a Replace preview when the selected campaign changes', async () => 
     value: async () => 'version: 11\nlibrary:\n  traits: []\n  skills: []\n  items: []\n',
   });
   fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Review import' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
   await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
   fireEvent.click(screen.getByRole('button', { name: 'Switch campaign' }));
   await waitFor(() =>

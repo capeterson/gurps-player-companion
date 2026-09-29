@@ -105,7 +105,7 @@ tools. The current covered surface is:
 | Current user (`GET /auth/me`) | Safe current-user identity with no credentials. |
 | Characters | List/detail/create/update/delete, warning dismissal, all trait/skill/spell/language/technique/inventory writes, combat updates, condition-group activation/deactivation. Include every writable field, optional/null/default behavior, and computed detail field. |
 | Campaigns | List/detail/create/update/delete, member and role changes, ownership transfer; use existing role checks. |
-| Campaign library | Read and CRUD for every library type, plus YAML import/export with all existing options. Reads support section/name/limit/offset narrowing; preserve YAML export as a typed text payload. |
+| Campaign library | Read and CRUD for every library type, plus YAML import/export with sourcebook selection and existing options. Restricted entries are owner-only. Reads support section/name/limit/offset narrowing; preserve YAML export as a typed text payload. |
 | Invitations and notifications | All list, invite/cancel/accept/reject, mark-read/read-all, and deletion operations. |
 | Adventure log | All reads/writes, privacy, session/location fields, optional points gained and recipient subsets, concrete XP award snapshots, character cap adjustments on create/edit/delete, and identical owner/own-character authorization. |
 | Encounters | List/detail/create/update, advance turn, combatant and effect CRUD; retain optimistic turn-concurrency checks and hidden-NPC/PC privacy. |
@@ -313,7 +313,7 @@ The same generated tools expose library `techLevelPolicy`, nested
 and `campaign.skillPrerequisitePolicy`. Because MCP executes the raw OpenAPI
 handler, required-TL and block/warn enforcement is identical to REST and sync.
 
-Library export returns YAML v13 as typed text, retaining effect order, scaling,
+Library export returns YAML v14 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
 without the campaign-local library UUID. Import accepts the existing v1–v12
 formats and preserves shared merge/replace and campaign-settings options. No
@@ -442,7 +442,7 @@ introduced. See [library-calculation-rules.md](library-calculation-rules.md).
 ## Structured weapon Range parity
 
 Inventory and campaign-library item `weaponData` use the shared `rangedRange`
-schema at REST, sync, MCP and YAML v13 boundaries. Each attack mode may carry
+schema at REST, sync, MCP and YAML v14 boundaries. Each attack mode may carry
 a fixed-yard Max and optional 1/2D/minimum, or an ST multiplier with an explicit
 wielder/weapon strength source. Legacy notation is retained for repair after
 migration; the roll path does not parse it. MCP tool schemas and the checked-in catalog are generated from the

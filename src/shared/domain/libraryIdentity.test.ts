@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { LibraryModifierCreate } from '../schemas/libraryMetadata.ts';
 import {
   canAdoptLibraryEntry,
+  canPlayerSelectLibraryEntry,
   canonicalLibraryKey,
   libraryEntryKey,
   libraryMetadataValues,
@@ -36,10 +37,14 @@ describe('library identity and source selection', () => {
       status: 'complete',
       role: 'definition',
       preferredEdition: false,
+      restricted: false,
       extraction: null,
     });
     expect(canAdoptLibraryEntry({ status: 'complete', role: 'definition' })).toBe(true);
     expect(canAdoptLibraryEntry({ status: 'complete', role: 'template' })).toBe(true);
+    expect(canAdoptLibraryEntry({ status: 'complete', restricted: true })).toBe(true);
+    expect(canPlayerSelectLibraryEntry({ status: 'complete', restricted: true })).toBe(false);
+    expect(canPlayerSelectLibraryEntry({ status: 'complete', restricted: false })).toBe(true);
     expect(canAdoptLibraryEntry({ status: 'needs_review', role: 'definition' })).toBe(false);
     expect(canAdoptLibraryEntry({ status: 'complete', role: 'example' })).toBe(false);
     expect(canAdoptLibraryEntry({ status: 'reference_only', role: 'reference' })).toBe(false);

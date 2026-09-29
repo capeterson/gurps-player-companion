@@ -355,7 +355,12 @@ seeds the character row's written fluency to `n/a`.
 
 - **Read**: any campaign **member**, through `GET /campaigns/{id}/library`
   (REST/MCP) and, in the PWA, the `campaign_library_*` sync cursor classes. The
-  app reads the library only from Dexie, so browsing works offline.
+  app reads the library only from Dexie, so browsing works offline. Entries
+  marked **Restricted** are GM-only: member REST and YAML reads exclude them,
+  cursor reads deliver removal events instead of their data, and the client
+  purges cached restricted rows after an owner loses ownership. Campaign history
+  excludes restricted entries from member feeds. Already owned character
+  snapshots remain usable; new member links to a restricted definition are denied.
 - **Write** (per-entity CRUD): campaign **owner** only, through REST
   (`POST/PATCH/DELETE /campaigns/{id}/library/{sources|modifiers|traits|skills|spells|items|enchantments|active-effects|languages|techniques|styles}[/{id}]`
   in `src/server/routes/campaignLibrary.ts`) or `/sync/operations`. Both
@@ -365,9 +370,10 @@ seeds the character row's written fluency to `n/a`.
   library". All eleven categories have dedicated editor forms. Languages and
   techniques are consumed on the character sheet; styles describe their component
   skills, perks and techniques without creating a separate character style row.
-- Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor)
-  and the top-nav `LibraryPage` (`/library`, the primary home for YAML
-  import/export), plus `LibraryAutocomplete` / `LibraryModifierPicker` on the
+- Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor),
+  `CampaignLibraryTransferPage` (the campaign's **Import & export** tab),
+  and the top-nav `LibraryPage` (`/library`, a campaign-switching editor), plus
+  `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
   trait/skill/spell/item/enchantment/language/technique. All of them read the
   synced Dexie stores.
@@ -472,7 +478,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 13`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 14`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -486,7 +492,8 @@ mechanism for sharing content between campaigns or seeding a new one.
   mechanics remain. v11 retains portable skill specialization policies and
   per-catalog-option rule overrides. The
   parser unions on the literal `version` field and newer fields default/absent
-  on older docs.
+  on older docs. v14 adds per-entry `restricted` and optional explicit
+  `scope: { kind: sources, sourceKeys: [...] }` for sourcebook packages.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
@@ -539,7 +546,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
   campaign settings, and all eleven library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
-  document assembled from different database moments.
+  document assembled from different database moments. `?sourceKeys=` accepts a
+  URL-encoded JSON array of source keys and selects
+  one or more first-class source keys and exports only their source records and
+  matching entries across all categories, with no campaign settings. Legacy
+  source-less entries are excluded. A member's export omits Restricted entries.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. The UI parses
   and validates a selected file locally, then shows a confirmation preview with
   incoming section counts and available deletion counts. Selecting a file alone
@@ -554,6 +565,13 @@ mechanism for sharing content between campaigns or seeding a new one.
     library. An explicit `spells: []` still deletes. The `languages` section
     (v4) follows the same optional-section rule.
   - Returns per-section `{ created, updated, deleted }` counts.
+  - A scoped v14 file or explicit `sourceKeys` selection from a full file
+    imports only those sourcebooks. Replace prunes only matching source-key
+    entries in included sections; other sources and unsourced entries remain.
+    Source records are upserted, never pruned by a scoped import. Scoped imports
+    cannot apply campaign settings. The final graph is validated under the
+    campaign lock, so missing cross-book references reject the entire import.
+    When older YAML omits `restricted`, an existing row keeps its GM restriction.
   - **`applyCampaignSettings`** (boolean, default `false`): opt-in. When
     true and the document carries a `campaign` block, `description`,
     `pointTarget`, `disadvantageCap`, `quirkCap`, `manaLevel`,
@@ -583,7 +601,7 @@ Names are display labels and duplicate names can coexist under distinct canonica
 keys or editions. Sources use their own canonical key. The final source/reference
 graph is validated before import writes, including entries retained by omitted
 sections. Source and modifier sections follow the omission-versus-empty replace
-rule. Export is canonical YAML v13; v1–v12 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 requires structured Range objects.
+rule. Export is canonical YAML v14; v1–v13 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 and later require structured Range objects.
 
 See [library-calculation-rules.md](library-calculation-rules.md) for standalone
 modifiers, completeness/adoption gates, calculation rules, explicit character
@@ -592,8 +610,10 @@ pricing snapshots/re-resolution, source preference and independent weapon modes.
 
 ## Library search and description editing
 
-The YAML import section folds closed by default and remembers its state on this
-device. Entry titles take their own row on mobile, with metadata/actions beneath.
+The campaign **Import & export** tab contains every YAML transfer control. Its
+sourcebook picker selects registered source keys rather than legacy citation
+text. The editor's category search and source filter do not affect transfers.
+
 The library management UI filters the current category as the user types in
 **Search library**. Matching is case-insensitive:
 every query word must appear in the human-readable fields (name, description,

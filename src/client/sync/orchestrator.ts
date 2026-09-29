@@ -491,7 +491,16 @@ class SyncOrchestrator {
           syncStateStore.set('syncing');
           appliedAnything = true;
         }
+        // A member promoted to GM has already advanced past the revisions of
+        // Restricted library rows that were hidden from them. Rewind the
+        // library cursors once after applying the ownership change so those
+        // older rows are fetched with the new permission.
+        const promotedToOwner = await this.hasNewlyOwnedCampaign(res.changes);
         await this.applyCursorResponse(res);
+        if (promotedToOwner) {
+          await getLocalDb().syncCursors.bulkDelete([...LIBRARY_ENTITY_CLASSES]);
+          return await this.pullInner(force, generation);
+        }
         lastAccessible = res.accessible;
         hasMore = Object.values(res.hasMore ?? {}).some((v) => v);
       }
@@ -1775,6 +1784,20 @@ class SyncOrchestrator {
     }));
   }
 
+  private async hasNewlyOwnedCampaign(changes: SyncCursorResponse['changes']): Promise<boolean> {
+    if (!this.currentUserId) return false;
+    const db = getLocalDb();
+    for (const change of changes) {
+      if (change.entityClass !== 'campaign' || change.command === 'delete') continue;
+      const data = change.data;
+      if (!data || typeof data !== 'object' || !('ownerId' in data)) continue;
+      if (data.ownerId !== this.currentUserId) continue;
+      const previous = await db.campaigns.get(change.entityId);
+      if (previous && previous.ownerId !== this.currentUserId) return true;
+    }
+    return false;
+  }
+
   private async resetCursorsForAccessExpansion(
     accessible: SyncCursorResponse['accessible'],
   ): Promise<boolean> {
@@ -2333,7 +2356,14 @@ class SyncOrchestrator {
       );
     }
 
-    await this.pruneInaccessibleLibrary(accessibleCampaignIds);
+    await this.pruneInaccessibleLibrary(
+      accessibleCampaignIds,
+      new Set(
+        camps
+          .filter((campaign) => campaign.ownerId === this.currentUserId)
+          .map((campaign) => campaign.id),
+      ),
+    );
 
     const staleCharacterIds = chars
       .filter((c) => !accessibleCharacterIds.has(c.id) && c.revision >= 0)
@@ -2436,6 +2466,7 @@ class SyncOrchestrator {
    */
   private async pruneInaccessibleLibrary(
     accessibleCampaignIds: ReadonlySet<string>,
+    ownedCampaignIds: ReadonlySet<string>,
   ): Promise<void> {
     const db = getLocalDb();
     const stores = LIBRARY_STORE_NAMES.map((name) => db[name]);
@@ -2447,7 +2478,9 @@ class SyncOrchestrator {
             (row) =>
               row.revision >= 0 &&
               typeof row.campaignId === 'string' &&
-              !accessibleCampaignIds.has(row.campaignId),
+              (!accessibleCampaignIds.has(row.campaignId) ||
+                ((row as { restricted?: boolean }).restricted === true &&
+                  !ownedCampaignIds.has(row.campaignId))),
           )
           .primaryKeys()) as string[];
         if (stale.length === 0) continue;

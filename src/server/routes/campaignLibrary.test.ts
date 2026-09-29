@@ -91,6 +91,141 @@ async function createTrait(
   return { res, body: (await res.json()) as Record<string, unknown> };
 }
 
+it('keeps restricted entries GM-only and replaces only selected sourcebooks', async () => {
+  const owner = await registerUser('scoped-owner');
+  const member = await registerUser('scoped-member');
+  const campaign = await createCampaign(owner.accessToken);
+  const id = String(campaign.id);
+  await addMember(owner.accessToken, id, member.email);
+  const base = `/api/v1/campaigns/${id}/library`;
+  for (const key of ['alpha-book', 'beta-book', 'empty-book']) {
+    const response = await app.request(`${base}/sources`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ key, name: key, abbreviation: key, priority: 100 }),
+    });
+    expect(response.status).toBe(201);
+  }
+  const secret = await createTrait(owner.accessToken, id, {
+    name: 'Secret Alpha',
+    sourceKey: 'alpha-book',
+    restricted: true,
+  });
+  expect(secret.res.status).toBe(201);
+  expect(
+    (
+      await createTrait(owner.accessToken, id, {
+        name: 'Public Beta',
+        sourceKey: 'beta-book',
+      })
+    ).res.status,
+  ).toBe(201);
+
+  const memberList = await app.request(base, { headers: bearer(member.accessToken) });
+  expect(JSON.stringify(await memberList.json())).not.toContain('Secret Alpha');
+  const ownerList = await app.request(base, { headers: bearer(owner.accessToken) });
+  expect(JSON.stringify(await ownerList.json())).toContain('Secret Alpha');
+  const memberExport = await app.request(`${base}/export`, { headers: bearer(member.accessToken) });
+  expect(await memberExport.text()).not.toContain('Secret Alpha');
+  const ownerExport = await app.request(
+    `${base}/export?sourceKeys=${encodeURIComponent(JSON.stringify(['alpha-book']))}`,
+    {
+      headers: bearer(owner.accessToken),
+    },
+  );
+  expect(ownerExport.status).toBe(200);
+  const scopedYaml = await ownerExport.text();
+  expect(scopedYaml).toContain('Secret Alpha');
+  expect(scopedYaml).not.toContain('Public Beta');
+  expect(scopedYaml).toContain('sourceKeys:');
+  const emptyExport = await app.request(
+    `${base}/export?sourceKeys=${encodeURIComponent(JSON.stringify(['empty-book']))}`,
+    { headers: bearer(owner.accessToken) },
+  );
+  expect(emptyExport.status).toBe(200);
+  const emptyYaml = await emptyExport.text();
+  expect(emptyYaml).toContain('empty-book');
+  expect(emptyYaml).toContain('traits: []');
+
+  const cursor = await app.request('/api/v1/sync/cursor', {
+    method: 'POST',
+    headers: jsonHeaders(member.accessToken),
+    body: JSON.stringify({
+      cursors: [{ entityClass: 'campaign_library_trait', sinceRevision: 0 }],
+    }),
+  });
+  expect(cursor.status).toBe(200);
+  const changes = (await cursor.json()) as SyncCursorResponse;
+  expect(changes.changes.find((change) => change.entityId === secret.body.id)?.command).toBe(
+    'delete',
+  );
+  expect(JSON.stringify(changes)).not.toContain('Secret Alpha');
+  const history = await app.request(`/api/v1/campaigns/${id}/history?detail=true`, {
+    headers: bearer(member.accessToken),
+  });
+  expect(history.status).toBe(200);
+  expect(JSON.stringify(await history.json())).not.toContain('Secret Alpha');
+
+  expect(
+    (
+      await createTrait(owner.accessToken, id, {
+        name: 'Extra Alpha',
+        sourceKey: 'alpha-book',
+      })
+    ).res.status,
+  ).toBe(201);
+  expect(
+    (
+      await createTrait(owner.accessToken, id, {
+        name: 'Extra Beta',
+        sourceKey: 'beta-book',
+      })
+    ).res.status,
+  ).toBe(201);
+  const imported = await app.request(`${base}/import`, {
+    method: 'POST',
+    headers: jsonHeaders(owner.accessToken),
+    body: JSON.stringify({ yaml: scopedYaml, mode: 'replace' }),
+  });
+  expect(imported.status).toBe(200);
+  const after = await app.request(base, { headers: bearer(owner.accessToken) });
+  const names = ((await after.json()) as { traits: { name: string }[] }).traits.map(
+    (row) => row.name,
+  );
+  expect(names).toContain('Secret Alpha');
+  expect(names).toContain('Extra Beta');
+  expect(names).not.toContain('Extra Alpha');
+  const withoutFlag = scopedYaml.replace(/\n\s+restricted: true/g, '');
+  const legacyReimport = await app.request(`${base}/import`, {
+    method: 'POST',
+    headers: jsonHeaders(owner.accessToken),
+    body: JSON.stringify({ yaml: withoutFlag, mode: 'merge' }),
+  });
+  expect(legacyReimport.status).toBe(200);
+  const finalList = await app.request(base, { headers: bearer(owner.accessToken) });
+  const finalTraits = (
+    (await finalList.json()) as { traits: { name: string; restricted: boolean }[] }
+  ).traits;
+  expect(finalTraits.find((row) => row.name === 'Secret Alpha')?.restricted).toBe(true);
+
+  const fullExport = await app.request(`${base}/export`, { headers: bearer(owner.accessToken) });
+  const fullYaml = await fullExport.text();
+  await createTrait(owner.accessToken, id, { name: 'Keep Alpha', sourceKey: 'alpha-book' });
+  await createTrait(owner.accessToken, id, { name: 'Remove Beta', sourceKey: 'beta-book' });
+  const selectedImport = await app.request(`${base}/import`, {
+    method: 'POST',
+    headers: jsonHeaders(owner.accessToken),
+    body: JSON.stringify({ yaml: fullYaml, sourceKeys: ['beta-book'], mode: 'replace' }),
+  });
+  expect(selectedImport.status).toBe(200);
+  const selectedList = await app.request(base, { headers: bearer(owner.accessToken) });
+  const selectedNames = ((await selectedList.json()) as { traits: { name: string }[] }).traits.map(
+    (row) => row.name,
+  );
+  expect(selectedNames).toContain('Keep Alpha');
+  expect(selectedNames).not.toContain('Remove Beta');
+});
+
 // ===================== CRUD =====================
 
 it('membership and role changes advance the campaign projection cursor', async () => {
@@ -983,7 +1118,7 @@ describe('YAML export/import round trip', () => {
     expect(modifierResponse.status).toBe(201);
     const modifier = (await modifierResponse.json()) as { id: string };
     const exportBefore = await exportYaml(owner.accessToken, String(campaign.id));
-    expect(exportBefore).toContain('version: 13');
+    expect(exportBefore).toContain('version: 14');
     expect(exportBefore).toContain('preferredEdition: true');
 
     const doc = (sources: unknown[], traits: unknown[], modifiers: unknown[]) =>
@@ -1096,7 +1231,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 13');
+    expect(yaml).toContain('version: 14');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -1570,7 +1705,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 13');
+    expect(firstYaml).toContain('version: 14');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {
