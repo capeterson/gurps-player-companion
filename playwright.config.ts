@@ -12,7 +12,7 @@
  * points this suite at it without asking Playwright to start a server.
  */
 
-import { accessSync, constants, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { constants, accessSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
