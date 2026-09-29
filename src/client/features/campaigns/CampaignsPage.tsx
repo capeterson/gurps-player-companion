@@ -5,6 +5,7 @@ import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campai
 import { MediaImage } from '../../components/MediaImage.tsx';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
+import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import { InvitationsInbox } from './InvitationsInbox.tsx';
 
@@ -36,10 +37,21 @@ export function CampaignsPage() {
 
   const create = useMutation({
     mutationFn: (snap: { name: string }) =>
-      api<CampaignOut>('/campaigns', {
-        method: 'POST',
-        body: { name: snap.name } satisfies CampaignCreate,
-      }),
+      journalCampaignMutation(
+        {
+          command: 'create',
+          method: 'POST',
+          path: '/campaigns',
+          body: { name: snap.name },
+          source: 'Campaign creation',
+          humanName: 'campaign created',
+        },
+        () =>
+          api<CampaignOut>('/campaigns', {
+            method: 'POST',
+            body: { name: snap.name } satisfies CampaignCreate,
+          }),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       setName('');

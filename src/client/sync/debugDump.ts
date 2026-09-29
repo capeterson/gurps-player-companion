@@ -85,9 +85,11 @@ function maskRestrictedLog(entries: SyncLogEntry[], access: LocalCharacterAccess
           previousValue: undefined,
           newValue: undefined,
           details: undefined,
+          request: undefined,
           payloadStored: undefined,
           payloadMetadata: undefined,
           humanName: undefined,
+          entityName: undefined,
           fieldPath: undefined,
           redacted: true,
         }

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
+import { tokenStore } from '../../../lib/tokenStore.ts';
 import { flashBus } from '../../../sync/flashBus.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
 import { usePoolBumpers } from './usePoolBumpers.ts';
@@ -288,5 +289,122 @@ describe('usePoolBumpers', () => {
     act(() => result.current.bumpFp(-1));
     await expectPools(9, -1);
     flash.mockRestore();
+  });
+});
+
+describe('pool sync burst identity', () => {
+  it('keeps one gesture identity when rapid HP changes require separate ordered requests', async () => {
+    const { result, db } = await setup();
+    await act(async () => {
+      await result.current.commitHpDeltas([{ delta: -1, at: 1000 }]);
+    });
+    const first = (await db.outbox.toArray())[0];
+    expect(first?.batchId).toBeTruthy();
+    if (!first) throw new Error('Missing first HP operation');
+    // A claimed operation cannot be coalesced away, even if a subsequent
+    // control event belongs to its explicit burst.
+    await db.outbox.update(first.clientOpId, { status: 'in_flight' });
+    await act(async () => {
+      await result.current.commitHpDeltas([{ delta: -1, at: 1150 }]);
+    });
+    const entries = await db.outbox.orderBy('enqueuedAt').toArray();
+    expect(entries).toHaveLength(2);
+    expect(entries.map((op) => op.batchId)).toEqual([first.batchId, first.batchId]);
+    expect(entries.map((op) => [op.prevValue, op.attemptedValue])).toEqual([
+      [10, 9],
+      [9, 8],
+    ]);
+    expect(entries[1]?.predecessorClientOpId).toBe(first.clientOpId);
+    await expectPools(8, 12);
+  });
+
+  it('preserves the burst identity and earliest baseline when pending HP taps coalesce', async () => {
+    const { result, db } = await setup();
+    await act(async () => {
+      await result.current.commitHpDeltas([{ delta: -1, at: 1000 }]);
+    });
+    const first = (await db.outbox.toArray())[0];
+    await act(async () => {
+      await result.current.commitHpDeltas([{ delta: -1, at: 1100 }]);
+    });
+    expect(await db.outbox.toArray()).toMatchObject([
+      { batchId: first?.batchId, prevValue: 10, attemptedValue: 8, status: 'pending' },
+    ]);
+  });
+
+  it('separates an HP tap at the debounce boundary and a separately applied injury', async () => {
+    const { result, db } = await setup();
+    const ids: Array<string | undefined> = [];
+    for (const [at, separateGesture] of [
+      [1000, false],
+      [1200, false],
+      [1250, true],
+      [1300, false],
+    ] as const) {
+      await act(async () => {
+        await result.current.commitHpDeltas([{ delta: -1, at }], { separateGesture });
+      });
+      const op = await db.outbox.orderBy('enqueuedAt').last();
+      ids.push(op?.batchId);
+      if (op) await db.outbox.update(op.clientOpId, { status: 'in_flight' });
+    }
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(4);
+  });
+
+  it('keeps fatigue HP and FP changes together while separating direct HP gestures', async () => {
+    const { result, db } = await setup(10, 0);
+    await act(async () => {
+      await result.current.commitFpDeltas([{ delta: -1, at: 1000 }]);
+    });
+    const fatigue = await db.outbox.toArray();
+    expect(fatigue.map((op) => op.fieldPath).sort()).toEqual(['currentFp', 'currentHp']);
+    expect(new Set(fatigue.map((op) => op.batchId)).size).toBe(1);
+    for (const op of fatigue) await db.outbox.update(op.clientOpId, { status: 'in_flight' });
+    await act(async () => {
+      await result.current.commitHpDeltas([{ delta: -1, at: 1050 }]);
+    });
+    const last = await db.outbox.orderBy('enqueuedAt').last();
+    expect(last?.batchId).not.toBe(fatigue[0]?.batchId);
+  });
+
+  it('separates reset and slider interactions from HP steps', async () => {
+    const { result, db } = await setup(8, 10);
+    const ids: Array<string | undefined> = [];
+    const capture = async (hp: number) => {
+      await expectPools(hp, 10);
+      const op = await db.outbox.orderBy('enqueuedAt').last();
+      ids.push(op?.batchId);
+      if (op) await db.outbox.update(op.clientOpId, { status: 'in_flight' });
+    };
+    act(() => result.current.bumpHp(-1));
+    await capture(7);
+    act(() => result.current.setHp(6));
+    await capture(6);
+    act(() => result.current.resetHp());
+    await capture(10);
+    act(() => result.current.bumpHp(-1));
+    await capture(9);
+    expect(ids.every(Boolean)).toBe(true);
+    expect(new Set(ids).size).toBe(4);
+  });
+
+  it('never reuses a preceding login session burst', async () => {
+    const tokens = { accessToken: 'test', refreshToken: 'refresh', accessTokenExpiresIn: 3600 };
+    tokenStore.write(tokens);
+    try {
+      const { result, db } = await setup();
+      await act(async () => {
+        await result.current.commitHpDeltas([{ delta: -1, at: 1000 }]);
+      });
+      const first = await db.outbox.orderBy('enqueuedAt').last();
+      tokenStore.write(tokens); // A new login session, even for the same account.
+      await act(async () => {
+        await result.current.commitHpDeltas([{ delta: -1, at: 1100 }]);
+      });
+      expect((await db.outbox.orderBy('enqueuedAt').last())?.batchId).not.toBe(first?.batchId);
+    } finally {
+      tokenStore.clear();
+    }
   });
 });

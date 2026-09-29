@@ -41,7 +41,7 @@ export function CombatTab({
         character={character}
         canWrite={canWrite}
         hpMax={bumpers.hpMax}
-        bumpHp={bumpers.bumpHp}
+        bumpHp={(delta) => bumpers.bumpHp(delta, { separateGesture: true })}
         openRoll={openRoll}
       />
       <ActiveEffectsPanel character={character} canWrite={canWrite} />

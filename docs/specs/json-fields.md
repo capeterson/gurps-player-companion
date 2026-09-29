@@ -103,8 +103,8 @@ persists JSON of its own:
 | `outbox.localCampaignTransferUndo` | Client-only child reference preimages and detached postimages for campaign assignment rollback; typed as `LocalCampaignTransferUndo[]`. Any new declaration postimage is validated with `libraryMechanics`. Stored atomically with the parent edit; excluded from the sync wire envelope. |
 | `syncMeta.value` | Per-key blobs (e.g. `bootstrap:<userId>` → `{ bootstrappedAt }`). Owned by the orchestrator. |
 | `rejectionToasts` rows | `RejectionRecord` interface in dexie.ts. |
-| `syncLog.previousValue`, `.newValue`, `.details` / gzip body envelope | Device-local bounded arbitrary diagnostic values, validated as `syncLogPayload` (`syncLog.ts`) when packing/decoding. Small and legacy payloads remain inline; larger new payloads are UTF-8 JSON gzip bytes in the binary `syncLogBodies.bytes` field (Dexie v15), never base64 or a server column. |
-| `syncLog.payloadMetadata` | `syncLogPayloadMetadata` (`syncLog.ts`), parsed at compression writes: snapshot-presence flag, optional acknowledgement/cursor revision and applied-field names, so grouping does not decode bodies. |
+| `syncLog.previousValue`, `.newValue`, `.request`, `.details` / gzip body envelope | Device-local bounded arbitrary diagnostic values, validated as `syncLogPayload` (`syncLog.ts`) when packing/decoding. Small and legacy payloads remain inline; larger new payloads are UTF-8 JSON gzip bytes in the binary `syncLogBodies.bytes` field (Dexie v15), never base64 or a server column. |
+| `syncLog.payloadMetadata` | `syncLogPayloadMetadata` (`syncLog.ts`), parsed at compression writes: snapshot-presence flag, optional acknowledgement/cursor revision, request-presence flag, applied-field names, and optional finite numeric before/after values for continuity checks, so grouping does not decode bodies. Access redaction clears this metadata with the payload. |
 
 The remaining sync bookkeeping rows are client-internal (never sent verbatim to the server — `outbox`
 entries are re-validated server-side per field) so TypeScript interfaces in

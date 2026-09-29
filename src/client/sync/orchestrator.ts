@@ -91,6 +91,8 @@ import {
   snapshotValue,
 } from './syncLog.ts';
 
+import { focusedSyncLogValues, syncEntityName } from './syncLogPresentation.ts';
+
 const ALL_ENTITY_CLASSES: readonly EntityClass[] = SYNCED_ENTITY_CLASSES;
 
 interface ServerRowOptions {
@@ -234,29 +236,30 @@ function pullLogEntry(
     entityId: change.entityId,
     parentId,
     command: change.command,
+    entityName: syncEntityName(characterRow),
     details: { revision: change.revision, appliedFields: changedFields },
   };
 
   if (!before && after) {
-    entry.newValue = snapshotValue(after);
+    entry.newValue = after;
   } else if (before && !after) {
-    entry.previousValue = snapshotValue(before);
+    entry.previousValue = before;
   } else if (before && after && changedFields.length === 1) {
     const field = changedFields[0];
     if (field !== undefined) {
       entry.fieldPath = field;
-      entry.previousValue = snapshotValue(before[field]);
-      entry.newValue = snapshotValue(after[field]);
+      entry.previousValue = before[field];
+      entry.newValue = after[field];
     }
   } else if (before && after && changedFields.length > 1) {
-    entry.previousValue = snapshotValue(
-      Object.fromEntries(changedFields.map((field) => [field, before[field]])),
-    );
-    entry.newValue = snapshotValue(
-      Object.fromEntries(changedFields.map((field) => [field, after[field]])),
-    );
+    entry.previousValue = Object.fromEntries(changedFields.map((field) => [field, before[field]]));
+    entry.newValue = Object.fromEntries(changedFields.map((field) => [field, after[field]]));
   }
 
+  const focused = focusedSyncLogValues(entry);
+  // Focus the full values before applying the diagnostic snapshot cap.
+  entry.previousValue = snapshotValue(focused.previousValue);
+  entry.newValue = snapshotValue(focused.newValue);
   return entry;
 }
 
@@ -709,6 +712,7 @@ class SyncOrchestrator {
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
+        batchId: op.batchId,
         reason: preservedNewerEdit
           ? `Failed attempt discarded by user after ${op.attemptCount} attempts; a newer local edit was kept${
               op.serverReason ? ` — ${op.serverReason}` : ''
@@ -721,7 +725,11 @@ class SyncOrchestrator {
         // on the superseding-edit path it keeps the user's newer value
         // instead -- claiming it went back to the old server value would
         // contradict what the field visibly shows.
-        previousValue: snapshotValue(op.attemptedValue),
+        previousValue: preservedNewerEdit
+          ? snapshotValue(restoredValue)
+          : op.command === 'delete'
+            ? undefined
+            : snapshotValue(op.attemptedValue),
         newValue: snapshotValue(restoredValue),
       });
       if (op.fieldPath) {
@@ -942,6 +950,7 @@ class SyncOrchestrator {
         if (!this.sessionIsCurrent(generation)) return;
         outcomes = res.outcomes ?? [];
       } catch (err) {
+        if (!this.sessionIsCurrent(generation)) return;
         if (isClientOutdatedError(err)) {
           // The server refused the whole batch before reading it: nothing
           // was delivered, so restore each claim exactly (no attempt, no
@@ -955,6 +964,7 @@ class SyncOrchestrator {
         // Network or server error covering the whole batch.  Revert
         // status so the loop retries with backoff.
         for (const op of ops) {
+          if (!this.sessionIsCurrent(generation)) return;
           const next = op.attemptCount + 1;
           await setOutboxStatus(op.clientOpId, 'transient_retry', {
             attemptCount: next,
@@ -964,7 +974,30 @@ class SyncOrchestrator {
             lastError: errorDetails(err),
           });
         }
+        if (!this.sessionIsCurrent(generation)) return;
         this.markCycleFailed();
+        await appendSyncLogEntries(
+          ops
+            .filter((op) => op.status !== 'transient_retry')
+            .map((op) => ({
+              direction: 'push',
+              result: 'retrying',
+              entityClass: op.entityClass,
+              entityId: op.entityId,
+              parentId: op.parentId,
+              command: op.command,
+              fieldPath: op.fieldPath,
+              humanName: op.humanName,
+              batchId: op.batchId,
+              request: operationRequest(op),
+              reason: failureReason(err, 'Upload will retry'),
+              details: snapshotValue({
+                error: errorDetails(err),
+                attemptCount: op.attemptCount + 1,
+              }),
+            })),
+        );
+        if (!this.sessionIsCurrent(generation)) return;
         await reportCycleFailure(err, 'Uploading changes failed', 'push', {
           operationCount: ops.length,
         });
@@ -1018,6 +1051,8 @@ class SyncOrchestrator {
             command: op.command,
             fieldPath: op.fieldPath,
             humanName: op.humanName,
+            batchId: op.batchId,
+            request: operationRequest(op),
             details: snapshotValue({
               serverReason: 'no outcome returned',
               attemptCount: next,
@@ -1097,6 +1132,8 @@ class SyncOrchestrator {
                   command: op.command,
                   fieldPath: fieldPath,
                   humanName: op.humanName,
+                  batchId: op.batchId,
+                  request: operationRequest(op),
                   details: { serverReason: outcome.reason, newRevision },
                 });
                 // Guard 2: no newer pending op for this field already queued.
@@ -1172,6 +1209,8 @@ class SyncOrchestrator {
               command: op.command,
               fieldPath: op.fieldPath,
               humanName: op.humanName,
+              batchId: op.batchId,
+              request: operationRequest(op),
               details: { serverReason: outcome.reason, attemptCount: op.attemptCount + 1 },
             });
           }
@@ -1205,7 +1244,26 @@ class SyncOrchestrator {
   ): Promise<void> {
     if (run.length === 0) return;
     const db = getLocalDb();
+    const generation = this.sessionGeneration;
+    const names = new Map(
+      await Promise.all(
+        run.map(
+          async ({ op }) =>
+            [
+              op.clientOpId,
+              (op.fieldPath === 'name' && typeof op.attemptedValue === 'string'
+                ? op.attemptedValue.slice(0, 200)
+                : undefined) ??
+                syncEntityName(asRow(op.attemptedValue)) ??
+                syncEntityName(await this.readLocalEntity(op.entityClass, op.entityId)) ??
+                syncEntityName(asRow(op.prevValue)),
+            ] as const,
+        ),
+      ),
+    );
+    if (!this.sessionIsCurrent(generation)) return;
     await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      if (!this.sessionIsCurrent(generation)) return;
       for (const { op, outcome } of run) {
         if (op.localMediaUploadId) await db.mediaUploads.delete(op.localMediaUploadId);
         if (op.fieldPath === 'portraitAssetId' || op.fieldPath === 'coverAssetId')
@@ -1223,6 +1281,7 @@ class SyncOrchestrator {
       }
       await db.outbox.bulkDelete(run.map(({ op }) => op.clientOpId));
     });
+    if (!this.sessionIsCurrent(generation)) return;
     await appendSyncLogEntries(
       run.map(({ op, outcome }) => ({
         direction: 'push' as const,
@@ -1233,8 +1292,11 @@ class SyncOrchestrator {
         command: op.command,
         fieldPath: op.fieldPath,
         humanName: op.humanName,
-        previousValue: snapshotValue(op.prevValue),
-        newValue: snapshotValue(op.attemptedValue),
+        batchId: op.batchId,
+        request: operationRequest(op),
+        entityName: names.get(op.clientOpId),
+        previousValue: snapshotValue(focusedOperation(op).previousValue),
+        newValue: snapshotValue(focusedOperation(op).newValue),
         details: snapshotValue(outcome),
       })),
     );
@@ -1424,6 +1486,8 @@ class SyncOrchestrator {
         parentId: op.parentId,
         command: op.command,
         humanName: op.humanName,
+        batchId: op.batchId,
+        request: operationRequest(op),
         details: { serverReason: outcome.reason, newRevision },
       });
       const newer = await db.outbox
@@ -1504,6 +1568,8 @@ class SyncOrchestrator {
       command: op.command,
       fieldPath: op.fieldPath,
       humanName: op.humanName,
+      batchId: op.batchId,
+      request: operationRequest(op),
       reason: outcome.reason ?? 'sync rejected',
       // Before/after describe the LOCAL ROW's movement, and a rollback
       // moves it the other way: away from the value the server refused,
@@ -1591,6 +1657,8 @@ class SyncOrchestrator {
       fieldPath: op.fieldPath,
       parentId: op.parentId,
       humanName: op.humanName,
+      batchId: op.batchId,
+      request: operationRequest(op),
       reason: rec.reason,
       ...(preserved
         ? {
@@ -2445,6 +2513,31 @@ class SyncOrchestrator {
   }
 }
 
+function asRow(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function focusedOperation(op: OutboxEntry) {
+  return focusedSyncLogValues({
+    entityClass: op.entityClass,
+    command: op.command,
+    fieldPath: op.fieldPath,
+    previousValue: op.prevValue,
+    newValue: op.command === 'delete' ? undefined : op.attemptedValue,
+  });
+}
+
+/** One submitted operation from its batch, without copying unrelated entity data. */
+function operationRequest(op: OutboxEntry): unknown {
+  return {
+    method: 'POST',
+    path: '/api/v1/sync/operations',
+    operation: snapshotValue(toEnvelope(op), 12_000),
+  };
+}
+
 function toEnvelope(op: OutboxEntry): OperationEnvelope {
   return {
     clientOpId: op.clientOpId,
@@ -2474,11 +2567,13 @@ function rollbackSnapshot(
   outcome: OperationOutcome,
 ): { previousValue: unknown; newValue: unknown } {
   let restored = op.prevValue;
-  if (outcome.latestEntity && typeof outcome.latestEntity === 'object' && op.fieldPath) {
-    restored = (outcome.latestEntity as Record<string, unknown>)[op.fieldPath];
+  if (outcome.latestEntity && typeof outcome.latestEntity === 'object') {
+    restored = op.fieldPath
+      ? (outcome.latestEntity as Record<string, unknown>)[op.fieldPath]
+      : outcome.latestEntity;
   }
   return {
-    previousValue: snapshotValue(op.attemptedValue),
+    previousValue: op.command === 'delete' ? undefined : snapshotValue(op.attemptedValue),
     newValue: snapshotValue(restored),
   };
 }

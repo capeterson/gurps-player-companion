@@ -163,7 +163,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to before/after values, metadata, and folded Request/Response payloads. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to focused before/after values, metadata, and adjacent folded Request/Response payloads. Subject names link to existing local entities using supported sheet anchors or library section/open routes. The dialog shows independent WebSocket status, relative last-connected time when disconnected, and the last successful transferred operation. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -502,17 +502,80 @@ changed* instead of just "character inventory patch". Legacy pull entries lack
 the `appliedFields` marker and are labeled as values not recorded by the app
 version that downloaded them; their old values cannot be reconstructed.
 
-The sync-log view combines a successful push with subsequent cursor echoes
-that changed no local data fields, matching the exact entity class, entity id,
-and acknowledged revision. The change remains one expandable item with its
-before/after values. **Request** folds the recorded operation fields and value
-(reconstructed from the bounded journal snapshot, rather than a complete wire
-envelope); **Response** folds the server acknowledgement and associated cursor
-revision metadata. Both folds start closed. Downloads with data changes,
-different revisions/entities, or legacy entries without an `appliedFields`
-marker remain separate items. This grouping only affects presentation: the
-journal and downloaded debug dump retain the individual records. Request and
-Response payloads both obey the existing access gate.
+The sync-log view combines a successful outbox push with revision-only cursor
+acknowledgements, matching the exact entity class, entity id, and acknowledged
+revision. Outbox acknowledgements must occur after the push. Browser REST campaign
+saves can receive their cursor echo before the REST promise settles, and can change
+local data when the response has not yet been mirrored: these exact-revision echoes
+also fold into the upload. Their changed-field names remain visible as **Local
+refresh**, and Response retains their before/after snapshots. Unrelated revisions,
+entities, and legacy pulls without an `appliedFields` marker remain separate. Grouping
+changes presentation only; the journal/debug export retain individual events.
+
+Rapid HP/FP steps and slider updates share an explicit burst `batchId` within
+that control's trailing 200 ms debounce window, assigned at interaction time
+before any asynchronous local write. Every pool surface uses `usePoolBumpers`,
+including encounter player controls. Different controls/fields, reset/Max,
+Apply damage, and account sessions close or separate bursts. Existing safe
+pending coalescing still preserves the original value and sends the latest value.
+When a burst spans multiple actual uploads, the sync view folds only successful
+numeric patches with matching batch/entity/field and a continuous value chain
+into one first-before/latest-after change. Each original Request and Response
+remains in its corresponding folding section. Failures, remote changes, and
+value discontinuities break groups; old events without burst IDs remain separate.
+Draft-only steppers already save once on Apply; autocomplete/search debounces
+are reads. No time-only grouping or new write path is introduced.
+
+Each current subject title includes its captured name and links to the actual local
+entity when it still exists and access permits. Character traits, skills, spells,
+and inventory use their supported sheet anchors; languages, techniques, and combat
+link to the parent sheet. All eleven library categories use the library's
+`?section=&open=` routes. Deleted subjects remain readable without dead links.
+Names are captured before truncation/compression, and are scrubbed with the values
+when character/campaign access is revoked. Reserved protocol classes are explicitly
+mapped but do not imply additional outbox coverage.
+
+Before/after focuses on changed fields, including changed keys within JSON objects
+such as house rules; arrays remain atomic values. Forward whole-entry patches do
+not claim omitted top-level fields were deleted. Rejection/local-revert snapshots
+continue to describe the local row's actual movement. Bookkeeping and unchanged
+values do not clutter the diff. Request and Response preserve independent bounded
+submitted/returned diagnostics rather than rebuilding them from focused values.
+
+**Request**, immediately left of **Response**, records the exact submitted operation
+from an outbox batch (including its original base revision, client operation id and
+batch id) or an online campaign request's method/path/body, without credentials.
+Submitted bodies/operations retain up to 12,000 characters with explicit truncation
+markers; normal before/after and response snapshots keep the existing 2,000-character
+limits. Earlier successful uploads retain the legacy reconstructed operation fold
+with an explicit note that the original request was not retained. Standalone pulls
+have Response only. Rejected/retried uploads retain their actual Request independently
+of rollback values. Both folds start closed, wrap/scroll within dynamic viewport
+bounds, and honor access gates before loading compressed bodies or exporting.
+
+Browser campaign creation, settings PATCH, ownership transfer and deletion now journal
+their online requests as uploads without changing their REST-only data path. YAML
+import records one aggregate upload with its submitted options and result; cursor
+changes remain individual downloads because the import result has no per-row revision
+acknowledgements. External API/MCP edits appear as downloads on this device; it cannot
+recover their original requests or fabricate missing historical settings uploads.
+Diagnostic failures never turn a successful server save into a reported save failure,
+and delayed responses are fenced against logout/account changes.
+
+The connection summary observes the existing WebSocket subscriber independently of
+HTTP sync: Connecting, Connected, Disconnected/Reconnecting, Offline, or Not connected.
+A silent WebSocket upgrade times out after 10 seconds and enters the existing
+reconnect backoff/cooldown; late events from that socket cannot alter the newer
+connection or its timestamp. A failed socket does not make working HTTP sync fail.
+Last connected is the last
+successful socket-open time, persisted under an account-scoped `syncMeta` key and
+shown relatively when disconnected; an unknown time says **Not yet connected**.
+The last successful sync time means an applied upload or downloaded data change,
+including aggregate online campaign/import writes. Empty cursor polls, revision-only
+echoes, retries, rollbacks, and failed cycles do not advance it. Its monotonic
+account-scoped metadata survives journal pruning; logout/resync purges both timestamp
+keys with all local stores. Relative times refresh every 30 seconds while the dialog
+is open and retain exact timestamps on the corresponding `time` elements.
 
 **Compressed diagnostic bodies.**
 

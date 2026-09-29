@@ -24,11 +24,12 @@ async function readJournal(page: Page): Promise<SyncLogEntry[]> {
 test('a synced edit and its revision response share one item with Request and Response folds', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   // Local debugging can reuse this test's own account between runs.
   const existingEmail = process.env.SYNC_LOG_E2E_EMAIL;
   await page.goto(existingEmail ? '/login' : '/register');
+  await expect(page.getByLabel(/email/i)).toBeVisible({ timeout: 15_000 });
   await page.getByLabel(/email/i).fill(existingEmail ?? `sync-log-${Date.now()}@example.com`);
   if (!existingEmail) await page.getByLabel(/display name/i).fill('Sync log QA');
   await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
@@ -38,6 +39,7 @@ test('a synced edit and its revision response share one item with Request and Re
   await page.getByLabel(/new character name/i).fill('Sync response hero');
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
+  const characterDestination = new URL(page.url()).pathname;
   const saved = () =>
     page.getByLabel('All changes saved', { exact: true }).filter({ visible: true });
   await expect(saved()).toBeVisible({ timeout: 15_000 });
@@ -65,7 +67,7 @@ test('a synced edit and its revision response share one item with Request and Re
     })
     .toBe(true);
   if (!push?.humanName) throw new Error('Expected the recorded ST change to have a title');
-  const title = push.humanName;
+  const title = 'Character: Sync response hero · ST';
   const revision = (push.details as { newRevision: number }).newRevision;
 
   // One registration/page covers the narrow screen and the footer breakpoint.
@@ -82,7 +84,7 @@ test('a synced edit and its revision response share one item with Request and Re
       .locator(':scope > div > details')
       .filter({ has: page.getByText(title, { exact: true }) });
     await expect(change).toHaveCount(1);
-    await change.locator(':scope > summary').click();
+    await change.locator(':scope > summary').click({ position: { x: 8, y: 12 } });
     await expect(change.getByText('Before', { exact: true })).toBeVisible();
     await expect(change.getByText('10', { exact: true })).toBeVisible();
     await expect(change.getByText('After', { exact: true })).toBeVisible();
@@ -165,10 +167,13 @@ test('a synced edit and its revision response share one item with Request and Re
   const dialog = page
     .getByRole('dialog')
     .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
-  const titleElement = dialog.getByText(compressed.humanName ?? 'description', { exact: true });
+  const titleElement = dialog.getByRole('link', {
+    name: 'Character: Sync response hero · Description',
+    exact: true,
+  });
   const change = titleElement.locator('xpath=ancestor::details[1]');
   await expect(change.getByText('After', { exact: true })).toHaveCount(0);
-  await titleElement.click();
+  await change.locator(':scope > summary').click({ position: { x: 8, y: 12 } });
   await expect(change.getByText(notes, { exact: true })).toBeVisible();
   const request = change
     .locator('details')
@@ -193,4 +198,153 @@ test('a synced edit and its revision response share one item with Request and Re
   const dump = JSON.parse(json) as { syncLog: SyncLogEntry[] };
   expect(dump.syncLog.find(({ id }) => id === compressed?.id)?.newValue).toBe(notes);
   expect(json).not.toContain('payloadStored');
+  await dialog.getByRole('button', { name: 'Close sync log' }).click();
+
+  const hpControl = page.getByRole('button', { name: /^Adjust HP,/ });
+  const hpLabel = await hpControl.getAttribute('aria-label');
+  const hpBeforeMatch = hpLabel?.match(/current (\d+(?:\.\d+)?) of/i);
+  if (!hpBeforeMatch) throw new Error('Expected the HP control to expose its current value');
+  const hpBefore = Number(hpBeforeMatch[1]);
+  await hpControl.click();
+  const hpAdjustment = page.getByLabel('HP adjustment');
+  await expect(hpAdjustment).toBeVisible();
+  const decreaseHp = hpAdjustment.getByRole('button', { name: 'Decrease HP by 1' });
+  await decreaseHp.click();
+  await decreaseHp.click();
+  await expect(saved()).toBeVisible({ timeout: 15_000 });
+  await saved().click();
+  const hpDialog = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
+  const hpTitle = hpDialog.getByRole('link', { name: 'HP', exact: true });
+  await expect(hpTitle).toHaveAttribute('href', characterDestination);
+  const hpChange = hpTitle.locator('xpath=ancestor::details[1]');
+  await expect(hpChange.locator(':scope > summary')).toContainText('Pushed');
+  await hpChange.locator(':scope > summary').click({ position: { x: 8, y: 12 } });
+  await expect(hpChange.getByText('Before', { exact: true })).toBeVisible();
+  await expect(hpChange.getByText(String(hpBefore), { exact: true })).toBeVisible();
+  await expect(hpChange.getByText('After', { exact: true })).toBeVisible();
+  await expect(hpChange.getByText(String(hpBefore - 2), { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('sync-log-hp-burst.png'),
+    animations: 'disabled',
+  });
+  await hpDialog.getByRole('button', { name: 'Close sync log' }).click();
+
+  // The same browser/account checks the online-only settings save and a long title.
+  await page.goto('/campaigns');
+  await page.getByRole('button', { name: '+ New campaign', exact: true }).click();
+  const campaignName = `Lantern Coast ${'x'.repeat(104)}`;
+  await page.getByRole('textbox', { name: 'Campaign name', exact: true }).fill(campaignName);
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  const campaignLink = page.getByRole('link', { name: campaignName, exact: true });
+  await expect(campaignLink).toBeVisible();
+  const destination = await campaignLink.getAttribute('href');
+  if (!destination) throw new Error('Expected campaign destination');
+  await campaignLink.click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('combobox', { name: 'Skill prerequisites' }) });
+  await settings.getByRole('combobox', { name: 'Skill prerequisites' }).selectOption('warn');
+  await settings.getByRole('button', { name: /^Save/ }).click();
+  await expect(settings).toBeHidden();
+  await expect
+    .poll(async () =>
+      (await readJournal(page)).some(
+        (entry) => entry.source === 'Campaign settings' && entry.direction === 'push',
+      ),
+    )
+    .toBe(true);
+  for (const width of [320, 390, 639, 640, 641, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await saved().click();
+    const logDialog = page
+      .getByRole('dialog')
+      .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
+    await expect(logDialog.getByText('WebSocket', { exact: true })).toBeVisible();
+    await expect(logDialog.getByText('Connected', { exact: true })).toBeVisible();
+    await expect(logDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
+    const settingsTitle = logDialog.getByRole('link', {
+      name: `Campaign: ${campaignName} · campaign rules updated`,
+      exact: true,
+    });
+    await expect(settingsTitle).toHaveAttribute('href', destination);
+    const settingsChange = settingsTitle.locator('xpath=ancestor::details[1]');
+    await expect(settingsChange.locator(':scope > summary')).toContainText('Pushed');
+    await settingsChange.locator(':scope > summary').click({ position: { x: 8, y: 12 } });
+    await expect(settingsChange.getByText('Before', { exact: true })).toBeVisible();
+    await expect(settingsChange.getByText('After', { exact: true })).toBeVisible();
+    await expect(
+      settingsChange.getByText('Skill prerequisite policy', { exact: true }),
+    ).toBeVisible();
+    await expect(settingsChange).toContainText('"block"');
+    await expect(settingsChange).toContainText('"warn"');
+    await expect(settingsChange).not.toContainText('protectNaturalDr');
+    const settingsRequest = settingsChange
+      .locator('details')
+      .filter({ has: page.getByText('Request', { exact: true }) });
+    const settingsResponse = settingsChange
+      .locator('details')
+      .filter({ has: page.getByText('Response', { exact: true }) });
+    const requestSummaryBox = await settingsRequest.locator('summary').boundingBox();
+    const responseSummaryBox = await settingsResponse.locator('summary').boundingBox();
+    expect(
+      requestSummaryBox && responseSummaryBox && requestSummaryBox.x < responseSummaryBox.x,
+    ).toBe(true);
+    await settingsRequest.locator('summary').click();
+    await expect(settingsRequest.locator('pre')).toContainText('"method": "PATCH"');
+    await expect(settingsRequest.locator('pre')).toContainText('"skillPrerequisitePolicy": "warn"');
+    await settingsResponse.locator('summary').click();
+    await expect(settingsResponse.locator('pre')).toContainText('"newRevision"');
+    for (const locator of [
+      logDialog.locator('.modal-box'),
+      settingsTitle,
+      settingsRequest.locator('pre'),
+      settingsResponse.locator('pre'),
+    ]) {
+      await locator.scrollIntoViewIfNeeded();
+      const box = await locator.boundingBox();
+      expect(box).not.toBeNull();
+      if (!box) throw new Error('Expected visible settings sync details');
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(900);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`sync-log-settings-${width}.png`) });
+    await logDialog.getByRole('button', { name: 'Close sync log' }).click();
+  }
+  await saved().click();
+  const linkedDialog = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
+  await linkedDialog
+    .getByRole('link', { name: `Campaign: ${campaignName} · campaign rules updated` })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${destination}$`));
+  await expect(linkedDialog).toBeHidden();
+
+  // Block the real socket on a reload while HTTP remains usable.
+  await page.routeWebSocket('**/api/v1/sync/ws**', (socket) => socket.close());
+  await page.reload();
+  await expect(saved()).toBeVisible({ timeout: 15_000 });
+  await saved().click();
+  const disconnectedDialog = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
+  await expect(
+    disconnectedDialog.getByText('Disconnected · Reconnecting', { exact: true }),
+  ).toBeVisible();
+  await expect(disconnectedDialog.getByText(/Last connected/)).toBeVisible();
+  await expect(
+    disconnectedDialog.getByText('HTTP sync continues while WebSocket reconnects.', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(disconnectedDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('sync-log-websocket-disconnected.png'),
+    animations: 'disabled',
+  });
 });

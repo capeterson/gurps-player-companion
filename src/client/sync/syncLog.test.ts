@@ -11,6 +11,7 @@ import {
   appendSyncLog,
   appendSyncLogEntries,
   flushSyncLogPrune,
+  lastSuccessfulSyncKey,
   markRejectionDismissed,
   pruneRejectionToasts,
   readRevokedCampaigns,
@@ -325,4 +326,21 @@ describe('appendSyncLogEntries', () => {
       vi.useRealTimers();
     }
   });
+});
+
+it('keeps the last successful operation through journal pruning without advancing for empty pulls or failures', async () => {
+  const db = getLocalDb();
+  const at = '2026-09-29T12:00:00Z';
+  await appendSyncLog({ direction: 'push', result: 'synced', occurredAt: at });
+  await appendSyncLog({
+    direction: 'pull',
+    result: 'synced',
+    occurredAt: '2026-09-29T12:01:00Z',
+    details: { revision: 42, appliedFields: [] },
+  });
+  await appendSyncLog({ direction: 'push', result: 'failed', occurredAt: '2026-09-29T12:02:00Z' });
+  await db.syncLog.clear();
+  expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toBe(at);
+  await appendSyncLog({ direction: 'push', result: 'synced', occurredAt: '2026-09-29T11:00:00Z' });
+  expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toBe(at);
 });

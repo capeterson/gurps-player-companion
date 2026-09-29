@@ -36,6 +36,7 @@ import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
 import { readActiveUser } from '../../sync/activeUser.ts';
+import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { librarySearchWords } from './librarySearch.ts';
 import { ActiveEffectsSection } from './sections/ActiveEffectsSection.tsx';
@@ -197,14 +198,31 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       mode: 'merge' | 'replace';
       applyCampaignSettings: boolean;
     }) =>
-      api<ImportResult>(`/campaigns/${snap.campaignId}/library/import`, {
-        method: 'POST',
-        body: {
-          yaml: snap.yaml,
-          mode: snap.mode,
-          applyCampaignSettings: snap.applyCampaignSettings,
+      journalCampaignMutation(
+        {
+          entityId: snap.campaignId,
+          command: 'patch',
+          method: 'POST',
+          path: `/campaigns/${snap.campaignId}/library/import`,
+          body: {
+            yaml: snap.yaml,
+            mode: snap.mode,
+            applyCampaignSettings: snap.applyCampaignSettings,
+          },
+          source: 'Library import',
+          humanName: 'library imported',
+          before: { name: campaigns?.find((c) => c.id === snap.campaignId)?.name },
         },
-      }),
+        () =>
+          api<ImportResult>(`/campaigns/${snap.campaignId}/library/import`, {
+            method: 'POST',
+            body: {
+              yaml: snap.yaml,
+              mode: snap.mode,
+              applyCampaignSettings: snap.applyCampaignSettings,
+            },
+          }),
+      ),
     onSuccess: (result) => {
       setPendingImport(null);
       setImportError(null);

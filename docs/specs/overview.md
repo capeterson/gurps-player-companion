@@ -990,8 +990,17 @@ there is no decorative cover slot or implied image-upload feature.
   show what actually changed — field, before/after values, entity, operation,
   and the failure reason where there is one. Successful changes and their
   matching revision-only cursor acknowledgements share one item, with folded
-  **Request** and **Response** sections; downloads that change data remain
-  separate. Larger diagnostic payloads use device-local gzip storage and load
+  **Request** and **Response** sections beside one another. Browser campaign saves
+  also retain their submitted request and matching cursor refresh; standalone pulls
+  have Response only. Rapid HP/FP adjustments share explicit debounce-burst IDs;
+  continuous successful uploads show one net change while retaining every raw
+  request/response. Resets, damage applications, failures, and remote changes
+  remain separate. Subject titles show names and link to existing entities;
+  before/after focuses on changed fields and nested settings. Campaign creation,
+  settings, ownership changes, deletion, and aggregate YAML imports journal their
+  online-only writes. WebSocket status and relative last-connection/last-successful
+  operation times remain independent of HTTP sync; empty polls do not reset the
+  successful-operation time. Larger diagnostic payloads use device-local gzip storage and load
   when a change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
 - **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
@@ -1175,6 +1184,9 @@ src/
                  into the portaled Current Status row
     sync/        orchestrator, outbox, libraryDependencies, patchKeys,
                  syncLog/syncLogPayload (bounded journal and lazy gzip bodies),
+                 syncLogPresentation (subject routes/names and focused diffs),
+                 onlineMutationLog (explicit online campaign/import diagnostics),
+                 gestureBatch (explicit IDs for rapid pool-control bursts),
                  state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts and syncEntityStore.ts — IndexedDB stores and shared

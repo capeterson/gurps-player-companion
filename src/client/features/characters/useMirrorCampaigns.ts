@@ -57,6 +57,7 @@ export function useMirrorCampaigns(campaigns: CampaignOut[] | undefined): void {
             enforceAttributeCaps: c.enforceAttributeCaps,
             shareCharacterSheets: c.shareCharacterSheets,
             allowGmCharacterEditing: c.allowGmCharacterEditing,
+            skillPrerequisitePolicy: c.skillPrerequisitePolicy ?? 'block',
             experimentalTurnTracker: c.experimentalTurnTracker,
             ...(c.ownerId === viewerId
               ? { viewerRole: 'owner' as const }

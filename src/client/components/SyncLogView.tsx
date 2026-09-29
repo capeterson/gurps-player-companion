@@ -1,7 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useState } from 'react';
+import type { EntityClass } from '../../shared/schemas/sync.ts';
 import type { OutboxEntry, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { syncEntityTable } from '../db/syncEntityStore.ts';
 import { useDialogState } from '../hooks/useDialogState.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
@@ -14,9 +16,21 @@ import {
 } from '../sync/minimalViewSweep.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
-import { readRevokedCampaigns, readRevokedCharacters } from '../sync/syncLog.ts';
+import {
+  isSuccessfulSyncOperation,
+  lastSuccessfulSyncKey,
+  readRevokedCampaigns,
+  readRevokedCharacters,
+} from '../sync/syncLog.ts';
 import { loadSyncLogEntry } from '../sync/syncLogPayload.ts';
+import {
+  focusedSyncLogValues,
+  syncFieldLabel,
+  syncLogEntityLink,
+  syncLogTitle,
+} from '../sync/syncLogPresentation.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
+import { useSyncWsStatus } from '../sync/useSyncWsStatus.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
 interface SyncLogViewProps {
@@ -30,6 +44,18 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   const ref = useDialogState(open);
   const toasts = useToasts();
   const status = useSyncStatus();
+  const websocket = useSyncWsStatus();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!open) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, [open]);
+  const lastSuccess = useLiveQuery(async () => {
+    const value = (await getLocalDb().syncMeta.get(lastSuccessfulSyncKey()))?.value;
+    return typeof value === 'string' ? value : undefined;
+  }, []);
   const outbox = useLiveQuery(
     () => getLocalDb().outbox.orderBy('enqueuedAt').reverse().toArray(),
     [],
@@ -38,6 +64,34 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     () => getLocalDb().syncLog.orderBy('occurredAt').reverse().limit(1_000).toArray(),
     [],
   );
+  // Bulk-read each class once. Never decompress journal bodies to render titles.
+  const entities = useLiveQuery(async () => {
+    const groups = new Map<EntityClass, Set<string>>();
+    for (const record of [...(log ?? []), ...(outbox ?? [])]) {
+      if (!record.entityClass || !record.entityId) continue;
+      const ids = groups.get(record.entityClass) ?? new Set<string>();
+      ids.add(record.entityId);
+      groups.set(record.entityClass, ids);
+    }
+    const result = new Map<string, Record<string, unknown>>();
+    await Promise.all(
+      [...groups].map(async ([entityClass, idSet]) => {
+        const ids = [...idSet];
+        const rows = await syncEntityTable(entityClass)?.bulkGet(ids);
+        rows?.forEach((row, index) => {
+          if (row) result.set(`${entityClass}:${ids[index]}`, row);
+        });
+      }),
+    );
+    return result;
+  }, [log, outbox]);
+  const currentEntity = (record: {
+    entityClass?: string | undefined;
+    entityId?: string | undefined;
+  }) => entities?.get(`${record.entityClass}:${record.entityId}`);
+  const lastOperation = [lastSuccess, (log ?? []).find(isSuccessfulSyncOperation)?.occurredAt]
+    .filter((at): at is string => typeof at === 'string' && Number.isFinite(Date.parse(at)))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
   // The outbox is deliberately NOT swept when access is downgraded --
   // a queued op is the user's own unsent intent and still has to be
   // delivered. But its `prevValue` can hold another player's private
@@ -67,7 +121,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
 
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
   const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
-  const recentChanges = combineAcknowledgements(log ?? []);
+  const recentChanges = combineBursts(combineAcknowledgements(log ?? []));
   const campaignHolds = (outbox ?? []).filter((op) => op.localCampaignDependencyUnknown);
   const confirmCampaignOrder = async (op: OutboxEntry, wait: boolean) => {
     try {
@@ -159,7 +213,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           onClose();
         }}
       >
-        <div className="modal-box flex max-h-[88vh] max-w-4xl flex-col border border-base-300 bg-base-100 p-0">
+        <div className="modal-box flex max-h-[88dvh] max-w-[min(56rem,calc(100dvw-2rem))] flex-col border border-base-300 bg-base-100 p-0">
           <header className="flex items-start justify-between border-b border-base-300 px-5 py-4">
             <div>
               <h2 className="font-display text-xl font-semibold">Sync log</h2>
@@ -178,6 +232,47 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           </header>
 
           <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-4">
+            <section
+              aria-label="Connection status"
+              className="grid gap-4 border-b border-base-300 pb-4 sm:grid-cols-2"
+            >
+              <div>
+                <p className="text-xs text-base-content/60">WebSocket</p>
+                <p className="mt-1 flex items-center gap-2 font-medium">
+                  <span
+                    aria-hidden="true"
+                    className={`status status-sm ${online && websocket.state === 'connected' ? 'status-success' : 'status-warning'}`}
+                  />
+                  {online ? wsLabel(websocket.state) : 'Offline'}
+                </p>
+                {(!online || websocket.state !== 'connected') && (
+                  <p className="mt-1 text-xs text-base-content/60">
+                    {websocket.lastConnectedAt ? (
+                      <>
+                        Last connected <RelativeTime at={websocket.lastConnectedAt} now={now} />
+                      </>
+                    ) : (
+                      'Not yet connected'
+                    )}
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-base-content/60">Last successful sync</p>
+                <p className="mt-1 font-medium">
+                  {lastOperation ? (
+                    <RelativeTime at={lastOperation} now={now} />
+                  ) : (
+                    'No successful sync recorded'
+                  )}
+                </p>
+                {online && websocket.state !== 'connected' && (
+                  <p className="mt-1 text-xs text-base-content/60">
+                    HTTP sync continues while WebSocket reconnects.
+                  </p>
+                )}
+              </div>
+            </section>
             {campaignHolds.length > 0 && (
               <section aria-label="Confirm campaign order">
                 <h3 className="font-semibold text-warning">Confirm an older unsaved addition</h3>
@@ -188,7 +283,19 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 </p>
                 {campaignHolds.map((op) => (
                   <article key={op.clientOpId} className="mt-3 space-y-2">
-                    <p>{changeName(op, isOutboxAccessRestricted(op, access))}</p>
+                    <p>
+                      {!isOutboxAccessRestricted(op, access) &&
+                      syncLogEntityLink(op, currentEntity(op)) ? (
+                        <a
+                          className="link link-hover"
+                          href={syncLogEntityLink(op, currentEntity(op))}
+                        >
+                          {changeName(op, false, currentEntity(op))}
+                        </a>
+                      ) : (
+                        changeName(op, isOutboxAccessRestricted(op, access), currentEntity(op))
+                      )}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -244,7 +351,21 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-error">
-                            {changeName(op, isOutboxAccessRestricted(op, access))}
+                            {!isOutboxAccessRestricted(op, access) &&
+                            syncLogEntityLink(op, currentEntity(op)) ? (
+                              <a
+                                className="link link-hover"
+                                href={syncLogEntityLink(op, currentEntity(op))}
+                              >
+                                {changeName(op, false, currentEntity(op))}
+                              </a>
+                            ) : (
+                              changeName(
+                                op,
+                                isOutboxAccessRestricted(op, access),
+                                currentEntity(op),
+                              )
+                            )}
                           </p>
                           <p className="text-base-content/70">
                             Failed {op.attemptCount} times ·{' '}
@@ -276,7 +397,12 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               {pending.map((op) => (
                 <ChangeRow
                   key={op.clientOpId}
-                  title={changeName(op, isOutboxAccessRestricted(op, access))}
+                  title={changeName(op, isOutboxAccessRestricted(op, access), currentEntity(op))}
+                  href={
+                    !isOutboxAccessRestricted(op, access)
+                      ? syncLogEntityLink(op, currentEntity(op))
+                      : undefined
+                  }
                   meta={`${statusLabel(op)} · ${formatTime(op.enqueuedAt)}`}
                   details={
                     <PendingDetails op={op} hideValues={isOutboxAccessRestricted(op, access)} />
@@ -286,11 +412,20 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             </SyncSection>
 
             <SyncSection title="Recently synced" empty="No sync activity has been recorded yet.">
-              {recentChanges.map(({ entry, responses }) => (
+              {recentChanges.map(({ entry, responses, members }) => (
                 <ChangeRow
                   key={entry.id}
-                  title={logName(entry, isRecordAccessRestricted(entry, access))}
-                  meta={`${directionLabel(entry)} · ${formatTime(entry.occurredAt)}`}
+                  title={logName(
+                    entry,
+                    isRecordAccessRestricted(entry, access),
+                    currentEntity(entry),
+                  )}
+                  href={
+                    !isRecordAccessRestricted(entry, access)
+                      ? syncLogEntityLink(entry, currentEntity(entry))
+                      : undefined
+                  }
+                  meta={`${directionLabel(entry)} · ${relativeTime(entry.occurredAt, now)}`}
                   tone={
                     entry.result === 'failed' || entry.result === 'rolled_back' ? 'bad' : undefined
                   }
@@ -298,6 +433,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                     <LogDetails
                       entry={entry}
                       restricted={isRecordAccessRestricted(entry, access)}
+                      members={members.filter(
+                        (member) => !isRecordAccessRestricted(member, access),
+                      )}
                       responses={responses.filter(
                         (response) => !isRecordAccessRestricted(response, access),
                       )}
@@ -415,15 +553,32 @@ function SyncSection({
  */
 function ChangeRow({
   title,
+  href,
   meta,
   details,
   tone,
-}: { title: string; meta: string; details?: React.ReactNode; tone?: 'bad' | undefined }) {
+}: {
+  title: string;
+  href?: string | undefined;
+  meta: string;
+  details?: React.ReactNode;
+  tone?: 'bad' | undefined;
+}) {
   const [expanded, setExpanded] = useState(false);
   if (!details) {
     return (
       <div className="flex flex-wrap justify-between gap-2 p-3 text-sm">
-        <span className="font-medium">{title}</span>
+        {href ? (
+          <a
+            href={href}
+            className="link link-hover min-w-0 max-w-full wrap-anywhere font-medium text-primary"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {title}
+          </a>
+        ) : (
+          <span className="min-w-0 max-w-full wrap-anywhere font-medium">{title}</span>
+        )}
         <span className="text-base-content/60">{meta}</span>
       </div>
     );
@@ -437,7 +592,17 @@ function ChangeRow({
         >
           ›
         </span>
-        <span className="font-medium">{title}</span>
+        {href ? (
+          <a
+            href={href}
+            className="link link-hover min-w-0 max-w-full wrap-anywhere font-medium text-primary"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {title}
+          </a>
+        ) : (
+          <span className="min-w-0 max-w-full wrap-anywhere font-medium">{title}</span>
+        )}
         <span className={`ml-auto ${tone === 'bad' ? 'text-error' : 'text-base-content/60'}`}>
           {meta}
         </span>
@@ -490,12 +655,13 @@ function DetailList({ rows }: { rows: DetailRow[] }) {
 interface SyncLogItem {
   entry: SyncLogEntry;
   responses: SyncLogEntry[];
+  members: SyncLogEntry[];
 }
 
-/** Only fold a cursor echo with no data changes into its exact successful push. */
+/** Match exact entity+revision. REST refreshes can change local data; retain that diff. */
 function combineAcknowledgements(entries: SyncLogEntry[]): SyncLogItem[] {
   const pushes = new Map<string, SyncLogItem>();
-  const items = entries.map<SyncLogItem>((entry) => ({ entry, responses: [] }));
+  const items = entries.map<SyncLogItem>((entry) => ({ entry, responses: [], members: [entry] }));
   const responseKey = (entry: SyncLogEntry, revision: unknown) =>
     entry.entityClass && entry.entityId && typeof revision === 'number'
       ? JSON.stringify([entry.entityClass, entry.entityId, revision])
@@ -511,20 +677,74 @@ function combineAcknowledgements(entries: SyncLogEntry[]): SyncLogItem[] {
   return items.filter((item) => {
     const { entry } = item;
     const appliedFields = logMetadata(entry)?.appliedFields;
-    if (
-      entry.direction !== 'pull' ||
-      entry.result !== 'synced' ||
-      hasValueSnapshot(entry) ||
-      !Array.isArray(appliedFields) ||
-      appliedFields.length !== 0
-    )
+    if (entry.direction !== 'pull' || entry.result !== 'synced' || !Array.isArray(appliedFields))
       return true;
     const key = responseKey(entry, logMetadata(entry)?.revision);
     const push = key ? pushes.get(key) : undefined;
-    if (!push || Date.parse(push.entry.occurredAt) > Date.parse(entry.occurredAt)) return true;
+    if (
+      !push ||
+      (!push.entry.source &&
+        (hasValueSnapshot(entry) ||
+          appliedFields.length !== 0 ||
+          Date.parse(push.entry.occurredAt) > Date.parse(entry.occurredAt)))
+    )
+      return true;
     push.responses.push(entry);
     return false;
   });
+}
+
+/** Only explicitly identified, continuous successful numeric bursts collapse. */
+function combineBursts(items: SyncLogItem[]): SyncLogItem[] {
+  const active = new Map<string, SyncLogItem>();
+  const result: SyncLogItem[] = [];
+  const number = (entry: SyncLogEntry, side: 'previous' | 'new') => {
+    const value = side === 'previous' ? entry.previousValue : entry.newValue;
+    return typeof value === 'number'
+      ? value
+      : entry.payloadMetadata?.[side === 'previous' ? 'previousNumber' : 'newNumber'];
+  };
+  for (const item of items) {
+    const { entry } = item;
+    if (!entry.entityClass || !entry.entityId) active.clear();
+    else if (!entry.fieldPath) {
+      for (const [key, candidate] of active) {
+        if (
+          candidate.entry.entityClass === entry.entityClass &&
+          candidate.entry.entityId === entry.entityId
+        )
+          active.delete(key);
+      }
+    }
+    const scope = JSON.stringify([entry.entityClass, entry.entityId, entry.fieldPath]);
+    const previous = number(entry, 'previous');
+    const next = number(entry, 'new');
+    const eligible =
+      entry.batchId &&
+      entry.direction === 'push' &&
+      entry.result === 'synced' &&
+      entry.command === 'patch' &&
+      entry.fieldPath &&
+      !entry.redacted &&
+      typeof previous === 'number' &&
+      typeof next === 'number';
+    const newer = active.get(scope);
+    if (
+      eligible &&
+      newer &&
+      newer.entry.batchId === entry.batchId &&
+      number(newer.members[newer.members.length - 1] as SyncLogEntry, 'previous') === next
+    ) {
+      newer.members.push(...item.members);
+      newer.responses.push(...item.responses);
+      continue;
+    }
+    // A failure, download, different burst or discontinuity is a hard boundary.
+    active.delete(scope);
+    if (eligible) active.set(scope, item);
+    result.push(item);
+  }
+  return result;
 }
 
 function logMetadata(entry: SyncLogEntry): Record<string, unknown> | undefined {
@@ -537,24 +757,40 @@ function LogDetails({
   entry,
   restricted,
   responses,
-}: { entry: SyncLogEntry; restricted: boolean; responses: SyncLogEntry[] }) {
+  members,
+}: {
+  entry: SyncLogEntry;
+  restricted: boolean;
+  responses: SyncLogEntry[];
+  members: SyncLogEntry[];
+}) {
   const [loaded, setLoaded] = useState<{
     source: SyncLogEntry;
     entry?: SyncLogEntry;
+    members?: SyncLogEntry[];
     error?: string;
   }>();
   useEffect(() => {
-    if (restricted || !entry.payloadStored) return;
+    if (restricted || (!entry.payloadStored && members.length === 1)) return;
     let active = true;
-    void loadSyncLogEntry(entry).then(
-      (value) => active && setLoaded({ source: entry, entry: value }),
+    void Promise.all(members.map(loadSyncLogEntry)).then(
+      (values) =>
+        active &&
+        setLoaded({
+          source: entry,
+          entry: {
+            ...(values[0] as SyncLogEntry),
+            previousValue: values[values.length - 1]?.previousValue,
+          },
+          members: values,
+        }),
       (error) => active && setLoaded({ source: entry, error: errorMessage(error) }),
     );
     return () => {
       active = false;
     };
-  }, [entry, restricted]);
-  if (!restricted && entry.payloadStored) {
+  }, [entry, restricted, members]);
+  if (!restricted && (entry.payloadStored || members.length > 1)) {
     if (loaded?.source !== entry || !loaded.entry) {
       return (
         <output className="block text-xs text-base-content/60">
@@ -569,20 +805,42 @@ function LogDetails({
         entry={loaded.entry}
         restricted={loaded.entry.redacted === true}
         responses={responses}
+        members={loaded.members ?? [loaded.entry]}
       />
     );
   }
-  return <LogDetailsContent entry={entry} restricted={restricted} responses={responses} />;
+  return (
+    <LogDetailsContent
+      entry={entry}
+      restricted={restricted}
+      responses={responses}
+      members={members}
+    />
+  );
 }
 
 function LogDetailsContent({
   entry,
   restricted,
   responses,
-}: { entry: SyncLogEntry; restricted: boolean; responses: SyncLogEntry[] }) {
+  members,
+}: {
+  entry: SyncLogEntry;
+  restricted: boolean;
+  responses: SyncLogEntry[];
+  members: SyncLogEntry[];
+}) {
   const rows: DetailRow[] = [];
+  if (members.length > 1)
+    rows.push(
+      textRow(
+        'Changes',
+        `${members.length} rapid adjustments · net change ${typeof entry.newValue === 'number' && typeof entry.previousValue === 'number' ? entry.newValue - entry.previousValue : ''}`,
+      ),
+    );
   if (entry.reason) rows.push(textRow('Reason', entry.reason, 'error'));
-  if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
+  if (entry.fieldPath) rows.push(textRow('Field', syncFieldLabel(entry.fieldPath)));
+  if (entry.source) rows.push(textRow('Source', entry.source));
   if (restricted) {
     // Either scrubbed at rest by the sweep, or still holding values for
     // an entity the viewer can no longer see -- an offline revert can
@@ -591,8 +849,29 @@ function LogDetailsContent({
     const subject = entry.entityClass === 'campaign' ? 'campaign' : 'character';
     rows.push(textRow('Values', `removed — you no longer have access to this ${subject}`));
   } else if (hasValueSnapshot(entry)) {
-    rows.push(valueRow('Before', entry.previousValue));
-    rows.push(valueRow('After', entry.newValue));
+    const focused = focusedSyncLogValues(entry);
+    if (!entry.fieldPath && focused.changedFields.length > 0)
+      rows.push(textRow('Changed', focused.changedFields.map(syncFieldLabel).join(', ')));
+    if (
+      (isEmptySnapshot(focused.previousValue) && isEmptySnapshot(focused.newValue)) ||
+      (entry.fieldPath &&
+        focused.changedFields.length === 0 &&
+        !isTruncatedSnapshot(focused.previousValue) &&
+        !isTruncatedSnapshot(focused.newValue))
+    ) {
+      rows.push(textRow('Values', 'no data fields changed locally'));
+    } else {
+      rows.push(
+        entry.command === 'create' && focused.previousValue === undefined
+          ? textRow('Before', 'No entry')
+          : valueRow('Before', focused.previousValue),
+      );
+      rows.push(
+        entry.command === 'delete' && entry.result === 'synced' && focused.newValue === undefined
+          ? textRow('After', 'Removed')
+          : valueRow('After', focused.newValue),
+      );
+    }
   } else if (entry.direction === 'pull') {
     // New entries always carry `appliedFields`, including an empty
     // list for revision-only/protected-field pulls. Older entries lack
@@ -610,44 +889,87 @@ function LogDetailsContent({
   if (entry.entityClass) rows.push(textRow('Entity', entry.entityClass.replaceAll('_', ' ')));
   if (entry.entityId) rows.push(textRow('Entity id', entry.entityId));
   if (entry.command) rows.push(textRow('Operation', entry.command));
+  const refreshed = [
+    ...new Set(
+      responses.flatMap((response) => {
+        const fields = logMetadata(response)?.appliedFields;
+        return Array.isArray(fields)
+          ? fields.filter((field): field is string => typeof field === 'string')
+          : [];
+      }),
+    ),
+  ];
+  if (refreshed.length)
+    rows.push(
+      textRow('Local refresh', `${refreshed.map(syncFieldLabel).join(', ')} (details in Response)`),
+    );
   rows.push(textRow('When', formatTime(entry.occurredAt)));
 
   return (
     <>
       <DetailList rows={rows} />
-      {!restricted && entry.direction === 'push' && entry.result === 'synced' && (
-        <PayloadDisclosure
-          label="Request"
-          value={{
-            entityClass: entry.entityClass,
-            entityId: entry.entityId,
-            parentId: entry.parentId,
-            command: entry.command,
-            fieldPath: entry.fieldPath,
-            prevValue: entry.previousValue,
-            attemptedValue: entry.newValue,
-          }}
-        />
-      )}
-      {/* Outcomes can carry a whole latestEntity; apply the same access gate
+      <div className="flex flex-wrap items-start gap-x-6">
+        {!restricted &&
+          entry.direction === 'push' &&
+          (entry.request !== undefined || entry.result === 'synced') && (
+            <PayloadDisclosure
+              label="Request"
+              note={
+                entry.request === undefined
+                  ? 'Recorded operation fields; the original request was not retained.'
+                  : undefined
+              }
+              value={
+                members.length > 1
+                  ? [...members]
+                      .reverse()
+                      .map((member) => ({ occurredAt: member.occurredAt, request: member.request }))
+                  : (entry.request ?? {
+                      entityClass: entry.entityClass,
+                      entityId: entry.entityId,
+                      parentId: entry.parentId,
+                      command: entry.command,
+                      fieldPath: entry.fieldPath,
+                      prevValue: entry.previousValue,
+                      attemptedValue: entry.newValue,
+                    })
+              }
+            />
+          )}
+        {/* Outcomes can carry a whole latestEntity; apply the same access gate
           to both the acknowledgement and its associated cursor response. */}
-      {!restricted && (entry.details !== undefined || responses.length > 0) && (
-        <PayloadDisclosure
-          label="Response"
-          loadValue={async () => {
-            const decoded = await Promise.all(responses.map(loadSyncLogEntry));
-            return decoded.length > 0
-              ? {
-                  acknowledgement: entry.details,
-                  cursor: decoded.map((response) => ({
-                    occurredAt: response.occurredAt,
-                    ...logMetadata(response),
-                  })),
-                }
-              : entry.details;
-          }}
-        />
-      )}
+        {!restricted && (entry.details !== undefined || responses.length > 0) && (
+          <PayloadDisclosure
+            label="Response"
+            loadValue={async () => {
+              const decoded = await Promise.all(responses.map(loadSyncLogEntry));
+              return decoded.length > 0
+                ? {
+                    acknowledgement:
+                      members.length > 1
+                        ? [...members].reverse().map((member) => ({
+                            occurredAt: member.occurredAt,
+                            response: member.details,
+                          }))
+                        : entry.details,
+                    cursor: decoded.map((response) => ({
+                      occurredAt: response.occurredAt,
+                      ...logMetadata(response),
+                      ...(hasValueSnapshot(response)
+                        ? { previousValue: response.previousValue, newValue: response.newValue }
+                        : {}),
+                    })),
+                  }
+                : members.length > 1
+                  ? [...members].reverse().map((member) => ({
+                      occurredAt: member.occurredAt,
+                      response: member.details,
+                    }))
+                  : entry.details;
+            }}
+          />
+        )}
+      </div>
     </>
   );
 }
@@ -656,12 +978,26 @@ function PayloadDisclosure({
   label,
   value,
   loadValue,
-}: { label: string; value?: unknown; loadValue?: () => Promise<unknown> }) {
+  note,
+}: {
+  label: string;
+  note?: string | undefined;
+  value?: unknown;
+  loadValue?: () => Promise<unknown>;
+}) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <details className="mt-2" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+    <details
+      className="mt-2 min-w-0 max-w-full open:w-full sm:open:w-[calc(50%-0.75rem)]"
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
       <summary className="cursor-pointer text-xs text-base-content/60">{label}</summary>
-      {expanded && <PayloadText value={value} loadValue={loadValue} />}
+      {expanded && (
+        <>
+          {note && <p className="mt-1 text-xs text-base-content/60">{note}</p>}
+          <PayloadText value={value} loadValue={loadValue} />
+        </>
+      )}
     </details>
   );
 }
@@ -704,12 +1040,38 @@ function PayloadText({
 
 function PendingDetails({ op, hideValues }: { op: OutboxEntry; hideValues: boolean }) {
   const rows: DetailRow[] = [];
-  if (op.fieldPath) rows.push(textRow('Field', op.fieldPath));
+  if (op.fieldPath) rows.push(textRow('Field', syncFieldLabel(op.fieldPath)));
   if (hideValues) {
     rows.push(textRow('Values', 'hidden — you no longer have access to this character'));
   } else {
-    rows.push(valueRow('Before', op.prevValue));
-    rows.push(valueRow('After', op.attemptedValue));
+    const focused = focusedSyncLogValues({
+      command: op.command,
+      fieldPath: op.fieldPath,
+      previousValue: op.prevValue,
+      newValue: op.command === 'delete' ? undefined : op.attemptedValue,
+    });
+    if (!op.fieldPath && focused.changedFields.length)
+      rows.push(textRow('Changed', focused.changedFields.map(syncFieldLabel).join(', ')));
+    if (
+      (isEmptySnapshot(focused.previousValue) && isEmptySnapshot(focused.newValue)) ||
+      (op.fieldPath &&
+        focused.changedFields.length === 0 &&
+        !isTruncatedSnapshot(focused.previousValue) &&
+        !isTruncatedSnapshot(focused.newValue))
+    ) {
+      rows.push(textRow('Values', 'no data fields changed locally'));
+    } else {
+      rows.push(
+        op.command === 'create' && focused.previousValue === undefined
+          ? textRow('Before', 'No entry')
+          : valueRow('Before', focused.previousValue),
+      );
+      rows.push(
+        op.command === 'delete'
+          ? textRow('After', 'Removed locally')
+          : valueRow('After', focused.newValue),
+      );
+    }
   }
   rows.push(textRow('Entity', op.entityClass.replaceAll('_', ' ')));
   rows.push(textRow('Entity id', op.entityId));
@@ -767,12 +1129,18 @@ function hasValueSnapshot(entry: SyncLogEntry): boolean {
  * `item "Hidden Blade"`), and it is the row's visible title -- so a
  * restricted op falls back to the generic class label.
  */
-function changeName(op: OutboxEntry, restricted = false): string {
+function changeName(op: OutboxEntry, restricted = false, row?: Record<string, unknown>): string {
   if (restricted) return `${op.entityClass.replaceAll('_', ' ')} ${op.command}`;
+  if (row)
+    return syncLogTitle(
+      { ...op, id: op.clientOpId, direction: 'push', result: 'synced', occurredAt: op.enqueuedAt },
+      row,
+    );
   return op.humanName ?? `${op.entityClass.replaceAll('_', ' ')} ${op.fieldPath ?? op.command}`;
 }
 
-function logName(entry: SyncLogEntry, restricted = false): string {
+function logName(entry: SyncLogEntry, restricted = false, row?: Record<string, unknown>): string {
+  if (!restricted && (entry.entityName || row)) return syncLogTitle(entry, row);
   if (entry.humanName && !restricted) return entry.humanName;
   // Cycle-level failures aren't about one entity.
   if (!entry.entityClass) return entry.reason ?? 'Sync cycle failed';
@@ -829,4 +1197,59 @@ function debugText(op: OutboxEntry, hideValues = false): string {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'unknown error';
+}
+
+function wsLabel(state: string): string {
+  return (
+    (
+      {
+        connecting: 'Connecting',
+        connected: 'Connected',
+        reconnecting: 'Disconnected · Reconnecting',
+        offline: 'Offline',
+        stopped: 'Not connected',
+      } as Record<string, string>
+    )[state] ?? 'Not connected'
+  );
+}
+
+export function relativeTime(at: string, now: number): string {
+  const delta = Math.max(0, now - Date.parse(at));
+  if (!Number.isFinite(delta)) return 'Unknown';
+  if (delta < 60_000) return 'just now';
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ['year', 365 * 86_400_000],
+    ['month', 30 * 86_400_000],
+    ['day', 86_400_000],
+    ['hour', 3_600_000],
+    ['minute', 60_000],
+  ];
+  const [unit, size] = units.find(([, size]) => delta >= size) ?? ['minute', 60_000];
+  return new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(
+    -Math.floor(delta / size),
+    unit,
+  );
+}
+
+function RelativeTime({ at, now }: { at: string; now: number }) {
+  return (
+    <time dateTime={at} title={formatTime(at)}>
+      {relativeTime(at, now)}
+    </time>
+  );
+}
+
+function isEmptySnapshot(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
+}
+
+function isTruncatedSnapshot(value: unknown): boolean {
+  return (
+    value !== null && typeof value === 'object' && 'truncated' in value && value.truncated === true
+  );
 }
