@@ -1017,6 +1017,11 @@ account immediately and revokes existing JWT sessions, refresh tokens, API keys
 and OAuth grants. Cancellation leaves the account suspended; unsuspension is
 blocked until the purge is cancelled. Administrators cannot suspend or purge
 themselves, and account actions serialize while the displayed state refreshes.
+The admin entry uses `AdminRequireAuth` and `/admin/login`, with sign-in returning
+to the requested admin page. It does not start the player sync orchestrator or
+wait for an IndexedDB bootstrap; expired or cleared sessions return to admin sign-in.
+Password recovery from admin sign-in opens the player recovery entry through a
+full navigation, so its form remains reachable across the bundle boundary.
 
 The same server runs `services/userPurge.ts` nightly at **03:00 UTC**, deleting
 suspended accounts whose 30-day deadline has elapsed. No purge runs at startup;
@@ -1171,7 +1176,7 @@ src/
                  SwUpdatePrompt (new-build toast), ui/*, markdown/ —
                  sanitized markdown renderer + Tiptap WYSIWYG markdown
                  editor used by the adventure log)
-    admin/       Separate admin SPA entry
+    admin/       Separate admin SPA entry; AdminRequireAuth guards HTTP-only pages without player sync
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
                  libraryMechanics.ts validates synced character-owned declarations)

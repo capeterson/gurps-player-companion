@@ -380,6 +380,10 @@ Key PG18 / trigger machinery, layered by migration:
   never ships in the player bundle (`AGENTS.md` — "No instance admin in the
   PWA"). Header links to `/admin/*` are hard `<a>` anchors, not SPA `Link`s, to
   cross the bundle boundary.
+  `AdminRequireAuth` subscribes to session changes and redirects signed-out users
+  to `/admin/login`; sign-in restores the requested admin route. It does not mount
+  the player's `SyncProvider` or `SyncBootstrapGate`, so admin access never waits
+  for a player-data download or starts the outbox/cursor/WebSocket subsystem.
 
 The same Bun process schedules due-account purges at 03:00 UTC with an unreferenced
 wall-clock timeout (`services/userPurge.ts`); creating an app in the test environment

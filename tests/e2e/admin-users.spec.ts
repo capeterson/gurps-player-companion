@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import type { Tokens } from '../../src/client/lib/tokenStore.ts';
 
 test('admin account controls confirm purge, expose nightly timing, cancel and unsuspend', async ({
   page,
@@ -11,6 +12,16 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
   );
   test.setTimeout(120_000);
   page.setDefaultTimeout(15_000);
+  let syncRequests = 0;
+  let syncSockets = 0;
+  await page.route('**/api/v1/sync/**', async (route) => {
+    syncRequests++;
+    await route.abort();
+  });
+  await page.routeWebSocket('**/api/v1/sync/ws**', (socket) => {
+    syncSockets++;
+    socket.close();
+  });
   const pool = new Pool({
     connectionString: process.env.ADMIN_E2E_DATABASE_URL,
     connectionTimeoutMillis: 5_000,
@@ -27,25 +38,26 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     const result = await pool.query<{ id: string }>('select id from users where email=$1', [email]);
     const user = result.rows[0];
     if (!user) throw new Error('Registered fixture user not found');
-    return { user };
+    return { user, tokens: (await response.json()) as Tokens };
   }
   try {
-    await page.goto('/register');
-    await page.getByLabel(/email/i).fill(adminEmail);
-    await page.getByLabel(/display name/i).fill('Admin browser fixture');
-    await page.getByLabel(/password/i).fill(password);
-    await page.getByRole('button', { name: 'Create account', exact: true }).click();
-    await expect(page).toHaveURL(/\/$/);
-    const adminResult = await pool.query<{ id: string }>(
-      'select id from users where email=$1',
-      [adminEmail],
-    );
-    const adminUser = adminResult.rows[0];
-    if (!adminUser) throw new Error('Registered admin fixture user not found');
-    const admin = { user: adminUser };
+    const admin = await register(adminEmail, 'Admin browser fixture');
     const member = await register(memberEmail, 'Purge browser fixture');
     await pool.query('update users set is_superuser=true where id=$1', [admin.user.id]);
-    await page.reload();
+    await page.addInitScript((tokens) => {
+      if (!sessionStorage.getItem('admin-e2e-session-ready')) {
+        localStorage.setItem(
+          'gpc.tokenPair.v1',
+          JSON.stringify({
+            ...tokens,
+            sessionId: crypto.randomUUID(),
+            version: 0,
+            refreshRequestId: crypto.randomUUID(),
+          }),
+        );
+        sessionStorage.setItem('admin-e2e-session-ready', '1');
+      }
+    }, admin.tokens);
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
     await page.getByPlaceholder('Search by email or display name…').fill(memberEmail);
@@ -129,9 +141,25 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     await expect(page.getByRole('heading', { name: 'Campaigns', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Images', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Uploaded images' })).toBeVisible();
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/login$/);
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Forgot your password?', exact: true }).click();
+    await expect(page).toHaveURL(/\/forgot-password$/);
+    await expect(page.getByRole('heading', { name: 'Forgot password', exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
+    await page.getByLabel(/email/i).fill(adminEmail);
+    await page.getByLabel(/^password$/i).fill(password);
+    await page.getByRole('button', { name: /^sign in$/i }).click();
+    await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
+    expect(syncRequests).toBe(0);
+    expect(syncSockets).toBe(0);
   } finally {
     try {
-      await pool.query('delete from users where email=ANY($1::text[])', [[adminEmail, memberEmail]]);
+      await pool.query('delete from users where email=ANY($1::text[])', [
+        [adminEmail, memberEmail],
+      ]);
     } finally {
       await pool.end();
     }
