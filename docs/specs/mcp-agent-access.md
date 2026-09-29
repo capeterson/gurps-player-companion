@@ -354,13 +354,11 @@ and no secret. Direct browser clients must also list their origin in
 `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
 CORS entry.
 
-The checked-in `plugins/gurps-player-companion-dev/` portable plugin package is
-bound only to `https://gurps-dev.abundant.zip/mcp` and is for developer-mode and
-local package testing. It deliberately uses a `-dev` identity. The public
-production plugin must be created separately against
-`https://gurps.abundant.zip/mcp`; a published MCP origin cannot be promoted from
-the dev hostname to production in place. The package's `PUBLISHING.md` tracks
-the remaining directory-review prerequisites and metadata risks.
+Client-specific plugin packages and private registered-app mappings are local
+artifacts, excluded from source control and Docker build contexts. Configure
+clients with the target instance's `/mcp` URL: `https://gurps.abundant.zip/mcp`
+for the hosted production instance, or `https://gurps-dev.abundant.zip/mcp`
+for development testing. Each user signs in and consents with their own GPC account.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,

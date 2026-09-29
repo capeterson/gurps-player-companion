@@ -1241,11 +1241,6 @@ docs/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked)
-plugins/
-  gurps-player-companion-dev/  Portable ChatGPT/Codex plugin package for the
-                               public development MCP endpoint, including its
-                               private registered-app mapping and a production-
-                               publishing readiness checklist
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
