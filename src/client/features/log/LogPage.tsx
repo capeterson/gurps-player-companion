@@ -409,9 +409,194 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     ? (entries.data?.find((e) => e.id === (remove.variables ?? ''))?.id ?? null)
     : null;
 
+  const characterName = (id: string) =>
+    characters?.find((character) => character.id === id)?.name ??
+    roster?.find((character) => character.id === id)?.name ??
+    'Character unavailable';
+
+  const editorForm = (
+    <form
+      className={editor.kind === 'create' ? 'card space-y-4 p-card' : 'space-y-4'}
+      aria-label={editor.kind === 'edit' ? 'Edit adventure log entry' : 'New adventure log entry'}
+      onSubmit={submit}
+    >
+      <div className="grid gap-3 sm:grid-cols-[7rem_1fr_7rem]">
+        <label className="form-control">
+          <span className="label-text">Date</span>
+          <input
+            type="date"
+            className="input input-bordered"
+            value={draft.sessionDate}
+            onChange={(e) => setDraft({ ...draft, sessionDate: e.target.value })}
+            required
+          />
+        </label>
+        <label className="form-control">
+          <span className="label-text">Title</span>
+          <input
+            type="text"
+            className="input input-bordered"
+            value={draft.title}
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+            placeholder="Session 13 — The Hollow Beneath Greymoor"
+            required
+          />
+        </label>
+        <div className="form-control min-w-0">
+          <div className="flex items-baseline gap-2">
+            <label htmlFor="log-attachment" className="label-text">
+              Attached to
+            </label>
+            <InfoTooltip
+              ariaLabel="About log attachments"
+              side="bottom"
+              contentClassName="w-64 max-h-[calc(100dvh-2rem)] overflow-y-auto"
+              content="Campaign entries are shared with all campaign members. Select one of your characters to make a private entry visible only to you. Point recipients are chosen separately."
+            >
+              ?
+            </InfoTooltip>
+          </div>
+          <select
+            id="log-attachment"
+            className="select w-full min-w-0"
+            value={draft.characterId ?? (draft.visibility === 'private' ? 'legacy-private' : '')}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                characterId: e.target.value || null,
+                visibility: e.target.value ? 'private' : 'campaign',
+              })
+            }
+          >
+            <option value="">Campaign</option>
+            {draft.visibility === 'private' && !draft.characterId && (
+              <option value="legacy-private" disabled>
+                Private (no character attached)
+              </option>
+            )}
+            {draft.characterId &&
+              !ownedCharacters.some((character) => character.id === draft.characterId) && (
+                <option value={draft.characterId} disabled>
+                  Private (character unavailable)
+                </option>
+              )}
+            {ownedCharacters.map((character) => (
+              <option key={character.id} value={character.id}>
+                {character.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
+        <label className="form-control">
+          <span className="label-text">Session #</span>
+          <input
+            type="number"
+            min={0}
+            className="input input-bordered"
+            value={draft.sessionNumber ?? ''}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                sessionNumber: e.target.value === '' ? null : Number(e.target.value),
+              })
+            }
+            placeholder="13"
+            aria-label="Session number"
+          />
+        </label>
+        <label className="form-control">
+          <span className="label-text">Location</span>
+          <input
+            type="text"
+            className="input input-bordered"
+            value={draft.location ?? ''}
+            onChange={(e) => setDraft({ ...draft, location: e.target.value })}
+            placeholder="The Hollow Beneath Greymoor"
+            aria-label="Location"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="form-control w-40">
+          <span className="label-text">Points gained (optional)</span>
+          <input
+            type="number"
+            className="input input-bordered"
+            min={0}
+            max={1000}
+            step={1}
+            value={draft.pointsGained ?? ''}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                pointsGained: event.target.value === '' ? null : Number(event.target.value),
+              })
+            }
+          />
+        </label>
+        <div className="min-w-0 space-y-1">
+          <p className="text-sm text-muted">
+            {draft.awardCharacterIds == null
+              ? 'Applies to all current campaign characters'
+              : `Applies to ${draft.awardCharacterIds.length} selected character${draft.awardCharacterIds.length === 1 ? '' : 's'}`}
+          </p>
+          <button
+            type="button"
+            className="btn btn-sm btn-outline"
+            onClick={() => {
+              setRecipientSelection(
+                draft.awardCharacterIds ?? (roster ?? []).map((character) => character.id),
+              );
+              setRecipientDialog(true);
+            }}
+          >
+            Choose characters
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-muted">
+        Points increase each recipient’s character point cap. Editing or deleting an award adjusts
+        that credit. The campaign’s starting point target stays the same.
+      </p>
+
+      <div className="form-control">
+        <span className="label-text">Body</span>
+        <RichTextEditor
+          value={draft.body}
+          onChange={(md) => setDraft((d) => ({ ...d, body: md }))}
+        />
+      </div>
+
+      {saveError && <p className="alert alert-error text-sm">{saveError}</p>}
+
+      <div className="flex justify-end gap-2">
+        <button type="button" className="btn btn-ghost" onClick={cancelEditor}>
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={create.isPending || update.isPending || !draft.title.trim()}
+        >
+          {editor.kind === 'edit'
+            ? update.isPending
+              ? 'Saving…'
+              : 'Save changes'
+            : create.isPending
+              ? 'Saving…'
+              : 'Save entry'}
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <header className="flex min-h-8 flex-wrap items-end justify-between gap-3">
         {campaignIdProp ? (
           <h2 className="font-display text-xl font-semibold leading-none">Adventure Log</h2>
         ) : (
@@ -451,11 +636,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             >
               + New entry
             </button>
-          ) : (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEditor}>
-              Cancel
-            </button>
-          )}
+          ) : null}
         </div>
       </header>
 
@@ -480,6 +661,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           <button
             type="button"
             onClick={() => setFilter('all')}
+            disabled={editor.kind === 'edit'}
             className={`chip ${filter === 'all' ? 'on' : ''}`}
           >
             All <span className="num text-dim ml-1">{entries.data ? counts.all : '—'}</span>
@@ -487,6 +669,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           <button
             type="button"
             onClick={() => setFilter('shared')}
+            disabled={editor.kind === 'edit'}
             className={`chip ${filter === 'shared' ? 'on' : ''}`}
           >
             Shared <span className="num text-dim ml-1">{entries.data ? counts.shared : '—'}</span>
@@ -494,6 +677,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           <button
             type="button"
             onClick={() => setFilter('private')}
+            disabled={editor.kind === 'edit'}
             className={`chip ${filter === 'private' ? 'on' : ''}`}
           >
             Private <span className="num text-dim ml-1">{entries.data ? counts.private : '—'}</span>
@@ -501,180 +685,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
         </div>
       )}
 
-      {editor.kind !== 'hidden' && campaignId && (
-        <form className="card space-y-4 p-card" onSubmit={submit}>
-          <div className="grid gap-3 sm:grid-cols-[7rem_1fr_7rem]">
-            <label className="form-control">
-              <span className="label-text">Date</span>
-              <input
-                type="date"
-                className="input input-bordered"
-                value={draft.sessionDate}
-                onChange={(e) => setDraft({ ...draft, sessionDate: e.target.value })}
-                required
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text">Title</span>
-              <input
-                type="text"
-                className="input input-bordered"
-                value={draft.title}
-                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                placeholder="Session 13 — The Hollow Beneath Greymoor"
-                required
-              />
-            </label>
-            <div className="form-control min-w-0">
-              <div className="flex items-baseline gap-2">
-                <label htmlFor="log-attachment" className="label-text">
-                  Attached to
-                </label>
-                <InfoTooltip
-                  ariaLabel="About log attachments"
-                  side="bottom"
-                  contentClassName="w-64 max-h-[calc(100dvh-2rem)] overflow-y-auto"
-                  content="Campaign entries are shared with all campaign members. Select one of your characters to make a private entry visible only to you. Point recipients are chosen separately."
-                >
-                  ?
-                </InfoTooltip>
-              </div>
-              <select
-                id="log-attachment"
-                className="select w-full min-w-0"
-                value={
-                  draft.characterId ?? (draft.visibility === 'private' ? 'legacy-private' : '')
-                }
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    characterId: e.target.value || null,
-                    visibility: e.target.value ? 'private' : 'campaign',
-                  })
-                }
-              >
-                <option value="">Campaign</option>
-                {draft.visibility === 'private' && !draft.characterId && (
-                  <option value="legacy-private" disabled>
-                    Private (no character attached)
-                  </option>
-                )}
-                {draft.characterId &&
-                  !ownedCharacters.some((character) => character.id === draft.characterId) && (
-                    <option value={draft.characterId} disabled>
-                      Private (character unavailable)
-                    </option>
-                  )}
-                {ownedCharacters.map((character) => (
-                  <option key={character.id} value={character.id}>
-                    {character.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[7rem_1fr]">
-            <label className="form-control">
-              <span className="label-text">Session #</span>
-              <input
-                type="number"
-                min={0}
-                className="input input-bordered"
-                value={draft.sessionNumber ?? ''}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    sessionNumber: e.target.value === '' ? null : Number(e.target.value),
-                  })
-                }
-                placeholder="13"
-                aria-label="Session number"
-              />
-            </label>
-            <label className="form-control">
-              <span className="label-text">Location</span>
-              <input
-                type="text"
-                className="input input-bordered"
-                value={draft.location ?? ''}
-                onChange={(e) => setDraft({ ...draft, location: e.target.value })}
-                placeholder="The Hollow Beneath Greymoor"
-                aria-label="Location"
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="form-control w-40">
-              <span className="label-text">Points gained (optional)</span>
-              <input
-                type="number"
-                className="input input-bordered"
-                min={0}
-                max={1000}
-                step={1}
-                value={draft.pointsGained ?? ''}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    pointsGained: event.target.value === '' ? null : Number(event.target.value),
-                  })
-                }
-              />
-            </label>
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm text-muted">
-                {draft.awardCharacterIds == null
-                  ? 'Applies to all current campaign characters'
-                  : `Applies to ${draft.awardCharacterIds.length} selected character${draft.awardCharacterIds.length === 1 ? '' : 's'}`}
-              </p>
-              <button
-                type="button"
-                className="btn btn-sm btn-outline"
-                onClick={() => {
-                  setRecipientSelection(
-                    draft.awardCharacterIds ?? (roster ?? []).map((character) => character.id),
-                  );
-                  setRecipientDialog(true);
-                }}
-              >
-                Choose characters
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-muted">
-            Points increase each recipient’s character point cap. Editing or deleting an award
-            adjusts that credit. The campaign’s starting point target stays the same.
-          </p>
-
-          <div className="form-control">
-            <span className="label-text">Body</span>
-            <RichTextEditor
-              value={draft.body}
-              onChange={(md) => setDraft((d) => ({ ...d, body: md }))}
-            />
-          </div>
-
-          {saveError && <p className="alert alert-error text-sm">{saveError}</p>}
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={create.isPending || update.isPending || !draft.title.trim()}
-            >
-              {editor.kind === 'edit'
-                ? update.isPending
-                  ? 'Saving…'
-                  : 'Save changes'
-                : create.isPending
-                  ? 'Saving…'
-                  : 'Save entry'}
-            </button>
-          </div>
-        </form>
-      )}
+      {editor.kind === 'create' && campaignId && editorForm}
 
       {entries.isLoading && campaignId && <p className="text-muted">Loading log…</p>}
       {entries.isError && campaignId && (
@@ -692,6 +703,19 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
       <div className="flex flex-col gap-4">
         {visible.map((entry) => {
           const modifiable = canModify(entry);
+          const isEditing = editor.kind === 'edit' && editor.entryId === entry.id;
+          // Legacy snapshots can contain repeated recipients; show their total credit once.
+          const awards = new Map<string, number>();
+          for (const award of entry.xpAwards) {
+            awards.set(award.characterId, (awards.get(award.characterId) ?? 0) + award.amount);
+          }
+          const amounts = [...awards.values()];
+          const points =
+            entry.pointsGained ??
+            (amounts.length > 0 && amounts.every((amount) => amount === amounts[0])
+              ? amounts[0]
+              : null);
+          const totalPoints = amounts.reduce((total, amount) => total + amount, 0);
           // Row edit/delete controls are only rendered when the editor is
           // fully hidden. While a create or edit draft is open elsewhere,
           // clicking Edit here would call `openEdit(entry)` and silently
@@ -700,59 +724,87 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           const canShowRowActions = modifiable && editor.kind === 'hidden';
           return (
             <article key={entry.id} className="card p-card">
-              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
-                <span className="num text-xs uppercase tracking-widest text-dim">
-                  {formatDate(entry.sessionDate)}
-                  {entry.sessionNumber !== null && <span> · Session {entry.sessionNumber}</span>}
-                  <span className="ml-2 normal-case tracking-normal text-muted">
-                    by <span className="text-base-content">{entry.authorDisplayName}</span>
-                  </span>
-                </span>
-                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-                  {entry.visibility === 'private' && (
-                    <span className="chip max-w-full whitespace-normal text-[10px] [overflow-wrap:anywhere]">
-                      private
-                      {entry.characterId
-                        ? ` · ${ownedCharacters.find((character) => character.id === entry.characterId)?.name ?? 'Character unavailable'}`
-                        : ''}
+              {isEditing ? (
+                editorForm
+              ) : (
+                <>
+                  <div className="mb-1 flex min-h-6 flex-wrap items-baseline justify-between gap-3">
+                    <span className="num text-xs uppercase tracking-widest text-dim">
+                      {formatDate(entry.sessionDate)}
+                      {entry.sessionNumber !== null && (
+                        <span> · Session {entry.sessionNumber}</span>
+                      )}
+                      <span className="ml-2 normal-case tracking-normal text-muted">
+                        by <span className="text-base-content">{entry.authorDisplayName}</span>
+                      </span>
                     </span>
-                  )}
-                  {canShowRowActions && (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-xs"
-                        onClick={() => openEdit(entry)}
-                        aria-label={`Edit ${entry.title}`}
+                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+                      {entry.visibility === 'private' && (
+                        <span className="chip max-w-full whitespace-normal text-[10px] [overflow-wrap:anywhere]">
+                          private
+                          {entry.characterId ? ` · ${characterName(entry.characterId)}` : ''}
+                        </span>
+                      )}
+                      {canShowRowActions && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs"
+                            onClick={() => openEdit(entry)}
+                            aria-label={`Edit ${entry.title}`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-xs text-error"
+                            onClick={() => setEntryToDelete(entry)}
+                            aria-label={`Delete ${entry.title}`}
+                            disabled={deleting === entry.id}
+                          >
+                            {deleting === entry.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <h3 className="font-display text-2xl font-semibold leading-tight">
+                    {entry.title}
+                  </h3>
+                  {(entry.pointsGained != null || entry.xpAwards.length > 0) && (
+                    <div className="mt-2 text-sm text-secondary">
+                      {points !== null
+                        ? `${points} point${points === 1 ? '' : 's'} gained · `
+                        : `Point awards: ${totalPoints} point${totalPoints === 1 ? '' : 's'} total · `}
+                      <InfoTooltip
+                        ariaLabel={`Characters awarded points for ${entry.title}`}
+                        side="bottom"
+                        scrollable
+                        contentClassName="w-72 max-h-[calc(100dvh-1rem)] overflow-y-auto"
+                        content={
+                          awards.size === 0 ? (
+                            'No characters received points.'
+                          ) : (
+                            <ul className="space-y-1">
+                              {[...awards].map(([id, amount]) => (
+                                <li key={id}>
+                                  {characterName(id)} · {amount} point{amount === 1 ? '' : 's'}
+                                </li>
+                              ))}
+                            </ul>
+                          )
+                        }
                       >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-xs text-error"
-                        onClick={() => setEntryToDelete(entry)}
-                        aria-label={`Delete ${entry.title}`}
-                        disabled={deleting === entry.id}
-                      >
-                        {deleting === entry.id ? 'Deleting…' : 'Delete'}
-                      </button>
-                    </>
+                        {awards.size} character{awards.size === 1 ? '' : 's'}
+                      </InfoTooltip>
+                    </div>
                   )}
-                </div>
-              </div>
-              <h3 className="font-display text-2xl font-semibold leading-tight">{entry.title}</h3>
-              {(entry.pointsGained != null || entry.xpAwards.length > 0) && (
-                <p className="mt-2 text-sm text-secondary">
-                  {entry.pointsGained != null
-                    ? `${entry.pointsGained} points gained · `
-                    : 'Point awards · '}
-                  {entry.xpAwards.length} character{entry.xpAwards.length === 1 ? '' : 's'}
-                </p>
+                  {entry.location && <p className="mt-1 text-sm text-muted">{entry.location}</p>}
+                  <div className="log-entry-body mt-3">
+                    <Markdown source={entry.body} className="text-sm leading-relaxed" />
+                  </div>
+                </>
               )}
-              {entry.location && <p className="mt-1 text-sm text-muted">{entry.location}</p>}
-              <div className="log-entry-body mt-3">
-                <Markdown source={entry.body} className="text-sm leading-relaxed" />
-              </div>
             </article>
           );
         })}

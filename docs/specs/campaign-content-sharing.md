@@ -626,13 +626,23 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   (including campaign owners and detailed campaign history).
 - **Write:** the entry's **author or the campaign owner**. The author or owner
   may also **edit** (`PATCH`) and **delete** (`DELETE`) entries; the client
-  `LogPage` exposes Edit/Delete controls on entries the viewer may modify.
+  `LogPage` exposes Edit/Delete controls on entries the viewer may modify. Edit
+  replaces that entry in its existing list position with the form; Save changes
+  and Cancel live in the form. Filters are disabled during editing so the draft
+  remains visible. New entries still open above the list. Private badges include
+  the attached character name, with an unavailable fallback for missing local names.
 - Entries carry nullable `characterId`, `sessionDate`, `title`, `body`, `visibility`, optional `pointsGained`, and `xpAwards`.
   `pointsGained` is a nullable integer from 0 to 1000. Creating an award snapshots all current
   campaign characters unless `awardCharacterIds` selects a subset (including an empty list).
   The form defaults to all for campaign owners, and to owned characters for other members;
   **Choose characters** opens a bounded checkbox dialog for missed sessions and other exceptions.
   `xpAwards` stores the concrete recipients/amounts; later joins do not retroactively earn points.
+  Cards show the per-recipient amount for uniform awards, or the total points for
+  varied legacy awards. The character-count tooltip lists saved recipients and
+  their individual amounts, deduplicating repeated legacy recipients and summing
+  their credit. Names resolve from the local character list and campaign roster;
+  unavailable names remain explicitly labeled. The tooltip wraps long names,
+  scrolls long lists, and stays within the visual viewport.
   An amount-only API edit retains recipients, and a body-only edit leaves awards unchanged.
   Legacy API callers may still send individual `xpAwards` (unique character IDs, at most 500).
   Owners may credit any character in their campaign; members may credit only their own.

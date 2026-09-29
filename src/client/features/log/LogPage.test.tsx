@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -137,6 +137,133 @@ describe('LogPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfirm.mockReturnValue(true);
+  });
+
+  it.each<[number | null, number[], string]>([
+    [null, [3, 3], '3 points gained'],
+    [null, [3, 5], 'Point awards: 8 points total'],
+    [0, [0, 0], '0 points gained'],
+    [1, [1, 1], '1 point gained'],
+    [1000, [1000, 1000], '1000 points gained'],
+    [null, [-2, 3], 'Point awards: 1 point total'],
+    [null, [-1000, 1000], 'Point awards: 0 points total'],
+  ])('shows award amounts (%s, %s) and saved recipient names', async (points, amounts, label) => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === `/campaigns/${CAMP_ID}/log`)
+        return [
+          makeEntry({
+            pointsGained: points,
+            xpAwards: amounts.map((amount, i) => ({
+              characterId: attachmentCharacters[i]?.id ?? '',
+              amount,
+            })),
+          }),
+        ];
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    expect(await screen.findByText(new RegExp(label))).toBeVisible();
+    const count = screen.getByRole('button', { name: 'Characters awarded points for My entry' });
+    expect(count).toHaveTextContent('2 characters');
+    await user.click(count);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(`My wanderer · ${amounts[0]} point`);
+    expect(tooltip).toHaveTextContent(`Someone else · ${amounts[1]} point`);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('counts a repeated historical recipient once and shows their combined award', async () => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === `/campaigns/${CAMP_ID}/log`)
+        return [
+          makeEntry({
+            xpAwards: [
+              { characterId: attachmentCharacters[0]?.id ?? '', amount: 3 },
+              { characterId: attachmentCharacters[0]?.id ?? '', amount: 3 },
+            ],
+          }),
+        ];
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    expect(await screen.findByText(/6 points gained/)).toBeVisible();
+    const trigger = screen.getByRole('button', { name: 'Characters awarded points for My entry' });
+    expect(trigger).toHaveTextContent('1 character');
+    await user.click(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('My wanderer · 6 points');
+  });
+
+  it('names the attached character in the private badge and preserves unavailable recipients', async () => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    vi.mocked(api).mockImplementation((async (path: string) => {
+      if (path === `/campaigns/${CAMP_ID}/log`)
+        return [
+          makeEntry({
+            visibility: 'private',
+            characterId: attachmentCharacters[0]?.id,
+            xpAwards: [{ characterId: 'deleted-character', amount: 4 }],
+          }),
+        ];
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    expect(await screen.findByText('private · My wanderer')).toBeVisible();
+    await user.hover(
+      screen.getByRole('button', { name: 'Characters awarded points for My entry' }),
+    );
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Character unavailable · 4 points',
+    );
+  });
+
+  it('replaces an older card with its editor in place and keeps the draft on a failed save', async () => {
+    setupResponses();
+    const base = vi.mocked(api).getMockImplementation();
+    let saved = false;
+    vi.mocked(api).mockImplementation((async (path: string, options?: { method?: string }) => {
+      if (options?.method === 'PATCH') {
+        if (!saved) throw new ApiError(422, 'Title rejected');
+        return makeEntry({ id: 'older', title: 'Revised older entry' });
+      }
+      if (path === `/campaigns/${CAMP_ID}/log`)
+        return [
+          makeEntry({ id: 'newer', title: 'Newer entry' }),
+          makeEntry({ id: 'older', title: saved ? 'Revised older entry' : 'Older entry' }),
+        ];
+      return base?.(path);
+    }) as typeof api);
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Edit Older entry' }));
+    const articles = screen.getAllByRole('article');
+    expect(
+      within(articles[0] as HTMLElement).getByRole('heading', { name: 'Newer entry' }),
+    ).toBeVisible();
+    const form = within(articles[1] as HTMLElement).getByRole('form', {
+      name: 'Edit adventure log entry',
+    });
+    expect(screen.queryByRole('heading', { name: 'Older entry' })).not.toBeInTheDocument();
+    await user.clear(within(form).getByLabelText('Title'));
+    await user.type(within(form).getByLabelText('Title'), 'Revised older entry');
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }));
+    expect(await within(form).findByText('Title rejected')).toBeVisible();
+    expect(within(form).getByLabelText('Title')).toHaveValue('Revised older entry');
+    saved = true;
+    await user.click(within(form).getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('heading', { name: 'Revised older entry' })).toBeVisible();
+    expect(screen.queryByRole('form')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit Revised older entry' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('heading', { name: 'Revised older entry' })).toBeVisible();
   });
 
   it('defaults to Campaign, offers only owned characters, and saves a private attachment', async () => {
