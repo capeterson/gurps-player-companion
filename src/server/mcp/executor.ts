@@ -49,7 +49,9 @@ export async function executeOperation(
   operation: IncludedOperation,
   input: OperationInput,
 ): Promise<Response> {
-  const url = new URL(concretePath(operation.path, input.path ?? {}), 'http://gpc.internal');
+  // This is an in-memory dispatch, not a network request. Use HTTPS so the
+  // production transport boundary does not redirect before the shared handler.
+  const url = new URL(concretePath(operation.path, input.path ?? {}), 'https://gpc.internal');
   appendQuery(url, input.query ?? {});
   const headers = new Headers({ accept: 'application/json, application/yaml, text/yaml' });
   if (input.body !== undefined) headers.set('content-type', 'application/json');

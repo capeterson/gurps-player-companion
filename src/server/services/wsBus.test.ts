@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { _resetForTests, publish, subscribe, subscriberCount } from './wsBus.ts';
+import { _resetForTests, closeAll, publish, subscribe, subscriberCount } from './wsBus.ts';
 
 interface FakeWs {
   readyState: number;
@@ -64,5 +64,28 @@ describe('wsBus', () => {
 
   it('publish is a no-op when no subscribers exist', () => {
     expect(() => publish('nobody', { kind: 'sync_invalidate', emittedAt: 'now' })).not.toThrow();
+  });
+});
+
+describe('wsBus.closeAll', () => {
+  it('closes every socket with 1012 and forgets them', () => {
+    const closed: Array<[number | undefined, string | undefined]> = [];
+    const ws = (readyState = 1) => ({
+      ...makeWs(readyState),
+      close(code?: number, reason?: string) {
+        closed.push([code, reason]);
+      },
+    });
+    subscribe('user-1', ws());
+    subscribe('user-1', ws());
+    subscribe('user-2', ws());
+    expect(closeAll()).toBe(3);
+    expect(closed).toEqual([
+      [1012, 'server restarting'],
+      [1012, 'server restarting'],
+      [1012, 'server restarting'],
+    ]);
+    expect(subscriberCount('user-1')).toBe(0);
+    expect(subscriberCount('user-2')).toBe(0);
   });
 });

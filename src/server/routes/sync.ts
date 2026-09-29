@@ -29,6 +29,13 @@ import {
   syncOperationsRequest,
   syncOperationsResponse,
 } from '../../shared/schemas/sync.ts';
+import {
+  CLIENT_OUTDATED_ERROR,
+  MIN_SUPPORTED_SYNC_PROTOCOL,
+  SYNC_PROTOCOL_HEADER,
+  SYNC_PROTOCOL_VERSION,
+  parseSyncProtocol,
+} from '../../shared/syncProtocol.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { getDb } from '../db/client.ts';
 import {
@@ -51,6 +58,31 @@ import {
 import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
+// Version gate first: an outdated build must learn to reload even when its
+// token has expired, and no queued operation may be interpreted (or rejected
+// and rolled back) in a shape this server no longer understands.
+router.use('/sync/*', async (c, next) => {
+  const clientProtocol = parseSyncProtocol(c.req.header(SYNC_PROTOCOL_HEADER));
+  c.header(SYNC_PROTOCOL_HEADER, String(SYNC_PROTOCOL_VERSION));
+  if (clientProtocol < MIN_SUPPORTED_SYNC_PROTOCOL) {
+    return c.json(
+      {
+        error: CLIENT_OUTDATED_ERROR,
+        clientProtocol,
+        minProtocol: MIN_SUPPORTED_SYNC_PROTOCOL,
+        serverProtocol: SYNC_PROTOCOL_VERSION,
+      },
+      426,
+    );
+  }
+  if (clientProtocol > SYNC_PROTOCOL_VERSION) {
+    // A newer client reached an older replica (rolling deploy or rollback).
+    // Nothing was read; the client retries and reaches a current replica.
+    c.header('retry-after', '5');
+    return c.json({ error: 'server_outdated' }, 503);
+  }
+  await next();
+});
 router.use('/sync/*', requireActiveUser);
 
 const DEFAULT_CURSOR_PAGE_SIZE = 200;
@@ -73,6 +105,8 @@ router.openapi(
       },
       401: errorResponse('Unauthorized'),
       422: errorResponse('Validation error'),
+      426: errorResponse('Client sync protocol is older than the server supports; reload the app'),
+      503: errorResponse('Client sync protocol is newer than this server; retry later'),
     },
   }),
   async (c) => {
@@ -130,6 +164,8 @@ router.openapi(
       },
       401: errorResponse('Unauthorized'),
       422: errorResponse('Validation error'),
+      426: errorResponse('Client sync protocol is older than the server supports; reload the app'),
+      503: errorResponse('Client sync protocol is newer than this server; retry later'),
     },
   }),
   async (c) => {

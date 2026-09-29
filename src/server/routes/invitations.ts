@@ -28,7 +28,7 @@ import { listQuery, uuid } from '../../shared/schemas/common.ts';
 import { campaignInvitationNotificationPayload } from '../../shared/schemas/notification.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin, tryLoadCampaignRole } from '../auth/permissions.ts';
-import { loadConfig } from '../config.ts';
+import { appUrl, loadConfig } from '../config.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { afterDbCommit } from '../db/client.ts';
 import { getDb } from '../db/client.ts';
@@ -221,7 +221,7 @@ router.openapi(
           inviterName: user.displayName,
           campaignName: campaign.name,
           role: requestedRole,
-          appUrl: config.appBaseUrl ?? '',
+          appUrl: appUrl(config),
         }).catch(() => {}),
       );
     }

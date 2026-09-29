@@ -17,7 +17,9 @@ all on one origin, one port.
 The official hosted instance is [gurps.abundant.zip](https://gurps.abundant.zip).
 The root [README](../../README.md) is the player-facing introduction, with
 current desktop/mobile screenshots and self-hosting/environment documentation
-at the end. Screenshot provenance and refresh notes live in
+at the end. `APP_HOSTNAME` is the bare public hostname; the server derives HTTPS
+in production and HTTP with `PORT` in development/test for all public app URLs.
+Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
 A first download that fails displays its reason and a retry action; an ended session
@@ -1023,6 +1025,8 @@ player client.
 ```
 src/
   server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
+    index.ts     Bun.serve entrypoint; SIGTERM/SIGINT graceful drain (`shutdownServer`)
+    lifecycle.ts Draining flag (readiness 503, `Connection: close`) during shutdown
     https.ts     Production HTTPS redirects and HSTS
     routes/health.ts  Liveness, database/migration readiness and release probes
     routes/      One file per resource group (auth, characters, campaigns,
@@ -1148,6 +1152,8 @@ src/
   shared/        Pure TypeScript — runs in Bun, browser, AND service worker
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
                  libraryMechanics.ts validates synced character-owned declarations)
+    syncProtocol.ts  Sync protocol version + header; `/sync/*` answers 426 to
+                 an outdated build, which then force-reloads onto the current one
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text

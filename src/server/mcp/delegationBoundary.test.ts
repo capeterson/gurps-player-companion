@@ -12,7 +12,8 @@ const redirectUri = 'http://127.0.0.1:49153/callback';
 const resource = 'http://localhost:3001/mcp';
 const config: AppConfig = {
   ...integrationTestConfig,
-  appBaseUrl: 'http://localhost:3001',
+  appHostname: 'localhost',
+  port: 3001,
   oauthClients: [
     {
       clientId,

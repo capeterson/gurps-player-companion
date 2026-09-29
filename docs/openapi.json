@@ -6285,7 +6285,7 @@
             }
           },
           "503": {
-            "description": "Database unavailable or required migrations missing",
+            "description": "Database unavailable, required migrations missing, or the process is shutting down",
             "content": {
               "application/json": {
                 "schema": {
@@ -132318,6 +132318,26 @@
                 }
               }
             }
+          },
+          "426": {
+            "description": "Client sync protocol is older than the server supports; reload the app",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Client sync protocol is newer than this server; retry later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -132677,6 +132697,26 @@
           },
           "422": {
             "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "426": {
+            "description": "Client sync protocol is older than the server supports; reload the app",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Client sync protocol is newer than this server; retry later",
             "content": {
               "application/json": {
                 "schema": {

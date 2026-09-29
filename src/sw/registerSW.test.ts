@@ -8,11 +8,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  FORCED_RELOAD_MIN_INTERVAL_MS,
   SW_UPDATE_POLL_MS,
   clearPendingSwUpdate,
   dismissPendingSwUpdate,
   getPendingSwUpdate,
   registerSwLifecycle,
+  requestClientUpdate,
+  resetForcedUpdateForTests,
   swEvents,
 } from './registerSW.ts';
 
@@ -279,5 +282,73 @@ describe('registerSwLifecycle update discovery', () => {
     // biome-ignore lint/performance/noDelete: restoring the absent-API shape is the point
     delete (navigator as { serviceWorker?: unknown }).serviceWorker;
     expect(() => registerSwLifecycle()()).not.toThrow();
+  });
+});
+
+describe('requestClientUpdate (server refused this build)', () => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  beforeEach(() => {
+    resetForcedUpdateForTests();
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('announces, activates the newest worker, then reloads', async () => {
+    const reload = vi.fn();
+    const announced = vi.fn();
+    window.addEventListener(swEvents.CLIENT_OUTDATED, announced, { once: true });
+    const worker = new FakeWorker();
+    worker.state = 'installed';
+    registration.update.mockImplementation(async () => {
+      registration.waiting = worker;
+    });
+    worker.postMessage.mockImplementation(() => worker.setState('activated'));
+
+    expect(requestClientUpdate({ reload })).toBe(true);
+    expect(announced).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+    expect(registration.update).toHaveBeenCalled();
+    expect(worker.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    // A second 426 in the same page does not start a second reload.
+    expect(requestClientUpdate({ reload })).toBe(true);
+    await wait(20);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for the user to leave an input so the draft is committed first', async () => {
+    const reload = vi.fn();
+    const input = document.createElement('input');
+    document.body.append(input);
+    input.focus();
+    expect(document.activeElement).toBe(input);
+
+    requestClientUpdate({ reload });
+    await wait(700);
+    expect(reload).not.toHaveBeenCalled();
+
+    input.blur();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+  });
+
+  it('does not reload in a loop when still outdated right after a forced reload', async () => {
+    let now = 1_000_000;
+    const reload = vi.fn();
+    requestClientUpdate({ reload, now: () => now });
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1));
+
+    // The reloaded page is a new module instance.
+    resetForcedUpdateForTests();
+    now += 5_000;
+    expect(requestClientUpdate({ reload, now: () => now })).toBe(false);
+    await wait(20);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    now += FORCED_RELOAD_MIN_INTERVAL_MS;
+    expect(requestClientUpdate({ reload, now: () => now })).toBe(true);
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(2));
   });
 });

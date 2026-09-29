@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import type { AppConfig } from './config.ts';
+import { type AppConfig, appUrl } from './config.ts';
 
 /** TLS terminates at the trusted edge; internal health probes use plain HTTP. */
 export function productionHttps(config: AppConfig): MiddlewareHandler {
@@ -8,10 +8,7 @@ export function productionHttps(config: AppConfig): MiddlewareHandler {
       await next();
     };
   }
-  const origin = config.appBaseUrl;
-  if (!origin) {
-    throw new Error('APP_BASE_URL is required for production HTTPS');
-  }
+  const origin = appUrl(config);
   return async (c, next) => {
     if (c.req.path === '/api/v1/healthz' || c.req.path === '/api/v1/readyz') {
       await next();

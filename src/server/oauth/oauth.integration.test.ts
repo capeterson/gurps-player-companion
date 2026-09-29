@@ -5,13 +5,15 @@ import { signAccessToken, verifyAccessToken } from '../auth/jwt.ts';
 import type { AppConfig } from '../config.ts';
 import { closeDb } from '../db/client.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+import { createOAuthRouter } from './routes.ts';
 
 configureIntegrationTestEnvironment();
 
 const redirectUri = 'http://127.0.0.1:49152/callback';
 const config: AppConfig = {
   ...integrationTestConfig,
-  appBaseUrl: 'http://localhost:3001',
+  appHostname: 'localhost',
+  port: 3001,
   oauthClients: [
     {
       clientId: 'oauth-integration-client',
@@ -88,6 +90,33 @@ async function issueGrant(scopes = 'gpc:read gpc:write') {
 
 describe('delegated OAuth and MCP', () => {
   afterAll(closeDb);
+
+  it('derives production discovery from the hostname rather than the request or internal port', async () => {
+    const app = createOAuthRouter({
+      ...config,
+      environment: 'production',
+      appHostname: 'gpc.example',
+      port: 3030,
+    });
+    const metadata = await app.request(
+      'https://internal.example/.well-known/oauth-authorization-server',
+    );
+    expect(metadata.status).toBe(200);
+    expect(await metadata.json()).toMatchObject({
+      issuer: 'https://gpc.example',
+      authorization_endpoint: 'https://gpc.example/oauth/authorize',
+      token_endpoint: 'https://gpc.example/oauth/token',
+      registration_endpoint: 'https://gpc.example/oauth/register',
+    });
+    const resource = await app.request(
+      'https://internal.example/.well-known/oauth-protected-resource/mcp',
+    );
+    expect(resource.status).toBe(200);
+    expect(await resource.json()).toMatchObject({
+      resource: 'https://gpc.example/mcp',
+      authorization_servers: ['https://gpc.example'],
+    });
+  });
 
   it('requires recent primary authentication before returning consent details', async () => {
     const app = createApp(config);

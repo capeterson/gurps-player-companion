@@ -15,7 +15,7 @@ import {
 } from './transport.ts';
 
 const document = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
-const config = { ...integrationTestConfig, appBaseUrl: 'http://localhost:3001' };
+const config = { ...integrationTestConfig, appHostname: 'localhost', port: 3001 };
 const resource = 'http://localhost:3001/mcp';
 function principal(): OAuthPrincipal {
   return {

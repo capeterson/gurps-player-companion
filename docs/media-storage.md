@@ -48,7 +48,7 @@ alone leaves database references to missing images. Changing backend does not
 automatically migrate existing objects.
 
 For the built-app offline browser test, run the compiled server with
-`ENVIRONMENT=test` and a localhost `APP_BASE_URL`: this serves built assets and
+`ENVIRONMENT=test`, `APP_HOSTNAME=localhost`, and the matching `PORT`: this serves built assets and
 the service worker while permitting local storage and HTTP loopback OAuth.
 
 ## Garage on Unraid

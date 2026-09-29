@@ -9,6 +9,7 @@ import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';
 import { requireActiveUser } from './auth/middleware.ts';
 import type { AppConfig } from './config.ts';
 import { productionHttps } from './https.ts';
+import { isDraining } from './lifecycle.ts';
 import { assertExactCoverage } from './mcp/catalog.ts';
 import { createMcpHandler } from './mcp/transport.ts';
 import { createOAuthAccountRouter, createOAuthRouter } from './oauth/routes.ts';
@@ -63,6 +64,9 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     c.set('requestId', requestId);
     c.header('x-request-id', requestId);
     await next();
+    // While shutting down, ask keep-alive clients to reconnect so their next
+    // request reaches the replacement instead of this draining process.
+    if (isDraining()) c.res.headers.set('connection', 'close');
   });
 
   app.use('*', productionHttps(config));

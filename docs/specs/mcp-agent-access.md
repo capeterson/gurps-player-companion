@@ -39,8 +39,10 @@ and OAuth endpoints, while MCP tool schemas describe the JSON-RPC operations.
 
 `auth/session.ts` resolves app JWTs and API keys, while `oauth/service.ts`
 resolves a separate grant-backed OAuth principal. The delegated executor creates
-an in-memory Request and runs it through the same registered Hono/OpenAPI handler
-chain as REST. A private WeakMap keyed by Request identity supplies the actor;
+an in-memory HTTPS Request and runs it through the same registered Hono/OpenAPI
+handler chain as REST. The synthetic HTTPS URL avoids the production HTTP redirect
+boundary; dispatch stays in process and makes no TLS or network connection.
+A private WeakMap keyed by Request identity supplies the actor;
 external headers and bodies cannot enter that map. The executor never mints an
 app JWT, forwards a bearer token, or makes a network loopback.
 
@@ -367,8 +369,11 @@ resource to `/oauth/authorize`; consent returns the one-time code to that
 callback. The client exchanges it with the original verifier and resource at
 `/oauth/token`, then uses the `gpco_` access token only at `/mcp`.
 
-`APP_BASE_URL` is the canonical origin used by discovery and audience checks.
-Production requires a pathless HTTPS origin. Proxies route `/mcp`, `/oauth/*`,
+`APP_HOSTNAME` is the bare public hostname used to derive the canonical origin
+for discovery and audience checks through `config.ts`'s `appUrl()`. Production
+requires it and derives HTTPS on port 443; development/test defaults to
+`localhost` and derives HTTP with `PORT`. Schemes, ports, paths, credentials,
+queries, and fragments are rejected in this setting. Proxies route `/mcp`, `/oauth/*`,
 and `/.well-known/*` without caching. The PWA navigation fallback excludes
 these protocol paths. The mutable service-worker entrypoints and HTML shells
 also carry `no-store` origin/CDN headers so an edge-cached old worker cannot
