@@ -120,6 +120,9 @@ describe('nightly account purge', () => {
   });
 
   it('starts one unreferenced nightly timer, skips tests and clears it on shutdown', async () => {
+    // Other route suites create development apps and start this singleton.
+    // Stop their timer before observing this test's scheduling calls.
+    await stopUserPurgeMaintenance();
     const originalSetTimeout = globalThis.setTimeout;
     const originalClearTimeout = globalThis.clearTimeout;
     const unref = mock(() => {});
