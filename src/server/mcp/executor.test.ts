@@ -58,7 +58,7 @@ function productionApp(trustProxy: boolean) {
       ...integrationTestConfig,
       environment: 'production',
       trustProxy,
-      appBaseUrl: 'https://gpc.example',
+      appHostname: 'gpc.example',
     }),
   );
   app.all('*', async (c) => {
