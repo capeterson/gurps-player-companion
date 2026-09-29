@@ -10,30 +10,42 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     'Set ADMIN_E2E_DATABASE_URL to this worktree test database',
   );
   test.setTimeout(120_000);
-  const pool = new Pool({ connectionString: process.env.ADMIN_E2E_DATABASE_URL });
+  page.setDefaultTimeout(15_000);
+  const pool = new Pool({
+    connectionString: process.env.ADMIN_E2E_DATABASE_URL,
+    connectionTimeoutMillis: 5_000,
+  });
   const password = 'AdminBrowserFixture123!';
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   const adminEmail = `admin-${suffix}@example.com`;
   const memberEmail = `purge-${suffix}-${'long-account-'.repeat(6)}@example.com`;
-  const ids: string[] = [];
   async function register(email: string, displayName: string) {
     const response = await request.post('/api/v1/auth/register', {
       data: { email, displayName, password },
     });
     expect(response.status()).toBe(201);
-    const result = await response.json();
-    ids.push(result.user.id);
-    return result;
+    const result = await pool.query<{ id: string }>('select id from users where email=$1', [email]);
+    const user = result.rows[0];
+    if (!user) throw new Error('Registered fixture user not found');
+    return { user };
   }
   try {
-    const admin = await register(adminEmail, 'Admin browser fixture');
+    await page.goto('/register');
+    await page.getByLabel(/email/i).fill(adminEmail);
+    await page.getByLabel(/display name/i).fill('Admin browser fixture');
+    await page.getByLabel(/password/i).fill(password);
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    await expect(page).toHaveURL(/\/$/);
+    const adminResult = await pool.query<{ id: string }>(
+      'select id from users where email=$1',
+      [adminEmail],
+    );
+    const adminUser = adminResult.rows[0];
+    if (!adminUser) throw new Error('Registered admin fixture user not found');
+    const admin = { user: adminUser };
     const member = await register(memberEmail, 'Purge browser fixture');
     await pool.query('update users set is_superuser=true where id=$1', [admin.user.id]);
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill(adminEmail);
-    await page.getByLabel(/^password$/i).fill(password);
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByRole('navigation')).toBeVisible();
+    await page.reload();
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
     await page.getByPlaceholder('Search by email or display name…').fill(memberEmail);
@@ -118,7 +130,10 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     await page.getByRole('link', { name: 'Images', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Uploaded images' })).toBeVisible();
   } finally {
-    if (ids.length) await pool.query('delete from users where id=ANY($1::uuid[])', [ids]);
-    await pool.end();
+    try {
+      await pool.query('delete from users where email=ANY($1::text[])', [[adminEmail, memberEmail]]);
+    } finally {
+      await pool.end();
+    }
   }
 });

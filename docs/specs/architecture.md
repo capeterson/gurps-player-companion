@@ -384,7 +384,10 @@ Key PG18 / trigger machinery, layered by migration:
 The same Bun process schedules due-account purges at 03:00 UTC with an unreferenced
 wall-clock timeout (`services/userPurge.ts`); creating an app in the test environment
 does not start it. A PostgreSQL transaction advisory lock serializes sweep workers,
-and audited per-account transactions contain failures. Each account commits separately
+which also delete expired `refresh_tokens` using an indexed expiry cutoff even
+when no accounts are due. Unexpired revoked rotation ancestors are retained for
+idempotent refresh retries and replay detection.
+Audited per-account transactions contain failures. Each account commits separately
 so the sync revision fence is released between accounts. Accounts are locked and their
 suspension/deadline rechecked before deletion. Owned campaigns use the same library
 detachment behavior as ordinary campaign deletion, preserving other players' paid

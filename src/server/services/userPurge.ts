@@ -8,6 +8,7 @@ import {
   characters,
   encounterEffects,
   encounters,
+  refreshTokens,
   users,
 } from '../db/schema.ts';
 import { isDraining } from '../lifecycle.ts';
@@ -16,7 +17,13 @@ import { advanceCampaignProjectionRevision } from './libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { publish } from './wsBus.ts';
 
-/** Due accounts are removed atomically; a failed account remains queued for the next night. */
+/** Keep unexpired revoked ancestors for rotation retries and replay detection. */
+export async function sweepExpiredRefreshTokens(now = new Date()): Promise<number> {
+  const result = await getDb().delete(refreshTokens).where(lte(refreshTokens.expiresAt, now));
+  return result.rowCount ?? 0;
+}
+
+/** Nightly expiry cleanup plus atomic account deletion; failed accounts stay queued. */
 export async function sweepUserPurges(now = new Date()): Promise<number> {
   const db = getDb();
   // Keep the sweep lock on its own connection. Each account commits separately
@@ -26,6 +33,8 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
       sql`select pg_try_advisory_xact_lock(hashtext('gpc:user-purge')) as acquired`,
     );
     if (!lock.rows[0]?.acquired) return 0;
+    // Expiry cleanup runs even when no accounts are scheduled for deletion.
+    await sweepExpiredRefreshTokens(now);
     const due = await db
       .select({ id: users.id })
       .from(users)

@@ -228,6 +228,7 @@ export const refreshTokens = pgTable(
     jtiKey: uniqueIndex('refresh_tokens_jti_key').on(t.jti),
     userIdx: index('refresh_tokens_user_idx').on(t.userId),
     familyIdx: index('refresh_tokens_family_idx').on(t.familyId),
+    expiresAtIdx: index('refresh_tokens_expires_at_idx').on(t.expiresAt),
   }),
 );
 

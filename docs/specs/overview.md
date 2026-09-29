@@ -164,7 +164,8 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   recovery also revokes API keys and removes passkeys. Creating a new passkey or
   API key requires a primary sign-in within the last ten minutes. Refresh
   replacement is transactional and supports a bounded idempotent retry after a
-  lost response.
+  lost response. Nightly maintenance deletes expired refresh-token rows;
+  unexpired revoked ancestors remain available for retry and replay detection.
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
 
@@ -1020,6 +1021,9 @@ themselves, and account actions serialize while the displayed state refreshes.
 The same server runs `services/userPurge.ts` nightly at **03:00 UTC**, deleting
 suspended accounts whose 30-day deadline has elapsed. No purge runs at startup;
 overdue accounts are handled on the next nightly run. A database advisory lock
+also covers expiry cleanup of `refresh_tokens`, including when no accounts are
+due. An expiry index supports the sweep; revoked rows remain until their expiry
+so rotation retries and replay detection retain their evidence. The lock
 prevents concurrent sweeps; per-account transactions isolate failures, and row
 locks/rechecks honor cancellation or rescheduling. The job deletes owned
 characters/campaigns and their cascading children, credentials, memberships,
@@ -1065,7 +1069,7 @@ src/
     mcp/         exact operation manifest/catalog, SDK transport, checked
                  snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
-                 userPurge (nightly due-account deletion at 03:00 UTC),
+                 userPurge (nightly account deletion and refresh-token expiry cleanup at 03:00 UTC),
                  defaultCampaignSources (new-campaign GURPS 4e source list),
                  libraryReferences (transactional source authorization for all
                  six character reference types plus nested item enchantments), ownedLibraryMechanics (saved

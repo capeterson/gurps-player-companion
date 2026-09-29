@@ -16,6 +16,7 @@ import {
   entityHistory,
   entityTombstones,
   mediaAssets,
+  refreshTokens,
   users,
 } from '../db/schema.ts';
 import { configureIntegrationTestEnvironment } from '../testConfig.ts';
@@ -75,6 +76,49 @@ async function campaign(ownerId: string) {
 }
 
 describe('nightly account purge', () => {
+  it('prunes expired refresh tokens even with no due accounts and retains unexpired rotation evidence', async () => {
+    const owner = await account(null, null);
+    const familyId = randomUUID();
+    const requestId = randomUUID();
+    const liveJti = randomUUID();
+    const ancestorJti = randomUUID();
+    const expiry = new Date(now.getTime() + 60_000);
+    await getDb()
+      .insert(refreshTokens)
+      .values([
+        { userId: owner.id, jti: randomUUID(), expiresAt: due },
+        { userId: owner.id, jti: randomUUID(), expiresAt: now, revokedAt: due },
+        { userId: owner.id, jti: liveJti, familyId, expiresAt: expiry },
+        {
+          userId: owner.id,
+          jti: ancestorJti,
+          familyId,
+          expiresAt: expiry,
+          revokedAt: due,
+          rotationRequestId: requestId,
+          replacementJti: liveJti,
+          rotatedAt: due,
+        },
+      ]);
+    const retained = await getDb()
+      .select()
+      .from(refreshTokens)
+      .where(inArray(refreshTokens.jti, [liveJti, ancestorJti]))
+      .orderBy(refreshTokens.jti);
+    expect(await sweepUserPurges(now)).toBe(0);
+    expect(
+      await getDb()
+        .select()
+        .from(refreshTokens)
+        .where(eq(refreshTokens.userId, owner.id))
+        .orderBy(refreshTokens.jti),
+    ).toEqual(retained);
+    expect(await sweepUserPurges(now)).toBe(0);
+    expect(
+      await getDb().select().from(refreshTokens).where(eq(refreshTokens.userId, owner.id)),
+    ).toHaveLength(2);
+  });
+
   it('starts one unreferenced nightly timer, skips tests and clears it on shutdown', async () => {
     const originalSetTimeout = globalThis.setTimeout;
     const originalClearTimeout = globalThis.clearTimeout;
