@@ -145,9 +145,8 @@ export const users = pgTable(
      */
     isSuperuser: boolean('is_superuser').notNull().default(false),
     /**
-     * 30-day soft-delete timer set by /admin/users/{id}/purge.  A future
-     * sweep job hard-deletes users whose timer has elapsed; for now the
-     * column itself is the contract.
+     * 30-day soft-delete timer set by /admin/users/{id}/purge. The nightly
+     * 03:00 UTC sweep hard-deletes suspended users whose timer has elapsed.
      */
     purgeScheduledAt: timestamp('purge_scheduled_at', { withTimezone: true }),
     /** Palette used in dark mode; CHECK-constrained to DARK_THEMES. */

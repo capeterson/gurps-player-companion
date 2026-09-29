@@ -12047,6 +12047,16 @@
               }
             }
           },
+          "400": {
+            "description": "Cannot act on self",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Forbidden",
             "content": {

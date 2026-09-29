@@ -1008,7 +1008,27 @@ there is no decorative cover slot or implied image-upload feature.
 ### Admin (separate bundle)
 A **separate Vite entry** (`src/client/admin/`, served at `/admin/*`) — not
 part of the PWA bundle — for superusers: manage users (suspend/purge) and
-campaigns. Per architecture invariant, instance admin never ships in the
+inspect campaigns and uploaded images, take down images, and disable/re-enable
+an uploader's uploads. Scheduling a purge requires confirmation, suspends the
+account immediately and revokes existing JWT sessions, refresh tokens, API keys
+and OAuth grants. Cancellation leaves the account suspended; unsuspension is
+blocked until the purge is cancelled. Administrators cannot suspend or purge
+themselves, and account actions serialize while the displayed state refreshes.
+
+The same server runs `services/userPurge.ts` nightly at **03:00 UTC**, deleting
+suspended accounts whose 30-day deadline has elapsed. No purge runs at startup;
+overdue accounts are handled on the next nightly run. A database advisory lock
+prevents concurrent sweeps; per-account transactions isolate failures, and row
+locks/rechecks honor cancellation or rescheduling. The job deletes owned
+characters/campaigns and their cascading children, credentials, memberships,
+invitations and authored logs/effects. Other players retain their characters and
+purchased library mechanics after an owned campaign disappears. Remaining
+campaign projections advance and post-commit WebSocket nudges accelerate sync.
+Append-only audit history and sync tombstones are retained. Unattached images
+are reclaimed by the existing media cleanup job; public cached copies may remain.
+Failures are logged and stay scheduled for the following night.
+
+Per architecture invariant, instance admin never ships in the
 player client.
 
 ---
@@ -1037,6 +1057,7 @@ src/
     mcp/         exact operation manifest/catalog, SDK transport, checked
                  snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
+                 userPurge (nightly due-account deletion at 03:00 UTC),
                  defaultCampaignSources (new-campaign GURPS 4e source list),
                  libraryReferences (transactional source authorization for all
                  six character reference types plus nested item enchantments), ownedLibraryMechanics (saved

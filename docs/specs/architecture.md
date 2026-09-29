@@ -347,6 +347,19 @@ Key PG18 / trigger machinery, layered by migration:
   PWA"). Header links to `/admin/*` are hard `<a>` anchors, not SPA `Link`s, to
   cross the bundle boundary.
 
+The same Bun process schedules due-account purges at 03:00 UTC with an unreferenced
+wall-clock timeout (`services/userPurge.ts`); creating an app in the test environment
+does not start it. A PostgreSQL transaction advisory lock serializes sweep workers,
+and audited per-account transactions contain failures. Each account commits separately
+so the sync revision fence is released between accounts. Accounts are locked and their
+suspension/deadline rechecked before deletion. Owned campaigns use the same library
+detachment behavior as ordinary campaign deletion, preserving other players' paid
+mechanics. Explicit deletion resolves campaign-owner and encounter-effect RESTRICT
+references; other user dependencies cascade. Audit/tombstone triggers remain active,
+surviving campaign projections advance and invalidations publish after commit.
+Unattached media is reclaimed by existing media maintenance. A stopped server misses
+the nightly run; overdue accounts run on the next night after startup.
+
 ## Testing & CI
 
 - `bun test src/server src/shared` — server + shared unit/integration
