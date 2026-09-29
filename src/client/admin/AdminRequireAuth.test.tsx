@@ -1,19 +1,22 @@
 import { act, render, screen } from '@testing-library/react';
+import { StrictMode, type ReactNode, useLayoutEffect } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { AdminRequireAuth } from './AdminRequireAuth.tsx';
 
-function renderAdmin() {
+function renderAdmin(child: ReactNode = <h1>Admin users</h1>) {
   return render(
-    <MemoryRouter initialEntries={['/admin/users']}>
-      <Routes>
-        <Route path="/admin/login" element={<h1>Sign in</h1>} />
-        <Route element={<AdminRequireAuth />}>
-          <Route path="/admin/users" element={<h1>Admin users</h1>} />
-        </Route>
-      </Routes>
-    </MemoryRouter>,
+    <StrictMode>
+      <MemoryRouter initialEntries={['/admin/users']}>
+        <Routes>
+          <Route path="/admin/login" element={<h1>Sign in</h1>} />
+          <Route element={<AdminRequireAuth />}>
+            <Route path="/admin/users" element={child} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </StrictMode>,
   );
 }
 
@@ -40,6 +43,16 @@ describe('AdminRequireAuth', () => {
     renderAdmin();
     expect(screen.getByRole('heading', { name: 'Admin users' })).toBeVisible();
     act(() => tokenStore.clear());
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Admin users' })).not.toBeInTheDocument();
+  });
+  it('observes a session cleared before its subscription is attached', () => {
+    function ClearSession() {
+      useLayoutEffect(() => tokenStore.clear(), []);
+      return <h1>Admin users</h1>;
+    }
+    tokenStore.write(tokens);
+    renderAdmin(<ClearSession />);
     expect(screen.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Admin users' })).not.toBeInTheDocument();
   });
