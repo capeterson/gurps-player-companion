@@ -429,7 +429,12 @@ the nightly run; overdue accounts run on the next night after startup.
   A one-shot `deps` service fills the project-local dependency volume from the
   frozen lockfile; it runs in parallel with PostgreSQL startup, and client
   tests depend only on `deps`, so they do not boot PostgreSQL.
-- `playwright test` — end-to-end.
+- `playwright test` — end-to-end. Its configuration checks runtime `TMPDIR`
+  permissions and a real write before Chromium starts, so an inaccessible
+  shared-memory directory fails immediately. Docker browser runs use a writable
+  worktree-specific disk volume. Server/shared integration tests and OAuth/MCP
+  browser tests run serially when they share a database because configured-client
+  reconciliation changes global OAuth state.
 - `bun run check` = `lint` (Biome) + `typecheck` (`tsc --build`) + `bun test`
   (**server + shared only**) + OpenAPI/MCP contract checks. It does **not**
   run the client vitest or Playwright suites — run those separately for client
