@@ -8,6 +8,9 @@ Nightly account purges (`services/userPurge.ts`) run each account's deletion and
 surviving-character library detachment through `withAudit` with an empty actor,
 recorded as a null system actor. Purges retain append-only history and deletion
 tombstones; campaign/character payload snapshots are not erased from the audit log.
+Authored log deletions in surviving campaigns use `resolveLogAwards` to reverse
+earned-point credit in that same audited transaction. Owned campaign deletion
+retains surviving characters' earned points, matching the ordinary campaign path.
 
 The **append-only history/audit log**:
 - Captures every mutation to characters (attributes incl. **temporary stat boosts**, traits, skills, spells, inventory, combat) and to campaign-level data (settings, membership, library, adventure log).

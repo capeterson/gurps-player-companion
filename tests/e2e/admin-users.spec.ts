@@ -31,7 +31,7 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     await pool.query('update users set is_superuser=true where id=$1', [admin.user.id]);
     await page.goto('/login');
     await page.getByLabel(/email/i).fill(adminEmail);
-    await page.getByLabel(/^password\b/i).fill(password);
+    await page.getByLabel(/^password$/i).fill(password);
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page.getByRole('navigation')).toBeVisible();
     await page.goto('/admin/users');

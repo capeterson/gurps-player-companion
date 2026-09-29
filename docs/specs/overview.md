@@ -1024,11 +1024,15 @@ prevents concurrent sweeps; per-account transactions isolate failures, and row
 locks/rechecks honor cancellation or rescheduling. The job deletes owned
 characters/campaigns and their cascading children, credentials, memberships,
 invitations and authored logs/effects. Other players retain their characters and
-purchased library mechanics after an owned campaign disappears. Remaining
+purchased library mechanics after an owned campaign disappears. Log deletions
+in surviving campaigns reverse their earned-point awards, including recipients
+who have since moved away; deleting an owned campaign preserves earned points
+on surviving characters, matching ordinary campaign deletion. Remaining
 campaign projections advance and post-commit WebSocket nudges accelerate sync.
 Append-only audit history and sync tombstones are retained. Unattached images
 are reclaimed by the existing media cleanup job; public cached copies may remain.
 Failures are logged and stay scheduled for the following night.
+Graceful shutdown cancels the next run and finishes the current account transaction.
 
 Per architecture invariant, instance admin never ships in the
 player client.

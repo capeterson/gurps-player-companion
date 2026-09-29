@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, mock } from 'bun:test';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb, runInDbTransaction } from '../db/client.ts';
 import {
+  adventureLogEntries,
   campaignLibraryTraits,
   campaignMemberships,
   campaigns,
@@ -18,7 +19,12 @@ import {
   users,
 } from '../db/schema.ts';
 import { configureIntegrationTestEnvironment } from '../testConfig.ts';
-import { nextNightlyPurgeAt, sweepUserPurges } from './userPurge.ts';
+import {
+  nextNightlyPurgeAt,
+  startUserPurgeMaintenance,
+  stopUserPurgeMaintenance,
+  sweepUserPurges,
+} from './userPurge.ts';
 import { subscribe } from './wsBus.ts';
 
 configureIntegrationTestEnvironment();
@@ -69,6 +75,36 @@ async function campaign(ownerId: string) {
 }
 
 describe('nightly account purge', () => {
+  it('starts one unreferenced nightly timer, skips tests and clears it on shutdown', async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    const unref = mock(() => {});
+    const fakeTimer = { unref };
+    const schedule = mock((_callback: unknown, _delay?: number) => fakeTimer);
+    const clear = mock((_timer: unknown) => {});
+    globalThis.setTimeout = schedule as unknown as typeof setTimeout;
+    globalThis.clearTimeout = clear as unknown as typeof clearTimeout;
+    try {
+      startUserPurgeMaintenance('test');
+      expect(schedule).not.toHaveBeenCalled();
+      const before = Date.now();
+      startUserPurgeMaintenance('production');
+      startUserPurgeMaintenance('production');
+      expect(schedule).toHaveBeenCalledTimes(1);
+      const delay = schedule.mock.calls[0]?.[1];
+      expect(delay).toBeGreaterThan(0);
+      expect(delay).toBeLessThanOrEqual(86400000);
+      expect(before + (delay ?? 0)).toBeCloseTo(nextNightlyPurgeAt(new Date(before)).getTime(), -2);
+      expect(unref).toHaveBeenCalledTimes(1);
+      await stopUserPurgeMaintenance();
+      expect(clear).toHaveBeenCalledWith(fakeTimer);
+    } finally {
+      await stopUserPurgeMaintenance();
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
+
   it('schedules the next 03:00 UTC boundary across month/year and DST dates', () => {
     for (const [input, output] of [
       ['2026-09-29T02:59:59.999Z', '2026-09-29T03:00:00.000Z'],
@@ -227,6 +263,46 @@ describe('nightly account purge', () => {
       'sync_invalidate',
       'encounter_invalidate',
     ]);
+  });
+
+  it('reverses authored log awards in surviving campaigns, including recipients who moved away', async () => {
+    const victim = await account();
+    const survivor = await account(null, null);
+    const shared = await campaign(survivor.id);
+    const [character] = await getDb()
+      .insert(characters)
+      .values({ ownerId: survivor.id, name: 'Award recipient', earnedPoints: 12 })
+      .returning();
+    if (!character) throw new Error('fixture failed');
+    // The purged author no longer has a membership or character in this campaign.
+    const [entry] = await getDb()
+      .insert(adventureLogEntries)
+      .values({
+        authorId: victim.id,
+        campaignId: shared.id,
+        sessionDate: '2026-09-29',
+        title: 'Past award',
+        pointsGained: 5,
+        xpAwards: [{ characterId: character.id, amount: 5 }],
+      })
+      .returning();
+    if (!entry) throw new Error('fixture failed');
+    expect(await sweepUserPurges(now)).toBe(1);
+    expect(
+      await getDb().select().from(adventureLogEntries).where(eq(adventureLogEntries.id, entry.id)),
+    ).toHaveLength(0);
+    expect(
+      (await getDb().select().from(characters).where(eq(characters.id, character.id)))[0]
+        ?.earnedPoints,
+    ).toBe(7);
+    expect(
+      (await getDb().select().from(campaigns).where(eq(campaigns.id, shared.id)))[0]?.revision,
+    ).toBeGreaterThan(shared.revision);
+    const events = await getDb()
+      .select()
+      .from(entityHistory)
+      .where(and(eq(entityHistory.entityId, character.id), eq(entityHistory.op, 'update')));
+    expect(events.at(-1)?.actorUserId).toBeNull();
   });
 
   it('honors a cancellation holding the account lock after enumeration', async () => {

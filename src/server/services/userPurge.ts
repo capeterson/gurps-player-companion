@@ -2,6 +2,7 @@ import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
+  adventureLogEntries,
   campaignMemberships,
   campaigns,
   characters,
@@ -9,6 +10,8 @@ import {
   encounters,
   users,
 } from '../db/schema.ts';
+import { isDraining } from '../lifecycle.ts';
+import { resolveLogAwards } from './adventureLogAwards.ts';
 import { advanceCampaignProjectionRevision } from './libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { publish } from './wsBus.ts';
@@ -30,6 +33,7 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
       .orderBy(asc(users.purgeScheduledAt), asc(users.id));
     let purged = 0;
     for (const candidate of due) {
+      if (isDraining()) break;
       try {
         // Empty actor denotes system maintenance. Each audited transaction
         // isolates an account's failure and publishes nudges only after commit.
@@ -62,6 +66,10 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
             .select({ campaignId: characters.campaignId })
             .from(characters)
             .where(eq(characters.ownerId, target.id));
+          const authoredLogs = await tx
+            .select({ campaignId: adventureLogEntries.campaignId })
+            .from(adventureLogEntries)
+            .where(eq(adventureLogEntries.authorId, target.id));
           const authoredEffects = await tx
             .select({ encounterId: encounters.id, campaignId: encounters.campaignId })
             .from(encounterEffects)
@@ -74,6 +82,7 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
               character.campaignId ? [character.campaignId] : [],
             ),
             ...authoredEffects.map((effect) => effect.campaignId),
+            ...authoredLogs.map((entry) => entry.campaignId),
           ]);
           const recipients = new Set<string>();
           if (affectedCampaignIds.size) {
@@ -103,6 +112,44 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
                 { campaignId: null },
                 campaign.id,
               );
+            }
+          }
+          // Match log deletion in surviving campaigns, including reversal of
+          // earned-point awards. System maintenance uses owner-level authority;
+          // its audit actor remains null. Owned campaign deletion, like REST,
+          // retains earned points on surviving characters.
+          for (const campaignId of [
+            ...new Set(authoredLogs.map((entry) => entry.campaignId)),
+          ].sort()) {
+            if (ownedCampaignIds.has(campaignId)) continue;
+            const [campaign] = await tx
+              .select()
+              .from(campaigns)
+              .where(eq(campaigns.id, campaignId))
+              .for('update');
+            if (!campaign) continue;
+            const entries = await tx
+              .select()
+              .from(adventureLogEntries)
+              .where(
+                and(
+                  eq(adventureLogEntries.campaignId, campaignId),
+                  eq(adventureLogEntries.authorId, target.id),
+                ),
+              )
+              .orderBy(asc(adventureLogEntries.id))
+              .for('update');
+            for (const entry of entries) {
+              await resolveLogAwards(
+                tx,
+                campaignId,
+                campaign.ownerId,
+                campaign.ownerId,
+                { pointsGained: null },
+                entry.xpAwards,
+                entry.pointsGained,
+              );
+              await tx.delete(adventureLogEntries).where(eq(adventureLogEntries.id, entry.id));
             }
           }
           // Delete explicit RESTRICT references before the user. Remaining
@@ -149,20 +196,32 @@ export function nextNightlyPurgeAt(now: Date): Date {
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
+let activeSweep: Promise<void> | undefined;
+let stopping = false;
 export function startUserPurgeMaintenance(environment: string): void {
-  if (timer || environment === 'test') return;
+  if (timer || activeSweep || environment === 'test' || isDraining()) return;
+  stopping = false;
   const schedule = () => {
     const now = new Date();
-    timer = setTimeout(async () => {
-      try {
-        await sweepUserPurges();
-      } catch {
-        console.error('user purge sweep failed; will retry next night');
-      } finally {
-        schedule();
-      }
+    timer = setTimeout(() => {
+      timer = undefined;
+      activeSweep = sweepUserPurges()
+        .then(() => undefined)
+        .catch(() => console.error('user purge sweep failed; will retry next night'))
+        .finally(() => {
+          activeSweep = undefined;
+          if (!stopping && !isDraining()) schedule();
+        });
     }, nextNightlyPurgeAt(now).getTime() - now.getTime());
     timer.unref();
   };
   schedule();
+}
+
+/** Stop scheduling and let the current account transaction finish before DB shutdown. */
+export async function stopUserPurgeMaintenance(): Promise<void> {
+  stopping = true;
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+  await activeSweep;
 }

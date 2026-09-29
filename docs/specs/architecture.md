@@ -70,7 +70,8 @@ latest migration. Both expose the optional `APP_RELEASE` image identifier.
 `Connection: close`), closes all `/sync/ws` sockets with code 1012 so clients
 reconnect to the replacement, stops accepting connections, and waits up to
 `SHUTDOWN_GRACE_SECONDS` (default 15) for in-flight requests — sync batches and
-in-request media processing — and any running media-cleanup sweep. Whatever is
+in-request media processing — and any running media-cleanup or account-purge work. Purge
+scheduling stops and the sweep finishes its current account before stopping. Whatever is
 still running at the deadline is force-closed (the outbox replays it), then the
 database pool closes and the process exits. A second signal exits immediately.
 Compose files give the app a 25 s `stop_grace_period` so Docker does not
