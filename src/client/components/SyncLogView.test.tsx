@@ -6,7 +6,11 @@ import { syncEntityTable } from '../db/syncEntityStore.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { readDrainableOps } from '../sync/outbox.ts';
 import { syncStateStore } from '../sync/state.ts';
-import { appendSyncLog, redactSyncLogForCharacters } from '../sync/syncLog.ts';
+import {
+  appendSyncLog,
+  lastSuccessfulSyncKey,
+  redactSyncLogForCharacters,
+} from '../sync/syncLog.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 
 const wsStatus = vi.hoisted(() => ({ state: 'connected', lastConnectedAt: null as string | null }));
@@ -14,9 +18,10 @@ vi.mock('../sync/useSyncWsStatus.ts', () => ({ useSyncWsStatus: () => wsStatus }
 
 const clearLocalAndFullResync = vi.fn();
 const revertFailedOperation = vi.fn();
+const syncNow = vi.fn();
 
 vi.mock('../sync/orchestrator.ts', () => ({
-  getSyncOrchestrator: () => ({ clearLocalAndFullResync, revertFailedOperation }),
+  getSyncOrchestrator: () => ({ clearLocalAndFullResync, revertFailedOperation, syncNow }),
 }));
 
 beforeEach(() => {
@@ -48,6 +53,7 @@ function renderView() {
 
 afterEach(async () => {
   vi.restoreAllMocks();
+  syncNow.mockReset();
   wsStatus.state = 'connected';
   wsStatus.lastConnectedAt = null;
   syncStateStore.reset('synced');
@@ -770,6 +776,30 @@ it('shows unknown connection and sync times without fabricating timestamps', asy
   const connection = await screen.findByRole('region', { name: 'Connection status' });
   expect(within(connection).getByText('Connecting')).toBeVisible();
   expect(within(connection).getByText('Not yet connected')).toBeVisible();
+  expect(within(connection).getByText('No successful sync recorded')).toBeVisible();
+});
+
+it('runs a requested sync and shows its successful empty-check time', async () => {
+  syncNow.mockImplementation(async () => {
+    await getLocalDb().syncMeta.put({
+      key: lastSuccessfulSyncKey(),
+      value: new Date().toISOString(),
+    });
+  });
+  renderView();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Sync now' }));
+  expect(syncNow).toHaveBeenCalledOnce();
+  const connection = await screen.findByRole('region', { name: 'Connection status' });
+  expect(await within(connection).findByText('just now')).toBeVisible();
+  expect(await screen.findByText('Sync completed')).toBeVisible();
+});
+
+it('reports a failed requested sync without changing the last-sync time', async () => {
+  syncNow.mockRejectedValue(new Error('server unavailable'));
+  renderView();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Sync now' }));
+  expect(await screen.findByText("Couldn't sync — server unavailable")).toBeVisible();
+  const connection = screen.getByRole('region', { name: 'Connection status' });
   expect(within(connection).getByText('No successful sync recorded')).toBeVisible();
 });
 

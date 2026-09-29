@@ -18,6 +18,7 @@ import {
 } from './orchestrator.ts';
 import { enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
+import { lastSuccessfulSyncKey } from './syncLog.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -102,6 +103,82 @@ afterEach(async () => {
   resetSyncOrchestratorForTests();
   syncStateStore.reset('synced');
   await resetLocalDb();
+});
+
+describe('manual HTTP sync', () => {
+  it('uploads a backed-off edit before checking the cursor', async () => {
+    await seedCharacter();
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+    });
+    await getLocalDb()
+      .outbox.toCollection()
+      .modify({
+        status: 'transient_retry',
+        nextEarliestAttemptAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+    const requests: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        requests.push(url);
+        if (!url.includes('/sync/operations')) return cursorResponse();
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status: 'applied',
+              newRevision: 2,
+            })),
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+
+    await getSyncOrchestrator().syncNow();
+
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toContain('/sync/operations');
+    expect(requests[1]).toContain('/sync/cursor');
+    expect(await getLocalDb().outbox.count()).toBe(0);
+  });
+
+  it('checks the server and refreshes the last-sync time even when nothing changed', async () => {
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    const fetchMock = vi.fn().mockResolvedValue(cursorResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getSyncOrchestrator().syncNow();
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('/sync/cursor');
+    expect((await getLocalDb().syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(
+      expect.any(String),
+    );
+    expect(await getLocalDb().syncLog.count()).toBe(0);
+  });
+
+  it('keeps the previous time when the requested HTTP sync fails', async () => {
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    const key = lastSuccessfulSyncKey();
+    await getLocalDb().syncMeta.put({ key, value: '2026-09-28T12:00:00.000Z' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unavailable', { status: 503 })));
+
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow();
+
+    expect((await getLocalDb().syncMeta.get(key))?.value).toBe('2026-09-28T12:00:00.000Z');
+  });
 });
 
 describe('applyOutcomes sync-log diagnostics', () => {
