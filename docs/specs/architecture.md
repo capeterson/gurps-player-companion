@@ -375,6 +375,11 @@ Key PG18 / trigger machinery, layered by migration:
   mandatory named-image promotion gate: it runs against the selected source
   image and must pass before any version tag, image alias, or GitHub Release is
   created.
+  `scripts/release-image.sh` resolves the source once to a SHA-256 digest, pulls
+  that digest and checks its OCI revision label against the release checkout.
+  Migration, the candidate server and image alias publication all use the same
+  pinned reference. Promotion currently accepts only one linux/amd64 runnable
+  image (plus attestations); additional platforms need their own acceptance.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in

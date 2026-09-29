@@ -87,11 +87,16 @@ jobs:
       - name: Install Chromium for release acceptance
         run: bunx playwright install --with-deps chromium
 
-      - name: Start source image with an isolated database
+      - name: Pin source digest and verify revision
+        id: source
         env:
           SRC: ${{ inputs.source }}
+        run: sh scripts/release-image.sh resolve
+
+      - name: Start source image with an isolated database
+        env:
+          CANDIDATE: ${{ steps.source.outputs.candidate }}
         run: |
-          docker pull "$IMAGE:$SRC"
           docker run --rm --network host \
             --env ENVIRONMENT \
             --env DATABASE_URL \
@@ -100,7 +105,7 @@ jobs:
             --env APP_BASE_URL \
             --env PORT \
             --env OAUTH_CLIENTS \
-            "$IMAGE:$SRC" bun run dist/server/migrate.js
+            "$CANDIDATE" bun run dist/server/migrate.js
           docker run --rm --detach --name gpc-release-candidate --network host \
             --env ENVIRONMENT \
             --env DATABASE_URL \
@@ -109,7 +114,7 @@ jobs:
             --env APP_BASE_URL \
             --env PORT \
             --env OAUTH_CLIENTS \
-            "$IMAGE:$SRC"
+            "$CANDIDATE"
           for attempt in {1..60}; do
             if curl --fail --silent http://localhost:3000/api/v1/healthz >/dev/null; then
               exit 0
@@ -152,18 +157,9 @@ jobs:
       - name: Re-tag image in GHCR
         id: retag
         env:
-          SRC: ${{ inputs.source }}
+          CANDIDATE: ${{ steps.source.outputs.candidate }}
           VER: ${{ inputs.version }}
-        run: |
-          TAGS=( -t "$IMAGE:v$VER" -t "$IMAGE:$VER" )
-          if [[ "$VER" != *-* ]]; then
-            MM="${VER%.*}"
-            TAGS+=( -t "$IMAGE:latest" -t "$IMAGE:$MM" )
-            echo "prerelease=false" >>"$GITHUB_OUTPUT"
-          else
-            echo "prerelease=true" >>"$GITHUB_OUTPUT"
-          fi
-          docker buildx imagetools create "${TAGS[@]}" "$IMAGE:$SRC"
+        run: sh scripts/release-image.sh promote
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

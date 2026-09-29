@@ -7,6 +7,13 @@ import {
   type MediaTarget,
 } from '../../../shared/schemas/media.ts';
 
+// Restrict native decoding before metadata inspection: checking metadata.format
+// afterwards would still expose every installed parser to untrusted uploads.
+sharp.block({ operation: ['VipsForeignLoad'] });
+sharp.unblock({
+  operation: ['VipsForeignLoadJpegBuffer', 'VipsForeignLoadPngBuffer', 'VipsForeignLoadWebpBuffer'],
+});
+
 let busy = false;
 export async function processImage(bytes: Uint8Array, target: MediaTarget) {
   if (busy) throw new HTTPException(503, { message: 'Image processor is busy; retry shortly' });

@@ -9,7 +9,8 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { type SQL, and, desc, eq, lt, sql } from 'drizzle-orm';
+import { type SQL, and, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { type AnyPgColumn, alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { summarizeEvent } from '../../shared/history/summarize.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -20,6 +21,7 @@ import { getDb } from '../db/client.ts';
 import { characters, entityHistory, oauthClients, users } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { resolveCharacterView } from '../services/characterAccess.ts';
+import { decideCharacterAccess } from './sync.ts';
 
 const router = createOpenApiApp();
 router.use('/characters/*', requireActiveUser);
@@ -207,7 +209,7 @@ router.openapi(
     const { id: campaignId } = c.req.valid('param');
     const { before, limit, detail, scope } = c.req.valid('query');
 
-    const { role } = await loadCampaignOr403(campaignId, user.id);
+    const { campaign, role } = await loadCampaignOr403(campaignId, user.id);
 
     // Character roll-up is available to campaign staff running the game.
     if (scope === 'character' && role !== 'owner' && role !== 'manager') {
@@ -216,72 +218,83 @@ router.openapi(
 
     // Determine scope filter: default to campaign-scope rows only.
     const scopeFilter = scope ?? 'campaign';
-    // Preserve the append-only audit record, but keep cursor bookkeeping out of
-    // the user-facing change feed. Actual campaign/library edits remain visible.
-    const meaningfulChange = sql`NOT (
-      ${entityHistory.entityClass} = 'campaign' AND ${entityHistory.op} = 'update'
-      AND (${entityHistory.oldRow} - 'updated_at' - 'revision')
-        IS NOT DISTINCT FROM (${entityHistory.newRow} - 'updated_at' - 'revision')
-    )`;
-
-    const batchSize = sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE (
-      SELECT count(*) FROM entity_history AS batch_members
-      WHERE batch_members.batch_id = ${entityHistory.batchId}
-        AND batch_members.campaign_id = ${campaignId}
-        AND batch_members.scope = ${scopeFilter}
-    ) END`.as('batch_size');
-    const selectBatch = (beforeRev: number | undefined) =>
-      baseHistorySelect(batchSize)
-        .where(
-          and(
-            meaningfulChange,
-            beforeRev
-              ? and(
-                  eq(entityHistory.campaignId, campaignId),
-                  eq(entityHistory.scope, scopeFilter),
-                  lt(entityHistory.revision, beforeRev),
-                )
-              : and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, scopeFilter)),
-          ),
-        )
-        .orderBy(desc(entityHistory.revision))
-        .limit(limit);
-
-    // Private adventure-log entries are visible ONLY to their author — even
-    // the campaign owner cannot read another member's private entry through
-    // /campaigns/{id}/log, so we don't exempt the owner here either. Hide a row
-    // if EITHER snapshot was a private entry not authored by the viewer:
-    // editing a private entry to 'campaign' visibility would otherwise leak the
-    // prior private title/body via the old_row when ?detail=1. Snapshots use
-    // jsonb column names (`visibility`, `author_id`).
-    const rowVisible = (row: HistoryEventRow): boolean => {
-      if (row.entityClass !== 'adventure_log') return true;
-      for (const snap of [row.oldRow, row.newRow] as Array<Record<string, unknown> | null>) {
-        if (snap && snap.visibility === 'private' && snap.author_id !== user.id) return false;
-      }
-      return true;
-    };
-
-    // Over-fetch: the visibility predicate runs AFTER the SQL limit, so a
-    // single query could return fewer than `limit` visible rows and make the
-    // client stop paginating early (it treats a short page as the end). Keep
-    // pulling older batches until we have `limit` visible rows or the source is
-    // exhausted. Bounded by MAX_BATCHES so a pathological run of hidden rows
-    // can't loop unboundedly.
-    const MAX_BATCHES = 20;
-    const visibleRows: HistoryEventRow[] = [];
-    let cursor = before;
-    for (let i = 0; i < MAX_BATCHES && visibleRows.length < limit; i++) {
-      const batch = await selectBatch(cursor);
-      if (batch.length === 0) break;
-      for (const row of batch) {
-        if (rowVisible(row)) visibleRows.push(row);
-      }
-      cursor = Number(batch[batch.length - 1]?.revision);
-      if (batch.length < limit) break; // source exhausted
+    // History survives deletions and campaign transfers (including departure
+    // mirrors with character_id=NULL). Authorize its recorded owner/campaign
+    // context through the same share gate as current character payloads.
+    const visibleOwners: string[] = [];
+    if (scopeFilter === 'character') {
+      const owners = await getDb()
+        .selectDistinct({ ownerId: entityHistory.ownerUserId })
+        .from(entityHistory)
+        .where(and(eq(entityHistory.campaignId, campaignId), eq(entityHistory.scope, 'character')));
+      const access = decideCharacterAccess({
+        viewerId: user.id,
+        characters: owners.map(({ ownerId }) => ({ id: ownerId, ownerId, campaignId })),
+        campaigns: [{ ...campaign, viewerRole: role }],
+      });
+      visibleOwners.push(
+        ...owners
+          .filter(({ ownerId }) => access.get(ownerId) === 'full')
+          .map(({ ownerId }) => ownerId),
+      );
     }
 
-    const events = visibleRows.slice(0, limit).map((row) => toHistoryEvent(row, detail));
+    // Apply visibility BEFORE pagination and to batch cardinality too. Neither
+    // summaries, details, nor counts may disclose hidden rows. A long hidden
+    // prefix must not make the client mistake a short page for end-of-history.
+    const visible = (table: {
+      entityClass: AnyPgColumn;
+      op: AnyPgColumn;
+      oldRow: AnyPgColumn;
+      newRow: AnyPgColumn;
+      ownerUserId: AnyPgColumn;
+    }) =>
+      and(
+        // Cursor-only bookkeeping remains audited but is absent from this feed.
+        sql`NOT (
+          ${table.entityClass} = 'campaign' AND ${table.op} = 'update'
+          AND (${table.oldRow} - 'updated_at' - 'revision')
+            IS NOT DISTINCT FROM (${table.newRow} - 'updated_at' - 'revision')
+        )`,
+        scopeFilter === 'character' ? inArray(table.ownerUserId, visibleOwners) : undefined,
+        // Either private snapshot hides the whole event from non-authors,
+        // including an update that later publishes a private adventure log.
+        sql`(${table.entityClass} <> 'adventure_log' OR (
+          (${table.oldRow}->>'visibility' IS DISTINCT FROM 'private'
+            OR ${table.oldRow}->>'author_id' = ${user.id})
+          AND (${table.newRow}->>'visibility' IS DISTINCT FROM 'private'
+            OR ${table.newRow}->>'author_id' = ${user.id})
+        ))`,
+      );
+    const batchMembers = alias(entityHistory, 'batch_members');
+    const batchCount = getDb()
+      .select({ value: count() })
+      .from(batchMembers)
+      .where(
+        and(
+          eq(batchMembers.batchId, entityHistory.batchId),
+          eq(batchMembers.campaignId, campaignId),
+          eq(batchMembers.scope, scopeFilter),
+          visible(batchMembers),
+        ),
+      );
+    const batchSize =
+      sql<number>`CASE WHEN ${entityHistory.batchId} IS NULL THEN 0 ELSE (${batchCount}) END`.as(
+        'batch_size',
+      );
+    const rows = await baseHistorySelect(batchSize)
+      .where(
+        and(
+          eq(entityHistory.campaignId, campaignId),
+          eq(entityHistory.scope, scopeFilter),
+          before ? lt(entityHistory.revision, before) : undefined,
+          visible(entityHistory),
+        ),
+      )
+      .orderBy(desc(entityHistory.revision))
+      .limit(limit);
+
+    const events = rows.map((row) => toHistoryEvent(row, detail));
     return c.json(events, 200);
   },
 );

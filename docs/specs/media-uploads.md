@@ -80,14 +80,19 @@ Asset infrastructure is not a new syncable entity class. No JSONB column is adde
 A session abort fences upload responses and metadata writes during logout/resync.
 The sync log exports `gpc-pending-images-v1` JSON with source bytes in base64;
 these bytes and URL manifests are excluded from shareable diagnostic exports.
-Sign-out asks before discarding unsaved sources. Export before signing out,
-changing passwords or clearing local data; those operations remove unsynced sources along with the rest of the account's local data.
+Sign-out and password change ask before discarding any queued edits, pending
+theme preferences, or unsaved sources. **Keep editing** retains the session and
+work for later synchronization; explicit discard removes the account's local
+data. Export unsaved images before confirming discard or clearing local data.
 
 ## Abuse and failure bounds
 
 Input maximum is 10 MiB, 40 megapixels, 12,000 pixels on either axis and one frame.
-SVG, GIF, animated inputs and arbitrary files fail server-side decoding. Sharp
-applies a ten-second timeout to each output conversion; one decoder runs per
+Sharp 0.35.5 supplies patched native dependencies. Before any metadata decode,
+all native input loaders are blocked except JPEG, PNG and WebP buffer loaders.
+Unsupported formats (including AVIF/HEIF, TIFF, GIF and SVG) cannot enter their
+parsers; the metadata gate still rejects animated inputs and enforces dimensions.
+Sharp applies a ten-second timeout to each output conversion; one decoder runs per
 process. PostgreSQL limits concurrent processing across replicas to two by
 default. The authenticated receiver permits two simultaneous media POST handlers
 per process, with a 14 MiB transport ceiling (10 MiB binary after decoding).

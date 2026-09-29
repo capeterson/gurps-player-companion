@@ -59,6 +59,50 @@ async function addMember(ownerToken: string, campaignId: string, email: string) 
   expect(res.status).toBe(200);
 }
 
+async function addManager(ownerToken: string, campaignId: string, email: string) {
+  await addMember(ownerToken, campaignId, email);
+  const campaignRes = await app.request(`/api/v1/campaigns/${campaignId}`, {
+    headers: bearer(ownerToken),
+  });
+  expect(campaignRes.status).toBe(200);
+  const campaign = (await campaignRes.json()) as {
+    members: Array<{ userId: string; email: string }>;
+  };
+  const member = campaign.members.find((item) => item.email === email);
+  expect(member).toBeDefined();
+  const promote = await app.request(`/api/v1/campaigns/${campaignId}/members/${member?.userId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders(ownerToken),
+    body: JSON.stringify({ role: 'manager' }),
+  });
+  expect(promote.status).toBe(200);
+}
+
+function historyFixture(args: {
+  entityId: string;
+  ownerId: string;
+  campaignId: string;
+  characterId: string | null;
+  op?: string;
+  batchId?: string | null;
+  name: string;
+}) {
+  return {
+    revision: sql<number>`nextval('revisions_seq')`,
+    scope: 'character',
+    entityClass: 'character',
+    entityId: args.entityId,
+    op: args.op ?? 'update',
+    characterId: args.characterId,
+    campaignId: args.campaignId,
+    ownerUserId: args.ownerId,
+    actorUserId: args.ownerId,
+    batchId: args.batchId ?? null,
+    oldRow: { name: `${args.name} old` },
+    newRow: { name: args.name },
+  };
+}
+
 async function createCharacter(
   accessToken: string,
   overrides: Record<string, unknown> = {},
@@ -76,6 +120,7 @@ type HistoryEvent = {
   id: string;
   revision: number;
   scope: string;
+  characterId: string | null;
   entityClass: string;
   op: string;
   actorUserId: string | null;
@@ -279,6 +324,203 @@ describe('GET /characters/{id}/history', () => {
 // ===================== CAMPAIGN HISTORY =====================
 
 describe('GET /campaigns/{id}/history', () => {
+  it('filters minimal-view manager history before pagination and batch counts, including deleted and departure mirrors', async () => {
+    const owner = await registerUser('camp-hist-private-owner');
+    const manager = await registerUser('camp-hist-private-manager');
+    const otherPlayer = await registerUser('camp-hist-private-player');
+    const campaign = await createCampaign(owner.accessToken, {
+      shareCharacterSheets: false,
+      allowGmCharacterEditing: false,
+    });
+    await addManager(owner.accessToken, campaign.id as string, manager.email);
+    await addMember(owner.accessToken, campaign.id as string, otherPlayer.email);
+
+    const hiddenCharacter = await createCharacter(otherPlayer.accessToken, {
+      name: 'Deleted private character',
+      campaignId: campaign.id,
+    });
+    const deniedCharacterHistory = await app.request(
+      `/api/v1/characters/${hiddenCharacter.id}/history`,
+      { headers: bearer(manager.accessToken) },
+    );
+    expect(deniedCharacterHistory.status).toBe(403);
+    const deleteRes = await app.request(`/api/v1/characters/${hiddenCharacter.id}`, {
+      method: 'DELETE',
+      headers: bearer(otherPlayer.accessToken),
+    });
+    expect(deleteRes.status).toBe(204);
+
+    const managerCharacter = await createCharacter(manager.accessToken, {
+      name: 'Manager owned character',
+      campaignId: campaign.id,
+    });
+    const campaignOwnerCharacter = await createCharacter(owner.accessToken, {
+      name: 'Campaign owner own character',
+      campaignId: campaign.id,
+    });
+    const managerBatchId = crypto.randomUUID();
+    const managerHistoryRows = [
+      historyFixture({
+        entityId: managerCharacter.id as string,
+        ownerId: managerCharacter.ownerId as string,
+        campaignId: campaign.id as string,
+        characterId: managerCharacter.id as string,
+        batchId: managerBatchId,
+        name: 'Manager owned change one',
+      }),
+      historyFixture({
+        entityId: managerCharacter.id as string,
+        ownerId: managerCharacter.ownerId as string,
+        campaignId: campaign.id as string,
+        characterId: managerCharacter.id as string,
+        batchId: managerBatchId,
+        name: 'Manager owned change two',
+      }),
+    ];
+    await getDb().insert(entityHistory).values(managerHistoryRows);
+
+    // Keep more than one page of hidden rows newer than the visible events.
+    // The real delete above exercises a removed character whose history row
+    // still has its character id. This NULL-id row models the campaign's
+    // departure mirror for a character that left the campaign.
+    const hiddenBatchId = managerBatchId;
+    const hiddenRows = Array.from({ length: 24 }, (_, index) =>
+      historyFixture({
+        entityId: crypto.randomUUID(),
+        ownerId: hiddenCharacter.ownerId as string,
+        campaignId: campaign.id as string,
+        characterId: index === 1 ? null : crypto.randomUUID(),
+        op: 'update',
+        batchId: index === 0 ? hiddenBatchId : null,
+        name: index === 1 ? 'Departure mirror secret' : `Hidden row ${index}`,
+      }),
+    );
+    await getDb().insert(entityHistory).values(hiddenRows);
+
+    const pages: HistoryEvent[] = [];
+    let before: number | undefined;
+    for (let page = 0; page < 5; page++) {
+      const query =
+        before === undefined
+          ? '?scope=character&detail=1&limit=1'
+          : `?scope=character&detail=1&limit=1&before=${before}`;
+      const res = await app.request(`/api/v1/campaigns/${campaign.id}/history${query}`, {
+        headers: bearer(manager.accessToken),
+      });
+      expect(res.status).toBe(200);
+      const events = (await res.json()) as HistoryEvent[];
+      if (events.length === 0) break;
+      pages.push(...events);
+      before = events.at(-1)?.revision;
+      if (events.length < 1) break;
+    }
+
+    expect(pages).toHaveLength(3);
+    expect(pages.map((event) => (event.newRow as Record<string, unknown>)?.name)).toEqual([
+      'Manager owned change two',
+      'Manager owned change one',
+      'Manager owned character',
+    ]);
+    expect(pages.slice(0, 2).every((event) => event.batchSize === 2)).toBe(true);
+    const serialized = JSON.stringify(pages);
+    expect(serialized).not.toContain('Deleted private character');
+    expect(serialized).not.toContain('Departure mirror secret');
+    expect(serialized).not.toContain('Hidden row');
+
+    const summaryRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/history?scope=character&limit=50`,
+      { headers: bearer(manager.accessToken) },
+    );
+    expect(summaryRes.status).toBe(200);
+    const summaryEvents = (await summaryRes.json()) as HistoryEvent[];
+    expect(summaryEvents.some((event) => event.summary.includes('Manager owned character'))).toBe(
+      true,
+    );
+    expect(summaryEvents.some((event) => event.summary.includes('Deleted private character'))).toBe(
+      false,
+    );
+    expect(
+      summaryEvents.every((event) => event.oldRow === undefined && event.newRow === undefined),
+    ).toBe(true);
+
+    const ownerRes = await app.request(
+      `/api/v1/campaigns/${campaign.id}/history?scope=character&detail=1&limit=50`,
+      { headers: bearer(owner.accessToken) },
+    );
+    expect(ownerRes.status).toBe(200);
+    const ownerEvents = (await ownerRes.json()) as HistoryEvent[];
+    expect(ownerEvents.some((event) => event.characterId === campaignOwnerCharacter.id)).toBe(true);
+    expect(
+      ownerEvents.some(
+        (event) =>
+          (event.newRow as Record<string, unknown> | null)?.name === 'Campaign owner own character',
+      ),
+    ).toBe(true);
+  });
+
+  it('campaign owners and managers with either full-view grant can read other character summaries and details', async () => {
+    const owner = await registerUser('camp-hist-full-owner');
+    const manager = await registerUser('camp-hist-full-manager');
+    const player = await registerUser('camp-hist-full-player');
+    for (const options of [
+      { shareCharacterSheets: true, allowGmCharacterEditing: false },
+      { shareCharacterSheets: false, allowGmCharacterEditing: true },
+    ]) {
+      const campaign = await createCampaign(owner.accessToken, options);
+      await addManager(owner.accessToken, campaign.id as string, manager.email);
+      await addMember(owner.accessToken, campaign.id as string, player.email);
+      const character = await createCharacter(player.accessToken, {
+        name: 'Shared character',
+        campaignId: campaign.id,
+      });
+      const batchId = crypto.randomUUID();
+      await getDb()
+        .insert(entityHistory)
+        .values([
+          historyFixture({
+            entityId: character.id as string,
+            ownerId: character.ownerId as string,
+            campaignId: campaign.id as string,
+            characterId: character.id as string,
+            batchId,
+            name: 'Visible batch one',
+          }),
+          historyFixture({
+            entityId: character.id as string,
+            ownerId: character.ownerId as string,
+            campaignId: campaign.id as string,
+            characterId: character.id as string,
+            batchId,
+            name: 'Visible batch two',
+          }),
+        ]);
+
+      for (const token of [owner.accessToken, manager.accessToken]) {
+        const summaryRes = await app.request(
+          `/api/v1/campaigns/${campaign.id}/history?scope=character&limit=50`,
+          { headers: bearer(token) },
+        );
+        expect(summaryRes.status).toBe(200);
+        const summaries = (await summaryRes.json()) as HistoryEvent[];
+        expect(summaries.some((event) => event.characterId === character.id)).toBe(true);
+        expect(summaries.some((event) => event.summary.includes('Shared character'))).toBe(true);
+
+        const detailRes = await app.request(
+          `/api/v1/campaigns/${campaign.id}/history?scope=character&detail=1&limit=50`,
+          { headers: bearer(token) },
+        );
+        expect(detailRes.status).toBe(200);
+        const details = (await detailRes.json()) as HistoryEvent[];
+        const visibleBatch = details.filter((event) => event.batchId === batchId);
+        expect(visibleBatch).toHaveLength(2);
+        expect(visibleBatch.every((event) => event.batchSize === 2)).toBe(true);
+        expect(
+          visibleBatch.map((event) => (event.newRow as Record<string, unknown>)?.name),
+        ).toEqual(['Visible batch two', 'Visible batch one']);
+      }
+    }
+  });
+
   it('owner sees campaign-scope events, newest first, after a settings change', async () => {
     const owner = await registerUser('camp-hist-owner');
     const campaign = await createCampaign(owner.accessToken, { name: 'Original Name' });

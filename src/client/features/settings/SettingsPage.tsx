@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUnsyncedChangesGuard } from '../../hooks/useUnsyncedChangesGuard.tsx';
 import { ApiError, api } from '../../lib/api.ts';
 import { createPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import {
   useStatusBarPreferences,
   writeStatusBarPreferences,
 } from '../../lib/statusBarPreferences.ts';
+import { clearPendingThemePreferences } from '../../lib/theme.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
@@ -18,6 +20,7 @@ export function SettingsPage() {
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const discardGuard = useUnsyncedChangesGuard();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -93,6 +96,7 @@ export function SettingsPage() {
       setNewPassword('');
       setConfirmPassword('');
       setError(null);
+      clearPendingThemePreferences();
       tokenStore.clear();
       await getSyncOrchestrator().purge();
       toasts.push('Password changed. Please sign in again.', { kind: 'success' });
@@ -179,7 +183,10 @@ export function SettingsPage() {
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
-            changePassword.mutate();
+            void discardGuard.guard('changePassword', async () => {
+              // The mutation's onError owns the field error and toast.
+              await changePassword.mutateAsync().catch(() => undefined);
+            });
           }}
         >
           <div>
@@ -278,6 +285,7 @@ export function SettingsPage() {
 
       <ApiKeysSection />
       <ConnectedAppsSection />
+      {discardGuard.dialog}
     </div>
   );
 }

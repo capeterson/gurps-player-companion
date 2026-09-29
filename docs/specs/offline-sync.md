@@ -709,6 +709,11 @@ rule that has been broken at least once.
   that order before wiping every Dexie store. Late sync responses therefore
   cannot repopulate storage after logout. New tables and new `syncMeta` keys
   **must** be added to the purge.
+  Before user-initiated logout or password change, `useUnsyncedChangesGuard`
+  checks the outbox, media uploads, and pending theme preferences. Unsynced work
+  requires explicit discard confirmation; **Keep editing** preserves the token
+  and all queued intent so it can synchronize later. A failed storage check
+  blocks cleanup. Confirmation is bound to the login session that requested it.
 
 ## Self-healing & pruning
 
