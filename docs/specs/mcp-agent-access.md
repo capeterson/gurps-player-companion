@@ -415,6 +415,11 @@ The checked-in evidence includes the generated 49-tool catalog, per-operation
 successful REST/MCP differential and scope-denial fixtures, OAuth boundary and
 transport tests, transaction/idempotency regressions, client consent/Settings
 tests, and the Playwright browser authorization acceptance flow.
+Production executor integration coverage also exercises the real `/auth/me`
+handler and mounted `/mcp` endpoint with a persisted OAuth user, grant and token.
+It checks successful `get_current_user` and `list_campaigns` response validation,
+absence of internal redirects, continued external HTTP redirects, and rejection
+of external requests that lack trusted execution authority.
 
 ## Active effects and skill procedures
 

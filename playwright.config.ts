@@ -12,7 +12,36 @@
  * points this suite at it without asking Playwright to start a server.
  */
 
+import { constants, accessSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+// Chromium drops capabilities that can let the runner bypass directory modes.
+// Check ordinary user permissions as well as an actual write before launching.
+const browserTmpDir = tmpdir();
+let tempProbe: string | undefined;
+try {
+  const directory = statSync(browserTmpDir);
+  const uid = process.getuid?.();
+  const groups = process.getgroups?.() ?? [];
+  const gid = process.getgid?.();
+  if (gid !== undefined) groups.push(gid);
+  const mask = directory.uid === uid ? 0o300 : groups.includes(directory.gid) ? 0o030 : 0o003;
+  if (uid !== undefined && (directory.mode & mask) !== mask) {
+    throw new Error('Directory permissions do not allow Chromium to write and traverse it');
+  }
+  accessSync(browserTmpDir, constants.W_OK | constants.X_OK);
+  tempProbe = mkdtempSync(join(browserTmpDir, 'gpc-playwright-preflight-'));
+  writeFileSync(join(tempProbe, 'write-check'), 'ok');
+} catch (cause) {
+  throw new Error(
+    `Playwright TMPDIR ${browserTmpDir} is not writable by Chromium. Mount a writable disk directory or worktree-specific Docker volume and set TMPDIR to it.`,
+    { cause },
+  );
+} finally {
+  if (tempProbe) rmSync(tempProbe, { recursive: true, force: true });
+}
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3001';
 const CHROMIUM_EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;

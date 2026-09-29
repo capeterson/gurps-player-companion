@@ -4,6 +4,14 @@
 
 GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed by a Bun/Hono/Postgres/Drizzle server. Alongside current rows, revisions, and deletion tombstones, the app records an append-only audit log. Players can review sheet edits and campaign owners can inspect campaign history.
 
+Nightly account purges (`services/userPurge.ts`) run each account's deletion and
+surviving-character library detachment through `withAudit` with an empty actor,
+recorded as a null system actor. Purges retain append-only history and deletion
+tombstones; campaign/character payload snapshots are not erased from the audit log.
+Authored log deletions in surviving campaigns use `resolveLogAwards` to reverse
+earned-point credit in that same audited transaction. Owned campaign deletion
+retains surviving characters' earned points, matching the ordinary campaign path.
+
 The **append-only history/audit log**:
 - Captures every mutation to characters (attributes incl. **temporary stat boosts**, traits, skills, spells, inventory, combat) and to campaign-level data (settings, membership, library, adventure log).
 - Surfaces a **History tab** on the character sheet. Its default Change history

@@ -6,16 +6,20 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { adminApi } from '../../lib/admin.ts';
 import { ApiError } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
+import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 
 export function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const toasts = useToasts();
   const queryKey = ['admin', 'user', id] as const;
+  const [purgeConfirmation, setPurgeConfirmation] = useState<string>();
 
   const detail = useQuery({
     queryKey,
@@ -25,9 +29,13 @@ export function UserDetailPage() {
 
   const onActionError = (err: unknown) =>
     toasts.push(err instanceof ApiError ? err.message : 'Action failed', { kind: 'error' });
-  const onActionSuccess = () => {
-    qc.invalidateQueries({ queryKey });
-    qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+  const onActionSuccess = async () => {
+    setPurgeConfirmation(undefined);
+    await Promise.all([
+      qc.invalidateQueries({ queryKey }),
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'campaign'] }),
+    ]);
   };
 
   const suspend = useMutation({
@@ -62,6 +70,8 @@ export function UserDetailPage() {
   }
   const u = detail.data;
   if (!u) return null;
+  const isSelf = u.id === readUserIdFromToken();
+  const busy = suspend.isPending || unsuspend.isPending || purge.isPending || cancelPurge.isPending;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -113,7 +123,7 @@ export function UserDetailPage() {
               type="button"
               className="btn btn-warning btn-sm"
               onClick={() => suspend.mutate()}
-              disabled={suspend.isPending}
+              disabled={busy || isSelf}
             >
               Suspend
             </button>
@@ -122,8 +132,7 @@ export function UserDetailPage() {
               type="button"
               className="btn btn-success btn-sm"
               onClick={() => unsuspend.mutate()}
-              disabled={unsuspend.isPending || u.purgeScheduledAt !== null}
-              title={u.purgeScheduledAt ? 'Cancel purge first' : undefined}
+              disabled={busy || isSelf || u.purgeScheduledAt !== null}
             >
               Unsuspend
             </button>
@@ -133,7 +142,7 @@ export function UserDetailPage() {
               type="button"
               className="btn btn-ghost btn-sm"
               onClick={() => cancelPurge.mutate()}
-              disabled={cancelPurge.isPending}
+              disabled={busy}
             >
               Cancel purge
             </button>
@@ -141,14 +150,45 @@ export function UserDetailPage() {
             <button
               type="button"
               className="btn btn-error btn-sm"
-              onClick={() => purge.mutate()}
-              disabled={purge.isPending}
+              onClick={() => setPurgeConfirmation(id)}
+              disabled={busy || isSelf}
             >
               Schedule purge (30 d)
             </button>
           )}
         </div>
+        {isSelf && (
+          <p className="text-sm text-base-content/60">
+            You cannot suspend or purge your own account.
+          </p>
+        )}
+        {u.purgeScheduledAt && (
+          <p className="text-sm text-base-content/60">
+            Deletion runs nightly at 03:00 UTC after the scheduled date. Cancel purge before
+            unsuspending this account.
+          </p>
+        )}
       </section>
+
+      <ConfirmDialog
+        open={purgeConfirmation === id}
+        title="Schedule account purge?"
+        confirmLabel="Schedule purge"
+        tone="error"
+        pending={purge.isPending}
+        pendingLabel="Scheduling…"
+        onConfirm={() => purge.mutate()}
+        onCancel={() => setPurgeConfirmation(undefined)}
+      >
+        <p>
+          This immediately suspends {u.email} and revokes their sessions, API keys and connected
+          apps. After 30 days, the nightly job permanently deletes this account, its owned
+          characters and campaigns, including campaign libraries and logs. Other players keep their
+          characters. Audit history is retained. Uploaded images are removed by image cleanup when
+          no longer attached. You can cancel the purge before the job runs; cancellation leaves the
+          account suspended.
+        </p>
+      </ConfirmDialog>
 
       <section className="card p-card space-y-3">
         <p className="label-eyebrow">Characters ({u.characters.length})</p>

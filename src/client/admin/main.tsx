@@ -23,9 +23,9 @@ import { SuspendedPage } from '../features/auth/SuspendedPage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from '../lib/sessionQueryCache.tsx';
 import { applyStoredTheme } from '../lib/theme.ts';
 import { ToastProvider } from '../lib/toast.tsx';
-import { RequireAuth } from '../routes/RequireAuth.tsx';
 import '../styles/theme.css';
 import { AdminLayout } from './AdminLayout.tsx';
+import { AdminRequireAuth } from './AdminRequireAuth.tsx';
 import { CampaignDetailPage } from './pages/CampaignDetailPage.tsx';
 import { CampaignsPage } from './pages/CampaignsPage.tsx';
 import { UserDetailPage } from './pages/UserDetailPage.tsx';
@@ -39,11 +39,12 @@ const router = createBrowserRouter([
   {
     errorElement: <AppErrorPage homeHref="/admin" />,
     children: [
-      { path: '/login', element: <LoginPage /> },
+      { path: '/login', element: <Navigate to="/admin/login" replace /> },
+      { path: '/admin/login', element: <LoginPage defaultReturnTo="/admin/users" /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/suspended', element: <SuspendedPage /> },
       {
-        element: <RequireAuth />,
+        element: <AdminRequireAuth />,
         children: [
           {
             element: <AdminLayout />,

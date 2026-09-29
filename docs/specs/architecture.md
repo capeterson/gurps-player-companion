@@ -76,7 +76,8 @@ so the production app cannot be embedded in a frame.
 `Connection: close`), closes all `/sync/ws` sockets with code 1012 so clients
 reconnect to the replacement, stops accepting connections, and waits up to
 `SHUTDOWN_GRACE_SECONDS` (default 15) for in-flight requests — sync batches and
-in-request media processing — and any running media-cleanup sweep. Whatever is
+in-request media processing — and any running media-cleanup or account-purge work. Purge
+scheduling stops and the sweep finishes its current account before stopping. Whatever is
 still running at the deadline is force-closed (the outbox replays it), then the
 database pool closes and the process exits. A second signal exits immediately.
 Compose files give the app a 25 s `stop_grace_period` so Docker does not
@@ -391,6 +392,26 @@ Key PG18 / trigger machinery, layered by migration:
   never ships in the player bundle (`AGENTS.md` — "No instance admin in the
   PWA"). Header links to `/admin/*` are hard `<a>` anchors, not SPA `Link`s, to
   cross the bundle boundary.
+  `AdminRequireAuth` subscribes to session changes and redirects signed-out users
+  to `/admin/login`; sign-in restores the requested admin route. It does not mount
+  the player's `SyncProvider` or `SyncBootstrapGate`, so admin access never waits
+  for a player-data download or starts the outbox/cursor/WebSocket subsystem.
+
+The same Bun process schedules due-account purges at 03:00 UTC with an unreferenced
+wall-clock timeout (`services/userPurge.ts`); creating an app in the test environment
+does not start it. A PostgreSQL transaction advisory lock serializes sweep workers,
+which also delete expired `refresh_tokens` using an indexed expiry cutoff even
+when no accounts are due. Unexpired revoked rotation ancestors are retained for
+idempotent refresh retries and replay detection.
+Audited per-account transactions contain failures. Each account commits separately
+so the sync revision fence is released between accounts. Accounts are locked and their
+suspension/deadline rechecked before deletion. Owned campaigns use the same library
+detachment behavior as ordinary campaign deletion, preserving other players' paid
+mechanics. Explicit deletion resolves campaign-owner and encounter-effect RESTRICT
+references; other user dependencies cascade. Audit/tombstone triggers remain active,
+surviving campaign projections advance and invalidations publish after commit.
+Unattached media is reclaimed by existing media maintenance. A stopped server misses
+the nightly run; overdue accounts run on the next night after startup.
 
 ## Testing & CI
 
@@ -408,7 +429,12 @@ Key PG18 / trigger machinery, layered by migration:
   A one-shot `deps` service fills the project-local dependency volume from the
   frozen lockfile; it runs in parallel with PostgreSQL startup, and client
   tests depend only on `deps`, so they do not boot PostgreSQL.
-- `playwright test` — end-to-end.
+- `playwright test` — end-to-end. Its configuration checks runtime `TMPDIR`
+  permissions and a real write before Chromium starts, so an inaccessible
+  shared-memory directory fails immediately. Docker browser runs use a writable
+  worktree-specific disk volume. Server/shared integration tests and OAuth/MCP
+  browser tests run serially when they share a database because configured-client
+  reconciliation changes global OAuth state.
 - `bun run check` = `lint` (Biome) + `typecheck` (`tsc --build`) + `bun test`
   (**server + shared only**) + OpenAPI/MCP contract checks. It does **not**
   run the client vitest or Playwright suites — run those separately for client

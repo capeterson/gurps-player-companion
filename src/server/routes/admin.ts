@@ -30,12 +30,14 @@ import {
 import { uuid } from '../../shared/schemas/common.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireSuperuser } from '../auth/permissions.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import {
   apiKeys,
   campaignMemberships,
   campaigns,
   characters,
+  oauthGrants,
   refreshTokens,
   users,
 } from '../db/schema.ts';
@@ -53,7 +55,7 @@ const PURGE_DELAY_MS = 30 * 24 * 60 * 60 * 1000;
 function ensureNotSelf(targetId: string, actorId: string): void {
   // Block superusers from suspending or purging themselves; the flag is
   // DB-only so an admin can't undo the lockout from the UI.
-  if (targetId === actorId) {
+  if (targetId.toLowerCase() === actorId.toLowerCase()) {
     throw new HTTPException(400, { message: 'cannot act on self' });
   }
 }
@@ -85,17 +87,20 @@ async function userSummary(userId: string): Promise<AdminUserSummary> {
  * The auth middleware's suspended check would already block them, but
  * this prunes the rows that would otherwise sit in implicit-revoke limbo.
  */
-async function revokeUserCredentials(userId: string): Promise<void> {
-  const db = getDb();
+async function revokeUserCredentials(tx: AuditTx, userId: string): Promise<void> {
   const now = new Date();
-  await db
+  await tx
     .update(refreshTokens)
     .set({ revokedAt: now })
     .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
-  await db
+  await tx
     .update(apiKeys)
     .set({ revokedAt: now })
     .where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)));
+  await tx
+    .update(oauthGrants)
+    .set({ revokedAt: now })
+    .where(and(eq(oauthGrants.userId, userId), isNull(oauthGrants.revokedAt)));
 }
 
 router.openapi(
@@ -233,14 +238,19 @@ router.openapi(
     await requireSuperuser(actor.id);
     const { userId } = c.req.valid('param');
     ensureNotSelf(userId, actor.id);
-    const db = getDb();
-    const updated = await db
-      .update(users)
-      .set({ suspendedAt: new Date(), updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning({ id: users.id });
-    if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
-    await revokeUserCredentials(userId);
+    await withAudit(actor.id, undefined, async (tx) => {
+      const updated = await tx
+        .update(users)
+        .set({
+          suspendedAt: new Date(),
+          authVersion: sql`${users.authVersion} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
+      await revokeUserCredentials(tx, userId);
+    });
     return c.json(await userSummary(userId), 200);
   },
 );
@@ -261,6 +271,7 @@ router.openapi(
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
       409: errorResponse('Purge pending — cancel first'),
+      400: errorResponse('Cannot act on self'),
     },
   }),
   async (c) => {
@@ -268,16 +279,17 @@ router.openapi(
     await requireSuperuser(actor.id);
     const { userId } = c.req.valid('param');
     ensureNotSelf(userId, actor.id);
-    const db = getDb();
-    const target = (await db.select().from(users).where(eq(users.id, userId)))[0];
-    if (!target) throw new HTTPException(404, { message: 'user not found' });
-    if (target.purgeScheduledAt !== null) {
-      throw new HTTPException(409, { message: 'purge pending; cancel first' });
-    }
-    await db
-      .update(users)
-      .set({ suspendedAt: null, updatedAt: new Date() })
-      .where(eq(users.id, userId));
+    await withAudit(actor.id, undefined, async (tx) => {
+      const [target] = await tx.select().from(users).where(eq(users.id, userId)).for('update');
+      if (!target) throw new HTTPException(404, { message: 'user not found' });
+      if (target.purgeScheduledAt !== null) {
+        throw new HTTPException(409, { message: 'purge pending; cancel first' });
+      }
+      await tx
+        .update(users)
+        .set({ suspendedAt: null, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    });
     return c.json(await userSummary(userId), 200);
   },
 );
@@ -306,18 +318,20 @@ router.openapi(
     await requireSuperuser(actor.id);
     const { userId } = c.req.valid('param');
     ensureNotSelf(userId, actor.id);
-    const db = getDb();
-    const updated = await db
-      .update(users)
-      .set({
-        purgeScheduledAt: new Date(Date.now() + PURGE_DELAY_MS),
-        suspendedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning({ id: users.id });
-    if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
-    await revokeUserCredentials(userId);
+    await withAudit(actor.id, undefined, async (tx) => {
+      const updated = await tx
+        .update(users)
+        .set({
+          purgeScheduledAt: new Date(Date.now() + PURGE_DELAY_MS),
+          suspendedAt: new Date(),
+          authVersion: sql`${users.authVersion} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
+      await revokeUserCredentials(tx, userId);
+    });
     return c.json(await userSummary(userId), 200);
   },
 );
@@ -343,13 +357,14 @@ router.openapi(
     const actor = c.get('user');
     await requireSuperuser(actor.id);
     const { userId } = c.req.valid('param');
-    const db = getDb();
-    const updated = await db
-      .update(users)
-      .set({ purgeScheduledAt: null, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning({ id: users.id });
-    if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
+    await withAudit(actor.id, undefined, async (tx) => {
+      const updated = await tx
+        .update(users)
+        .set({ purgeScheduledAt: null, updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning({ id: users.id });
+      if (updated.length === 0) throw new HTTPException(404, { message: 'user not found' });
+    });
     return c.json(await userSummary(userId), 200);
   },
 );

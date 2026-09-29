@@ -5,7 +5,7 @@ import { ApiError, api } from '../../lib/api.ts';
 import { getPasskey, passkeysSupported } from '../../lib/passkeys.ts';
 import { type Tokens, tokenStore } from '../../lib/tokenStore.ts';
 
-export function LoginPage() {
+export function LoginPage({ defaultReturnTo = '/' }: { defaultReturnTo?: '/' | '/admin/users' }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -15,11 +15,15 @@ export function LoginPage() {
   const candidate = loginState?.returnTo;
   const returnTo =
     typeof candidate === 'string' &&
-    (candidate === '/oauth/consent' || candidate.startsWith('/oauth/consent?'))
+    (candidate === '/oauth/consent' ||
+      candidate.startsWith('/oauth/consent?') ||
+      (defaultReturnTo === '/admin/users' &&
+        (candidate === '/admin' || candidate.startsWith('/admin/'))))
       ? candidate
-      : '/';
+      : defaultReturnTo;
   const isOAuthReauthentication =
-    returnTo !== '/' && loginState?.reason === 'oauth-consent-reauthentication';
+    returnTo.startsWith('/oauth/consent') &&
+    loginState?.reason === 'oauth-consent-reauthentication';
 
   const passkeyLogin = useMutation({
     mutationFn: async () => {
@@ -120,9 +124,15 @@ export function LoginPage() {
           {passkeyLogin.isPending ? 'Checking passkey…' : 'Use a passkey'}
         </button>
         <p className="text-sm text-muted">
-          <Link to="/forgot-password" className="link link-primary">
-            Forgot your password?
-          </Link>
+          {defaultReturnTo === '/admin/users' ? (
+            <a href="/forgot-password" className="link link-primary">
+              Forgot your password?
+            </a>
+          ) : (
+            <Link to="/forgot-password" className="link link-primary">
+              Forgot your password?
+            </Link>
+          )}
         </p>
         <p className="text-sm text-muted">
           New here?{' '}
