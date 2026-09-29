@@ -178,7 +178,28 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
     name: 'Discard unsaved changes and change password?',
   });
   await expect(passwordDialog).toBeVisible();
+  await expect(
+    passwordDialog.getByText('Discard unsaved changes and change password?', { exact: true }),
+  ).toBeVisible();
   await expect(passwordDialog.getByRole('button', { name: 'Keep editing' })).toBeVisible();
+  await expect(
+    passwordDialog.getByRole('button', { name: 'Discard and change password' }),
+  ).toBeVisible();
+  const passwordDialogBoxes = await Promise.all([
+    passwordDialog.locator('.modal-box').boundingBox(),
+    passwordDialog.getByRole('button', { name: 'Keep editing' }).boundingBox(),
+    passwordDialog.getByRole('button', { name: 'Discard and change password' }).boundingBox(),
+  ]);
+  for (const box of passwordDialogBoxes) {
+    expect(box).not.toBeNull();
+    if (box) {
+      expect(box.x).toBeGreaterThanOrEqual(-1);
+      expect(box.y).toBeGreaterThanOrEqual(-1);
+      expect(box.x + box.width).toBeLessThanOrEqual(321);
+      expect(box.y + box.height).toBeLessThanOrEqual(845);
+    }
+  }
+  await page.screenshot({ path: testInfo.outputPath('password-confirm-320.png') });
   await page.keyboard.press('Escape');
   await expect(passwordDialog).toBeHidden();
   expect(passwordRequests).toBe(0);
