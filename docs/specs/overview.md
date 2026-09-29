@@ -22,6 +22,11 @@ in production and HTTP with `PORT` in development/test for all public app URLs.
 Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
+The production image ships only production dependencies. The HTTP app denies
+framing, caches content-hashed assets immutably, and keeps HTML and service-worker
+entrypoints uncached so releases remain discoverable (see
+[architecture.md](architecture.md)).
+
 A first download that fails displays its reason and a retry action; an ended session
 before that download completes offers sign-in instead of an indefinite loading state.
 
@@ -168,6 +173,11 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   unexpired revoked ancestors remain available for retry and replay detection.
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
+- **Unsaved changes at sign-out**: logout and password change check queued
+  edits, unsaved images, and pending theme preferences before ending the session.
+  A confirmation offers **Keep editing** or explicit discard; cancel preserves
+  the signed-in session and local work. Confirmed sign-out still purges all
+  account data from this device.
 
 ### Character sheet (the core surface)
 Route `/characters/:id`. Sectioned sheet
@@ -1166,6 +1176,7 @@ src/
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
     hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+                 useUnsyncedChangesGuard (confirmed session cleanup),
                  useAppHeaderBottom (live sticky-header offset),
                  useSelectedCampaignId (legacy Log/Library campaign URL selection),
                  useFlashState (shared flash-pulse primitive the draft
@@ -1233,6 +1244,7 @@ public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
   capture-screenshots.mjs  Refresh canonical captures from a seeded local app
+  release-image.sh  Pin and verify a candidate image, then promote its tested digest
   seed-lantern-mcp.ts  NDJSON connector bridge for the shared Lantern recipe (one existing owner)
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign

@@ -138,11 +138,17 @@ Two new read routes (no client writes), using the same OpenAPI/zod pattern as ex
 
 - **`GET /api/v1/characters/:id/history`** (new handlers in `src/server/routes/characters.ts` or a new `history.ts` router): returns `entity_history` rows where `character_id = :id`, scope `character`, ordered `revision DESC`, with `?before=<revision>&limit=<n>` cursor pagination. Authz: `loadCharacterOr403` — owner OR campaign GM/member (respecting minimal-view; see Risks). The GM "view all characters in the campaign" requirement is satisfied because the campaign owner has `full` access to every member character (`decideCharacterAccess`), so the per-character endpoint works for them; the campaign History view (below) also offers a roll-up across all characters.
 - **`GET /api/v1/campaigns/:id/history`**: returns rows where `campaign_id = :id` **AND `scope = 'campaign'`**, ordered `revision DESC`, paginated. Authz: `loadCampaignOr403` (member can read; only owner/manager-relevant rows as appropriate). The `scope='campaign'` filter is what **excludes character-level changes** from the campaign view, per requirement.
-- **GM character roll-up (same endpoint family):** `GET /api/v1/campaigns/:id/history?scope=character` returns `scope='character'` rows across all characters in the campaign for campaign owners and managers. The GM dashboard polls this stream every five seconds and highlights newly observed rows for 30 seconds.
+- **GM character roll-up (same endpoint family):** `GET /api/v1/campaigns/:id/history?scope=character` is available to campaign owners and managers, but each event must pass `decideCharacterAccess`. Managers with sharing and GM editing both disabled see only their own character events. Campaign owners retain full access; enabling sharing or GM editing grants managers the corresponding full access. The decision uses the event's recorded owner/campaign context, so deleted characters and departure mirrors with a null `character_id` remain gated. The GM dashboard polls this stream every five seconds and highlights newly observed rows for 30 seconds.
 
 Response shape: array of `historyEventOut` (new zod schema in `src/shared/schemas/history.ts`): `{ id, revision, scope, entityClass, entityId, op, characterId, campaignId, actorUserId, actorDisplayName, batchId, batchSize, summary, createdAt }`. `batchSize` is the server-computed total number of rows sharing the `batchId` within the requested feed scope, including rows outside the current page. The server **computes `summary` server-side** with the shared formatter (below) and joins `users.displayName` for the actor, so the list payload is small and never ships raw private `old_row`/`new_row` jsonb by default. The full field-level `oldRow`/`newRow` is returned **only** when the client requests `?detail=1` (used when expanding a batch) and only after the same authz/redaction check — minimal-view characters get no detail.
 
 Client data access via **TanStack Query** (consistent with campaigns/notifications HTTP reads), with `useInfiniteQuery` for "load older". Filtering & search run **locally** over the loaded pages (see UI).
+
+Campaign-feed authorization runs in SQL before the page limit and applies to
+`batchSize` as well: hidden summaries, snapshots and counts never leave the
+server, and a long hidden prefix cannot truncate pagination. Private adventure
+logs are visible only to their author; either private before/after snapshot
+hides the event from other viewers, including a later publication update.
 
 ---
 

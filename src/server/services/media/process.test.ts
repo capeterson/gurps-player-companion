@@ -61,6 +61,32 @@ describe('media image processing', () => {
     );
   });
 
+  it('cannot decode valid AVIF, GIF, TIFF, or SVG inputs', async () => {
+    const source = () =>
+      sharp({
+        create: { width: 8, height: 4, channels: 3, background: { r: 90, g: 130, b: 170 } },
+      });
+    const forbidden = [
+      ['AVIF', await source().avif({ effort: 0 }).toBuffer()],
+      ['GIF', await source().gif().toBuffer()],
+      ['TIFF', await source().tiff().toBuffer()],
+      [
+        'SVG',
+        Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="4"><rect width="8" height="4" fill="#5a82aa"/></svg>',
+        ),
+      ],
+    ] as const;
+
+    for (const [format, bytes] of forbidden) {
+      await expect(sharp(bytes).metadata(), `${format} loader stays blocked`).rejects.toThrow();
+      await expect(
+        processImage(bytes, 'character'),
+        `${format} upload is rejected`,
+      ).rejects.toThrow();
+    }
+  });
+
   it('rejects images just beyond the maximum dimension even when their pixel count is small', async () => {
     const image = await sharp({
       create: { width: 12001, height: 1, channels: 3, background: { r: 20, g: 30, b: 40 } },
