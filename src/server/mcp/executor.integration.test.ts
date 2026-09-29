@@ -54,7 +54,7 @@ describe('delegated executor transaction settlement', () => {
         ...integrationTestConfig,
         environment: 'production',
         trustProxy: false,
-        appBaseUrl: 'https://gpc.example',
+        appHostname: 'gpc.example',
       }),
     );
     app.post(operation.path, async (c) => {
