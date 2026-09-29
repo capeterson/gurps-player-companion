@@ -4,7 +4,12 @@ import { canAdoptLibraryEntry } from '../../shared/domain/libraryIdentity.ts';
 import { activeEffectsField } from '../../shared/schemas/activeEffects.ts';
 import { requireCampaignMember } from '../auth/permissions.ts';
 import type { AuditTx } from '../db/auditContext.ts';
-import { campaignLibraryActiveEffects, characters, inventoryItems } from '../db/schema.ts';
+import {
+  campaignLibraryActiveEffects,
+  campaigns,
+  characters,
+  inventoryItems,
+} from '../db/schema.ts';
 
 /** Shared by REST and sync, inside the owning character's audited write. */
 export async function prepareActiveEffects(
@@ -16,6 +21,12 @@ export async function prepareActiveEffects(
 ) {
   if (updates.activeEffects === undefined) return;
   const entries = activeEffectsField.parse(updates.activeEffects);
+  const [previousCharacter] = characterId
+    ? await tx
+        .select({ activeEffects: characters.activeEffects })
+        .from(characters)
+        .where(eq(characters.id, characterId))
+    : [];
   for (const entry of entries) {
     if (entry.sourceInventoryId) {
       const [item] = await tx
@@ -59,7 +70,20 @@ export async function prepareActiveEffects(
         ),
       )
       .for('share');
-    if (!source || !canAdoptLibraryEntry(source))
+    const [campaign] = source?.restricted
+      ? await tx
+          .select({ ownerId: campaigns.ownerId })
+          .from(campaigns)
+          .where(eq(campaigns.id, campaignId))
+      : [];
+    const alreadyHeld = previousCharacter?.activeEffects.some(
+      (old) => old.id === entry.id && old.definitionId === entry.definitionId,
+    );
+    if (
+      !source ||
+      !canAdoptLibraryEntry(source) ||
+      (source.restricted && campaign?.ownerId !== actorId && !alreadyHeld)
+    )
       throw new HTTPException(403, {
         message: 'Active effect definition unavailable in this campaign',
       });

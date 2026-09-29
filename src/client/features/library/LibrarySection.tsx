@@ -479,6 +479,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
               {row.name}
               <span className="mt-1 flex flex-wrap gap-1 text-xs font-normal">
                 {row.sourceKey && <span className="badge badge-sm">{row.sourceKey}</span>}
+                {row.restricted && <span className="badge badge-sm badge-warning">Restricted</span>}
                 {row.status && row.status !== 'complete' && (
                   <span className="badge badge-sm badge-warning">
                     {row.status.replaceAll('_', ' ')}
@@ -561,6 +562,9 @@ function LibraryRowImpl<R extends LibraryListRow>({
                   <span className="badge">{row.sourceKey ?? 'Legacy source'}</span>
                   <span className="badge">{row.status ?? 'complete'}</span>
                   <span className="badge">{row.role ?? 'definition'}</span>
+                  {row.restricted && (
+                    <span className="badge badge-warning">Restricted · GM only</span>
+                  )}
                   {row.preferredEdition && <span className="badge">Preferred edition</span>}
                 </div>
                 {row.sourceLocator && <p>{row.sourceLocator}</p>}

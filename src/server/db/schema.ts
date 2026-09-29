@@ -1046,6 +1046,7 @@ function libraryMetadataColumns() {
       .notNull()
       .default('definition'),
     preferredEdition: boolean('preferred_edition').notNull().default(false),
+    restricted: boolean('restricted').notNull().default(false),
     extraction: jsonb('extraction').$type<LibraryMetadata['extraction']>(),
   };
 }

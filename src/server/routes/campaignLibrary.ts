@@ -38,6 +38,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
+import { canonicalLibraryKey } from '../../shared/domain/libraryIdentity.ts';
+import { calculationKey } from '../../shared/schemas/calculation.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
@@ -52,7 +54,12 @@ import {
   libraryTraitOut,
 } from '../../shared/schemas/campaignLibrary.ts';
 import { uuid } from '../../shared/schemas/common.ts';
-import { LibraryYamlError, emitLibraryYaml, parseLibraryYaml } from '../../shared/yaml/library.ts';
+import {
+  LibraryYamlError,
+  emitLibraryYaml,
+  parseLibraryYaml,
+  sourceScopedLibrary,
+} from '../../shared/yaml/library.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignMember, requireCampaignOwner } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
@@ -154,8 +161,10 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const { section, search, limit, offset } = c.req.valid('query');
-    await requireCampaignMember(id, user.id);
+    const { campaign } = await requireCampaignMember(id, user.id);
     const db = getDb();
+    const visible = <T extends { restricted?: boolean }>(rows: T[]): T[] =>
+      campaign.ownerId === user.id ? rows : rows.filter((row) => !row.restricted);
     const includes = (candidate: string) => section === undefined || section === candidate;
     const sources = includes('sources') ? await selectLibrarySection(db, sourceEntity, id) : [];
     const modifiers = includes('modifiers')
@@ -181,22 +190,37 @@ router.openapi(
     return c.json(
       {
         sources: narrowLibraryRows(sources.map(sourceEntity.toOut), search, limit, offset),
-        modifiers: narrowLibraryRows(modifiers.map(modifierEntity.toOut), search, limit, offset),
-        traits: narrowLibraryRows(traits.map(traitEntity.toOut), search, limit, offset),
-        skills: narrowLibraryRows(skills.map(skillEntity.toOut), search, limit, offset),
-        spells: narrowLibraryRows(spells.map(spellEntity.toOut), search, limit, offset),
-        items: narrowLibraryRows(items.map(itemEntity.toOut), search, limit, offset),
-        languages: narrowLibraryRows(languages.map(languageEntity.toOut), search, limit, offset),
-        techniques: narrowLibraryRows(techniques.map(techniqueEntity.toOut), search, limit, offset),
-        styles: narrowLibraryRows(styles.map(styleEntity.toOut), search, limit, offset),
+        modifiers: narrowLibraryRows(
+          visible(modifiers).map(modifierEntity.toOut),
+          search,
+          limit,
+          offset,
+        ),
+        traits: narrowLibraryRows(visible(traits).map(traitEntity.toOut), search, limit, offset),
+        skills: narrowLibraryRows(visible(skills).map(skillEntity.toOut), search, limit, offset),
+        spells: narrowLibraryRows(visible(spells).map(spellEntity.toOut), search, limit, offset),
+        items: narrowLibraryRows(visible(items).map(itemEntity.toOut), search, limit, offset),
+        languages: narrowLibraryRows(
+          visible(languages).map(languageEntity.toOut),
+          search,
+          limit,
+          offset,
+        ),
+        techniques: narrowLibraryRows(
+          visible(techniques).map(techniqueEntity.toOut),
+          search,
+          limit,
+          offset,
+        ),
+        styles: narrowLibraryRows(visible(styles).map(styleEntity.toOut), search, limit, offset),
         enchantments: narrowLibraryRows(
-          enchantments.map(enchantmentEntity.toOut),
+          visible(enchantments).map(enchantmentEntity.toOut),
           search,
           limit,
           offset,
         ),
         activeEffects: narrowLibraryRows(
-          activeEffects.map(activeEffectEntity.toOut),
+          visible(activeEffects).map(activeEffectEntity.toOut),
           search,
           limit,
           offset,
@@ -240,7 +264,16 @@ router.openapi(
     tags: ['campaigns'],
     security: [{ bearerAuth: [] }],
     summary: 'Export the library as YAML (member or owner)',
-    request: { params: z.object({ id: uuid }) },
+    request: {
+      params: z.object({ id: uuid }),
+      query: z.object({
+        sourceKeys: z
+          .string()
+          .max(5000)
+          .optional()
+          .describe('JSON array of source keys, URL encoded in the query string'),
+      }),
+    },
     responses: {
       200: {
         description: 'YAML document',
@@ -256,6 +289,15 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
+    const rawRequested = c.req.valid('query').sourceKeys;
+    let requested: string[] | undefined;
+    if (rawRequested !== undefined) {
+      try {
+        requested = z.array(calculationKey).min(1).max(30).parse(JSON.parse(rawRequested));
+      } catch {
+        throw new HTTPException(400, { message: 'sourceKeys must be a JSON array of source keys' });
+      }
+    }
     const db = getDb();
     const snapshot = await db.transaction(
       async (tx) => {
@@ -304,34 +346,63 @@ router.openapi(
       enchantments,
       activeEffects,
     } = snapshot;
-    const yamlText = emitLibraryYaml({
-      campaign: {
-        name: campaign.name,
-        description: campaign.description,
-        pointTarget: campaign.pointTarget,
-        disadvantageCap: campaign.disadvantageCap,
-        quirkCap: campaign.quirkCap,
-        manaLevel: campaign.manaLevel,
-        houseRules: campaign.houseRules,
-        techLevel: campaign.techLevel,
-        skillPrerequisitePolicy: campaign.skillPrerequisitePolicy,
-        enforceAttributeCaps: campaign.enforceAttributeCaps,
-      },
+    const visible = <T extends { restricted?: boolean }>(rows: T[]): T[] =>
+      campaign.ownerId === user.id ? rows : rows.filter((row) => !row.restricted);
+    const allLibrary = {
       sources: sources.map(sourceEntity.rowToCreate),
-      modifiers: modifiers.map(modifierEntity.rowToCreate),
-      traits: traits.map(traitEntity.rowToCreate),
-      skills: skills.map(skillEntity.rowToCreate),
-      spells: spells.map(spellEntity.rowToCreate),
-      items: items.map(itemEntity.rowToCreate),
-      languages: languages.map(languageEntity.rowToCreate),
-      techniques: techniques.map(techniqueEntity.rowToCreate),
-      styles: styles.map(styleEntity.rowToCreate),
-      enchantments: enchantments.map(enchantmentEntity.rowToCreate),
-      activeEffects: activeEffects.map(activeEffectEntity.rowToCreate),
+      modifiers: visible(modifiers).map(modifierEntity.rowToCreate),
+      traits: visible(traits).map(traitEntity.rowToCreate),
+      skills: visible(skills).map(skillEntity.rowToCreate),
+      spells: visible(spells).map(spellEntity.rowToCreate),
+      items: visible(items).map(itemEntity.rowToCreate),
+      languages: visible(languages).map(languageEntity.rowToCreate),
+      techniques: visible(techniques).map(techniqueEntity.rowToCreate),
+      styles: visible(styles).map(styleEntity.rowToCreate),
+      enchantments: visible(enchantments).map(enchantmentEntity.rowToCreate),
+      activeEffects: visible(activeEffects).map(activeEffectEntity.rowToCreate),
+    };
+    let exported: Parameters<typeof emitLibraryYaml>[0] = allLibrary;
+    if (requested) {
+      try {
+        const scoped = sourceScopedLibrary(allLibrary, requested);
+        exported = {
+          ...scoped,
+          sources: scoped.sources ?? [],
+          modifiers: scoped.modifiers ?? [],
+          spells: scoped.spells ?? [],
+          languages: scoped.languages ?? [],
+          techniques: scoped.techniques ?? [],
+          styles: scoped.styles ?? [],
+          enchantments: scoped.enchantments ?? [],
+          activeEffects: scoped.activeEffects ?? [],
+        };
+      } catch (error) {
+        throw new HTTPException(400, { message: (error as Error).message });
+      }
+    }
+    const yamlText = emitLibraryYaml({
+      ...(requested ? { scope: { kind: 'sources' as const, sourceKeys: requested } } : {}),
+      ...(!requested
+        ? {
+            campaign: {
+              name: campaign.name,
+              description: campaign.description,
+              pointTarget: campaign.pointTarget,
+              disadvantageCap: campaign.disadvantageCap,
+              quirkCap: campaign.quirkCap,
+              manaLevel: campaign.manaLevel,
+              houseRules: campaign.houseRules,
+              techLevel: campaign.techLevel,
+              skillPrerequisitePolicy: campaign.skillPrerequisitePolicy,
+              enforceAttributeCaps: campaign.enforceAttributeCaps,
+            },
+          }
+        : {}),
+      ...exported,
     });
     return c.body(yamlText, 200, {
       'content-type': 'application/yaml; charset=utf-8',
-      'content-disposition': `attachment; filename="${slugify(campaign.name)}-library.yaml"`,
+      'content-disposition': `attachment; filename="${slugify(campaign.name)}-${requested ? 'sourcebooks' : 'library'}.yaml"`,
     });
   },
 );
@@ -344,6 +415,7 @@ const importBody = z.object({
     .min(1)
     .max(20 * 1024 * 1024),
   mode: importMode.default('merge'),
+  sourceKeys: z.array(z.string().min(1).max(160)).min(1).max(30).optional(),
   /** Opt-in: apply the doc's `campaign` block (description/pointTarget/
    * disadvantageCap/quirkCap/manaLevel/techLevel/enforceAttributeCaps) to the campaigns row. Never
    * touches `name`.  Default off so a routine content import can't
@@ -374,7 +446,7 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const { yaml, mode, applyCampaignSettings } = c.req.valid('json');
+    const { yaml, mode, applyCampaignSettings, sourceKeys } = c.req.valid('json');
     await requireCampaignOwner(id, user.id);
 
     let doc: ReturnType<typeof parseLibraryYaml>;
@@ -386,6 +458,34 @@ router.openapi(
       }
       throw err;
     }
+    const scopedKeys = doc.scope?.sourceKeys ?? sourceKeys;
+    if (
+      doc.scope &&
+      sourceKeys &&
+      (sourceKeys.length !== doc.scope.sourceKeys.length ||
+        sourceKeys.some(
+          (key) =>
+            !doc.scope?.sourceKeys.some(
+              (candidate) => canonicalLibraryKey(candidate) === canonicalLibraryKey(key),
+            ),
+        ))
+    )
+      throw new HTTPException(400, { message: 'Selected sourcebooks do not match the file scope' });
+    if (scopedKeys && applyCampaignSettings)
+      throw new HTTPException(400, {
+        message: 'Sourcebook imports cannot apply campaign settings',
+      });
+    let incoming = doc.library;
+    if (scopedKeys) {
+      try {
+        incoming = sourceScopedLibrary(doc.library, scopedKeys);
+      } catch (error) {
+        throw new HTTPException(400, { message: (error as Error).message });
+      }
+    }
+    const scopedSet = scopedKeys && new Set(scopedKeys.map(canonicalLibraryKey));
+    const onlySelected = (row: { sourceKey?: string | null }) =>
+      !!row.sourceKey && !!scopedSet?.has(canonicalLibraryKey(row.sourceKey));
 
     // Re-validate the campaign block against the campaign settings
     // schema before touching anything: the YAML doc schema only checks
@@ -447,43 +547,109 @@ router.openapi(
         .for('update');
       const currentGraph = await loadLibraryGraph(tx, id);
       try {
-        validateLibraryGraph(mergeLibraryGraph(currentGraph, doc.library as LibraryGraph, mode));
+        validateLibraryGraph(
+          mergeLibraryGraph(currentGraph, incoming as LibraryGraph, mode, scopedKeys),
+        );
       } catch (error) {
         throw new HTTPException(400, { message: (error as Error).message });
       }
       await advanceLibraryCampaignRevision(tx, id);
-      const sources = await upsertByKey(tx, sourceEntity, id, doc.library.sources, mode);
-      const modifiers = await upsertByKey(tx, modifierEntity, id, doc.library.modifiers, mode);
-      const traits = await upsertByKey(tx, traitEntity, id, doc.library.traits, mode);
-      const skills = await upsertByKey(tx, skillEntity, id, doc.library.skills, mode);
+      const sources = await upsertByKey(
+        tx,
+        sourceEntity,
+        id,
+        incoming.sources,
+        scopedKeys ? 'merge' : mode,
+      );
+      const modifiers = await upsertByKey(
+        tx,
+        modifierEntity,
+        id,
+        incoming.modifiers,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+      const traits = await upsertByKey(
+        tx,
+        traitEntity,
+        id,
+        incoming.traits,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+      const skills = await upsertByKey(
+        tx,
+        skillEntity,
+        id,
+        incoming.skills,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
       // Only prune spells when the document actually carried a spells
       // section: pre-spell-library exports omit it entirely, and a
       // replace-mode import of one of those files must not wipe the
       // current spell library.  An explicit `spells: []` still deletes.
       // (See upsertByKey's doc comment — this is generic behavior keyed
       // off `incoming === undefined`.)
-      const spells = await upsertByKey(tx, spellEntity, id, doc.library.spells, mode);
-      const items = await upsertByKey(tx, itemEntity, id, doc.library.items, mode);
+      const spells = await upsertByKey(
+        tx,
+        spellEntity,
+        id,
+        incoming.spells,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+      const items = await upsertByKey(
+        tx,
+        itemEntity,
+        id,
+        incoming.items,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
       // Languages, like spells, are an optional YAML section: pre-v4
       // exports omit it entirely and a replace-mode import of one of
       // those files must not wipe the campaign's language library.
-      const languages = await upsertByKey(tx, languageEntity, id, doc.library.languages, mode);
-      const techniques = await upsertByKey(tx, techniqueEntity, id, doc.library.techniques, mode);
-      const styles = await upsertByKey(tx, styleEntity, id, doc.library.styles, mode);
+      const languages = await upsertByKey(
+        tx,
+        languageEntity,
+        id,
+        incoming.languages,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+      const techniques = await upsertByKey(
+        tx,
+        techniqueEntity,
+        id,
+        incoming.techniques,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+      const styles = await upsertByKey(
+        tx,
+        styleEntity,
+        id,
+        incoming.styles,
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
       const enchantments = await upsertByKey(
         tx,
         enchantmentEntity,
         id,
-        doc.library.enchantments,
+        incoming.enchantments,
         mode,
+        scopedSet ? onlySelected : undefined,
       );
 
       const activeEffects = await upsertByKey(
         tx,
         activeEffectEntity,
         id,
-        doc.library.activeEffects,
+        incoming.activeEffects,
         mode,
+        scopedSet ? onlySelected : undefined,
       );
 
       // Opt-in campaign-settings apply (validated above): only fields
@@ -505,8 +671,8 @@ router.openapi(
         mode,
         sources,
         modifiers,
-        editionDecisions: libraryEditionDecisions(currentGraph, doc.library as LibraryGraph),
-        incomplete: Object.values(doc.library)
+        editionDecisions: libraryEditionDecisions(currentGraph, incoming as LibraryGraph),
+        incomplete: Object.values(incoming)
           .flat()
           .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length,
         traits,

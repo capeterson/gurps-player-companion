@@ -57,6 +57,133 @@ const STALE_CAMPAIGN_ID = '0193b3c0-f1f0-7000-8000-00000000dc01';
 const SPECULATIVE_CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000d003';
 
 describe('accessible-set prune', () => {
+  it('removes cached Restricted rows when the viewer loses campaign ownership', async () => {
+    const db = getLocalDb();
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e011';
+    await db.campaigns.put({
+      id: STALE_CAMPAIGN_ID,
+      ownerId: 'user-1',
+      name: 'Transferred campaign',
+      revision: 1,
+    } as never);
+    await db.campaignLibraryTraits.put({
+      id: traitId,
+      campaignId: STALE_CAMPAIGN_ID,
+      name: 'Former GM secret',
+      kind: 'advantage',
+      restricted: true,
+      revision: 1,
+    } as never);
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse(
+          [
+            {
+              entityClass: 'campaign',
+              entityId: STALE_CAMPAIGN_ID,
+              command: 'patch',
+              revision: 2,
+              data: {
+                id: STALE_CAMPAIGN_ID,
+                ownerId: 'user-2',
+                name: 'Transferred campaign',
+                revision: 2,
+              },
+            },
+          ],
+          { characterIds: [], campaignIds: [STALE_CAMPAIGN_ID] },
+        ),
+      ),
+    );
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+    await orchestrator.triggerCursorPull();
+    expect(await db.campaignLibraryTraits.get(traitId)).toBeUndefined();
+  });
+
+  it('backfills previously hidden library rows when a member becomes campaign owner', async () => {
+    const db = getLocalDb();
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e010';
+    await db.campaigns.put({
+      id: STALE_CAMPAIGN_ID,
+      ownerId: 'user-2',
+      name: 'Promoted campaign',
+      revision: 1,
+    } as never);
+    await db.syncCursors.bulkPut([
+      { entityClass: 'campaign', revision: 1 },
+      { entityClass: 'campaign_library_trait', revision: 500 },
+    ]);
+    await db.syncMeta.put({
+      key: 'accessible:user-1',
+      value: { characterIds: [], campaignIds: [STALE_CAMPAIGN_ID] },
+    });
+    loginAs('user-1');
+    const accessible = { characterIds: [], campaignIds: [STALE_CAMPAIGN_ID] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        cursorResponse(
+          [
+            {
+              entityClass: 'campaign',
+              entityId: STALE_CAMPAIGN_ID,
+              command: 'patch',
+              revision: 2,
+              data: {
+                id: STALE_CAMPAIGN_ID,
+                ownerId: 'user-1',
+                name: 'Promoted campaign',
+                revision: 2,
+              },
+            },
+          ],
+          accessible,
+        ),
+      )
+      .mockResolvedValueOnce(
+        cursorResponse(
+          [
+            {
+              entityClass: 'campaign_library_trait',
+              entityId: traitId,
+              command: 'patch',
+              revision: 4,
+              data: {
+                id: traitId,
+                campaignId: STALE_CAMPAIGN_ID,
+                name: 'GM-only trait',
+                kind: 'advantage',
+                restricted: true,
+                revision: 4,
+              },
+            },
+          ],
+          accessible,
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const orchestrator = getSyncOrchestrator();
+    orchestrator.setCurrentUser('user-1');
+    await orchestrator.triggerCursorPull();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string) as {
+      cursors: { entityClass: string; sinceRevision: number }[];
+    };
+    expect(
+      secondBody.cursors.find((cursor) => cursor.entityClass === 'campaign_library_trait')
+        ?.sinceRevision,
+    ).toBe(0);
+    expect(await db.campaignLibraryTraits.get(traitId)).toMatchObject({
+      name: 'GM-only trait',
+      restricted: true,
+    });
+  });
+
   it('resets every cursor once when access expands so old rows are backfilled', async () => {
     const db = getLocalDb();
     await db.syncCursors.bulkPut([

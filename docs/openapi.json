@@ -860,6 +860,9 @@
           "preferredEdition": {
             "type": "boolean"
           },
+          "restricted": {
+            "type": "boolean"
+          },
           "extraction": {
             "$ref": "#/components/schemas/LibraryExtractionRecord"
           },
@@ -1081,6 +1084,9 @@
             ]
           },
           "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
             "type": "boolean"
           },
           "extraction": {
@@ -3015,6 +3021,9 @@
           "preferredEdition": {
             "type": "boolean"
           },
+          "restricted": {
+            "type": "boolean"
+          },
           "extraction": {
             "$ref": "#/components/schemas/LibraryExtractionRecord"
           },
@@ -3434,6 +3443,9 @@
           "preferredEdition": {
             "type": "boolean"
           },
+          "restricted": {
+            "type": "boolean"
+          },
           "extraction": {
             "$ref": "#/components/schemas/LibraryExtractionRecord"
           },
@@ -3535,6 +3547,9 @@
           "preferredEdition": {
             "type": "boolean"
           },
+          "restricted": {
+            "type": "boolean"
+          },
           "extraction": {
             "$ref": "#/components/schemas/LibraryExtractionRecord"
           },
@@ -3629,6 +3644,9 @@
             ]
           },
           "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
             "type": "boolean"
           },
           "extraction": {
@@ -3943,6 +3961,9 @@
             ]
           },
           "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
             "type": "boolean"
           },
           "extraction": {
@@ -15635,6 +15656,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/components/schemas/LibraryExtractionRecord"
                   },
@@ -16444,6 +16468,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -17318,6 +17345,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -18466,6 +18496,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -19678,6 +19711,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/components/schemas/LibraryExtractionRecord"
                   },
@@ -19955,6 +19991,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -20298,6 +20337,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -21993,6 +22035,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -23754,6 +23799,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/components/schemas/LibraryExtractionRecord"
                   },
@@ -23954,6 +24002,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -24222,6 +24273,9 @@
                   "preferredEdition": {
                     "type": "boolean"
                   },
+                  "restricted": {
+                    "type": "boolean"
+                  },
                   "extraction": {
                     "$ref": "#/components/schemas/LibraryExtractionRecord"
                   },
@@ -24478,6 +24532,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -24799,6 +24856,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -25123,6 +25183,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -25511,6 +25574,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -26042,6 +26108,9 @@
                     ]
                   },
                   "preferredEdition": {
+                    "type": "boolean"
+                  },
+                  "restricted": {
                     "type": "boolean"
                   },
                   "extraction": {
@@ -26831,6 +26900,17 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 5000,
+              "description": "JSON array of source keys, URL encoded in the query string"
+            },
+            "required": false,
+            "description": "JSON array of source keys, URL encoded in the query string",
+            "name": "sourceKeys",
+            "in": "query"
           }
         ],
         "responses": {
@@ -26913,6 +26993,16 @@
                       "replace"
                     ],
                     "default": "merge"
+                  },
+                  "sourceKeys": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "minItems": 1,
+                    "maxItems": 30
                   },
                   "applyCampaignSettings": {
                     "type": "boolean",

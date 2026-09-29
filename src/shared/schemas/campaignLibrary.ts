@@ -491,11 +491,20 @@ export const libraryYamlVersion = z.union([
   z.literal(11),
   z.literal(12),
   z.literal(13),
+  z.literal(14),
 ]);
+
+export const librarySourceScope = z
+  .object({
+    kind: z.literal('sources'),
+    sourceKeys: z.array(z.string().trim().min(1).max(160)).min(1).max(30),
+  })
+  .strict();
 
 export const libraryYamlDoc = z
   .object({
     version: libraryYamlVersion,
+    scope: librarySourceScope.optional(),
     campaign: z
       .object({
         name: z.string().min(1).max(120).optional(),
@@ -591,6 +600,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     category: true,
@@ -609,6 +619,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     description: true,
@@ -639,6 +650,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     kind: true,
@@ -659,6 +671,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     attribute: true,
@@ -685,6 +698,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     college: true,
@@ -705,6 +719,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     category: true,
@@ -730,6 +745,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     description: true,
@@ -747,6 +763,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     description: true,
@@ -760,6 +777,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     defaultSkillName: true,
@@ -777,6 +795,7 @@ export const libraryPortableFieldManifest = {
     status: true,
     role: true,
     preferredEdition: true,
+    restricted: true,
     extraction: true,
     name: true,
     description: true,

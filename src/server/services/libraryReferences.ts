@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { canAdoptLibraryEntry, modifierApplies } from '../../shared/domain/libraryIdentity.ts';
 import {
@@ -29,7 +29,7 @@ import {
   campaignLibraryEnchantments,
   campaignLibraryItems,
   campaignLibraryLanguages,
-  type campaignLibraryModifiers,
+  campaignLibraryModifiers,
   campaignLibrarySkills,
   campaignLibrarySpells,
   campaignLibraryTechniques,
@@ -86,7 +86,8 @@ export async function hydrateItemEnchantmentDefinitions<T extends Record<string,
   tx: AuditTx,
   campaignId: string | null,
   values: T,
-  existing?: { weaponData: unknown; armor: unknown; isArmor: boolean },
+  existing?: { weaponData: unknown; armor: unknown; isArmor: boolean; enchantments?: unknown },
+  actorId?: string,
 ): Promise<T> {
   if (values.enchantments === undefined) return values;
   const parsed = enchantmentRef.array().safeParse(values.enchantments);
@@ -119,6 +120,20 @@ export async function hydrateItemEnchantmentDefinitions<T extends Record<string,
       throw new HTTPException(403, {
         message: 'Enchantment definition is unavailable in this campaign',
       });
+    if (definition.restricted && actorId) {
+      const [campaign] = await tx
+        .select({ ownerId: campaigns.ownerId })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId));
+      const held = enchantmentRef.array().safeParse(existing?.enchantments);
+      if (
+        campaign?.ownerId !== actorId &&
+        (!held.success ||
+          parsed.data.filter((next) => next.definitionId?.toLowerCase() === definition.id).length >
+            held.data.filter((prior) => prior.definitionId?.toLowerCase() === definition.id).length)
+      )
+        throw new HTTPException(403, { message: 'Enchantment definition is restricted to the GM' });
+    }
     const compatible =
       definition.applicability === 'any' ||
       (definition.applicability === 'weapon' && weaponData != null) ||
@@ -259,7 +274,7 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
       campaign && (campaign.ownerId === userId || membership) ? parent.campaignId : null;
     Object.assign(
       values,
-      await hydrateItemEnchantmentDefinitions(tx, readableCampaignId, values, item),
+      await hydrateItemEnchantmentDefinitions(tx, readableCampaignId, values, item, userId),
     );
   }
   const sourceId =
@@ -309,6 +324,40 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
   if (!source) throw denied();
   if (!canAdoptLibraryEntry(source))
     throw new HTTPException(400, { message: 'This library entry is incomplete or reference-only' });
+  const existingSourceId =
+    existing && cfg.field in existing ? (existing as Record<string, unknown>)[cfg.field] : null;
+  if (source.restricted && campaign.ownerId !== userId && existingSourceId !== canonicalSourceId)
+    throw denied();
+  if (kind === 'traits' && campaign.ownerId !== userId && Array.isArray(values.modifiers)) {
+    const next = values.modifiers as import('../../shared/schemas/trait.ts').TraitModifier[];
+    const held =
+      existing && 'modifiers' in existing
+        ? (existing.modifiers as import('../../shared/schemas/trait.ts').TraitModifier[])
+        : [];
+    const ids = [...new Set(next.flatMap((row) => row.pricingResolution?.definitionId ?? []))];
+    if (ids.length > 0) {
+      const definitions = await tx
+        .select({
+          id: campaignLibraryModifiers.id,
+          restricted: campaignLibraryModifiers.restricted,
+        })
+        .from(campaignLibraryModifiers)
+        .where(
+          and(
+            eq(campaignLibraryModifiers.campaignId, campaign.id),
+            inArray(campaignLibraryModifiers.id, ids),
+          ),
+        );
+      for (const definition of definitions) {
+        if (
+          definition.restricted &&
+          next.filter((row) => row.pricingResolution?.definitionId === definition.id).length >
+            held.filter((row) => row.pricingResolution?.definitionId === definition.id).length
+        )
+          throw new HTTPException(403, { message: 'Modifier definition is restricted to the GM' });
+      }
+    }
+  }
   if (kind === 'traits' && 'kind' in source) {
     const traitKind = values.kind ?? (existing && 'kind' in existing ? existing.kind : undefined);
     if (source.kind !== traitKind) throw denied();
@@ -352,8 +401,20 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
             const definition = old.localModifier
               ? traitSource.availableModifiers.find((m) => m.name === old.localModifier)
               : catalog.modifiers.find((row) => row.id === old.definitionId);
+            const globalDefinition = old.localModifier
+              ? null
+              : (definition as typeof campaignLibraryModifiers.$inferSelect | undefined);
             if (
               !definition ||
+              (globalDefinition?.restricted &&
+                campaign.ownerId !== userId &&
+                !(
+                  existing &&
+                  'modifiers' in existing &&
+                  (
+                    existing.modifiers as import('../../shared/schemas/trait.ts').TraitModifier[]
+                  ).some((prior) => prior.pricingResolution?.definitionId === globalDefinition.id)
+                )) ||
               (!old.localModifier &&
                 !modifierApplies(
                   definition as typeof campaignLibraryModifiers.$inferSelect,

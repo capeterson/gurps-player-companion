@@ -63,12 +63,28 @@ export function mergeLibraryGraph(
   current: LibraryGraph,
   incoming: LibraryGraph,
   mode: 'merge' | 'replace',
+  sourceKeys?: readonly string[],
 ): LibraryGraph {
   const result = { ...current };
+  const scope = sourceKeys && new Set(sourceKeys.map(canonicalLibraryKey));
   for (const [section, rows] of Object.entries(incoming)) {
     if (rows === undefined) continue;
     if (mode === 'replace') {
-      result[section] = rows;
+      result[section] = scope
+        ? section === 'sources'
+          ? [
+              ...(current[section] ?? []).filter(
+                (row) => !scope.has(canonicalLibraryKey(row.key || row.name)),
+              ),
+              ...rows,
+            ]
+          : [
+              ...(current[section] ?? []).filter(
+                (row) => !scope.has(canonicalLibraryKey(row.sourceKey ?? '')),
+              ),
+              ...rows,
+            ]
+        : rows;
       continue;
     }
     const keyOf = (entry: LibraryGraphEntry) =>

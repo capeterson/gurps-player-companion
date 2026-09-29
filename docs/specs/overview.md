@@ -312,7 +312,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v13. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v14. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -873,7 +873,8 @@ there is no decorative cover slot or implied image-upload feature.
   **fully sync-backed**: every member browses it from Dexie (offline too), and
   the owner's creates, edits and deletes go through the outbox (edits are
   whole-entry patches, AGENTS.md S13) with the standard rejection toast and row
-  flash. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
+  flash. **Restricted** entries remain GM-only across library reads, export,
+  sync and history; existing character snapshots remain usable. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
   CRUD forms for all eleven categories, including **languages, techniques and styles**.
   The dedicated character-sheet Languages and Techniques panels consume their
   definitions through autocompletes; styles remain library reference packages. Built for
@@ -893,15 +894,14 @@ there is no decorative cover slot or implied image-upload feature.
   and a draft the client can already tell is invalid (schema, specialization
   rule, duplicate name) stays open with the reason. The whole catalog is also
   **importable/exportable as versioned YAML**
-  for sharing between campaigns. The campaign workspace's **Library** page
-  (`/campaigns/:id/library`, backed by `features/library/LibraryPage.tsx`) is the
-  primary home for the YAML import/export flow; `/library` remains a legacy
-  campaign-switching entry point. Import validates the chosen file and shows a confirmation
+  for sharing between campaigns. The campaign workspace's **Import & export** tab
+  (`/campaigns/:id/library-transfer`) holds whole-library and sourcebook-scoped
+  transfers; `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v13 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v14 retains them.
 - **Adventure log**: session log entries attached to Campaign (shared, default)
   or an owned character (private), with an attachment dropdown and explanatory
   tooltip, an optional **session number** (running
@@ -1131,8 +1131,8 @@ src/
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
       campaigns/ Campaign workspace identity/navigation, overview, scoped
-                 Log/Library/History/Encounters routes, and GM dashboard
-      library/   LibraryPage (page shell: import/export, sticky category/search
+                 Log/Library/Import & export/History/Encounters routes, and GM dashboard
+      library/   LibraryPage (catalog and transfer views, sticky category/search
                  toolbar, URL state), LibrarySection (generic sortable, grouped,
                  foldable table with memoized expandable rows),
                  sections/*Section (per-category columns, groups, details and

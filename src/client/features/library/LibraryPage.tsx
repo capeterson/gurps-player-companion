@@ -1,6 +1,6 @@
 /**
- * Campaign library viewer + YAML import/export. GMs can edit individual
- * entries; members can browse and download the current library.
+ * Campaign library viewer and campaign transfer tab. GMs can edit individual
+ * entries; members can browse and download the visible library.
  *
  * The library is sync-backed (AGENTS.md S0): entries are read from Dexie and
  * every edit goes through the outbox, so browsing and editing work offline.
@@ -26,11 +26,13 @@ import {
   mergeLibraryGraph,
   validateLibraryGraph,
 } from '../../../shared/domain/libraryGraph.ts';
-import { canAdoptLibraryEntry } from '../../../shared/domain/libraryIdentity.ts';
+import {
+  canAdoptLibraryEntry,
+  canonicalLibraryKey,
+} from '../../../shared/domain/libraryIdentity.ts';
 import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
-import type { ImportResult } from '../../../shared/schemas/campaignLibrary.ts';
+import type { ImportResult, LibraryYamlDoc } from '../../../shared/schemas/campaignLibrary.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
-import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
@@ -92,7 +94,13 @@ function parseSection(value: string | null): SectionKey {
  * `?section=`, `?q=` and `?open=` make a section, a search and an open
  * entry linkable.
  */
-export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
+export function LibraryPage({
+  campaignId: campaignIdProp,
+  transferOnly = false,
+}: {
+  campaignId?: string;
+  transferOnly?: boolean;
+} = {}) {
   const qc = useQueryClient();
   // Campaign rows are synced read-only, so the switcher and the owner check
   // work offline too.
@@ -174,13 +182,22 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
   const [applyCampaignSettings, setApplyCampaignSettings] = useState(false);
+  const [fileCandidate, setFileCandidate] = useState<{
+    yaml: string;
+    fileName: string;
+    doc: LibraryYamlDoc;
+  } | null>(null);
+  const [selectedImportKeys, setSelectedImportKeys] = useState<string[] | null>(null);
+  const [selectedExportKeys, setSelectedExportKeys] = useState<string[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<{
     campaignId: string;
     fileName: string;
     yaml: string;
     mode: 'merge' | 'replace';
+    sourceKeys: string[] | null;
     applyCampaignSettings: boolean;
     counts: { label: string; incoming: number; removed: number | null }[];
     blocked: number;
@@ -196,6 +213,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       campaignId: string;
       yaml: string;
       mode: 'merge' | 'replace';
+      sourceKeys: string[] | null;
       applyCampaignSettings: boolean;
     }) =>
       journalCampaignMutation(
@@ -207,6 +225,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           body: {
             yaml: snap.yaml,
             mode: snap.mode,
+            ...(snap.sourceKeys ? { sourceKeys: snap.sourceKeys } : {}),
             applyCampaignSettings: snap.applyCampaignSettings,
           },
           source: 'Library import',
@@ -219,6 +238,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
             body: {
               yaml: snap.yaml,
               mode: snap.mode,
+              ...(snap.sourceKeys ? { sourceKeys: snap.sourceKeys } : {}),
               applyCampaignSettings: snap.applyCampaignSettings,
             },
           }),
@@ -243,6 +263,8 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   async function onFileSelected(file: File) {
     const selectedCampaignId = campaignId;
     if (!selectedCampaignId) return;
+    setFileCandidate(null);
+    setPendingImport(null);
     if (file.size > 20 * 1024 * 1024) {
       setImportError('YAML payload is larger than 20 MB');
       return;
@@ -253,8 +275,29 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       const { parseLibraryYaml } = await import('../../../shared/yaml/library.ts');
       if (selectedCampaignId !== currentCampaignId.current) return;
       const parsed = parseLibraryYaml(yaml);
+      setFileCandidate({ yaml, fileName: file.name, doc: parsed });
+      setSelectedImportKeys(parsed.scope?.sourceKeys ?? null);
+      setPendingImport(null);
+      setImportError(null);
+      setImportMessage(null);
+    } catch (error) {
+      setFileCandidate(null);
+      setPendingImport(null);
+      setImportError(error instanceof Error ? error.message : 'Could not read YAML file');
+    }
+  }
+
+  async function prepareImport() {
+    if (!fileCandidate || !campaignId) return;
+    try {
+      const { sourceScopedLibrary } = await import('../../../shared/yaml/library.ts');
+      const { yaml, fileName, doc: parsed } = fileCandidate;
+      const sourceKeys = parsed.scope?.sourceKeys ?? selectedImportKeys;
+      const incoming = sourceKeys
+        ? sourceScopedLibrary(parsed.library, sourceKeys)
+        : parsed.library;
       const mode = importMode;
-      const applySettings = applyCampaignSettings;
+      const applySettings = !sourceKeys && applyCampaignSettings;
       if (mode === 'replace' && !localLibrary) {
         throw new Error('Reload the current library before replacing it');
       }
@@ -273,23 +316,33 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       ] as const;
       if (!localLibrary)
         throw new Error('Wait for the current library before validating an import');
-      validateLibraryGraph(mergeLibraryGraph(localLibrary, parsed.library as LibraryGraph, mode));
-      const blocked = Object.values(parsed.library)
+      validateLibraryGraph(
+        mergeLibraryGraph(localLibrary, incoming as LibraryGraph, mode, sourceKeys ?? undefined),
+      );
+      const blocked = Object.values(incoming)
         .flat()
         .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length;
+      const selectedSourceKeys = sourceKeys && new Set(sourceKeys.map(canonicalLibraryKey));
       const preview = sections.flatMap(([label, key, naturalKey]) => {
-        const incoming = parsed.library[key];
+        const incomingRows = incoming[key];
         // Omitted optional sections are intentionally untouched by Replace.
-        if (!incoming) return [];
+        if (!incomingRows) return [];
         const current = localLibrary?.[key];
-        const incomingKeys = new Set(incoming.map((entry) => naturalKey(entry as never)));
+        const incomingKeys = new Set(incomingRows.map((entry) => naturalKey(entry as never)));
         return [
           {
             label,
-            incoming: incoming.length,
+            incoming: incomingRows.length,
             removed:
               mode === 'replace' && current
-                ? current.filter((entry) => !incomingKeys.has(naturalKey(entry as never))).length
+                ? current.filter(
+                    (entry) =>
+                      (!selectedSourceKeys ||
+                        (key !== 'sources' &&
+                          'sourceKey' in entry &&
+                          selectedSourceKeys.has(canonicalLibraryKey(String(entry.sourceKey))))) &&
+                      !incomingKeys.has(naturalKey(entry as never)),
+                  ).length
                 : null,
           },
         ];
@@ -297,14 +350,15 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
       setImportError(null);
       setImportMessage(null);
       setPendingImport({
-        campaignId: selectedCampaignId,
-        fileName: file.name,
+        campaignId,
+        fileName,
         yaml,
+        sourceKeys,
         mode,
         applyCampaignSettings: applySettings,
         counts: preview,
         blocked,
-        editionDecisions: libraryEditionDecisions(localLibrary, parsed.library as LibraryGraph),
+        editionDecisions: libraryEditionDecisions(localLibrary, incoming as LibraryGraph),
       });
     } catch (error) {
       setPendingImport(null);
@@ -314,6 +368,7 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
 
   function downloadExport() {
     if (!campaignId) return;
+    setExportError(null);
     // Route through `apiFetch` so the export inherits the shared
     // refresh-on-401 retry; a raw `fetch` would 401 the first time
     // after the 15-minute access-token TTL expires.  An anchor-click
@@ -321,22 +376,25 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
     // need to pull the bytes via fetch and synthesize a blob URL.
     void (async () => {
       try {
-        const res = await apiFetch(`/campaigns/${campaignId}/library/export`);
+        const query = selectedExportKeys?.length
+          ? `?sourceKeys=${encodeURIComponent(JSON.stringify(selectedExportKeys))}`
+          : '';
+        const res = await apiFetch(`/campaigns/${campaignId}/library/export${query}`);
         if (!res.ok) {
-          setImportError(`Export failed: HTTP ${res.status}`);
+          setExportError(`Export failed: HTTP ${res.status}`);
           return;
         }
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${slugify(currentCampaign?.name ?? 'library')}-library.yaml`;
+        a.download = `${slugify(currentCampaign?.name ?? 'library')}-${selectedExportKeys ? 'sourcebooks' : 'library'}.yaml`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
       } catch (err) {
-        setImportError(err instanceof Error ? err.message : 'Export failed');
+        setExportError(err instanceof Error ? err.message : 'Export failed');
       }
     })();
   }
@@ -358,6 +416,184 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
   const pageStyle = {
     '--library-scroll-offset': `${headerBottom + toolbarHeight + 8}px`,
   } as CSSProperties;
+
+  if (transferOnly)
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <header>
+          <h2 className="font-display text-2xl font-semibold">Import &amp; export</h2>
+          <p className="mt-1 text-sm text-base-content/60">
+            Move a whole campaign library or selected sourcebooks between campaigns.
+          </p>
+        </header>
+        <section className="card card-border bg-base-100">
+          <div className="card-body gap-4">
+            <h3 className="card-title">Export YAML</h3>
+            <p>Choose sourcebooks for a portable package, or export the entire library.</p>
+            <SourcebookSelection
+              sources={library.sources}
+              selected={selectedExportKeys}
+              onChange={setSelectedExportKeys}
+              allLabel="Entire library"
+            />
+            {selectedExportKeys !== null && (
+              <p className="text-sm text-base-content/60">
+                Entries without a sourcebook key are excluded from this export.
+              </p>
+            )}
+            {exportError && (
+              <p role="alert" className="alert alert-error">
+                {exportError}
+              </p>
+            )}
+            <div className="card-actions justify-end">
+              <button
+                className="btn btn-sm"
+                type="button"
+                disabled={
+                  !campaignId || (selectedExportKeys !== null && selectedExportKeys.length === 0)
+                }
+                onClick={downloadExport}
+              >
+                Export YAML
+              </button>
+            </div>
+          </div>
+        </section>
+        {isOwner && (
+          <section className="card card-border bg-base-100">
+            <div className="card-body gap-4">
+              <h3 className="card-title">Import YAML</h3>
+              <p>
+                Merge adds or updates entries. Replace also removes missing entries within the
+                selected scope. Sourcebook imports leave other books and campaign settings alone.
+              </p>
+              <label className="form-control">
+                <span className="label-text">YAML file</span>
+                <input
+                  type="file"
+                  className="file-input file-input-sm"
+                  accept=".yaml,.yml,text/yaml,application/yaml,text/plain"
+                  disabled={importMutation.isPending}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void onFileSelected(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {fileCandidate && (
+                <>
+                  <p className="text-sm">Selected: {fileCandidate.fileName}</p>
+                  <SourcebookSelection
+                    sources={fileCandidate.doc.library.sources ?? []}
+                    selected={selectedImportKeys}
+                    onChange={setSelectedImportKeys}
+                    allLabel="Entire file"
+                    locked={!!fileCandidate.doc.scope}
+                  />
+                </>
+              )}
+              <label className="form-control">
+                <span className="label-text">Mode</span>
+                <select
+                  className="select select-sm"
+                  value={importMode}
+                  onChange={(e) => setImportMode(e.target.value as 'merge' | 'replace')}
+                >
+                  <option value="merge">Merge (add/update)</option>
+                  <option value="replace">Replace selected scope</option>
+                </select>
+              </label>
+              {!selectedImportKeys && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={applyCampaignSettings}
+                    onChange={(e) => setApplyCampaignSettings(e.target.checked)}
+                  />
+                  Apply campaign settings from the file
+                </label>
+              )}
+              {importError && (
+                <p role="alert" className="alert alert-error">
+                  {importError}
+                </p>
+              )}
+              {importMessage && <output className="alert alert-success">{importMessage}</output>}
+              <div className="card-actions justify-end">
+                <button
+                  className="btn btn-sm"
+                  type="button"
+                  disabled={
+                    !fileCandidate ||
+                    importMutation.isPending ||
+                    (selectedImportKeys !== null && selectedImportKeys.length === 0)
+                  }
+                  onClick={() => void prepareImport()}
+                >
+                  Review import
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+        <ConfirmDialog
+          open={pendingImport !== null}
+          title={`Import ${pendingImport?.fileName ?? 'YAML'}?`}
+          confirmLabel={
+            pendingImport?.mode === 'replace' ? 'Replace selected scope' : 'Merge library'
+          }
+          tone={pendingImport?.mode === 'replace' ? 'error' : 'primary'}
+          pending={importMutation.isPending}
+          pendingLabel="Importing…"
+          onCancel={() => setPendingImport(null)}
+          onConfirm={() => {
+            if (
+              !pendingImport ||
+              pendingImport.campaignId !== campaignId ||
+              importMutation.isPending
+            )
+              return;
+            importMutation.mutate({
+              campaignId: pendingImport.campaignId,
+              yaml: pendingImport.yaml,
+              mode: pendingImport.mode,
+              sourceKeys: pendingImport.sourceKeys,
+              applyCampaignSettings: pendingImport.applyCampaignSettings,
+            });
+          }}
+        >
+          <p>
+            {pendingImport?.sourceKeys
+              ? `Selected sourcebooks: ${pendingImport.sourceKeys.join(', ')}. Other sourcebooks remain unchanged.`
+              : 'The entire file will be imported.'}
+          </p>
+          <ul className="mt-2 space-y-1" aria-label="Import preview">
+            {pendingImport?.counts.map((row) => (
+              <li key={row.label}>
+                {row.label}: {row.incoming} in file
+                {row.removed !== null && ` · ${row.removed} to remove`}
+              </li>
+            ))}
+          </ul>
+          {pendingImport?.blocked ? (
+            <p>
+              {pendingImport.blocked} incomplete or reference entries cannot be added to characters.
+            </p>
+          ) : null}
+          {pendingImport?.editionDecisions.length ? (
+            <p>{pendingImport.editionDecisions.length} edition decisions will be applied.</p>
+          ) : null}
+          {importError && (
+            <p role="alert" className="alert alert-error mt-2">
+              {importError}
+            </p>
+          )}
+        </ConfirmDialog>
+      </div>
+    );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6" style={pageStyle}>
@@ -404,14 +640,6 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
               ))}
             </select>
           )}
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={!campaignId}
-            onClick={downloadExport}
-          >
-            Export YAML
-          </button>
         </div>
       </header>
 
@@ -420,129 +648,6 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
           You don&apos;t belong to any campaigns yet.
         </div>
       )}
-
-      {campaignId && isOwner && (
-        <FoldSection
-          preferenceKey={`${campaignId}:library-import`}
-          title="Import YAML"
-          defaultOpen={false}
-        >
-          <div className="space-y-3">
-            <p className="text-sm text-muted">
-              Upload a campaign-library YAML document. <strong>Merge</strong> adds or updates
-              entries by canonical key and source edition (traits also match kind; entries without
-              aliases use their names) and leaves absent entries alone. <strong>Replace</strong>{' '}
-              also removes entries missing from sections included in the file. Omitted optional
-              sections remain untouched; an explicit empty section clears it. Importing needs a
-              connection.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="form-control">
-                <span className="label-text">Mode</span>
-                <select
-                  className="select select-bordered select-sm"
-                  value={importMode}
-                  onChange={(e) => setImportMode(e.target.value as 'merge' | 'replace')}
-                >
-                  <option value="merge">Merge (add/update)</option>
-                  <option value="replace">Replace (sync exact)</option>
-                </select>
-              </label>
-              <label className="flex items-center gap-2 self-end pb-1.5">
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={applyCampaignSettings}
-                  onChange={(e) => setApplyCampaignSettings(e.target.checked)}
-                />
-                <span className="label-text">
-                  Apply campaign settings from the file (description, point target, caps, mana level
-                  — never the name)
-                </span>
-              </label>
-              <label className="form-control">
-                <span className="label-text">YAML file</span>
-                <input
-                  type="file"
-                  className="file-input file-input-bordered file-input-sm"
-                  accept=".yaml,.yml,text/yaml,application/yaml,text/plain"
-                  disabled={importMutation.isPending}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void onFileSelected(file);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              {importMutation.isPending && <span className="text-sm text-muted">Importing…</span>}
-            </div>
-            {importError && <p className="alert alert-error text-sm">{importError}</p>}
-            {importMessage && <p className="alert alert-success text-sm">{importMessage}</p>}
-          </div>
-        </FoldSection>
-      )}
-      <ConfirmDialog
-        open={pendingImport !== null}
-        title={`Import ${pendingImport?.fileName ?? 'YAML'}?`}
-        confirmLabel={pendingImport?.mode === 'replace' ? 'Replace library' : 'Merge library'}
-        tone={pendingImport?.mode === 'replace' ? 'error' : 'primary'}
-        pending={importMutation.isPending}
-        pendingLabel="Importing…"
-        onCancel={() => setPendingImport(null)}
-        onConfirm={() => {
-          if (!pendingImport || pendingImport.campaignId !== campaignId || importMutation.isPending)
-            return;
-          importMutation.mutate({
-            campaignId: pendingImport.campaignId,
-            yaml: pendingImport.yaml,
-            mode: pendingImport.mode,
-            applyCampaignSettings: pendingImport.applyCampaignSettings,
-          });
-        }}
-      >
-        <p>
-          {pendingImport?.mode === 'replace'
-            ? 'Replace removes entries missing from sections included in this file. Omitted optional sections remain untouched.'
-            : 'Merge will add or update entries without deleting existing entries.'}
-          {pendingImport?.applyCampaignSettings &&
-            ' Campaign settings in the file will also be applied.'}
-        </p>
-        {pendingImport && (
-          <p>
-            {pendingImport.blocked} incomplete/reference entries will remain blocked from character
-            adoption.
-          </p>
-        )}
-        {pendingImport && pendingImport.editionDecisions.length > 0 && (
-          <details>
-            <summary>Source edition decisions ({pendingImport.editionDecisions.length})</summary>
-            <ul>
-              {pendingImport.editionDecisions.map((decision) => (
-                <li key={JSON.stringify([decision.section, decision.key, decision.sourceKey])}>
-                  {decision.section}: {decision.key} · {decision.sourceKey ?? 'legacy'} —{' '}
-                  {decision.decision.replaceAll('_', ' ')}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-        <ul className="mt-2 space-y-1" aria-label="Import preview">
-          {pendingImport?.counts.map((row) => (
-            <li key={row.label}>
-              {row.label}: {row.incoming} in file
-              {row.removed !== null && ` · ${row.removed} to remove`}
-            </li>
-          ))}
-        </ul>
-        {pendingImport?.mode === 'replace' &&
-          pendingImport.counts.some((row) => row.removed === null) && (
-            <p className="mt-2 text-warning">
-              Some current section counts are unavailable. The server will report final deletion
-              counts after import.
-            </p>
-          )}
-        {importError && <p className="alert alert-error mt-2">{importError}</p>}
-      </ConfirmDialog>
 
       <div ref={toolbarRef} className="library-toolbar" style={{ top: `${headerBottom}px` }}>
         <div className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
@@ -612,6 +717,66 @@ export function LibraryPage({ campaignId: campaignIdProp }: { campaignId?: strin
         </div>
       )}
     </div>
+  );
+}
+
+function SourcebookSelection({
+  sources,
+  selected,
+  onChange,
+  allLabel,
+  locked = false,
+}: {
+  sources: readonly { key: string; name: string; abbreviation: string }[];
+  selected: string[] | null;
+  onChange: (keys: string[] | null) => void;
+  allLabel: string;
+  locked?: boolean;
+}) {
+  return (
+    <fieldset className="fieldset">
+      <legend className="font-medium">Scope</legend>
+      {!locked && (
+        <label className="flex items-center gap-2">
+          <input
+            className="checkbox checkbox-sm"
+            type="checkbox"
+            checked={selected === null}
+            onChange={() => onChange(null)}
+          />
+          {allLabel}
+        </label>
+      )}
+      {sources.length === 0 && (
+        <p className="text-sm text-base-content/60">No keyed sourcebooks in this file.</p>
+      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sources.map((source) => (
+          <label key={source.key} className="flex items-center gap-2">
+            <input
+              className="checkbox checkbox-sm"
+              type="checkbox"
+              disabled={locked}
+              checked={
+                selected?.some(
+                  (key) => canonicalLibraryKey(key) === canonicalLibraryKey(source.key),
+                ) ?? false
+              }
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? [...(selected ?? []), source.key]
+                    : (selected ?? []).filter(
+                        (key) => canonicalLibraryKey(key) !== canonicalLibraryKey(source.key),
+                      ),
+                )
+              }
+            />
+            {source.abbreviation} · {source.name}
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

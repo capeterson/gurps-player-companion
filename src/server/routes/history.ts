@@ -244,6 +244,7 @@ router.openapi(
     // prefix must not make the client mistake a short page for end-of-history.
     const visible = (table: {
       entityClass: AnyPgColumn;
+      entityId: AnyPgColumn;
       op: AnyPgColumn;
       oldRow: AnyPgColumn;
       newRow: AnyPgColumn;
@@ -265,6 +266,24 @@ router.openapi(
           AND (${table.newRow}->>'visibility' IS DISTINCT FROM 'private'
             OR ${table.newRow}->>'author_id' = ${user.id})
         ))`,
+        role === 'owner' || scopeFilter !== 'campaign'
+          ? undefined
+          : sql`(
+          ${table.entityClass} NOT LIKE 'campaign_library_%' OR (
+            COALESCE((${table.oldRow}->>'restricted')::boolean, false) = false
+            AND COALESCE((${table.newRow}->>'restricted')::boolean, false) = false
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_traits r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_skills r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_spells r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_items r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_languages r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_techniques r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_styles r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_enchantments r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_active_effects r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_modifiers r WHERE r.id = ${table.entityId} AND r.restricted)
+          )
+        )`,
       );
     const batchMembers = alias(entityHistory, 'batch_members');
     const batchCount = getDb()

@@ -18,6 +18,7 @@ export function libraryMetadataValues(entry: LibraryMetadata & { name: string })
     status: entry.status ?? 'complete',
     role: entry.role ?? 'definition',
     preferredEdition: entry.preferredEdition ?? false,
+    restricted: entry.restricted ?? false,
     extraction: entry.extraction ?? null,
   };
 }
@@ -26,6 +27,11 @@ export function canAdoptLibraryEntry(entry: LibraryMetadata): boolean {
     (entry.status ?? 'complete') === 'complete' &&
     ['definition', 'template'].includes(entry.role ?? 'definition')
   );
+}
+
+/** Availability is separate from completeness so internal pricing references remain valid. */
+export function canPlayerSelectLibraryEntry(entry: LibraryMetadata): boolean {
+  return !entry.restricted && canAdoptLibraryEntry(entry);
 }
 export function preferredLibraryEditions<
   T extends LibraryMetadata & { name: string; kind?: string | undefined },

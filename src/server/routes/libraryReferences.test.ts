@@ -81,6 +81,80 @@ const configs = [
 ] as const;
 const doors = ['rest-create', 'rest-patch', 'sync-create', 'sync-field', 'sync-body'] as const;
 
+it('preserves held restricted traits while rejecting new player links through REST and sync', async () => {
+  const gm = await register();
+  const player = await register();
+  const campaign = await create(gm.token, '/campaigns', { name: 'Restricted library' });
+  expect(
+    (await request(gm.token, `/campaigns/${campaign.id}/members`, { email: player.email })).status,
+  ).toBe(200);
+  const character = await create(player.token, '/characters', {
+    name: 'Player',
+    campaignId: campaign.id,
+  });
+  const source = await create(gm.token, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'GM trait',
+    kind: 'advantage',
+  });
+  const heldResponse = await request(player.token, `/characters/${character.id}/traits`, {
+    name: 'GM trait',
+    kind: 'advantage',
+    libraryTraitId: source.id,
+  });
+  expect(heldResponse.status).toBe(201);
+  const held = (await heldResponse.json()) as { trait: { id: string } };
+  expect(
+    (
+      await request(
+        gm.token,
+        `/campaigns/${campaign.id}/library/traits/${source.id}`,
+        { restricted: true },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await request(
+        player.token,
+        `/characters/${character.id}/traits/${held.trait.id}`,
+        { notes: 'Still usable' },
+        'PATCH',
+      )
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await request(player.token, `/characters/${character.id}/traits`, {
+        name: 'New link',
+        kind: 'advantage',
+        libraryTraitId: source.id,
+      })
+    ).status,
+  ).toBe(403);
+  const sync = await request(player.token, '/sync/operations', {
+    operations: [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_trait',
+        parentId: character.id,
+        entityId: crypto.randomUUID(),
+        command: 'create',
+        attemptedValue: {
+          name: 'New sync link',
+          kind: 'advantage',
+          libraryTraitId: source.id,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  });
+  expect(sync.status).toBe(200);
+  expect(((await sync.json()) as { outcomes: { status: string }[] }).outcomes[0]?.status).toBe(
+    'unauthorized',
+  );
+});
+
 for (const change of ['editing-disabled', 'manager-demoted'] as const) {
   for (const wholeBody of [false, true]) {
     it.each([...configs])(

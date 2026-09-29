@@ -18,6 +18,8 @@ export const libraryMetadataShape = {
   status: z.enum(['complete', 'needs_review', 'reference_only']).optional(),
   role: z.enum(['definition', 'template', 'example', 'reference']).optional(),
   preferredEdition: z.boolean().optional(),
+  /** GM-only content. Omitted legacy documents remain unrestricted. */
+  restricted: z.boolean().optional(),
   extraction: extractionRecord.nullable().optional(),
 };
 export const libraryMetadata = z.object(libraryMetadataShape).openapi('LibraryMetadata');

@@ -18,7 +18,40 @@ import {
   LibraryYamlError,
   emitLibraryYaml,
   parseLibraryYaml,
+  sourceScopedLibrary,
 } from './library.ts';
+
+it('packages selected sourcebooks and retains explicit GM restrictions', () => {
+  const doc = parseLibraryYaml(
+    emitLibraryYaml({
+      scope: { kind: 'sources', sourceKeys: ['alpha'] },
+      sources: [
+        { key: 'alpha', name: 'Alpha', abbreviation: 'A', priority: 100 },
+        { key: 'beta', name: 'Beta', abbreviation: 'B', priority: 100 },
+      ],
+      traits: [
+        libraryTraitCreate.parse({
+          name: 'Secret',
+          kind: 'advantage',
+          sourceKey: 'alpha',
+          restricted: true,
+        }),
+        libraryTraitCreate.parse({ name: 'Public', kind: 'advantage', sourceKey: 'beta' }),
+      ],
+      skills: [],
+      spells: [],
+      items: [],
+      languages: [],
+      techniques: [],
+      styles: [],
+    }),
+  );
+  const selected = sourceScopedLibrary(doc.library, ['alpha']);
+  expect(selected.sources?.map((source) => source.key)).toEqual(['alpha']);
+  expect(selected.traits.map((trait) => trait.name)).toEqual(['Secret']);
+  expect(selected.traits[0]?.restricted).toBe(true);
+  expect(() => sourceScopedLibrary(doc.library, ['missing'])).toThrow('missing its source record');
+});
 
 describe('library portability field manifest', () => {
   it('exhaustively matches every portable schema shape', () => {
@@ -84,7 +117,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     styles: [],
     enchantments: [definition],
   });
-  expect(yaml).toContain('version: 13');
+  expect(yaml).toContain('version: 14');
   expect(yaml).not.toContain('definitionId');
   const parsed = parseLibraryYaml(yaml).library;
   expect(parsed.enchantments).toEqual([definition]);
@@ -206,7 +239,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 13');
+  expect(yaml).toContain('version: 14');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -517,7 +550,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 13');
+    expect(first).toContain('version: 14');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

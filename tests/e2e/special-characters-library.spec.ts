@@ -189,7 +189,8 @@ test('library preserves special text and each Unicode group jump reaches its own
   await expect(page.getByRole('button', { name: taggedSkillName, exact: true })).toBeVisible();
   await librarySearch.fill('');
 
-  await page.getByRole('button', { name: /Import YAML/i }).click();
+  await page.goto(`/campaigns/${campaignId}/library-transfer`);
+  await expect(page.getByRole('heading', { name: 'Import & export' })).toBeVisible();
   const exportDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export YAML' }).click();
   const download = await exportDownload;
@@ -201,7 +202,31 @@ test('library preserves special text and each Unicode group jump reaches its own
   expect(exportedYaml).toContain(tag);
   expect(exportedYaml).toContain(canary);
   await page.getByLabel('YAML file').setInputFiles(yamlPath);
-  await expect(page.getByRole('dialog', { name: /Import special-library\.yaml/i })).toBeVisible();
+  await page.getByRole('button', { name: 'Review import' }).click();
+  const importDialog = page.getByRole('dialog', { name: /Import special-library\.yaml/i });
+  await expect(importDialog).toBeVisible();
+  const modalBox = importDialog.locator('.modal-box');
+  await expect(modalBox).toHaveCSS('opacity', '1');
+  for (const width of [320, 639, 640, 768, 1280]) {
+    await page.setViewportSize({ width, height: 720 });
+    await expect(page.getByRole('heading', { name: 'Import & export' })).toBeVisible();
+    await expect(importDialog.getByRole('button', { name: 'Merge library' })).toBeVisible();
+    await expect(modalBox).toHaveCSS('opacity', '1');
+    const box = await modalBox.boundingBox();
+    if (!box) throw new Error('Import dialog has no visible bounding box');
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(720);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    if (width === 320)
+      await page.screenshot({
+        path: testInfo.outputPath('library-transfer-mobile.png'),
+        animations: 'disabled',
+      });
+  }
   await page.getByRole('button', { name: 'Merge library' }).click();
   await expect(page.getByText(/Imported|Merged|created|updated/i)).toBeVisible({ timeout: 15_000 });
   await page.goto(`/campaigns/${campaignId}/library?section=spells`);

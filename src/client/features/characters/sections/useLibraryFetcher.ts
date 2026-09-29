@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useCallback } from 'react';
 import {
   canAdoptLibraryEntry,
+  canPlayerSelectLibraryEntry,
   preferredLibraryEditions,
 } from '../../../../shared/domain/libraryIdentity.ts';
 import type { ActiveEffectDefinitionOut } from '../../../../shared/schemas/activeEffects.ts';
@@ -18,6 +19,7 @@ import type { LibraryEntityClass } from '../../../../shared/schemas/sync.ts';
 import type { LocalLibraryItem } from '../../../db/dexie.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { syncEntityTable } from '../../../db/syncEntityStore.ts';
+import { readActiveUser } from '../../../sync/activeUser.ts';
 import { normalizeLibraryItemRow } from '../../library/useLocalLibrary.ts';
 
 /**
@@ -93,7 +95,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
               (row) => normalizeLibraryItemRow(row as unknown as LocalLibraryItem) as unknown as T,
             )
           : all;
-      const available = normalized.filter(canAdoptLibraryEntry);
+      const campaign = await getLocalDb().campaigns.get(campaignId);
+      const owner = campaign?.ownerId === readActiveUser();
+      const available = normalized.filter(
+        owner ? canAdoptLibraryEntry : canPlayerSelectLibraryEntry,
+      );
       const list = allSources ? available : preferredLibraryEditions(available, sources);
       if (q.length === 0)
         return [...list].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);

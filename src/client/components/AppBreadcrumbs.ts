@@ -34,6 +34,7 @@ export function appBreadcrumbPage(pathname: string): string | null {
     return 'Adventure log';
   if (/^\/library\/?$/.test(pathname) || /^\/campaigns\/[^/]+\/library\/?$/.test(pathname))
     return 'Library';
+  if (/^\/campaigns\/[^/]+\/library-transfer\/?$/.test(pathname)) return 'Import & export';
   if (/^\/campaigns\/[^/]+\/history\/?$/.test(pathname)) return 'History';
   if (/^\/campaigns\/[^/]+\/gm\/?$/.test(pathname)) return 'GM dashboard';
   if (/^\/campaigns\/[^/]+\/encounters\/?$/.test(pathname)) return 'Encounters';
