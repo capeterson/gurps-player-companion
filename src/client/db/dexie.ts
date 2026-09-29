@@ -5,6 +5,7 @@ import type {
 import type { PricingResolution } from '../../shared/schemas/calculation.ts';
 import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
+import type { SyncLogPayloadMetadata } from '../../shared/schemas/syncLog.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -462,12 +463,21 @@ export interface SyncLogEntry {
   previousValue?: unknown;
   newValue?: unknown;
   details?: unknown;
+  /** A larger payload is stored as gzip bytes in syncLogBodies under this id. */
+  payloadStored?: true | undefined;
+  payloadMetadata?: SyncLogPayloadMetadata | undefined;
   /**
    * Set by `redactSyncLogForCharacters` when the viewer lost access to
    * this entity's character: payload fields are cleared, metadata
    * stays. The UI says so rather than rendering a blank.
    */
   redacted?: boolean | undefined;
+}
+
+export interface SyncLogBody {
+  id: string;
+  encoding: 'gzip';
+  bytes: Uint8Array<ArrayBuffer>;
 }
 
 export interface SyncCursor {
@@ -623,9 +633,12 @@ class LocalDb extends Dexie {
   tombstones!: Table<TombstoneRow, [string, string]>;
   rejectionToasts!: Table<RejectionRecord, string>;
   syncLog!: Table<SyncLogEntry, string>;
+  syncLogBodies!: Table<SyncLogBody, string>;
 
   constructor() {
     super('gurps-pc-local');
+    // Existing journal rows remain readable inline; new large bodies are lazy.
+    this.version(15).stores({ syncLogBodies: 'id' });
     this.version(14).stores({ mediaUploads: 'id, userId, targetId, state', mediaManifests: 'id' });
     this.version(1).stores({
       characters: 'id, ownerId, campaignId, updatedAt, revision',
@@ -852,6 +865,7 @@ export const ALL_STORE_NAMES = [
   'tombstones',
   'rejectionToasts',
   'syncLog',
+  'syncLogBodies',
 ] as const;
 
 /**

@@ -13,6 +13,21 @@ function jwtForUser(userId: string): string {
 async function seedEveryStore() {
   const db = getLocalDb();
   await db.characters.put({ id: 'char-1', ownerId: 'user-1', name: 'Old', revision: 9 } as never);
+  await db.syncLog.put({
+    id: 'compressed-old-log',
+    direction: 'push',
+    result: 'synced',
+    entityClass: 'character',
+    entityId: 'char-1',
+    command: 'patch',
+    occurredAt: new Date().toISOString(),
+    payloadStored: true,
+  });
+  await db.syncLogBodies.put({
+    id: 'compressed-old-log',
+    encoding: 'gzip',
+    bytes: new Uint8Array([0x1f, 0x8b]),
+  });
   await db.characterTraits.put({ id: 'trait-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterSkills.put({ id: 'skill-1', characterId: 'char-1', revision: 9 } as never);
   await db.characterSpells.put({ id: 'spell-1', characterId: 'char-1', revision: 9 } as never);

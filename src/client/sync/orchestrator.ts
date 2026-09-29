@@ -82,6 +82,7 @@ import {
   type NewSyncLogEntry,
   appendSyncLog,
   appendSyncLogEntries,
+  invalidatePendingSyncLogWrites,
   pruneRejectionToasts,
   redactSyncLogForCampaigns,
   redactSyncLogForCharacters,
@@ -782,6 +783,7 @@ class SyncOrchestrator {
   // ---------- internals ----------
 
   private async clearAllLocalStores(): Promise<void> {
+    invalidatePendingSyncLogWrites();
     const db = getLocalDb();
     const stores = ALL_STORE_NAMES.map((name) => db[name]);
     await db.transaction('rw', stores, async () => {

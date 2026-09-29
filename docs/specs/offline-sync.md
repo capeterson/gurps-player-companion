@@ -155,7 +155,7 @@ works offline.**
 
 | Piece | File | Role |
 |---|---|---|
-| Local DB | `src/client/db/dexie.ts` | IndexedDB stores + the `outbox`, `syncCursors`, `syncMeta`, `tombstones`, `rejectionToasts`, and bounded `syncLog`. The UI's source of truth. |
+| Local DB | `src/client/db/dexie.ts` | IndexedDB stores + the `outbox`, `syncCursors`, `syncMeta`, `tombstones`, `rejectionToasts`, bounded `syncLog`, and separately loaded gzip `syncLogBodies`. The UI's source of truth. |
 | Outbox helpers | `src/client/sync/outbox.ts` | `enqueueFieldPatch` / `enqueueCreate` / `enqueueDelete` — write the local row and the queued op in **one Dexie transaction**. Coalescing lives here. |
 | Orchestrator | `src/client/sync/orchestrator.ts` | Long-lived singleton: drains the outbox, pulls the cursor, applies outcomes, bootstraps, emits sync state, handles online/offline + backoff + multi-tab locks. The only module that talks to `/sync/*`. |
 | Sync state | `src/client/sync/state.ts` | `SyncStateStore` the indicator subscribes to. |
@@ -163,7 +163,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, each expandable (collapsed by default) to its before/after values and metadata. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to before/after values, metadata, and folded Request/Response payloads. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -502,6 +502,50 @@ changed* instead of just "character inventory patch". Legacy pull entries lack
 the `appliedFields` marker and are labeled as values not recorded by the app
 version that downloaded them; their old values cannot be reconstructed.
 
+The sync-log view combines a successful push with subsequent cursor echoes
+that changed no local data fields, matching the exact entity class, entity id,
+and acknowledged revision. The change remains one expandable item with its
+before/after values. **Request** folds the recorded operation fields and value
+(reconstructed from the bounded journal snapshot, rather than a complete wire
+envelope); **Response** folds the server acknowledgement and associated cursor
+revision metadata. Both folds start closed. Downloads with data changes,
+different revisions/entities, or legacy entries without an `appliedFields`
+marker remain separate items. This grouping only affects presentation: the
+journal and downloaded debug dump retain the individual records. Request and
+Response payloads both obey the existing access gate.
+
+**Compressed diagnostic bodies.**
+
+New large journal payloads (`previousValue`, `newValue`, and `details` together)
+are gzip-compressed through native `CompressionStream` into binary
+`Uint8Array` records in the separate Dexie v15 `syncLogBodies` store, keyed by
+the journal id. The journal keeps only metadata plus a payload reference and
+the revision/applied-field summary needed for grouping. The list query never
+loads the binary bodies. Payloads below 1,024 UTF-8 bytes stay inline; larger
+ones use gzip only when it saves more than 128 bytes. Missing native stream
+support or compression failures keep the inline representation. Existing
+inline records remain readable without a migration/backfill.
+
+Compression preserves the 2,000-character snapshot caps and is performed
+before the journal write transaction, with at most eight concurrent streams
+per cursor page. Journal writes inside an existing IDB transaction stay inline
+so stream awaits cannot auto-commit an outbox reconciliation. Metadata and
+bodies commit together, and pruning, access redaction, emergency resync, and
+logout remove the corresponding bodies too. Logout/resync invalidate any
+unfinished compression writes before clearing stores, so they cannot recreate
+records after the wipe.
+
+Closed change rows mount no detail content. Opening one reads/decompresses
+its body with `DecompressionStream`; closing it releases the loaded content.
+Request/Response JSON is formatted only while its fold is open. Decode errors
+show a readable message rather than breaking the log; reopening retries.
+Decoding validates the diagnostic envelope and caps its output at 64 KiB.
+The debug download decodes accessible bodies sequentially into ordinary JSON,
+records missing/corrupt bodies as unavailable, and rechecks access after
+decoding. It never exports compressed bytes or reads restricted bodies.
+Implementation: `src/client/sync/syncLogPayload.ts` and shared envelope/metadata
+schemas in `src/shared/schemas/syncLog.ts`.
+
 **Rollback entries record the direction the local row actually moved.** A
 rejected patch moves the row *away* from the refused `attemptedValue` and back
 to what `revertLocal` restored — `prevValue`, or the server's `latestEntity`
@@ -517,7 +561,7 @@ visibly shows.
 sheet records that player's values here, and a `conflict`/`stale_base` outcome
 can carry a whole `latestEntity` row in `details` — so the journal is one of the
 surfaces `AGENTS.md`'s share-gate invariant covers.
-`redactSyncLogForCharacters()` clears `previousValue` / `newValue` / `details`
+`redactSyncLogForCharacters()` deletes stored bodies, clears `previousValue` / `newValue` / `details`
 and sets `redacted: true` on every entry whose `entityId` **or `parentId`**
 matches a character being minimized or pruned; both
 `enforceMinimalViewLocally` and `pruneInaccessibleLocally` call it. `parentId`
@@ -567,7 +611,7 @@ The debug dump matters most here: it is a file the user hands to someone else.
 only runs after a successful cursor pull — so a revert performed **offline**
 writes a fresh snapshot after the last sweep, with no later pull to clean it up.
 Both `SyncLogView` and the debug dump re-check journal entries and rejection
-records against the live masked set (the `Raw` details block is gated the same
+records against the live masked set (the `Request` and `Response` folds are gated the same
 way; a `conflict` outcome can carry a whole `latestEntity` row). A **child**
 record whose parent character is missing is restricted: `pruneInaccessible-
 Locally` matches dirty ops by `entityId` only, so a queued *child* op does not
@@ -661,7 +705,8 @@ debug log" button (`buildSyncDebugDump()` in `src/client/sync/debugDump.ts`)
 that assembles a JSON file for players to attach to bug reports: a metadata
 header (timestamp, user agent, online state, derived userId, sync indicator
 state, pending-op counts, per-store row counts), the full `outbox`,
-`rejectionToasts`, `syncLog`, and `syncCursors` tables. It deliberately
+`rejectionToasts`, readable `syncLog` journal (decoding accessible stored bodies),
+and `syncCursors` tables. It deliberately
 excludes every entity store (characters, traits, skills, inventory, etc.) and
 the access/refresh tokens — a dump attached to a support request must not leak
 other players' cached sheets or session credentials. Assembly is pure Dexie

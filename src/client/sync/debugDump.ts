@@ -29,6 +29,7 @@ import {
 import type { SyncIndicatorState } from './state.ts';
 import { syncStateStore } from './state.ts';
 import { readRevokedCampaigns, readRevokedCharacters } from './syncLog.ts';
+import { loadSyncLogEntry } from './syncLogPayload.ts';
 
 export interface SyncDebugDump {
   meta: {
@@ -84,6 +85,8 @@ function maskRestrictedLog(entries: SyncLogEntry[], access: LocalCharacterAccess
           previousValue: undefined,
           newValue: undefined,
           details: undefined,
+          payloadStored: undefined,
+          payloadMetadata: undefined,
           humanName: undefined,
           fieldPath: undefined,
           redacted: true,
@@ -127,6 +130,7 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
         db.outbox.count(),
         db.rejectionToasts.count(),
         db.syncLog.count(),
+        db.syncLogBodies.count(),
       ]).then(
         ([
           characters,
@@ -142,6 +146,7 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
           outboxCount,
           rejectionToastsCount,
           syncLogCount,
+          syncLogBodiesCount,
         ]) => ({
           characters,
           characterTraits,
@@ -156,6 +161,7 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
           outbox: outboxCount,
           rejectionToasts: rejectionToastsCount,
           syncLog: syncLogCount,
+          syncLogBodies: syncLogBodiesCount,
         }),
       ),
     ]);
@@ -165,8 +171,28 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
     await readRevokedCampaigns(),
   );
   const outbox = maskRestrictedOps(rawOutbox, access);
-  const syncLog = maskRestrictedLog(rawSyncLog, access);
+  const syncLog: SyncLogEntry[] = [];
+  // Apply the gate before opening any bodies. Decode sequentially so exporting
+  // a 1,000-row journal doesn't create 1,000 decompression streams at once.
+  for (const entry of maskRestrictedLog(rawSyncLog, access)) {
+    try {
+      syncLog.push(await loadSyncLogEntry(entry));
+    } catch (error) {
+      const { payloadStored: _stored, payloadMetadata: _metadata, ...metadata } = entry;
+      syncLog.push({
+        ...metadata,
+        details: { unavailable: error instanceof Error ? error.message : 'Could not read details' },
+      });
+    }
+  }
   const rejectionToasts = maskRestrictedRejections(rawRejections, access);
+  // An export can take longer than an access sweep. Check again after decoding,
+  // before returning any recovered private values to the downloadable file.
+  const finalAccess = characterAccessFrom(
+    await db.characters.toArray(),
+    await readRevokedCharacters(),
+    await readRevokedCampaigns(),
+  );
 
   return {
     meta: {
@@ -184,8 +210,8 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
       mode: import.meta.env.MODE,
     },
     syncCursors,
-    outbox,
-    rejectionToasts,
-    syncLog,
+    outbox: maskRestrictedOps(outbox, finalAccess),
+    rejectionToasts: maskRestrictedRejections(rejectionToasts, finalAccess),
+    syncLog: maskRestrictedLog(syncLog, finalAccess),
   };
 }

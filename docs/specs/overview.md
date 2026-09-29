@@ -983,7 +983,12 @@ there is no decorative cover slot or implied image-upload feature.
   confirmed emergency action to abandon local changes and pull a fresh server
   copy. Every queued and journalled event **expands** (collapsed by default) to
   show what actually changed — field, before/after values, entity, operation,
-  and the failure reason where there is one.
+  and the failure reason where there is one. Successful changes and their
+  matching revision-only cursor acknowledgements share one item, with folded
+  **Request** and **Response** sections; downloads that change data remain
+  separate. Larger diagnostic payloads use device-local gzip storage and load
+  when a change opens; closed rows/folds do not format their bodies. Debug
+  downloads still export readable JSON.
 - **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
   share horizontal collision handling, dynamic-viewport width limits, and content
   wrapping so their full surface remains reachable on narrow screens and after
@@ -1131,6 +1136,7 @@ src/
     components/CharacterHeaderChromeContext.tsx  Mobile header controls passed
                  into the portaled Current Status row
     sync/        orchestrator, outbox, libraryDependencies, patchKeys,
+                 syncLog/syncLogPayload (bounded journal and lazy gzip bodies),
                  state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
     db/          dexie.ts and syncEntityStore.ts — IndexedDB stores and shared

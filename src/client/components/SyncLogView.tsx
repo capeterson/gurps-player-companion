@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { OutboxEntry, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { useDialogState } from '../hooks/useDialogState.ts';
@@ -15,6 +15,7 @@ import {
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
 import { readRevokedCampaigns, readRevokedCharacters } from '../sync/syncLog.ts';
+import { loadSyncLogEntry } from '../sync/syncLogPayload.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { ConfirmDialog } from './ui/ConfirmDialog.tsx';
 
@@ -66,6 +67,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
 
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
   const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
+  const recentChanges = combineAcknowledgements(log ?? []);
   const campaignHolds = (outbox ?? []).filter((op) => op.localCampaignDependencyUnknown);
   const confirmCampaignOrder = async (op: OutboxEntry, wait: boolean) => {
     try {
@@ -284,7 +286,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             </SyncSection>
 
             <SyncSection title="Recently synced" empty="No sync activity has been recorded yet.">
-              {(log ?? []).map((entry) => (
+              {recentChanges.map(({ entry, responses }) => (
                 <ChangeRow
                   key={entry.id}
                   title={logName(entry, isRecordAccessRestricted(entry, access))}
@@ -296,6 +298,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                     <LogDetails
                       entry={entry}
                       restricted={isRecordAccessRestricted(entry, access)}
+                      responses={responses.filter(
+                        (response) => !isRecordAccessRestricted(response, access),
+                      )}
                     />
                   }
                 />
@@ -414,6 +419,7 @@ function ChangeRow({
   details,
   tone,
 }: { title: string; meta: string; details?: React.ReactNode; tone?: 'bad' | undefined }) {
+  const [expanded, setExpanded] = useState(false);
   if (!details) {
     return (
       <div className="flex flex-wrap justify-between gap-2 p-3 text-sm">
@@ -423,7 +429,7 @@ function ChangeRow({
     );
   }
   return (
-    <details className="group text-sm">
+    <details className="group text-sm" onToggle={(event) => setExpanded(event.currentTarget.open)}>
       <summary className="flex cursor-pointer flex-wrap items-baseline gap-2 p-3 hover:bg-base-200">
         <span
           aria-hidden="true"
@@ -436,7 +442,9 @@ function ChangeRow({
           {meta}
         </span>
       </summary>
-      <div className="border-base-300 border-t bg-base-200/40 px-3 py-2">{details}</div>
+      {expanded && (
+        <div className="border-base-300 border-t bg-base-200/40 px-3 py-2">{details}</div>
+      )}
     </details>
   );
 }
@@ -479,7 +487,99 @@ function DetailList({ rows }: { rows: DetailRow[] }) {
   );
 }
 
-function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: boolean }) {
+interface SyncLogItem {
+  entry: SyncLogEntry;
+  responses: SyncLogEntry[];
+}
+
+/** Only fold a cursor echo with no data changes into its exact successful push. */
+function combineAcknowledgements(entries: SyncLogEntry[]): SyncLogItem[] {
+  const pushes = new Map<string, SyncLogItem>();
+  const items = entries.map<SyncLogItem>((entry) => ({ entry, responses: [] }));
+  const responseKey = (entry: SyncLogEntry, revision: unknown) =>
+    entry.entityClass && entry.entityId && typeof revision === 'number'
+      ? JSON.stringify([entry.entityClass, entry.entityId, revision])
+      : undefined;
+  for (const item of items) {
+    const { entry } = item;
+    if (entry.direction !== 'push' || entry.result !== 'synced') continue;
+    const key = responseKey(entry, logMetadata(entry)?.newRevision);
+    // The journal is newest first. Keep the latest acknowledgement if an
+    // idempotent retry recorded the same revision more than once.
+    if (key && !pushes.has(key)) pushes.set(key, item);
+  }
+  return items.filter((item) => {
+    const { entry } = item;
+    const appliedFields = logMetadata(entry)?.appliedFields;
+    if (
+      entry.direction !== 'pull' ||
+      entry.result !== 'synced' ||
+      hasValueSnapshot(entry) ||
+      !Array.isArray(appliedFields) ||
+      appliedFields.length !== 0
+    )
+      return true;
+    const key = responseKey(entry, logMetadata(entry)?.revision);
+    const push = key ? pushes.get(key) : undefined;
+    if (!push || Date.parse(push.entry.occurredAt) > Date.parse(entry.occurredAt)) return true;
+    push.responses.push(entry);
+    return false;
+  });
+}
+
+function logMetadata(entry: SyncLogEntry): Record<string, unknown> | undefined {
+  return entry.details !== null && typeof entry.details === 'object'
+    ? (entry.details as Record<string, unknown>)
+    : entry.payloadMetadata;
+}
+
+function LogDetails({
+  entry,
+  restricted,
+  responses,
+}: { entry: SyncLogEntry; restricted: boolean; responses: SyncLogEntry[] }) {
+  const [loaded, setLoaded] = useState<{
+    source: SyncLogEntry;
+    entry?: SyncLogEntry;
+    error?: string;
+  }>();
+  useEffect(() => {
+    if (restricted || !entry.payloadStored) return;
+    let active = true;
+    void loadSyncLogEntry(entry).then(
+      (value) => active && setLoaded({ source: entry, entry: value }),
+      (error) => active && setLoaded({ source: entry, error: errorMessage(error) }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [entry, restricted]);
+  if (!restricted && entry.payloadStored) {
+    if (loaded?.source !== entry || !loaded.entry) {
+      return (
+        <output className="block text-xs text-base-content/60">
+          {loaded?.source === entry && loaded.error
+            ? `Couldn't load change details — ${loaded.error}`
+            : 'Loading change details…'}
+        </output>
+      );
+    }
+    return (
+      <LogDetailsContent
+        entry={loaded.entry}
+        restricted={loaded.entry.redacted === true}
+        responses={responses}
+      />
+    );
+  }
+  return <LogDetailsContent entry={entry} restricted={restricted} responses={responses} />;
+}
+
+function LogDetailsContent({
+  entry,
+  restricted,
+  responses,
+}: { entry: SyncLogEntry; restricted: boolean; responses: SyncLogEntry[] }) {
   const rows: DetailRow[] = [];
   if (entry.reason) rows.push(textRow('Reason', entry.reason, 'error'));
   if (entry.fieldPath) rows.push(textRow('Field', entry.fieldPath));
@@ -497,10 +597,7 @@ function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: bo
     // New entries always carry `appliedFields`, including an empty
     // list for revision-only/protected-field pulls. Older entries lack
     // that marker because their values truly were never captured.
-    const appliedFields =
-      entry.details !== null && typeof entry.details === 'object'
-        ? (entry.details as { appliedFields?: unknown }).appliedFields
-        : undefined;
+    const appliedFields = logMetadata(entry)?.appliedFields;
     rows.push(
       textRow(
         'Values',
@@ -518,17 +615,90 @@ function LogDetails({ entry, restricted }: { entry: SyncLogEntry; restricted: bo
   return (
     <>
       <DetailList rows={rows} />
-      {/* `details` can carry a whole `latestEntity` row on a conflict,
-          so it is gated by the same check as the value snapshots. */}
-      {!restricted && entry.details !== undefined && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-base-content/60">Raw</summary>
-          <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs">
-            {JSON.stringify(entry.details, null, 2)}
-          </pre>
-        </details>
+      {!restricted && entry.direction === 'push' && entry.result === 'synced' && (
+        <PayloadDisclosure
+          label="Request"
+          value={{
+            entityClass: entry.entityClass,
+            entityId: entry.entityId,
+            parentId: entry.parentId,
+            command: entry.command,
+            fieldPath: entry.fieldPath,
+            prevValue: entry.previousValue,
+            attemptedValue: entry.newValue,
+          }}
+        />
+      )}
+      {/* Outcomes can carry a whole latestEntity; apply the same access gate
+          to both the acknowledgement and its associated cursor response. */}
+      {!restricted && (entry.details !== undefined || responses.length > 0) && (
+        <PayloadDisclosure
+          label="Response"
+          loadValue={async () => {
+            const decoded = await Promise.all(responses.map(loadSyncLogEntry));
+            return decoded.length > 0
+              ? {
+                  acknowledgement: entry.details,
+                  cursor: decoded.map((response) => ({
+                    occurredAt: response.occurredAt,
+                    ...logMetadata(response),
+                  })),
+                }
+              : entry.details;
+          }}
+        />
       )}
     </>
+  );
+}
+
+function PayloadDisclosure({
+  label,
+  value,
+  loadValue,
+}: { label: string; value?: unknown; loadValue?: () => Promise<unknown> }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <details className="mt-2" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary className="cursor-pointer text-xs text-base-content/60">{label}</summary>
+      {expanded && <PayloadText value={value} loadValue={loadValue} />}
+    </details>
+  );
+}
+
+function PayloadText({
+  value,
+  loadValue,
+}: { value?: unknown; loadValue?: (() => Promise<unknown>) | undefined }) {
+  const [loaded, setLoaded] = useState<{
+    source: typeof loadValue;
+    value?: unknown;
+    error?: string;
+  }>();
+  useEffect(() => {
+    if (!loadValue) return;
+    let active = true;
+    void loadValue().then(
+      (value) => active && setLoaded({ source: loadValue, value }),
+      (error) => active && setLoaded({ source: loadValue, error: errorMessage(error) }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [loadValue]);
+  if (loadValue && (loaded?.source !== loadValue || loaded.error)) {
+    return (
+      <output className="mt-1 block text-xs text-base-content/60">
+        {loaded?.source === loadValue && loaded.error
+          ? `Couldn't load response — ${loaded.error}`
+          : 'Loading response…'}
+      </output>
+    );
+  }
+  return (
+    <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-all text-xs">
+      {JSON.stringify(loadValue ? loaded?.value : value, null, 2)}
+    </pre>
   );
 }
 
@@ -585,7 +755,11 @@ function isTruncated(value: object): value is { truncated: true; length?: number
 
 /** Undefined is a valid one side of a create/delete, so either side is sufficient. */
 function hasValueSnapshot(entry: SyncLogEntry): boolean {
-  return entry.previousValue !== undefined || entry.newValue !== undefined;
+  return (
+    entry.previousValue !== undefined ||
+    entry.newValue !== undefined ||
+    entry.payloadMetadata?.hasValueSnapshot === true
+  );
 }
 
 /**
