@@ -4,7 +4,7 @@
  * when `persistent: true` is set.
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ToastApi, ToastProvider, useToasts } from './toast.tsx';
 
@@ -25,6 +25,27 @@ afterEach(() => {
 });
 
 describe('ToastProvider persistent option', () => {
+  it('keeps a notification actionable in the active dialog and after closing it', async () => {
+    vi.useRealTimers();
+    render(
+      <ToastProvider>
+        <Capture />
+        <dialog aria-label="Image editor" />
+      </ToastProvider>,
+    );
+    const dialog = screen.getByLabelText('Image editor') as HTMLDialogElement;
+    act(() => dialog.showModal());
+    act(() => captured?.push('Image rejected', { kind: 'error', persistent: true }));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Image rejected'),
+    );
+    act(() => dialog.close());
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(screen.getByRole('alert')).toHaveTextContent('Image rejected');
+    fireEvent.click(screen.getByLabelText('Dismiss notification'));
+    expect(screen.queryByText('Image rejected')).toBeNull();
+  });
+
   it('auto-dismisses non-persistent error toasts', async () => {
     render(
       <ToastProvider>

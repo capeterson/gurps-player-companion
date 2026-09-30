@@ -25,13 +25,19 @@ async function upload(locator: Locator, name: string, bytes: Buffer) {
 async function expectInsideViewport(page: Page, image: Locator, width: number) {
   await image.scrollIntoViewIfNeeded();
   await expect(image).toBeVisible();
-  await expect
-    .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
-    .toBeGreaterThan(0);
+  if (await image.evaluate((element) => element.tagName === 'IMG')) {
+    await expect
+      .poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth))
+      .toBeGreaterThan(0);
+  }
   const box = await image.boundingBox();
   expect(box).not.toBeNull();
   expect(box?.x).toBeGreaterThanOrEqual(0);
   expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+  expect(box?.y).toBeGreaterThanOrEqual(0);
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+    page.viewportSize()?.height ?? 900,
+  );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     width,
   );
@@ -66,10 +72,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     'Requires configured local or S3-compatible storage; set MEDIA_E2E_STORAGE=1 to run',
   );
   test.setTimeout(180_000);
-  const viewportWidths = [320, 767, 768, 769];
+  const viewportWidths = [320, 639, 640, 641, 767, 768, 769, 1280];
   const userEmail = `e2e-media-${suffix()}@example.com`;
-  const characterName = `Media Hero ${suffix()}`;
-  const campaignName = `Media Campaign ${suffix()}`;
+  const characterName = `Media Hero ${suffix()} of the Forgotten Coast and the Northern Expedition`;
+  const campaignName = `Media Campaign ${suffix()} — Expedition through the Forgotten Coast`;
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await register(page, userEmail);
@@ -78,10 +84,30 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+$/, { timeout: 15_000 });
 
-  const portraitInput = page.getByLabel('Upload portrait');
+  const portraitTrigger = page.getByRole('button', { name: `Edit portrait for ${characterName}` });
+  await expect(portraitTrigger).toBeVisible();
+  await expect(page.getByLabel('Upload portrait')).toHaveCount(0);
+  await expect(page.getByText(/JPEG, PNG or WebP/)).toHaveCount(0);
+  await portraitTrigger.click();
+  const portraitEditor = page.getByRole('dialog', { name: 'Character portrait' });
+  const portraitInput = portraitEditor.getByLabel('Upload portrait');
   await expect(portraitInput).toBeVisible({ timeout: 15_000 });
+  await portraitInput.setInputFiles({
+    name: 'unsupported.gif',
+    mimeType: 'image/gif',
+    buffer: Buffer.from('invalid'),
+  });
+  const portraitError = portraitEditor.getByRole('alert');
+  await expect(
+    portraitEditor.getByText("Couldn't save Portrait — Choose a JPEG, PNG, or WebP image", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(portraitTrigger.locator('..')).toHaveAttribute('data-flashing', 'true');
+  await portraitEditor.getByLabel('Dismiss notification').click();
+  await expect(portraitError).toHaveCount(0);
   await upload(portraitInput, 'portrait.png', await photo({ r: 130, g: 80, b: 140 }));
-  const portrait = page.getByRole('img', { name: `${characterName} portrait` });
+  const portrait = portraitTrigger.locator('img');
   await expect(portrait).toHaveAttribute('src', /^\/media\/[a-f0-9]{64}\/display\.webp$/, {
     timeout: 30_000,
   });
@@ -96,7 +122,9 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
 
   for (const width of viewportWidths) {
     await page.setViewportSize({ width, height: 900 });
-    await expectInsideViewport(page, portrait, width);
+    await expectInsideViewport(page, portraitEditor.locator('.modal-box'), width);
+    await expectInsideViewport(page, portraitInput, width);
+    await expect(portraitEditor.getByText(/JPEG, PNG or WebP/)).toBeVisible();
     await page.screenshot({ path: `test-results/media-portrait-${width}.png`, fullPage: true });
   }
 
@@ -117,8 +145,11 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await expect(
     page.getByRole('status').filter({ hasText: /image queued|uploading|saving image/i }),
   ).toBeVisible();
+  await portraitEditor.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(portraitTrigger).toBeFocused();
   await page.reload();
-  await expect(page.getByLabel('Upload portrait')).toBeVisible({ timeout: 20_000 });
+  await expect(portraitTrigger).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel('Upload portrait')).toHaveCount(0);
   await expect(portrait).toHaveAttribute('src', /^blob:/);
   await expect
     .poll(() => portrait.evaluate((element: HTMLImageElement) => element.naturalWidth))
@@ -134,7 +165,7 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   expect(dialog.message()).toContain('discards unsaved image files');
   await dialog.dismiss();
   await cancelSignOut;
-  await expect(page.getByLabel('Upload portrait')).toBeVisible();
+  await expect(portraitTrigger).toBeVisible();
   await expect(portrait).toHaveAttribute('src', /^blob:/);
 
   await context.setOffline(false);
@@ -154,10 +185,14 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await expect(page.getByRole('link', { name: campaignName })).toBeVisible({ timeout: 15_000 });
   await page.getByRole('link', { name: campaignName }).click();
   await expect(page.getByRole('heading', { name: campaignName })).toBeVisible({ timeout: 15_000 });
-  const coverInput = page.getByLabel('Upload campaign cover');
+  await expect(page.getByLabel('Upload campaign cover')).toHaveCount(0);
+  await expect(page.getByText(/JPEG, PNG or WebP/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: campaignName });
+  const coverInput = settings.getByLabel('Upload campaign cover');
   await expect(coverInput).toBeVisible({ timeout: 15_000 });
   await upload(coverInput, 'campaign-cover.png', await photo({ r: 175, g: 110, b: 55 }));
-  const cover = page.getByRole('img', { name: `${campaignName} cover` });
+  const cover = settings.getByRole('img', { name: `${campaignName} cover` });
   await expect(cover).toHaveAttribute('src', /^\/media\/[a-f0-9]{64}\/display\.webp$/, {
     timeout: 30_000,
   });
@@ -166,7 +201,9 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await expectRuntimeCached(page, coverUrl, 'gpc-public-image-displays-v1');
   for (const width of viewportWidths) {
     await page.setViewportSize({ width, height: 900 });
-    await expectInsideViewport(page, cover, width);
+    await expectInsideViewport(page, settings.locator('.modal-box'), width);
+    await expectInsideViewport(page, coverInput, width);
+    await expect(settings.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
     await page.screenshot({ path: `test-results/media-cover-${width}.png`, fullPage: true });
   }
 
@@ -178,6 +215,8 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     buffer: await photo({ r: 45, g: 95, b: 170 }),
   });
   await expect(cover).toHaveAttribute('src', /^blob:/);
+  await settings.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByLabel('Upload campaign cover')).toHaveCount(0);
   await page.getByLabel('Open user menu').click();
   const confirmDialog = page.waitForEvent('dialog', { timeout: 15_000 });
   const confirmSignOut = page.getByRole('button', { name: 'Logout' }).click();

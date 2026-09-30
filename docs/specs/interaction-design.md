@@ -21,6 +21,28 @@ wrapper supplies effective attributes and appends pools, secondary stats,
 conditions and lookup results inside the same shell. Its name link opens a new
 tab; missing mechanics show the existing unavailable notice and hide numbers.
 
+## Identity images and campaign settings
+
+The Overview Identity panel pairs a compact portrait or neutral silhouette with
+the character name. Below 640px they stack to keep the name input readable;
+wider layouts place them side by side. For character editors the portrait is a keyboard-accessible
+button opening a centered native dialog. Image upload, removal, recovery controls
+and file-sharing help belong inside that dialog. Closing it leaves local-first
+image work intact; rollback feedback also flashes the visible portrait trigger.
+Readers see the image or silhouette without editing controls. Shared notifications
+portal into the active native dialog so rejection toasts remain visible and
+dismissible above its backdrop; they return to the page when the dialog closes.
+The notification stack is bounded by the dynamic viewport and scrolls internally
+when multiple messages exceed its height.
+
+Campaign settings uses a centered, wide native dialog with wrapping Campaign,
+Rules, and Members section buttons. The header, section buttons and Save/Cancel
+actions stay visible while the body scrolls. Sections remain mounted to retain
+form drafts. Owner cover editing and image help live only in Campaign; covers in
+workspace headers are display-only. Offline owners can enter the dialog to edit
+covers, with unavailable online preferences disabled and member actions hidden.
+Cover selection queues immediately and separately from the settings Save action.
+
 ## Read first, edit on demand
 
 A sheet collection shows its owned entries before asking the player to create

@@ -614,22 +614,26 @@ function IdentityPanel({
   return (
     <section className="card p-5 space-y-3">
       <p className="label-eyebrow">Identity</p>
-      <MediaImage
-        targetType="character"
-        targetId={character.id}
-        assetId={character.portraitAssetId}
-        name={character.name}
-        editable={canWrite}
-      />
-      {canWrite ? (
-        <input
-          aria-label="character name"
-          className={`${DRAFT_FIELD_CLASS} font-name text-4xl bg-transparent border-0 outline-0 w-full focus:ring-2 focus:ring-primary/40 rounded px-1`}
-          {...nameField.inputProps}
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+        <MediaImage
+          targetType="character"
+          targetId={character.id}
+          assetId={character.portraitAssetId}
+          name={character.name}
+          editable={canWrite}
         />
-      ) : (
-        <h1 className="font-name text-4xl">{character.name}</h1>
-      )}
+        <div className="w-full min-w-0 flex-1">
+          {canWrite ? (
+            <input
+              aria-label="character name"
+              className={`${DRAFT_FIELD_CLASS} font-name text-2xl sm:text-4xl bg-transparent border-0 outline-0 w-full focus:ring-2 focus:ring-primary/40 rounded px-1`}
+              {...nameField.inputProps}
+            />
+          ) : (
+            <h1 className="font-name break-words text-2xl sm:text-4xl">{character.name}</h1>
+          )}
+        </div>
+      </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div className="form-control">
           <span className="label-text-alt label-eyebrow">Tech level</span>

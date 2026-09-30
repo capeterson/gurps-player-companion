@@ -1,5 +1,5 @@
 import { Blob as NodeBlob, File as NodeFile } from 'node:buffer';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
@@ -71,6 +71,45 @@ beforeEach(() => {
 });
 
 describe('MediaImage', () => {
+  it('shows a silhouette and opens upload/help only inside the portrait editor', async () => {
+    await seedCharacter();
+    mount();
+    expect(screen.getByRole('img', { name: 'Ari portrait placeholder' })).toBeVisible();
+    expect(screen.queryByLabelText('Upload portrait')).toBeNull();
+    expect(screen.queryByText(/JPEG, PNG or WebP/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
+    const editor = screen.getByRole('dialog', { name: 'Character portrait' });
+    expect(await within(editor).findByLabelText('Upload portrait')).toBeVisible();
+    expect(within(editor).getByText(/JPEG, PNG or WebP/)).toBeVisible();
+    fireEvent.click(within(editor).getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByLabelText('Upload portrait')).toBeNull();
+  });
+
+  it('can reopen after portrait editing permission is removed and restored', async () => {
+    await seedCharacter();
+    const view = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
+    expect(screen.getByRole('dialog')).toBeVisible();
+    const component = (editable: boolean) => (
+      <ToastProvider>
+        <MediaImage targetType="character" targetId={CHARACTER_ID} editable={editable} name="Ari" />
+      </ToastProvider>
+    );
+    view.rerender(component(false));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    view.rerender(component(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
+    expect(screen.getByRole('dialog')).toBeVisible();
+  });
+
+  it('keeps a read-only silhouette free of editing controls', async () => {
+    await seedCharacter();
+    mount(false);
+    expect(screen.getByRole('img', { name: 'Ari portrait placeholder' })).toBeVisible();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
   it('shows an already downloaded portrait when its entity is available offline', async () => {
     await seedCharacter(ASSET_ID);
     await getLocalDb().mediaManifests.put({
@@ -124,6 +163,7 @@ describe('MediaImage', () => {
     await seedCharacter();
     mount();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
     const input = await screen.findByLabelText('Upload portrait');
     const selected = new NodeFile([new NodeBlob(['portrait'])], 'portrait.png', {
       type: 'image/png',
@@ -131,10 +171,9 @@ describe('MediaImage', () => {
     fireEvent.change(input, { target: { files: [selected] } });
 
     expect(await screen.findByRole('status')).toHaveTextContent('Image queued for upload');
-    expect(await screen.findByRole('img', { name: 'Ari portrait' })).toHaveAttribute(
-      'src',
-      'blob:portrait-preview',
-    );
+    expect(
+      await within(screen.getByRole('dialog')).findByRole('img', { name: 'Ari portrait' }),
+    ).toHaveAttribute('src', 'blob:portrait-preview');
     const db = getLocalDb();
     await waitFor(async () => expect(await db.mediaUploads.count()).toBe(1));
     expect(await db.outbox.count()).toBe(1);
@@ -148,6 +187,7 @@ describe('MediaImage', () => {
     await seedCharacter();
     mount();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
     const input = await screen.findByLabelText('Upload portrait');
     const unsupported = new NodeFile(['not an image'], 'portrait.gif', {
       type: 'image/gif',
@@ -170,6 +210,7 @@ describe('MediaImage', () => {
     writeActiveUser(USER_ID);
     await seedCharacter();
     mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit portrait for Ari' }));
     const input = await screen.findByLabelText('Upload portrait');
     const first = new NodeFile(['first'], 'first.png', { type: 'image/png' });
     const second = new NodeFile(['second'], 'second.png', { type: 'image/png' });

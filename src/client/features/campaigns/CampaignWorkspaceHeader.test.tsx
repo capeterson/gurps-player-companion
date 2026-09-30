@@ -71,7 +71,7 @@ describe('CampaignWorkspaceHeader', () => {
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument();
   });
 
-  it('reveals staff navigation while keeping settings honest when offline', () => {
+  it('reveals staff navigation and keeps settings available for offline cover edits', () => {
     render(
       <ToastProvider>
         <MemoryRouter initialEntries={['/campaigns/camp-1/gm']}>
@@ -87,6 +87,8 @@ describe('CampaignWorkspaceHeader', () => {
       'aria-current',
       'page',
     );
-    expect(screen.getByRole('button', { name: 'Settings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeEnabled();
+    expect(screen.queryByLabelText('Upload campaign cover')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Image uploads are unavailable/)).not.toBeInTheDocument();
   });
 });

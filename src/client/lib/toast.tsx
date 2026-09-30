@@ -80,8 +80,39 @@ export function useToasts(): ToastApi {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [toastTarget, setToastTarget] = useState<HTMLElement | null>(null);
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const dismissHandlers = useRef(new Map<string, (id: string) => void>());
+
+  useEffect(() => {
+    // A body portal sits below the native dialog top layer. Keep notifications
+    // inside the most recently opened dialog so errors remain visible/actionable.
+    let dialogs: HTMLDialogElement[] = [];
+    const updateTarget = (records: MutationRecord[] = []) => {
+      dialogs = dialogs.filter((dialog) => dialog.isConnected && dialog.open);
+      for (const record of records) {
+        if (record.type !== 'attributes' || !(record.target instanceof HTMLDialogElement)) continue;
+        const dialog = record.target;
+        if (dialog.open) {
+          dialogs = dialogs.filter((current) => current !== dialog);
+          dialogs.push(dialog);
+        }
+      }
+      for (const dialog of document.querySelectorAll<HTMLDialogElement>('dialog[open]')) {
+        if (!dialogs.includes(dialog)) dialogs.push(dialog);
+      }
+      setToastTarget(dialogs.at(-1) ?? document.body);
+    };
+    updateTarget();
+    const observer = new MutationObserver(updateTarget);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['open'],
+    });
+    return () => observer.disconnect();
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -135,11 +166,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<ToastApi>(() => ({ push, dismiss }), [push, dismiss]);
 
-  // Render the toast layer through a portal to <body> so it stacks above
-  // the app shell regardless of containing-block / overflow context.
+  // Portal outside the app shell, or into the active native dialog top layer.
   const toastLayer = (
     <div
-      className="toast toast-end pointer-events-none fixed inset-x-2 bottom-2 z-50 flex max-w-[calc(100dvw-1rem)] flex-col gap-2 sm:left-auto sm:right-4 sm:bottom-4 sm:w-auto sm:max-w-lg"
+      className="toast toast-end pointer-events-none fixed inset-x-2 bottom-2 z-50 flex max-h-[calc(100dvh-1rem)] max-w-[calc(100dvw-1rem)] flex-col gap-2 overflow-y-auto sm:left-auto sm:right-4 sm:bottom-4 sm:w-auto sm:max-w-lg"
       aria-live="polite"
     >
       {toasts.map((t) => (
@@ -184,7 +214,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      {typeof document !== 'undefined' && createPortal(toastLayer, document.body)}
+      {typeof document !== 'undefined' && createPortal(toastLayer, toastTarget ?? document.body)}
     </ToastContext.Provider>
   );
 }

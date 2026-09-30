@@ -1,7 +1,7 @@
 # Active effects and skill procedures
 
 Active effects are an experimental campaign feature. The owner opts in through
-**Campaign settings → Experimental features → Enable active effects**
+**Campaign settings → Rules → Experimental features → Enable active effects**
 (`experimentalActiveEffects`). Migration `0064_experimental_active_effects.sql`
 adds a non-null boolean defaulting to false for every existing campaign; new
 campaigns also default false. Missing cached flags, unresolved campaigns, and

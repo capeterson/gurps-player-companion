@@ -11,6 +11,23 @@ sanitization, quotas, attachment, caching and cleanup use the same paths. It is
 only for a single dev/test instance. Item images are future work: the reusable storage/processing/client
 layers exist, but their target types, authorization, schemas and UI are not enabled.
 
+## Image editing surfaces
+
+The character Overview Identity panel pairs the name with a portrait or neutral
+silhouette. Authorized editors click the portrait to open a centered **Character
+portrait** dialog. Upload, remove, queued status, retry/download/discard actions,
+and file-format/public-link/cache help appear only in that dialog. Closing it
+keeps queued image edits; the portrait trigger still flashes on rejection.
+Read-only portraits and placeholders expose no editing controls.
+
+Campaign headers display their cover without upload controls or help. Unassigned
+covers do not reserve an empty preview area, including in settings. Owners
+open **Settings → Campaign** to edit it. Settings is a centered, wide dialog with
+Campaign, Rules, and Members sections, a scrolling body and persistent heading
+and actions. Cover changes queue independently of the online **Save** action.
+An owner with an offline local campaign can open settings to queue cover changes;
+unavailable online preferences and membership actions cannot be submitted.
+
 ## Access and caching contract
 
 Character write permission controls portrait changes. Only the campaign owner
