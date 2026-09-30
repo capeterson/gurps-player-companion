@@ -983,7 +983,9 @@ settings sections; switching sections retains drafts.
     - **Encounter tracker**: campaign pages list active and ended encounters;
      owners/managers can select PCs from the campaign roster, create and fully
      edit NPC combatants, reorder combatants (including Wait reslots), end
-      combat, advance turns while combat is active, and maintain or
+     combat. Detailed NPC creation/editing uses a native modal above the sticky
+     header, with viewport-bounded height and internal scrolling; Escape closes it.
+      Owners/managers can advance turns while combat is active and maintain or
     acknowledge timed effects. Effect add/edit supports templates, manual
     round/minute/hour/indefinite durations, known-spell prefills, maintenance
     costs, and optional PC-sheet links; expiry acknowledgement/removal confirms

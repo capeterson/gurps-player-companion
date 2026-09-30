@@ -226,6 +226,10 @@ when the text contains no spaces.
 Long account names remain width-bounded in the shared header through tablet
 widths; opening the account menu must not horizontally scroll the page.
 
+Detailed encounter NPC forms open in the native dialog top layer, above the
+sticky app header. Their height stays within the dynamic viewport, with internal
+scrolling for long forms, and Escape closes the dialog and its controlled state.
+
 Summary rows use a fluid name column and compact value/action columns. Long
 names and references wrap rather than shrinking to a few letters or forcing
 the whole page to scroll horizontally. At narrow widths, secondary metadata

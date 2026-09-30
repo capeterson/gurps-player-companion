@@ -20,6 +20,7 @@ import type {
 } from '../../../shared/schemas/encounter.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { type LocalCharacter, type LocalCharacterSpell, getLocalDb } from '../../db/dexie.ts';
+import { useDialogState } from '../../hooks/useDialogState.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { CampaignWorkspaceHeader } from '../campaigns/CampaignWorkspaceHeader.tsx';
 import { useCampaignWorkspace } from '../campaigns/useCampaignWorkspace.ts';
@@ -590,6 +591,7 @@ function NpcDialog({
   onClose(): void;
   onSave(body: CombatantCreate | CombatantUpdate): void;
 }) {
+  const dialogRef = useDialogState(true);
   const [name, setName] = useState(combatant?.name ?? '');
   const [basicSpeed, setBasicSpeed] = useState(String(combatant?.basicSpeed ?? 5));
   const [dx, setDx] = useState(String(combatant?.dx ?? 10));
@@ -662,7 +664,7 @@ function NpcDialog({
     </label>
   );
   return (
-    <dialog open className="modal">
+    <dialog ref={dialogRef} className="modal" onClose={onClose}>
       <div className="modal-box max-h-[calc(100dvh-3rem)] max-w-2xl overflow-y-auto">
         <h3 className="font-display text-2xl">{combatant ? 'Edit NPC' : 'Add NPC'}</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
