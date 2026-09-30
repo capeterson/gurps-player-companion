@@ -988,7 +988,9 @@ settings sections; switching sections retains drafts.
       Owners/managers can advance turns while combat is active and maintain or
     acknowledge timed effects. Effect add/edit supports templates, manual
     round/minute/hour/indefinite durations, known-spell prefills, maintenance
-    costs, and optional PC-sheet links; expiry acknowledgement/removal confirms
+    costs, and optional PC-sheet links. Effect forms also use native modals above
+    the sticky header, with internal scrolling and Escape dismissal.
+    Expiry acknowledgement/removal confirms
      and, after the REST acknowledgement succeeds, clears linked sheet values through the character outbox. Members receive the server's privacy-safe
    projection; a player can use local-first HP/FP and condition quick actions
     only for their own PC. Each character's Combat tab also has its own

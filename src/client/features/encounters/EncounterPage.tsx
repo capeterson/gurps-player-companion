@@ -821,6 +821,7 @@ function EffectDialog({
   onClose(): void;
   onSave(body: EffectCreate | EffectUpdate): void;
 }) {
+  const dialogRef = useDialogState(true);
   const [name, setName] = useState(effect?.name ?? '');
   const [targetCombatantId, setTarget] = useState(effect?.targetCombatantId ?? '');
   const [casterCombatantId, setCaster] = useState(effect?.casterCombatantId ?? '');
@@ -902,7 +903,7 @@ function EffectDialog({
     onSave(effect ? body : createBody);
   };
   return (
-    <dialog open className="modal">
+    <dialog ref={dialogRef} className="modal" onClose={onClose}>
       <div className="modal-box max-h-[calc(100dvh-3rem)] max-w-xl overflow-y-auto">
         <h3 className="font-display text-2xl">{effect ? 'Edit effect' : 'Add effect'}</h3>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
