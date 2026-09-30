@@ -25,12 +25,14 @@ import { alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/schemas/campaign.ts';
 import { listQuery, uuid } from '../../shared/schemas/common.ts';
-import { campaignInvitationNotificationPayload } from '../../shared/schemas/notification.ts';
+import {
+  campaignInvitationNotificationPayload,
+  eventNotificationPayload,
+} from '../../shared/schemas/notification.ts';
+import { notificationPreferences } from '../../shared/schemas/notificationPreferences.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { requireCampaignAdmin, tryLoadCampaignRole } from '../auth/permissions.ts';
-import { appUrl, loadConfig } from '../config.ts';
-import { withAudit } from '../db/auditContext.ts';
-import { afterDbCommit } from '../db/client.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
 import { isUniqueViolation } from '../db/errors.ts';
 import {
@@ -43,7 +45,6 @@ import {
   notifications,
   users,
 } from '../db/schema.ts';
-import { getResend, sendCampaignInviteEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { advanceCampaignProjectionRevision } from '../services/libraryInvalidation.ts';
 
@@ -110,6 +111,44 @@ async function findUserByHandle(handle: string): Promise<DbUser | null> {
   // Then display-name match (case-insensitive).
   const byName = await db.select().from(users).where(sql`lower(${users.displayName}) = ${lowered}`);
   return byName[0] ?? null;
+}
+
+async function notifyInvitationResponse(
+  tx: AuditTx,
+  invitation: DbCampaignInvitation,
+  actorName: string,
+  accepted: boolean,
+): Promise<void> {
+  const [sender] = await tx
+    .select({ preferences: users.notificationPreferences })
+    .from(users)
+    .where(eq(users.id, invitation.inviterId));
+  const [campaign] = await tx
+    .select({ name: campaigns.name })
+    .from(campaigns)
+    .where(eq(campaigns.id, invitation.campaignId));
+  if (!sender || !campaign || !notificationPreferences.parse(sender.preferences).invitations)
+    return;
+  const payload = eventNotificationPayload.parse({
+    topic: 'invitations',
+    title: accepted ? 'Invitation accepted' : 'Invitation declined',
+    message: `${actorName} ${accepted ? 'joined' : 'declined the invitation to'} ${campaign.name}.`,
+    href: `/campaigns/${invitation.campaignId}`,
+    actorId: invitation.inviteeId,
+    campaignId: invitation.campaignId,
+    characterId: null,
+    changes: [],
+  });
+  await tx
+    .insert(notifications)
+    .values({
+      userId: invitation.inviterId,
+      type: 'event',
+      relatedId: invitation.id,
+      payload,
+      groupKey: `invitation-response:${invitation.id}`,
+    })
+    .onConflictDoNothing();
 }
 
 router.openapi(
@@ -185,20 +224,21 @@ router.openapi(
         // Emit a notification for the invitee in the same transaction so
         // a half-applied invitation can never leave a stranded
         // notification (and vice versa).
-        await tx.insert(notifications).values({
-          userId: target.id,
-          type: NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
-          relatedId: row.id,
-          // Parse through the shared payload schema so the emitted jsonb
-          // can never drift from what NotificationsBell expects to read.
-          payload: campaignInvitationNotificationPayload.parse({
-            campaign_id: campaignId,
-            campaign_name: campaign.name,
-            inviter_id: user.id,
-            inviter_display_name: user.displayName,
-            role: requestedRole,
-          }),
-        });
+        if (notificationPreferences.parse(target.notificationPreferences).invitations)
+          await tx.insert(notifications).values({
+            userId: target.id,
+            type: NOTIFICATION_TYPE_CAMPAIGN_INVITATION,
+            relatedId: row.id,
+            // Parse through the shared payload schema so the emitted jsonb
+            // can never drift from what NotificationsBell expects to read.
+            payload: campaignInvitationNotificationPayload.parse({
+              campaign_id: campaignId,
+              campaign_name: campaign.name,
+              inviter_id: user.id,
+              inviter_display_name: user.displayName,
+              role: requestedRole,
+            }),
+          });
         return row.id;
       });
     } catch (err) {
@@ -208,22 +248,6 @@ router.openapi(
         });
       }
       throw err;
-    }
-
-    const config = loadConfig();
-    const resend = getResend(config);
-    const resendFromEmail = config.resendFromEmail;
-    if (resend && resendFromEmail) {
-      afterDbCommit(() =>
-        sendCampaignInviteEmail(resend, resendFromEmail, {
-          to: target.email,
-          displayName: target.displayName,
-          inviterName: user.displayName,
-          campaignName: campaign.name,
-          role: requestedRole,
-          appUrl: appUrl(config),
-        }).catch(() => {}),
-      );
     }
 
     const out = await loadInvitationOut(insertedId);
@@ -482,6 +506,7 @@ router.openapi(
         });
       }
       await advanceCampaignProjectionRevision(tx, invitation.campaignId);
+      await notifyInvitationResponse(tx, invitation, user.displayName, true);
       return true;
     });
     if (!flipped) {
@@ -533,13 +558,15 @@ router.openapi(
     // Same conditional-update pattern as cancel/accept: zero rows means
     // a parallel decision already terminated the invitation.
     const updated = await withAudit(user.id, undefined, async (tx) => {
-      return tx
+      const changed = await tx
         .update(campaignInvitations)
         .set({ status: 'rejected', decidedAt: new Date(), updatedAt: new Date() })
         .where(
           and(eq(campaignInvitations.id, invitationId), eq(campaignInvitations.status, 'pending')),
         )
         .returning({ id: campaignInvitations.id });
+      if (changed.length) await notifyInvitationResponse(tx, invitation, user.displayName, false);
+      return changed;
     });
     if (updated.length === 0) {
       throw new HTTPException(409, { message: 'invitation already decided' });

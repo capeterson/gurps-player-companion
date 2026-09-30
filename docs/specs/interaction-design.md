@@ -159,6 +159,9 @@ keep suggestions above navigation and inside the visual viewport. A closed
 form or folded section must not leave an autocomplete floating over the page.
 See the overlay rules in [AGENTS.md](../../AGENTS.md): dynamic viewport size
 limits alone do not establish containment.
+Downward-opening panels can opt into the shared overlay hook's available-height
+measurement. The notification bell uses it to scroll within the remaining visual
+viewport below either a single-row or wrapped mobile header.
 
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
 award summaries. These tooltips retain horizontal collision handling, constrain

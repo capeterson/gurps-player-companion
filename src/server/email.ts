@@ -73,3 +73,21 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+export async function sendNotificationEmail(
+  resend: Resend,
+  from: string,
+  opts: { to: string; subject: string; message: string; appUrl: string; idempotencyKey: string },
+): Promise<void> {
+  const result = await resend.emails.send(
+    {
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      text: `${opts.message}\n\nOpen Player Companion: ${opts.appUrl}`,
+      html: `<p>${escapeHtml(opts.message)}</p><p><a href="${escapeHtml(opts.appUrl)}">Open Player Companion</a></p>`,
+    },
+    { idempotencyKey: opts.idempotencyKey },
+  );
+  if (result.error) throw new Error('Email delivery failed');
+}

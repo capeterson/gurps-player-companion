@@ -39,9 +39,43 @@ export const notificationOut = z.object({
   relatedId: uuid.nullable(),
   readAt: isoTimestamp.nullable(),
   createdAt: isoTimestamp,
+  actionable: z.boolean().optional(),
 });
 
 export type NotificationOut = z.infer<typeof notificationOut>;
 export type CampaignInvitationNotificationPayload = z.infer<
   typeof campaignInvitationNotificationPayload
 >;
+
+export const eventNotificationPayload = z.object({
+  topic: z.enum([
+    'invitations',
+    'membership',
+    'characterChanges',
+    'points',
+    'campaignChanges',
+    'adventureLog',
+    'libraryChanges',
+  ]),
+  title: z.string().min(1).max(300),
+  message: z.string().min(1).max(1000),
+  href: z
+    .string()
+    .max(300)
+    .regex(/^\/(?:characters|campaigns)(?:\/[a-zA-Z0-9/-]+)?(?:#[a-zA-Z0-9-]+)?$/)
+    .nullable(),
+  actorId: uuid.nullable(),
+  characterId: uuid.nullable(),
+  campaignId: uuid.nullable(),
+  changes: z.array(z.string().max(120)).max(30).default([]),
+});
+export type EventNotificationPayload = z.infer<typeof eventNotificationPayload>;
+
+/** Durable mail payload, intentionally restricted to invitations and security. */
+export const notificationEmailPayload = z
+  .object({
+    subject: z.string().min(1).max(300),
+    message: z.string().min(1).max(1500),
+  })
+  .strict();
+export type NotificationEmailPayload = z.infer<typeof notificationEmailPayload>;

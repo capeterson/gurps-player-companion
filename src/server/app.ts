@@ -27,6 +27,7 @@ import { healthRouter } from './routes/health.ts';
 import { historyRouter } from './routes/history.ts';
 import { invitationsRouter } from './routes/invitations.ts';
 import { mediaRouter } from './routes/media.ts';
+import { notificationPreferencesRouter } from './routes/notificationPreferences.ts';
 import { notificationsRouter } from './routes/notifications.ts';
 import { syncRouter } from './routes/sync.ts';
 import { createSyncWsHandler } from './routes/syncWs.ts';
@@ -35,6 +36,7 @@ import { mediaAdmission } from './services/media/admission.ts';
 import { mediaConfig } from './services/media/config.ts';
 import { startMediaMaintenance } from './services/media/maintenance.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
+import { startNotificationMaintenance } from './services/notificationMaintenance.ts';
 import { startUserPurgeMaintenance } from './services/userPurge.ts';
 import { attachStaticHandler } from './static.ts';
 
@@ -57,6 +59,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   const app = createOpenApiApp();
   startMediaMaintenance();
   startUserPurgeMaintenance(config.environment);
+  startNotificationMaintenance(config.environment);
 
   // Generate correlation IDs at the trusted server boundary. Never accept a
   // caller-supplied ID: the response header can be shown to a user safely and
@@ -164,6 +167,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
   app.route('/api/v1', invitationsRouter);
+  app.route('/api/v1', notificationPreferencesRouter);
   app.route('/api/v1', notificationsRouter);
   app.route('/api/v1', adminRouter);
   app.route('/api/v1', campaignLibraryRouter);

@@ -276,8 +276,13 @@ export async function dispatchOperation(
   const batchId = op.batchId ?? op.clientOpId;
   if (op.entityClass === 'character') ctx.batch?.access.clear();
   try {
-    const outcome = await withAudit(ctx.userId, batchId, (tx) =>
-      dispatchOperationInner({ ...ctx, batchId }, op, tx),
+    // The audit fallback identifies one operation, not an explicit user gesture.
+    // Only an explicit batch controls notification grouping; singleton ops use bursts.
+    const outcome = await withAudit(
+      ctx.userId,
+      batchId,
+      (tx) => dispatchOperationInner({ ...ctx, batchId }, op, tx),
+      op.batchId ?? null,
     );
     if (outcome.status === 'applied' && ctx.batch) {
       ctx.batch.invalidations.push(

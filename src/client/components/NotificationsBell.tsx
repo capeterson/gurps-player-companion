@@ -1,19 +1,22 @@
 /**
  * Header notification bell.  Polls /notifications every 30 s (matches
  * gurps-player-web) and renders a dropdown with per-row actions:
- *   - Unread campaign-invitation rows show Accept / Decline that call
+ *   - Pending campaign-invitation rows show Accept / Decline that call
  *     into the invitations API; the server marks the notification read
  *     as part of accept/reject so the bell clears on next poll.
- *   - Already-read or non-actionable rows show Dismiss instead.
+ *   - Non-actionable rows show Dismiss; reading an invitation leaves it actionable.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import {
   type NotificationOut,
   campaignInvitationNotificationPayload,
+  eventNotificationPayload,
 } from '../../shared/schemas/notification.ts';
 import { useViewportBoundedOverlay } from '../hooks/useViewportBoundedOverlay.ts';
-import { ApiError } from '../lib/api.ts';
+import { ApiError, api } from '../lib/api.ts';
+import { useDesktopNotificationDelivery } from '../lib/desktopNotifications.ts';
 import { invitationsApi } from '../lib/invitations.ts';
 import { notificationsApi } from '../lib/notifications.ts';
 import { useToasts } from '../lib/toast.tsx';
@@ -29,7 +32,9 @@ function isCampaignInvite(n: NotificationOut): boolean {
 export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const qc = useQueryClient();
   const toasts = useToasts();
-  const panelRef = useViewportBoundedOverlay<HTMLDivElement>();
+  const panelRef = useViewportBoundedOverlay<HTMLDivElement>(true, undefined, {
+    constrainHeight: true,
+  });
 
   const notifications = useQuery({
     queryKey: ['notifications'],
@@ -38,6 +43,8 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
     refetchOnWindowFocus: true,
   });
 
+  const me = useQuery({ queryKey: ['auth', 'me'], queryFn: () => api<{ id: string }>('/auth/me') });
+  useDesktopNotificationDelivery(me.data?.id, notifications.data);
   const items = notifications.data ?? [];
   const unread = items.filter((n) => n.readAt === null);
 
@@ -71,9 +78,21 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
       toasts.push(err instanceof ApiError ? err.message : 'Dismiss failed', { kind: 'error' }),
   });
 
+  const markRead = useMutation({
+    mutationFn: (id: string) => notificationsApi.markRead(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err) =>
+      toasts.push(err instanceof Error ? err.message : 'Could not mark notification read', {
+        kind: 'error',
+      }),
+  });
   const markAllRead = useMutation({
     mutationFn: () => notificationsApi.markAllRead(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+    onError: (err) =>
+      toasts.push(err instanceof Error ? err.message : 'Could not mark notifications read', {
+        kind: 'error',
+      }),
   });
 
   return (
@@ -94,8 +113,12 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
       </summary>
       <div
         ref={panelRef}
-        style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
-        className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100dvw-1rem))] [overflow-wrap:anywhere] rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg"
+        style={{
+          marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
+          maxHeight:
+            'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, calc(100dvh - 5rem)))',
+        }}
+        className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100dvw-1rem))] [overflow-wrap:anywhere] overflow-y-auto rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg"
       >
         <div className="flex items-baseline justify-between mb-2">
           <span className="label-eyebrow">Notifications</span>
@@ -119,7 +142,7 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
         {items.length === 0 && !notifications.isError ? (
           <p className="text-sm text-base-content/60 py-4 text-center">You're all caught up.</p>
         ) : items.length > 0 ? (
-          <ul className="grid gap-2 max-h-96 overflow-y-auto">
+          <ul className="grid gap-2">
             {items.map((n) => {
               const inviteId = n.relatedId;
               // Parse via the shared payload schema; fall back to
@@ -133,7 +156,9 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
               // Accept / Decline only while the underlying invite is still
               // actionable. Past that, show Dismiss so the row can be
               // cleared without firing a stale request.
-              const showInviteActions = isCampaignInvite(n) && inviteId !== null && isUnread;
+              const showInviteActions =
+                isCampaignInvite(n) && inviteId !== null && (n.actionable ?? isUnread);
+              const event = eventNotificationPayload.safeParse(n.payload);
               return (
                 <li
                   key={n.id}
@@ -141,11 +166,48 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
                     isUnread ? 'bg-base-200/40' : 'bg-base-100'
                   }`}
                 >
-                  <p className="text-sm">
-                    <strong>{inviter}</strong> invited you to <strong>{campaignName}</strong>
-                    {role === 'manager' ? ' as a manager' : ''}.
-                  </p>
+                  {isCampaignInvite(n) ? (
+                    <p className="text-sm">
+                      <strong>{inviter}</strong> invited you to <strong>{campaignName}</strong>
+                      {role === 'manager' ? ' as a manager' : ''}.
+                    </p>
+                  ) : event.success ? (
+                    <div className="text-sm">
+                      <p className="font-medium">{event.data.title}</p>
+                      <p>{event.data.message}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm">
+                      A notification is available. Its details could not be displayed.
+                    </p>
+                  )}
+                  <time className="mt-1 block text-xs text-muted" dateTime={n.createdAt}>
+                    {new Date(n.createdAt).toLocaleString()}
+                  </time>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    {!isCampaignInvite(n) && event.success && event.data.href && (
+                      <Link
+                        className="btn btn-ghost btn-xs"
+                        to={event.data.href}
+                        onClick={(event) => {
+                          if (isUnread) markRead.mutate(n.id);
+                          const dropdown = event.currentTarget.closest('details');
+                          if (dropdown) dropdown.open = false;
+                        }}
+                      >
+                        View
+                      </Link>
+                    )}
+                    {isUnread && !showInviteActions && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        disabled={markRead.isPending}
+                        onClick={() => markRead.mutate(n.id)}
+                      >
+                        Mark read
+                      </button>
+                    )}
                     {showInviteActions && inviteId ? (
                       <>
                         <button

@@ -62,6 +62,10 @@ import type {
 } from '../../shared/schemas/inventory.ts';
 import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences,
+} from '../../shared/schemas/notificationPreferences.ts';
 import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schemas/skill.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
@@ -159,6 +163,10 @@ export const users = pgTable(
       .$type<LightThemeName>()
       .notNull()
       .default('illuminated-manuscript'),
+    notificationPreferences: jsonb('notification_preferences')
+      .$type<NotificationPreferences>()
+      .notNull()
+      .default(DEFAULT_NOTIFICATION_PREFERENCES),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -533,6 +541,7 @@ export const notifications = pgTable(
      * `campaignInvitationNotificationPayload` for 'campaign_invitation'). */
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull().default({}),
     relatedId: uuid('related_id'),
+    groupKey: text('group_key'),
     readAt: timestamp('read_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -541,6 +550,7 @@ export const notifications = pgTable(
     userIdx: index('notifications_user_idx').on(t.userId),
     relatedIdx: index('notifications_related_idx').on(t.relatedId),
     readIdx: index('notifications_read_idx').on(t.readAt),
+    groupKey: uniqueIndex('notifications_group_key').on(t.userId, t.groupKey),
   }),
 );
 
@@ -1671,3 +1681,35 @@ export const mediaCounters = pgTable('media_counters', {
   amount: bigint('amount', { mode: 'number' }).notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
 });
+
+/** Transactional audit-event work; recipient IDs are snapshotted before access disappears. */
+export const notificationHistoryQueue = pgTable('notification_history_queue', {
+  gestureBatchId: uuid('gesture_batch_id'),
+  historyId: uuid('history_id')
+    .primaryKey()
+    .references(() => entityHistory.id, { onDelete: 'cascade' }),
+  recipientIds: uuid('recipient_ids').array().notNull(),
+  campaignName: text('campaign_name'),
+});
+export const notificationEmailQueue = pgTable(
+  'notification_email_queue',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: varchar('kind', { length: 32 })
+      .$type<'invitation' | 'invitation_accepted' | 'security'>()
+      .notNull(),
+    relatedId: uuid('related_id'),
+    eventKey: text('event_key').notNull(),
+    subject: varchar('subject', { length: 300 }).notNull(),
+    message: varchar('message', { length: 1500 }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+  },
+  (t) => ({ eventKey: uniqueIndex('notification_email_event_key').on(t.eventKey) }),
+);
