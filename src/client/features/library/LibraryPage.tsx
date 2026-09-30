@@ -674,8 +674,8 @@ export function LibraryPage({
             </button>
           ))}
         </div>
-        <div className="flex items-end gap-2">
-          <label>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="shrink-0">
             Source
             <select
               className="select select-sm max-w-40"
@@ -690,21 +690,23 @@ export function LibraryPage({
               ))}
             </select>
           </label>
-          <label className="min-w-0 flex-1">
-            <span className="label-eyebrow mb-1 block">Search library</span>
-            <input
-              type="search"
-              className="input input-bordered input-sm w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, description, source, college…"
-            />
-          </label>
-          {search && (
-            <button type="button" className="btn btn-sm" onClick={() => setSearch('')}>
-              Clear search
-            </button>
-          )}
+          <div className="flex min-w-64 flex-1 items-end gap-2">
+            <label className="min-w-36 flex-1">
+              <span className="label-eyebrow mb-1 block">Search library</span>
+              <input
+                type="search"
+                className="input input-bordered input-sm w-full"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name, description, source, college…"
+              />
+            </label>
+            {search && (
+              <button type="button" className="btn btn-sm shrink-0" onClick={() => setSearch('')}>
+                Clear search
+              </button>
+            )}
+          </div>
         </div>
         <div ref={setJumpSlot} className="empty:hidden" />
       </div>

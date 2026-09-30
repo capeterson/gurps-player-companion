@@ -212,6 +212,9 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+Library source selection and search share a wrapping toolbar. The search input
+and **Clear search** button stay together, taking a separate row when needed.
+
 Long account names remain width-bounded in the shared header through tablet
 widths; opening the account menu must not horizontally scroll the page.
 

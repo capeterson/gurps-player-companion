@@ -915,7 +915,9 @@ settings sections; switching sections retains drafts.
   and a one-line source excerpt that preserves punctuation (including comparison
   symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
-  the app header. Search matches every word across names, descriptions, sources
+  the app header. On narrow screens the search field and its **Clear search**
+  button wrap together onto a row below the source selector, preserving usable
+  input width. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or
   entry linkable. Drafts survive category switches, searches and folded groups,
   and a draft the client can already tell is invalid (schema, specialization
