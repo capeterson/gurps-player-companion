@@ -528,6 +528,10 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   for its stable project name and host ports; pass all further Compose commands
   through the same wrapper. The default Compose name and ports in
   `docker-compose.dev.yml` are for the primary checkout only.
+- The host expires GPC worktree Compose projects after 48 hours without a
+  Compose start or wrapper lease renewal. For work lasting longer, run
+  `./scripts/dev-worktree.sh keepalive` before the lease expires. This command
+  only renews the lease; it does not start a container.
 - Run the complete client suite with
   `./scripts/dev-worktree.sh --profile test run --rm client-tests`. Vitest
   requires real Node 22; Bun's `node` fallback cannot run it.

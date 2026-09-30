@@ -12,7 +12,7 @@ services:
 
   db:
     image: postgres:18-alpine
-    restart: unless-stopped
+    restart: 'no'
     environment:
       POSTGRES_USER: gurps
       POSTGRES_PASSWORD: gurps

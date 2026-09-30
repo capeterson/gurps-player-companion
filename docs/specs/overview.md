@@ -1360,6 +1360,9 @@ handlers for validated writes, owned mechanics, history and revisions.
 Before a new development task on local `main`, fetch and fast-forward from
 `origin/main` as prescribed in [AGENTS.md](../../AGENTS.md), preserving local
 work. Re-read project instructions and relevant specs changed by that update.
+The worktree Compose wrapper renews a host cleanup lease whenever it is used;
+`./scripts/dev-worktree.sh keepalive` renews the lease during longer work without
+starting containers. The host removes idle GPC worktree containers after 48 hours.
 
 The armor-location design study at [prototypes/armor-preview.html](../prototypes/armor-preview.html)
 opens directly in a browser without dependencies or a build. It previews all 15

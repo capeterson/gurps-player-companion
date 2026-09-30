@@ -17,5 +17,16 @@ if [ "${1:-}" = "info" ]; then
   exit 0
 fi
 
+lease_dir="${XDG_STATE_HOME:-$HOME/.local/state}/worktree-container-cleanup/leases"
+mkdir -p "$lease_dir"
+lease_tmp=$(mktemp "$lease_dir/$project.XXXXXX")
+printf '%s\n' "$repo_dir" > "$lease_tmp"
+mv -f "$lease_tmp" "$lease_dir/$project"
+
+if [ "${1:-}" = "keepalive" ]; then
+  printf 'Renewed cleanup lease for %s\n' "$project"
+  exit 0
+fi
+
 cd "$repo_dir"
 exec docker compose -p "$project" -f docker-compose.dev.yml "$@"
