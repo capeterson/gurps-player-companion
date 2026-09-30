@@ -212,6 +212,9 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+Long account names remain width-bounded in the shared header through tablet
+widths; opening the account menu must not horizontally scroll the page.
+
 Summary rows use a fluid name column and compact value/action columns. Long
 names and references wrap rather than shrinking to a few letters or forcing
 the whole page to scroll horizontally. At narrow widths, secondary metadata

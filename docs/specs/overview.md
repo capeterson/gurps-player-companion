@@ -1004,6 +1004,9 @@ settings sections; switching sections retains drafts.
   selection into `Campaign › <campaign name> › Log/Library`. The first level
   returns to its collection and the named level returns to that entity's main
   page. Campaign sub-navigation carries the current campaign into Log/Library.
+  Long account names stay truncated through tablet widths so the user-menu
+  trigger fits alongside the other header controls; the menu retains the account
+  email within viewport bounds.
 - **Logged-in home**: a compact welcome and the four most recently updated
   characters. Global Character, Campaign, Log, and Library destinations stay in the
   persistent header instead of being repeated as homepage buttons or shortcut
