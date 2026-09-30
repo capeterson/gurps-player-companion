@@ -189,6 +189,7 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
   expect(response.status()).toBe(201);
   const character = (await response.json()) as { id: string };
   await page.goto(`/characters/${character.id}`);
+  await selectCharacterSection(page, 'Combat');
   await expect(page.getByRole('button', { name: 'Start tracker' })).toBeVisible();
   await page.getByRole('button', { name: 'Start tracker' }).click();
   await expect(page.getByRole('button', { name: 'Next turn' })).toBeVisible();
@@ -202,6 +203,7 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
   });
   await page.reload();
   await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Combat');
   await expect(page.getByText('Solo tracker', { exact: true })).toHaveCount(0);
 
   await api(page, `/campaigns/${campaignId}`, {
