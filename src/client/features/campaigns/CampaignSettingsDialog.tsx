@@ -1,5 +1,6 @@
 /**
- * Campaign settings modal — owner-only. Lets the GM tune point
+ * Campaign settings modal — owners edit rules; managers manage members.
+ * Lets the GM tune point
  * target, disadvantage / quirk caps, and toggle whether character
  * sheets are shared with other members.
  *
@@ -27,8 +28,9 @@ import type {
   HouseRuleSet,
   TransferOwnershipRequest,
 } from '../../../shared/schemas/campaign.ts';
+import { MediaImage } from '../../components/MediaImage.tsx';
+import type { LocalCampaign } from '../../db/dexie.ts';
 import { useDialogState } from '../../hooks/useDialogState.ts';
-import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
@@ -39,7 +41,8 @@ import { TransferOwnershipDialog } from './TransferOwnershipDialog.tsx';
 
 interface Props {
   open: boolean;
-  campaign: CampaignOut;
+  campaign: CampaignOut | LocalCampaign;
+  onlineAvailable?: boolean;
   /** Role of the viewer in this campaign — owner or manager unlocks invitations. */
   viewerRole: CampaignRole;
   onClose: () => void;
@@ -53,9 +56,20 @@ function nullableIntFromInput(s: string): number | null | 'invalid' {
   return n;
 }
 
-export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: Props) {
+export function CampaignSettingsDialog({
+  open,
+  campaign,
+  viewerRole,
+  onlineAvailable = true,
+  onClose,
+}: Props) {
+  const [section, setSection] = useState<'campaign' | 'rules' | 'members'>(
+    viewerRole === 'owner' ? 'campaign' : 'members',
+  );
+  const canEditSettings = viewerRole === 'owner' && onlineAvailable;
+  const members = 'members' in campaign ? campaign.members : [];
   const ref = useDialogState(open);
-  const transferMenuRef = useViewportBoundedOverlay<HTMLUListElement>();
+  const bodyRef = useRef<HTMLDivElement>(null);
   const toasts = useToasts();
   const qc = useQueryClient();
 
@@ -68,13 +82,15 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [quirkCap, setQuirkCap] = useState(
     campaign.quirkCap == null ? '' : String(campaign.quirkCap),
   );
-  const [manaLevel, setManaLevel] = useState<ManaLevel>(campaign.manaLevel);
+  const [manaLevel, setManaLevel] = useState<ManaLevel>(campaign.manaLevel ?? 'normal');
   const [techLevel, setTechLevel] = useState(
     campaign.techLevel == null ? '' : String(campaign.techLevel),
   );
-  const [enforceAttributeCaps, setEnforceAttributeCaps] = useState(campaign.enforceAttributeCaps);
-  const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets);
-  const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing);
+  const [enforceAttributeCaps, setEnforceAttributeCaps] = useState(
+    campaign.enforceAttributeCaps ?? true,
+  );
+  const [shareSheets, setShareSheets] = useState(campaign.shareCharacterSheets ?? true);
+  const [allowGmEditing, setAllowGmEditing] = useState(campaign.allowGmCharacterEditing ?? false);
   const [skillPrerequisitePolicy, setSkillPrerequisitePolicy] = useState(
     campaign.skillPrerequisitePolicy ?? 'block',
   );
@@ -88,7 +104,7 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const editingCampaign = useRef<string | null>(null);
+  const editingCampaign = useRef<{ id: string; remoteHydrated: boolean } | null>(null);
 
   // Each time the dialog opens with a (potentially) new campaign,
   // hydrate the local form state.  Without this, reopening for
@@ -98,21 +114,25 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
       editingCampaign.current = null;
       return;
     }
-    if (editingCampaign.current === campaign.id) return;
-    editingCampaign.current = campaign.id;
+    const sameCampaign = editingCampaign.current?.id === campaign.id;
+    // Local settings cannot be edited until the remote campaign is loaded.
+    // Hydrate once at that transition, then preserve every subsequent draft.
+    if (sameCampaign && (editingCampaign.current?.remoteHydrated || !onlineAvailable)) return;
+    editingCampaign.current = { id: campaign.id, remoteHydrated: onlineAvailable };
     setPointTarget(campaign.pointTarget == null ? '' : String(campaign.pointTarget));
     setDisadCap(campaign.disadvantageCap == null ? '' : String(campaign.disadvantageCap));
     setQuirkCap(campaign.quirkCap == null ? '' : String(campaign.quirkCap));
-    setManaLevel(campaign.manaLevel);
+    setManaLevel(campaign.manaLevel ?? 'normal');
     setTechLevel(campaign.techLevel == null ? '' : String(campaign.techLevel));
-    setEnforceAttributeCaps(campaign.enforceAttributeCaps);
-    setShareSheets(campaign.shareCharacterSheets);
-    setAllowGmEditing(campaign.allowGmCharacterEditing);
+    setEnforceAttributeCaps(campaign.enforceAttributeCaps ?? true);
+    setShareSheets(campaign.shareCharacterSheets ?? true);
+    setAllowGmEditing(campaign.allowGmCharacterEditing ?? false);
     setSkillPrerequisitePolicy(campaign.skillPrerequisitePolicy ?? 'block');
     setExperimentalTurnTracker(campaign.experimentalTurnTracker ?? false);
     setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
     setError(null);
-  }, [open, campaign]);
+    if (!sameCampaign) setSection(viewerRole === 'owner' ? 'campaign' : 'members');
+  }, [open, campaign, viewerRole, onlineAvailable]);
 
   const update = useMutation({
     mutationFn: (body: CampaignUpdate) =>
@@ -199,12 +219,14 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditSettings || update.isPending) return;
     setError(null);
     const pt = nullableIntFromInput(pointTarget);
     const dc = nullableIntFromInput(disadCap);
     const qcVal = nullableIntFromInput(quirkCap);
     const tl = nullableIntFromInput(techLevel);
     if (pt === 'invalid' || dc === 'invalid' || qcVal === 'invalid' || tl === 'invalid') {
+      setSection('campaign');
       setError('Caps, point target, and tech level must be non-negative integers (or blank).');
       return;
     }
@@ -229,25 +251,30 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
     <>
       <dialog
         ref={ref}
-        onClose={onClose}
-        className="modal-back"
+        onClose={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+        className="modal"
         aria-labelledby="campaign-settings-title"
       >
         <form
           method="dialog"
-          className="card relative max-h-[calc(100dvh-3rem)] w-[28rem] max-w-[calc(100vw-3rem)] overflow-y-auto p-5 gap-3"
+          className="modal-box flex max-h-[calc(100dvh-1rem)] w-[60rem] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden p-0"
           onSubmit={onSubmit}
         >
-          <header className="flex items-baseline justify-between">
-            <div>
+          <header className="flex shrink-0 items-start justify-between gap-3 px-4 pt-5 pb-4 sm:px-7">
+            <div className="min-w-0">
               <p className="label-eyebrow">Campaign settings</p>
-              <h2 id="campaign-settings-title" className="font-display text-2xl font-semibold">
+              <h2
+                id="campaign-settings-title"
+                className="font-display text-2xl font-semibold [overflow-wrap:anywhere]"
+              >
                 {campaign.name}
               </h2>
             </div>
             <button
               type="button"
-              className="btn btn-ghost btn-sm"
+              className="btn btn-ghost btn-square shrink-0"
               onClick={onClose}
               aria-label="Close"
             >
@@ -255,291 +282,384 @@ export function CampaignSettingsDialog({ open, campaign, viewerRole, onClose }: 
             </button>
           </header>
 
-          {viewerRole === 'owner' && (
-            <div className="grid grid-cols-3 gap-2">
-              <label className="form-control">
-                <span className="label-text text-xs">Point target</span>
-                <input
-                  className="input input-bordered input-sm num"
-                  value={pointTarget}
-                  onChange={(e) => setPointTarget(e.target.value)}
-                  placeholder="—"
-                />
-              </label>
-              <label className="form-control">
-                <span className="label-text text-xs">Disadv. cap</span>
-                <input
-                  className="input input-bordered input-sm num"
-                  value={disadCap}
-                  onChange={(e) => setDisadCap(e.target.value)}
-                  placeholder="—"
-                />
-              </label>
-              <label className="form-control">
-                <span className="label-text text-xs">Quirk cap</span>
-                <input
-                  className="input input-bordered input-sm num"
-                  value={quirkCap}
-                  onChange={(e) => setQuirkCap(e.target.value)}
-                  placeholder="—"
-                />
-              </label>
-              <label className="form-control">
-                <span className="label-text text-xs">Tech level</span>
-                <input
-                  className="input input-bordered input-sm num"
-                  value={techLevel}
-                  onChange={(e) => setTechLevel(e.target.value)}
-                  placeholder="—"
-                />
-              </label>
-            </div>
-          )}
-
-          {viewerRole === 'owner' && (
-            <label className="form-control">
-              <span className="label-text text-xs">Mana level</span>
-              <select
-                className="select select-bordered select-sm"
-                value={manaLevel}
-                onChange={(e) => setManaLevel(e.target.value as ManaLevel)}
-              >
-                {MANA_LEVELS.map((m) => (
-                  <option key={m} value={m}>
-                    {MANA_LEVEL_LABELS[m]}
-                  </option>
-                ))}
-              </select>
-              <span className="label-text-alt text-xs text-base-content/60">
-                Low mana is −5 to every spell; high or better lets non-mages cast. Very high mana
-                requires energy up front, restores mages' personal FP spent casting on their own
-                turn next turn, and makes every failure critical. Applied to every character sheet
-                in this campaign.
-              </span>
-            </label>
-          )}
-
-          {viewerRole === 'owner' && (
-            <label className="form-control">
-              <span className="label-text text-xs">Skill prerequisites</span>
-              <select
-                className="select select-bordered select-sm"
-                value={skillPrerequisitePolicy}
-                onChange={(event) =>
-                  setSkillPrerequisitePolicy(event.target.value as 'block' | 'warn')
-                }
-              >
-                <option value="block">Block unmet prerequisites</option>
-                <option value="warn">Warn only</option>
-              </select>
-            </label>
-          )}
-
-          {viewerRole === 'owner' && (
-            <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm mt-0.5"
-                checked={enforceAttributeCaps}
-                onChange={(e) => setEnforceAttributeCaps(e.target.checked)}
-              />
-              <span className="flex-1">
-                <span className="block text-sm font-medium">Enforce attribute caps</span>
-                <span className="block text-xs text-base-content/60">
-                  Caps purchased DX, IQ, and HT at 20, and purchased Will and Per at 20 total. ST
-                  and temporary bonuses remain uncapped (B14-B16).
-                </span>
-              </span>
-            </label>
-          )}
-
-          {viewerRole === 'owner' && (
-            <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm mt-0.5"
-                checked={shareSheets}
-                onChange={(e) => setShareSheets(e.target.checked)}
-              />
-              <span className="flex-1">
-                <span className="block text-sm font-medium">Share character sheets</span>
-                <span className="block text-xs text-base-content/60">
-                  When off, fellow members see only "readily apparent" details (name, height,
-                  weight, age, appearance, TL) instead of the full sheet. The owner and you (the GM)
-                  always see the full sheet.
-                </span>
-              </span>
-            </label>
-          )}
-
-          {viewerRole === 'owner' && (
-            <label className="cursor-pointer flex items-start gap-3">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm mt-0.5"
-                checked={allowGmEditing}
-                onChange={(e) => setAllowGmEditing(e.target.checked)}
-              />
-              <span className="flex-1">
-                <span className="block text-sm font-medium">Allow GM character editing</span>
-                <span className="block text-xs text-base-content/60">
-                  Lets campaign owners and managers edit player-owned character sheets. Players
-                  still control their own sheets, and all changes remain visible in history.
-                </span>
-              </span>
-            </label>
-          )}
-
-          <fieldset
-            disabled={viewerRole !== 'owner' || update.isPending}
-            className="border-t border-base-300 pt-3"
+          <nav
+            aria-label="Settings sections"
+            className="flex shrink-0 flex-wrap gap-1 border-b border-base-300 px-4 pb-3 sm:px-7"
           >
-            <legend className="label-eyebrow">Experimental features</legend>
-            <label className="flex items-start gap-3 pt-2">
-              <input
-                type="checkbox"
-                className="checkbox checkbox-sm mt-0.5"
-                checked={experimentalTurnTracker}
-                onChange={(e) => setExperimentalTurnTracker(e.target.checked)}
-              />
-              <span>
-                <span className="block text-sm font-medium">Enable turn tracker</span>
-                <span className="block text-xs text-base-content/60">
-                  Unfinished, experimental tools for campaign encounters and character turn
-                  tracking. Off by default. Turning this off keeps saved encounters and local
-                  tracker data.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-
-          <fieldset
-            className="border-t border-base-300 pt-3 space-y-3"
-            disabled={viewerRole !== 'owner' || update.isPending}
-          >
-            <legend className="label-eyebrow">Campaign rules</legend>
-            <label className="form-control">
-              <span className="label-text text-xs">House rule set</span>
-              <select
-                className="select select-bordered select-sm"
-                aria-label="House rule set"
-                value={houseRules.ruleSet}
-                onChange={(e) =>
-                  setHouseRules((current) =>
-                    applyHouseRuleSet(current, e.target.value as HouseRuleSet),
-                  )
-                }
+            {[
+              ...(viewerRole === 'owner' ? [{ id: 'campaign' as const, label: 'Campaign' }] : []),
+              { id: 'rules' as const, label: 'Rules' },
+              { id: 'members' as const, label: 'Members' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`btn btn-sm ${section === item.id ? 'btn-active' : 'btn-ghost'}`}
+                aria-pressed={section === item.id}
+                aria-controls={`settings-${item.id}`}
+                onClick={() => {
+                  setSection(item.id);
+                  if (bodyRef.current) bodyRef.current.scrollTop = 0;
+                }}
               >
-                <option value="none">None</option>
-                <option value="j_talisar">J Talisar</option>
-                <option value="custom">Custom</option>
-              </select>
-              <span className="label-text-alt text-xs text-base-content/60">
-                Named sets load their complete bundle. Choose Custom to edit the current bundle;
-                none of its options are reset.
-              </span>
-            </label>
-
-            {(['General', 'Combat', 'Magic', 'Path magic', 'Campaign content'] as const).map(
-              (group) => (
-                <details
-                  key={group}
-                  open={group === 'Combat'}
-                  className="rounded-box bg-base-200/50 p-2"
-                >
-                  <summary className="cursor-pointer text-sm font-semibold">{group}</summary>
-                  <div className="mt-2 space-y-3">
-                    {HOUSE_RULE_DEFINITIONS.filter((rule) => rule.group === group).map((rule) => (
-                      <label key={rule.key} className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm mt-0.5"
-                          checked={houseRules[rule.key]}
-                          disabled={houseRules.ruleSet !== 'custom'}
-                          onChange={(e) =>
-                            setHouseRules((current) =>
-                              customizeHouseRule(current, rule.key, e.target.checked),
-                            )
-                          }
-                        />
-                        <span>
-                          <span className="block text-sm font-medium">{rule.label}</span>
-                          <span className="block text-xs text-base-content/60">
-                            {rule.description}
-                          </span>
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </details>
-              ),
-            )}
-          </fieldset>
-
-          {error && <p className="alert alert-error text-sm">{error}</p>}
-
-          {(viewerRole === 'owner' || viewerRole === 'manager') && (
-            <>
-              <CampaignMembersPanel campaign={campaign} viewerRole={viewerRole} />
-              <CampaignInvitePanel campaignId={campaign.id} viewerRole={viewerRole} />
-            </>
-          )}
-
-          {viewerRole === 'owner' && (
-            <section className="border-t border-base-300 pt-3 mt-1 space-y-2">
-              <p className="label-eyebrow">Danger zone</p>
-              <div className="flex flex-wrap gap-2">
-                <details className="dropdown">
-                  <summary className="btn btn-ghost btn-xs">Transfer ownership ▾</summary>
-                  <ul
-                    ref={transferMenuRef}
-                    style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
-                    className="menu dropdown-content z-30 mt-1 max-h-56 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300 bg-base-100 p-2 shadow-lg"
-                  >
-                    {campaign.members.filter((m) => m.userId !== campaign.ownerId).length === 0 && (
-                      <li className="text-xs text-base-content/60 px-2 py-1">
-                        No other members yet.
-                      </li>
-                    )}
-                    {campaign.members
-                      .filter((m) => m.userId !== campaign.ownerId)
-                      .sort((a, b) => a.displayName.localeCompare(b.displayName))
-                      .map((m) => (
-                        <li key={m.userId}>
-                          <button
-                            type="button"
-                            onClick={() => setTransferTarget(m)}
-                            disabled={transfer.isPending}
-                          >
-                            {m.displayName}
-                            <span className="text-xs text-base-content/60">{m.role}</span>
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                </details>
-                <button
-                  type="button"
-                  className="btn btn-error btn-outline btn-xs"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={remove.isPending}
-                >
-                  Delete campaign…
-                </button>
-              </div>
-            </section>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
-              Cancel
-            </button>
-            {viewerRole === 'owner' && (
-              <button type="submit" className="btn btn-primary btn-sm" disabled={update.isPending}>
-                {update.isPending ? 'Saving…' : 'Save'}
+                {item.label}
               </button>
+            ))}
+          </nav>
+          <div
+            ref={bodyRef}
+            className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7"
+          >
+            {!onlineAvailable && (
+              <p className="alert mb-5 text-sm">
+                Connect to change campaign rules or manage members. Cover changes can still queue on
+                this device.
+              </p>
             )}
+            <section
+              id="settings-campaign"
+              aria-label="Campaign preferences"
+              hidden={section !== 'campaign'}
+              className="space-y-6"
+            >
+              {viewerRole === 'owner' && (
+                <section className="space-y-3" aria-labelledby="settings-cover-title">
+                  <div>
+                    <h3 id="settings-cover-title" className="text-lg font-semibold">
+                      Campaign cover
+                    </h3>
+                    <p className="text-sm text-base-content/60">
+                      Set the scene for your campaign. Image changes save separately from these
+                      settings, including while offline.
+                    </p>
+                  </div>
+                  <MediaImage
+                    targetType="campaign"
+                    targetId={campaign.id}
+                    assetId={campaign.coverAssetId}
+                    name={campaign.name}
+                    editable
+                  />
+                </section>
+              )}
+              <fieldset
+                disabled={!canEditSettings || update.isPending}
+                className="min-w-0 space-y-4 border-t border-base-300 pt-4"
+              >
+                <legend className="text-lg font-semibold">Character creation &amp; play</legend>
+                {viewerRole === 'owner' && (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <label className="form-control min-w-0 gap-1.5">
+                      <span className="label-text text-xs">Point target</span>
+                      <input
+                        className="input w-full min-w-0 num"
+                        value={pointTarget}
+                        onChange={(e) => setPointTarget(e.target.value)}
+                        placeholder="—"
+                      />
+                    </label>
+                    <label className="form-control min-w-0 gap-1.5">
+                      <span className="label-text text-xs">Disadv. cap</span>
+                      <input
+                        className="input w-full min-w-0 num"
+                        value={disadCap}
+                        onChange={(e) => setDisadCap(e.target.value)}
+                        placeholder="—"
+                      />
+                    </label>
+                    <label className="form-control min-w-0 gap-1.5">
+                      <span className="label-text text-xs">Quirk cap</span>
+                      <input
+                        className="input w-full min-w-0 num"
+                        value={quirkCap}
+                        onChange={(e) => setQuirkCap(e.target.value)}
+                        placeholder="—"
+                      />
+                    </label>
+                    <label className="form-control min-w-0 gap-1.5">
+                      <span className="label-text text-xs">Tech level</span>
+                      <input
+                        className="input w-full min-w-0 num"
+                        value={techLevel}
+                        onChange={(e) => setTechLevel(e.target.value)}
+                        placeholder="—"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {viewerRole === 'owner' && (
+                  <label className="form-control min-w-0 gap-1.5">
+                    <span className="label-text text-xs">Mana level</span>
+                    <select
+                      className="select w-full"
+                      value={manaLevel}
+                      onChange={(e) => setManaLevel(e.target.value as ManaLevel)}
+                    >
+                      {MANA_LEVELS.map((m) => (
+                        <option key={m} value={m}>
+                          {MANA_LEVEL_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="label-text-alt text-xs text-base-content/60">
+                      Low mana is −5 to every spell; high or better lets non-mages cast. Very high
+                      mana requires energy up front, restores mages' personal FP spent casting on
+                      their own turn next turn, and makes every failure critical. Applied to every
+                      character sheet in this campaign.
+                    </span>
+                  </label>
+                )}
+
+                {viewerRole === 'owner' && (
+                  <label className="form-control min-w-0 gap-1.5">
+                    <span className="label-text text-xs">Skill prerequisites</span>
+                    <select
+                      className="select w-full"
+                      value={skillPrerequisitePolicy}
+                      onChange={(event) =>
+                        setSkillPrerequisitePolicy(event.target.value as 'block' | 'warn')
+                      }
+                    >
+                      <option value="block">Block unmet prerequisites</option>
+                      <option value="warn">Warn only</option>
+                    </select>
+                  </label>
+                )}
+
+                {viewerRole === 'owner' && (
+                  <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm mt-0.5"
+                      checked={enforceAttributeCaps}
+                      onChange={(e) => setEnforceAttributeCaps(e.target.checked)}
+                    />
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium">Enforce attribute caps</span>
+                      <span className="block text-xs text-base-content/60">
+                        Caps purchased DX, IQ, and HT at 20, and purchased Will and Per at 20 total.
+                        ST and temporary bonuses remain uncapped (B14-B16).
+                      </span>
+                    </span>
+                  </label>
+                )}
+
+                {viewerRole === 'owner' && (
+                  <label className="cursor-pointer flex items-start gap-3 pt-2 border-t border-base-300">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm mt-0.5"
+                      checked={shareSheets}
+                      onChange={(e) => setShareSheets(e.target.checked)}
+                    />
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium">Share character sheets</span>
+                      <span className="block text-xs text-base-content/60">
+                        When off, fellow members see only "readily apparent" details (name, height,
+                        weight, age, appearance, TL) instead of the full sheet. The owner and you
+                        (the GM) always see the full sheet.
+                      </span>
+                    </span>
+                  </label>
+                )}
+
+                {viewerRole === 'owner' && (
+                  <label className="cursor-pointer flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm mt-0.5"
+                      checked={allowGmEditing}
+                      onChange={(e) => setAllowGmEditing(e.target.checked)}
+                    />
+                    <span className="flex-1">
+                      <span className="block text-sm font-medium">Allow GM character editing</span>
+                      <span className="block text-xs text-base-content/60">
+                        Lets campaign owners and managers edit player-owned character sheets.
+                        Players still control their own sheets, and all changes remain visible in
+                        history.
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </fieldset>
+            </section>
+            <section
+              id="settings-rules"
+              aria-label="Campaign rules"
+              hidden={section !== 'rules'}
+              className="space-y-6"
+            >
+              <fieldset
+                className="min-w-0 space-y-4"
+                disabled={!canEditSettings || update.isPending}
+              >
+                <legend className="text-lg font-semibold">House rules</legend>
+                <label className="form-control gap-1.5">
+                  <span className="label-text text-xs">House rule set</span>
+                  <select
+                    className="select w-full"
+                    aria-label="House rule set"
+                    value={houseRules.ruleSet}
+                    onChange={(e) =>
+                      setHouseRules((current) =>
+                        applyHouseRuleSet(current, e.target.value as HouseRuleSet),
+                      )
+                    }
+                  >
+                    <option value="none">None</option>
+                    <option value="j_talisar">J Talisar</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                  <span className="label-text-alt text-xs text-base-content/60">
+                    Named sets load their complete bundle. Choose Custom to edit the current bundle;
+                    none of its options are reset.
+                  </span>
+                </label>
+
+                {(['General', 'Combat', 'Magic', 'Path magic', 'Campaign content'] as const).map(
+                  (group) => (
+                    <details
+                      key={group}
+                      open={group === 'Combat'}
+                      className="collapse collapse-arrow rounded-box border border-base-300 bg-base-200/30"
+                    >
+                      <summary className="collapse-title font-semibold">{group}</summary>
+                      <div className="collapse-content space-y-4">
+                        {HOUSE_RULE_DEFINITIONS.filter((rule) => rule.group === group).map(
+                          (rule) => (
+                            <label key={rule.key} className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className="checkbox checkbox-sm mt-0.5"
+                                checked={houseRules[rule.key]}
+                                disabled={houseRules.ruleSet !== 'custom'}
+                                onChange={(e) =>
+                                  setHouseRules((current) =>
+                                    customizeHouseRule(current, rule.key, e.target.checked),
+                                  )
+                                }
+                              />
+                              <span>
+                                <span className="block text-sm font-medium">{rule.label}</span>
+                                <span className="block text-xs text-base-content/60">
+                                  {rule.description}
+                                </span>
+                              </span>
+                            </label>
+                          ),
+                        )}
+                      </div>
+                    </details>
+                  ),
+                )}
+              </fieldset>
+
+              <fieldset
+                disabled={!canEditSettings || update.isPending}
+                className="min-w-0 border-t border-base-300 pt-3"
+              >
+                <legend className="label-eyebrow">Experimental features</legend>
+                <label className="flex items-start gap-3 pt-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm mt-0.5"
+                    checked={experimentalTurnTracker}
+                    onChange={(e) => setExperimentalTurnTracker(e.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Enable turn tracker</span>
+                    <span className="block text-xs text-base-content/60">
+                      Unfinished, experimental tools for campaign encounters and character turn
+                      tracking. Off by default. Turning this off keeps saved encounters and local
+                      tracker data.
+                    </span>
+                  </span>
+                </label>
+              </fieldset>
+            </section>
+            <section
+              id="settings-members"
+              aria-label="Campaign membership"
+              hidden={section !== 'members'}
+              className="space-y-5"
+            >
+              <p className="text-sm text-base-content/60">
+                Invitations, role changes, and ownership actions take effect immediately.
+              </p>
+
+              {onlineAvailable &&
+                'members' in campaign &&
+                (viewerRole === 'owner' || viewerRole === 'manager') && (
+                  <>
+                    <CampaignMembersPanel campaign={campaign} viewerRole={viewerRole} />
+                    <CampaignInvitePanel campaignId={campaign.id} viewerRole={viewerRole} />
+                  </>
+                )}
+
+              {viewerRole === 'owner' && onlineAvailable && (
+                <section className="border-t border-base-300 pt-3 mt-1 space-y-2">
+                  <p className="label-eyebrow">Danger zone</p>
+                  <div className="flex flex-wrap gap-2">
+                    <details className="w-full">
+                      <summary className="btn btn-ghost btn-xs">Transfer ownership ▾</summary>
+                      <ul className="menu mt-2 max-h-[min(14rem,50dvh)] w-full [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300 bg-base-100 p-2">
+                        {members.filter((m) => m.userId !== campaign.ownerId).length === 0 && (
+                          <li className="text-xs text-base-content/60 px-2 py-1">
+                            No other members yet.
+                          </li>
+                        )}
+                        {members
+                          .filter((m) => m.userId !== campaign.ownerId)
+                          .sort((a, b) => a.displayName.localeCompare(b.displayName))
+                          .map((m) => (
+                            <li key={m.userId}>
+                              <button
+                                type="button"
+                                onClick={() => setTransferTarget(m)}
+                                disabled={transfer.isPending}
+                              >
+                                {m.displayName}
+                                <span className="text-xs text-base-content/60">{m.role}</span>
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                    </details>
+                    <button
+                      type="button"
+                      className="btn btn-error btn-outline btn-xs"
+                      onClick={() => setConfirmDelete(true)}
+                      disabled={remove.isPending}
+                    >
+                      Delete campaign…
+                    </button>
+                  </div>
+                </section>
+              )}
+            </section>
           </div>
+          <footer className="shrink-0 border-t border-base-300 px-4 py-3 sm:px-7">
+            {error && (
+              <p role="alert" className="alert alert-error mb-3 text-sm">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>
+                Cancel
+              </button>
+              {canEditSettings && (
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={update.isPending}
+                >
+                  {update.isPending ? 'Saving…' : 'Save'}
+                </button>
+              )}
+            </div>
+          </footer>
         </form>
       </dialog>
       <TransferOwnershipDialog

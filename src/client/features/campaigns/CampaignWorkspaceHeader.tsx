@@ -60,7 +60,6 @@ export function CampaignWorkspaceHeader({ campaignId, workspace }: Props) {
           targetId={campaignId}
           assetId={campaign.coverAssetId}
           name={campaign.name}
-          editable={viewerRole === 'owner'}
         />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -90,8 +89,7 @@ export function CampaignWorkspaceHeader({ campaignId, workspace }: Props) {
             <button
               type="button"
               className="btn btn-sm"
-              disabled={!remoteCampaign}
-              title={remoteCampaign ? 'Campaign settings' : 'Connect to edit campaign settings'}
+              title="Campaign settings"
               onClick={() => setSettingsOpen(true)}
             >
               <AppIcon name="settings" size={16} />
@@ -117,10 +115,11 @@ export function CampaignWorkspaceHeader({ campaignId, workspace }: Props) {
             </NavLink>
           ))}
       </nav>
-      {settingsOpen && remoteCampaign && (
+      {settingsOpen && (
         <CampaignSettingsDialog
           open
-          campaign={remoteCampaign}
+          campaign={remoteCampaign ?? campaign}
+          onlineAvailable={Boolean(remoteCampaign)}
           viewerRole={viewerRole}
           onClose={() => setSettingsOpen(false)}
         />

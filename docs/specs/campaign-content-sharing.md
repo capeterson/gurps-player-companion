@@ -12,7 +12,7 @@ describes the three sharing mechanisms as they exist today:
 
 Plus the **adventure log** (per-entry visibility) and **invitations**
 (how people join). Memberships, settings, invitations, and adventure-log entries
-are online-only REST + React Query surfaces. Campaigns are pulled read-only into
+are online-only REST + React Query surfaces (cover images are the local-first exception). Campaigns are pulled read-only into
 Dexie for the share gate, campaign names, mana, and house rules, while the
 campaign library is fully local-first and flows through the offline outbox. See
 [offline-sync.md](offline-sync.md) S0.
@@ -29,6 +29,25 @@ OAuth scope is an additional ceiling; it never replaces current campaign role,
 membership, private-log, hidden-encounter, GM-edit, or character-share checks.
 MCP results pass through the same list/detail/history projections. Membership
 revocation takes effect on the next tool call.
+
+## Campaign settings
+
+Settings opens a centered, spacious dialog with horizontal **Campaign**, **Rules**,
+and **Members** navigation. Its heading, navigation, and Save/Cancel actions stay
+visible while the body scrolls; narrow screens retain the same sections. Switching
+sections keeps drafts mounted. Campaign groups the owner-only cover editor, point
+limits, world settings and sheet-sharing policies; Rules contains house-rule bundles
+and experimental features. Managers start in Members and may read Rules.
+
+The workspace header displays the cover without editing controls or upload help.
+All cover controls and public-link/cache guidance live in Settings → Campaign.
+Image changes queue immediately and independently of Save/Cancel. Owners can open
+settings from the local campaign mirror offline and edit their cover; other settings
+remain disabled and unloaded membership actions stay hidden until remote campaign
+data is available. The first remote load refreshes disabled local settings before
+unlocking edits; subsequent refetches preserve the draft. Membership/invitation
+and ownership actions remain immediate;
+transfer candidates expand inline so they remain reachable in the scrolling dialog.
 
 ## House rules
 

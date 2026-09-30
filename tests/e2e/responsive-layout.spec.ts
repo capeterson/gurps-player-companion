@@ -5,6 +5,7 @@ const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
 async function enableTurnTracker(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /settings/i }).click();
+  await page.getByRole('button', { name: 'Rules', exact: true }).click();
   await page.getByRole('checkbox', { name: /Enable turn tracker/i }).check();
   await page.getByRole('button', { name: /^save$/i }).click();
   await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
