@@ -308,7 +308,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     });
     await expect(defenseRoll.getByText(/^Success · margin/)).toBeVisible();
     await expect(defenseRoll.getByRole('button', { name: 'Incoming damage…' })).toHaveCount(0);
-    await defenseRoll.getByRole('button', { name: 'Roll again' }).evaluate((button) => {
+    await defenseRoll.getByRole('button', { name: /Roll vs \d+/ }).evaluate((button) => {
       const originalRandom = Math.random;
       Math.random = () => 0.99;
       try {
@@ -364,6 +364,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(
       status.getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
+    await selectCharacterSection(page, 'Combat');
     await expect(incomingAttack).toBeVisible();
     await expect(incomingAttack.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
     await expect

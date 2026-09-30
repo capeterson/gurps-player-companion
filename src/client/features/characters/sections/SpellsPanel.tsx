@@ -545,7 +545,7 @@ function SpellReferenceDialog({
     >
       <div className="modal-box w-[calc(100dvw-2rem)] max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-base-300 bg-base-100">
         <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 [overflow-wrap:anywhere]">
             <h3 className="break-words font-display text-xl">{spell.name}</h3>
             <p className="mt-1 text-xs text-base-content/70">
               {spell.college ?? 'No college'} · IQ/{spell.difficulty} · {spell.points} points
@@ -560,7 +560,7 @@ function SpellReferenceDialog({
             <AppIcon name="close" size={18} />
           </button>
         </header>
-        <dl className="my-5 grid grid-cols-2 gap-4 text-sm">
+        <dl className="my-5 grid grid-cols-2 gap-4 text-sm [overflow-wrap:anywhere]">
           <div>
             <dt className="text-xs text-base-content/60">Casting cost</dt>
             <dd>

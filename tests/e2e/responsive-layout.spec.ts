@@ -611,7 +611,7 @@ test('effect dialog keeps its actions reachable on a short mobile viewport', asy
 test('maintain-payment dialog keeps long resource labels and free-maintenance actions contained', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 320, height: 700 });
+  await page.setViewportSize({ width: 320, height: 568 });
   const email = `responsive-cast-dialog-${suffix()}@example.com`;
 
   await page.goto('/register');
@@ -632,7 +632,12 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
   await page.getByRole('button', { name: /^spells 0$/i }).click();
   await page.getByRole('button', { name: /add spell/i }).click();
   await page.getByLabel(/name \*/i).fill(spellName);
+  const longCollege = 'Pneumonoultramicroscopicsilicovolcanoconiosis-responsive spell college';
+  const longCastingTime = 'Pneumonoultramicroscopically40Second';
+  await page.getByLabel('College').fill(longCollege);
   await page.getByLabel('Upkeep').fill('1');
+  await page.getByLabel('Casting time').fill(longCastingTime);
+  await page.getByLabel('Duration').fill(longCastingTime);
   await page.getByRole('button', { name: /^add spell$/i }).click();
   await expect(page.getByText(spellName, { exact: true })).toBeVisible();
 
@@ -649,7 +654,7 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
   await page.getByRole('button', { name: /^add$/i }).click();
 
   await selectCharacterSection(page, 'Inventory');
-  const powerstoneName = 'PneumonoultramicroscopicsilicovolcanoconiosisResponsivePowerstone';
+  const powerstoneName = 'The Ancient Granite Tower Powerstone of the Northern Highlands';
   await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: `Edit ${powerstoneName}` }).click();
@@ -666,9 +671,15 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
   await spellForm.getByRole('button', { name: /^add$/i }).click();
   const spellRow = page.getByRole('rowgroup', { name: spellName });
   await expect(spellRow).toBeVisible();
+  await spellRow.getByRole('button', { name: `Read ${spellName}` }).click();
+  const referenceDialog = page.getByRole('dialog', { name: `Spell reference: ${spellName}` });
+  const referenceBox = referenceDialog.locator('.modal-box');
+  await expect(referenceBox).toContainText(longCollege);
+  await expect(referenceBox).toContainText(longCastingTime);
+  await referenceDialog.getByRole('button', { name: 'Close spell reference' }).click();
 
   for (const width of [320, 390, 639, 640, 641, 1023, 1024, 1025, 1279, 1280, 1281]) {
-    await page.setViewportSize({ width, height: 700 });
+    await page.setViewportSize({ width, height: 568 });
     await spellRow.getByRole('button', { name: `Maintain ${spellName}` }).click();
     const dialog = page.getByRole('dialog', { name: `Maintain ${spellName}` });
     const modalBox = dialog.locator('.modal-box');
@@ -681,30 +692,56 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
           .map((animation) => animation.finished.catch(() => {})),
       );
     });
+    if (width === 320) {
+      await page.screenshot({ path: '/tmp/gpc-spell-visual/payment-dialog-320x568-top.png' });
+    }
     const bounds = await modalBox.boundingBox();
     if (!bounds) throw new Error(`Maintain dialog has no box at ${width}px`);
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 1);
     expect(bounds.y).toBeGreaterThanOrEqual(0);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(701);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(569);
+    await expect(modalBox).toContainText(longCollege);
+    await expect(modalBox).toContainText(longCastingTime);
+    for (const content of [longCollege, longCastingTime]) {
+      const contentBox = await modalBox.getByText(content).first().boundingBox();
+      if (!contentBox) throw new Error(`Dialog content has no box at ${width}px: ${content}`);
+      expect(contentBox.x).toBeGreaterThanOrEqual(bounds.x);
+      expect(contentBox.x + contentBox.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+    }
 
     const stoneSpend = dialog.getByRole('spinbutton', {
       name: `${powerstoneName} (powerstone)`,
     });
+    const allocationTable = dialog.getByRole('table', { name: 'Energy allocation' });
+    const sourceCell = stoneSpend.locator('xpath=ancestor::tr').locator('td').first();
+    await stoneSpend.scrollIntoViewIfNeeded();
     await expect(stoneSpend).toBeVisible();
     const stoneBounds = await stoneSpend.boundingBox();
+    const sourceCellBox = await sourceCell.boundingBox();
+    const allocationTableBox = await allocationTable.boundingBox();
     if (!stoneBounds) throw new Error(`Powerstone allocation has no box at ${width}px`);
+    if (!sourceCellBox || !allocationTableBox)
+      throw new Error(`Powerstone source cell has no box at ${width}px`);
     expect(stoneBounds.x).toBeGreaterThanOrEqual(0);
     expect(stoneBounds.x + stoneBounds.width).toBeLessThanOrEqual(width + 1);
+    expect(sourceCell).toContainText(powerstoneName);
+    if (width < 640) {
+      expect(sourceCellBox.width).toBeGreaterThanOrEqual(allocationTableBox.width * 0.5);
+    }
 
     await dialog.getByLabel('Energy to spend').fill('0');
     const freeMaintenance = dialog.getByRole('button', { name: 'Record free maintenance' });
+    await freeMaintenance.scrollIntoViewIfNeeded();
+    if (width === 320) {
+      await page.screenshot({ path: '/tmp/gpc-spell-visual/payment-dialog-320x568.png' });
+    }
     const actionBounds = await freeMaintenance.boundingBox();
     if (!actionBounds) throw new Error(`Free maintenance action has no box at ${width}px`);
     expect(actionBounds.x).toBeGreaterThanOrEqual(0);
     expect(actionBounds.x + actionBounds.width).toBeLessThanOrEqual(width + 1);
     expect(actionBounds.y).toBeGreaterThanOrEqual(0);
-    expect(actionBounds.y + actionBounds.height).toBeLessThanOrEqual(701);
+    expect(actionBounds.y + actionBounds.height).toBeLessThanOrEqual(569);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).not.toBeVisible();
   }

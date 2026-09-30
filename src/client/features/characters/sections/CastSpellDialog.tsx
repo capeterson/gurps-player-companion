@@ -228,14 +228,14 @@ export function CastSpellDialog({
         <h3 className="break-words font-display text-2xl">
           {maintaining ? `Maintain ${spell.name}` : spell.name}
         </h3>
-        <p className="text-sm text-base-content/70 mt-1">
+        <p className="text-sm text-base-content/70 mt-1 [overflow-wrap:anywhere]">
           {spell.college ?? 'No college'} · IQ/{spell.difficulty} · effective skill{' '}
           <span className="num text-base-content">{spell.level ?? '—'}</span>
           {character.manaLevel !== 'normal' && (
             <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
           )}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm [overflow-wrap:anywhere] sm:grid-cols-4">
           <div>
             <p className="label-eyebrow">{maintaining ? 'Base upkeep' : 'Base cost'}</p>
             <p className="num text-xl">
@@ -319,7 +319,7 @@ export function CastSpellDialog({
           <thead>
             <tr>
               <th scope="col">Source</th>
-              <th scope="col" className="w-20 text-right">
+              <th scope="col" className="hidden w-20 text-right sm:table-cell">
                 Available
               </th>
               <th scope="col" className="w-24 text-right">
@@ -412,8 +412,17 @@ interface SourceRowProps {
 function SourceRow({ label, available, value, onChange, tone }: SourceRowProps) {
   return (
     <tr>
-      <td className={`min-w-0 break-words ${tone === 'warning' ? 'text-warning' : ''}`}>{label}</td>
-      <td className="num text-right text-xs text-base-content/60">{available}</td>
+      <td
+        className={`min-w-0 [overflow-wrap:anywhere] ${tone === 'warning' ? 'text-warning' : ''}`}
+      >
+        {label}
+        <span className="block text-xs text-base-content/60 sm:hidden">
+          Available: <span className="num">{available}</span>
+        </span>
+      </td>
+      <td className="num hidden text-right text-xs text-base-content/60 sm:table-cell">
+        {available}
+      </td>
       <td className="text-right">
         <input
           type="number"

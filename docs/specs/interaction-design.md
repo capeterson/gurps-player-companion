@@ -75,6 +75,9 @@ The level opens the existing Roll Sheet. Cast and Maintain open a separate
 energy-payment dialog with Source/Available/Spend columns and an explicit Pay N
 energy or Record free cast/maintenance action. Rolling and payment remain
 separate; no automatic success resolution or maintained-spell tracker is added.
+Below 640px, the available pool appears beneath its source name, leaving room
+for readable names beside the Spend input. Short viewports scroll within the
+dialog while keeping its payment and cancellation actions reachable.
 Unknown campaign mana and unlearned legacy spells still hold casting. Existing
 mana, failure-cost, powerstone, and fatigue rules are unchanged.
 

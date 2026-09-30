@@ -213,8 +213,9 @@ test('overview stays compact and description and conditional effects work at sup
   const adrenaline = page.getByRole('checkbox', { name: 'Adrenaline', exact: true });
   await expect(focused).not.toBeChecked();
   await expect(adrenaline).not.toBeChecked();
-  await focused.check();
-  await adrenaline.check();
+  await focused.click();
+  await expect(focused).toBeChecked();
+  await adrenaline.click();
   await expect(focused).toBeChecked();
   await expect(adrenaline).toBeChecked();
   const sheetOverview = page.getByRole('button', { name: /^Sheet overview/ });
