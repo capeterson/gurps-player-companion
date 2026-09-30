@@ -379,7 +379,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   row on narrow screens, and the shared row handle supports drag and keyboard
   ordering. Sort and custom order are device-only per-character preferences.
   Adding is collapsed until requested, and one full-width row editor opens at a
-  time. Notes, source rules, modifiers, and custom mechanics remain available
+  time. Its **Edit** heading wraps the full trait name, including unspaced names.
+  Notes, source rules, modifiers, and custom mechanics remain available
   there; advanced sections appear only when configured or when an owner chooses
   to add effects. Read-only campaign viewers retain search, sorting,
   ordering, and configured details without seeing mutation controls. Unsaved
@@ -394,7 +395,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The shared row handle supports drag and keyboard ordering. Sort and custom
   order are device-only per-character preferences, survive reloads, and clear on
   logout. A row opens one full-width inline editor; the add form stays collapsed
-  until requested, and Source & rules is absent unless that skill has configured
+  until requested. The **Edit** heading wraps long skill names and specializations
+  within the editor. Source & rules is absent unless that skill has configured
   TL or owned mechanics to show. Read-only viewers keep search, sorting, custom
   presentation order, details, and rolls without receiving mutation controls.
   Library definitions explicitly declare whether specialization is forbidden,

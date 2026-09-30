@@ -863,8 +863,10 @@ function TraitRow({
           <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
             {canWrite ? (
               <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
-                <header className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium">Edit {trait.name}</h3>
+                <header className="flex min-w-0 items-start justify-between gap-3">
+                  <h3 className="min-w-0 [overflow-wrap:anywhere] font-medium">
+                    Edit {trait.name}
+                  </h3>
                   {saving && (
                     <span className="text-xs text-warning" aria-live="polite">
                       Saving…

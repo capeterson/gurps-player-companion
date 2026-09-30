@@ -1,5 +1,5 @@
-import { type Page, expect, test } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
+import { type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
 
 async function register(
