@@ -44,11 +44,11 @@ async function putCaretAtFraction(editor: import('@playwright/test').Locator, fr
       nodes.push(text);
       totalLength += text.data.length;
     }
-    if (nodes.length === 0 || totalLength === 0)
-      throw new Error('Rich editor has no selectable text');
+    const lastNode = nodes.at(-1);
+    if (!lastNode || totalLength === 0) throw new Error('Rich editor has no selectable text');
 
     let remaining = Math.floor(totalLength * targetFraction);
-    let targetNode = nodes[nodes.length - 1]!;
+    let targetNode = lastNode;
     let targetOffset = targetNode.data.length;
     for (const node of nodes) {
       if (remaining <= node.data.length) {
