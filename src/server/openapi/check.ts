@@ -10,7 +10,7 @@ import { createApp } from '../app.ts';
 import type { AppConfig } from '../config.ts';
 
 const config: AppConfig = {
-  environment: 'development',
+  environment: 'test',
   port: 3000,
   host: '0.0.0.0',
   databaseUrl: 'postgres://emit-only-no-db@localhost/none',
@@ -34,6 +34,9 @@ const config: AppConfig = {
 
 const SNAPSHOT_PATH = 'docs/openapi.json';
 
+// Metadata generation must not start maintenance jobs, even from a developer
+// shell with local media configured. Those jobs can keep the command alive.
+process.env.ENVIRONMENT = 'test';
 const app = createApp(config);
 const generated = app.getOpenAPIDocument({
   openapi: '3.0.0',
