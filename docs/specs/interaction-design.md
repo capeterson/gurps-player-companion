@@ -215,6 +215,9 @@ without changing the shared calculation rules.
 Library source selection and search share a wrapping toolbar. The search input
 and **Clear search** button stay together, taking a separate row when needed.
 
+Adventure-log titles, author names, and locations wrap within their cards even
+when the text contains no spaces.
+
 Long account names remain width-bounded in the shared header through tablet
 widths; opening the account menu must not horizontally scroll the page.
 

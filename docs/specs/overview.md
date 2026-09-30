@@ -945,6 +945,8 @@ settings sections; switching sections retains drafts.
   offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
   can be **edited or deleted** by their author or the campaign owner. Editing
   replaces the selected card in place, with Save changes and Cancel beside the draft.
+  Titles, author names, and locations wrap within their entry cards, including
+  values without spaces, so narrow screens do not gain horizontal page overflow.
   Award summaries show the points per recipient (or the total for varied legacy awards);
   the character count opens a bounded, scrollable tooltip of the saved recipients
   and their amounts. Private badges name the attached character when available. See
