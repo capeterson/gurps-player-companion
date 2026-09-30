@@ -41,6 +41,58 @@ async function settleLayout(page: import('@playwright/test').Page) {
   );
 }
 
+async function expectInsideVisualViewport(locator: import('@playwright/test').Locator) {
+  const bounds = await locator.boundingBox();
+  expect(bounds).not.toBeNull();
+  if (!bounds) throw new Error('Expected overlay bounds to be present');
+  const viewport = await locator.page().evaluate(() => {
+    const visual = window.visualViewport;
+    return visual
+      ? {
+          left: visual.offsetLeft,
+          top: visual.offsetTop,
+          right: visual.offsetLeft + visual.width,
+          bottom: visual.offsetTop + visual.height,
+        }
+      : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+  });
+  expect(bounds.x).toBeGreaterThanOrEqual(viewport.left - 1);
+  expect(bounds.y).toBeGreaterThanOrEqual(viewport.top - 1);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.right + 1);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.bottom + 1);
+}
+
+async function expectTextInsideVisualViewport(locator: import('@playwright/test').Locator) {
+  const bounds = await locator.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return [...range.getClientRects()].map(({ left, top, right, bottom }) => ({
+      left,
+      top,
+      right,
+      bottom,
+    }));
+  });
+  const viewport = await locator.page().evaluate(() => {
+    const visual = window.visualViewport;
+    return visual
+      ? {
+          left: visual.offsetLeft,
+          top: visual.offsetTop,
+          right: visual.offsetLeft + visual.width,
+          bottom: visual.offsetTop + visual.height,
+        }
+      : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+  });
+  expect(bounds.length).toBeGreaterThan(0);
+  for (const line of bounds) {
+    expect(line.left).toBeGreaterThanOrEqual(viewport.left - 1);
+    expect(line.top).toBeGreaterThanOrEqual(viewport.top - 1);
+    expect(line.right).toBeLessThanOrEqual(viewport.right + 1);
+    expect(line.bottom).toBeLessThanOrEqual(viewport.bottom + 1);
+  }
+}
+
 async function register(page: import('@playwright/test').Page) {
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(`pool-overlay-${Date.now()}@example.com`);
@@ -159,6 +211,132 @@ test('pool popovers keep endpoint text above the mobile navigation flower', asyn
 
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
+  }
+
+  const browser = page.context().browser();
+  if (!browser) throw new Error('Chromium browser was not available for the touch viewport');
+  const tokenPair = await page.evaluate(() => localStorage.getItem('gpc.tokenPair.v1'));
+  expect(tokenPair).not.toBeNull();
+  const touchContext = await browser.newContext({
+    baseURL: testInfo.project.use.baseURL,
+    viewport: { width: 568, height: 320 },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
+  await touchContext.addInitScript((storedTokenPair) => {
+    if (storedTokenPair) localStorage.setItem('gpc.tokenPair.v1', storedTokenPair);
+  }, tokenPair);
+  const touchPage = await touchContext.newPage();
+  try {
+    await touchPage.goto(`/characters/${character.id}`);
+    await expect(
+      touchPage.getByRole('button', { name: /Adjust HP, current -1000 of 149/ }),
+    ).toBeVisible();
+    const cdp = await touchContext.newCDPSession(touchPage);
+    for (const pool of [
+      {
+        label: 'HP',
+        fullEndpoint: 'Full',
+        footnote:
+          'At 0 HP or less, roll HT each turn to stay conscious. Death checks begin at −149 HP and repeat at each full −149 HP threshold; certain death is −745 HP.',
+      },
+      {
+        label: 'FP',
+        fullEndpoint: 'Rested',
+        footnote: 'At −149 FP, further fatigue loss is paid from HP instead.',
+      },
+    ]) {
+      const trigger = touchPage.getByRole('button', {
+        name: new RegExp(`Adjust ${pool.label}, current -1000 of 149`),
+      });
+      await trigger.tap();
+      const panel = touchPage.locator(`fieldset[aria-label="${pool.label} adjustment"]`);
+      await expect(panel).toBeVisible();
+      await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1.5 });
+      await settleLayout(touchPage);
+      await expectInsideVisualViewport(panel);
+
+      await panel.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await settleLayout(touchPage);
+      const endpoint = panel.getByText(pool.fullEndpoint, { exact: true });
+      const footnote = panel.getByText(pool.footnote, { exact: true });
+      await expect(endpoint).toBeVisible();
+      await expect(footnote).toBeVisible();
+      await endpoint.scrollIntoViewIfNeeded();
+      await settleLayout(touchPage);
+      await expectTextInsideVisualViewport(endpoint);
+      await footnote.scrollIntoViewIfNeeded();
+      await settleLayout(touchPage);
+      await expectTextInsideVisualViewport(footnote);
+      if (pool.label === 'HP') {
+        const screenshotPath = testInfo.outputPath('hp-pinch-150-percent-contained.png');
+        const screenshot = await touchPage.screenshot({ animations: 'disabled' });
+        await writeFile(screenshotPath, screenshot);
+        await testInfo.attach('hp-pinch-150-percent-contained', {
+          path: screenshotPath,
+          contentType: 'image/png',
+        });
+      }
+
+      const increase = panel.getByRole('button', { name: `Increase ${pool.label} by 1` });
+      const increasedValue = pool.label === 'HP' ? '-745' : '-999';
+      await increase.scrollIntoViewIfNeeded();
+      await settleLayout(touchPage);
+      const increaseBounds = await increase.boundingBox();
+      expect(increaseBounds).not.toBeNull();
+      if (!increaseBounds) throw new Error('Expected the increase control to be visible');
+      const visualBounds = await touchPage.evaluate(() => {
+        const visual = window.visualViewport;
+        if (!visual) throw new Error('Expected a visual viewport on the touch page');
+        return {
+          left: visual.offsetLeft,
+          top: visual.offsetTop,
+          right: visual.offsetLeft + visual.width,
+          bottom: visual.offsetTop + visual.height,
+        };
+      });
+      const tapX = increaseBounds.x + increaseBounds.width / 2;
+      const tapY = increaseBounds.y + increaseBounds.height / 2;
+      expect(tapX).toBeGreaterThanOrEqual(visualBounds.left);
+      expect(tapX).toBeLessThanOrEqual(visualBounds.right);
+      expect(tapY).toBeGreaterThanOrEqual(visualBounds.top);
+      expect(tapY).toBeLessThanOrEqual(visualBounds.bottom);
+      await touchPage.touchscreen.tap(tapX, tapY);
+      await expect(panel.getByLabel(`Current ${pool.label}`)).toHaveText(increasedValue);
+
+      await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+      await touchPage.setViewportSize({ width: 320, height: 568 });
+      await settleLayout(touchPage);
+      await expectInsideVisualViewport(panel);
+      await expect(panel.getByLabel(`Current ${pool.label}`)).toHaveText(increasedValue);
+      await panel.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await settleLayout(touchPage);
+      await endpoint.scrollIntoViewIfNeeded();
+      await settleLayout(touchPage);
+      await expectTextInsideVisualViewport(endpoint);
+      await footnote.scrollIntoViewIfNeeded();
+      await settleLayout(touchPage);
+      await expectTextInsideVisualViewport(footnote);
+      await touchPage.setViewportSize({ width: 568, height: 320 });
+      await settleLayout(touchPage);
+      await expectInsideVisualViewport(panel);
+      await expect(panel.getByLabel(`Current ${pool.label}`)).toHaveText(increasedValue);
+      await touchPage.keyboard.press('Escape');
+      await expect(panel).toBeHidden();
+      await expect(
+        touchPage.getByRole('button', {
+          name: new RegExp(`Adjust ${pool.label}, current ${increasedValue} of 149`),
+        }),
+      ).toBeVisible();
+      await touchPage.setViewportSize({ width: 568, height: 320 });
+    }
+  } finally {
+    await touchContext.close();
   }
 
   await page.setViewportSize({ width: 568, height: 320 });

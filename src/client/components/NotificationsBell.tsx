@@ -118,7 +118,7 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
           maxHeight:
             'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, calc(100dvh - 5rem)))',
         }}
-        className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100dvw-1rem))] [overflow-wrap:anywhere] overflow-y-auto rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg"
+        className="dropdown-content z-50 mt-2 w-[min(20rem,calc(100dvw-1rem))] max-w-[var(--viewport-overlay-available-width,calc(100dvw-1rem))] [overflow-wrap:anywhere] overflow-y-auto rounded-xl border border-base-300/60 bg-base-100 p-3 shadow-arcane-lg"
       >
         <div className="flex items-baseline justify-between mb-2">
           <span className="label-eyebrow">Notifications</span>

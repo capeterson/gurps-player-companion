@@ -177,8 +177,14 @@ function PoolAdjustmentPanel({
   const listId = useId();
   const minimum = -max;
   const sliderValue = Math.max(minimum, Math.min(max, current));
-  const panelStyle = { '--pool-panel-top': `${panelTop}px` } as CSSProperties;
-  const panelRef = useViewportBoundedOverlay<HTMLFieldSetElement>();
+  const panelStyle = {
+    '--pool-panel-top': `${panelTop}px`,
+    maxHeight:
+      'min(calc(100dvh - var(--pool-panel-top) - 1rem), var(--viewport-overlay-available-height, calc(100dvh - var(--pool-panel-top) - 1rem)))',
+  } as CSSProperties;
+  const panelRef = useViewportBoundedOverlay<HTMLFieldSetElement>(true, undefined, {
+    constrainHeight: true,
+  });
 
   return (
     <fieldset
@@ -186,7 +192,7 @@ function PoolAdjustmentPanel({
       id={id}
       aria-label={`${label} adjustment`}
       style={panelStyle}
-      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:left-0! min-[1280px]:right-auto! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-[32rem] min-[1280px]:max-w-[calc(100dvw_-_2rem)] min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)]"
+      className="dropdown-content fixed! left-1/2! right-auto! top-[var(--pool-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--pool-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-[min(32rem,var(--viewport-overlay-available-width,calc(100dvw-1rem)))] translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:left-0! min-[1280px]:right-auto! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-[32rem] min-[1280px]:max-w-[min(calc(100dvw_-_2rem),var(--viewport-overlay-available-width,calc(100dvw_-_2rem)))] min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)]"
     >
       <div className="mb-3">
         <div className="flex items-start justify-between gap-3">
@@ -380,7 +386,7 @@ function ChoicePanel({
       ref={panelRef}
       id={id}
       style={panelStyle}
-      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-lg translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-96 min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)] ${alignEnd ? 'min-[1280px]:left-auto! min-[1280px]:right-0!' : 'min-[1280px]:left-0! min-[1280px]:right-auto!'}`}
+      className={`dropdown-content fixed! left-1/2! top-[var(--status-panel-top)]! z-50 max-h-[calc(100dvh_-_var(--status-panel-top)_-_1rem)] w-[calc(100dvw_-_2rem)] max-w-[min(32rem,var(--viewport-overlay-available-width,calc(100dvw-1rem)))] translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))] overflow-y-auto overscroll-contain rounded-box border border-base-300 bg-base-100 p-4 shadow-arcane-lg min-[1280px]:absolute! min-[1280px]:top-full! min-[1280px]:mt-[9px] min-[1280px]:w-96 min-[1280px]:translate-x-[var(--viewport-overlay-shift-x,0px)] ${alignEnd ? 'min-[1280px]:left-auto! min-[1280px]:right-0!' : 'min-[1280px]:left-0! min-[1280px]:right-auto!'}`}
     >
       <h2 className="font-display text-lg">{title}</h2>
       {description && <p className="mt-1 text-xs text-base-content/60">{description}</p>}

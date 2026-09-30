@@ -145,7 +145,7 @@ export function SkillReferenceCombobox({
       <Popover
         ref={panelRef}
         maxHeight={320}
-        className="z-50 w-[var(--trigger-width)] max-h-[calc(100dvh-1rem)] max-w-[calc(100dvw-1rem)] overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg [translate:var(--viewport-overlay-shift-x,0px)_0]"
+        className="z-50 w-[var(--trigger-width)] max-h-[calc(100dvh-1rem)] max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow-lg [translate:var(--viewport-overlay-shift-x,0px)_0]"
       >
         <ListBox className="p-1 outline-none" items={visibleOptions}>
           {(option) => (

@@ -1067,10 +1067,15 @@ settings sections; switching sections retains drafts.
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
 - **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
-  share horizontal collision handling, dynamic-viewport width limits, and content
-  wrapping so their full surface remains reachable on narrow screens and after
-  resize or zoom. The sync status tooltip and notifications panel use this shared
-  behavior; growing overlays also clamp to dynamic viewport height and scroll
+  share horizontal collision handling, measured visual-viewport width limits, and
+  content wrapping so their full surface remains reachable on narrow screens and after
+  resize or zoom. Width caps shrink during pinch zoom and recover on zoom-out;
+  measurement listeners attach when a delayed panel mounts. The sync status
+  tooltip and notifications panel use this shared behavior; the account and
+  compact character/app menus clamp to the remaining
+  visual viewport height and scroll internally, including after rotation or
+  pinch zoom. HP/FP adjustment panels use the same remaining-height constraint.
+  Growing overlays also clamp to dynamic viewport height and scroll
   internally where needed. A source guard rejects raw `data-tip` tooltips and
   anchored dropdown content that bypasses the collision helper.
 - **Notifications**: the bell receives invitations/responses, membership/access changes,

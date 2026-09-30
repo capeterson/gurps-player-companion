@@ -156,7 +156,7 @@ export function TempBoostPopover({
       role="dialog"
       aria-label={`Modifiers for ${label}`}
       style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
+      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
     >
       <div className="label-eyebrow mb-2">{label} modifiers</div>
       {perm && (

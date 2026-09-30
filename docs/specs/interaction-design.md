@@ -296,15 +296,24 @@ keep suggestions above navigation and inside the visual viewport. A closed
 form or folded section must not leave an autocomplete floating over the page.
 See the overlay rules in [AGENTS.md](../../AGENTS.md): dynamic viewport size
 limits alone do not establish containment.
+The shared overlay hook measures available visual-viewport width before collision
+handling; each overlay combines that cap with its existing width limit so pinch
+zoom can shrink it and zooming out can restore it. Ref attachment installs the
+measurement listeners even when a panel mounts after its parent hook.
 Downward-opening panels can opt into the shared overlay hook's available-height
-measurement. The notification bell uses it to scroll within the remaining visual
-viewport below either a single-row or wrapped mobile header.
+measurement. The notification bell, account menu, and compact character/app menu
+use it to scroll within the remaining visual viewport below either a single-row
+or wrapped mobile header, including after rotation and pinch zoom. Menu items
+remain in one column while their panel scrolls.
 
 The closed mobile sheet-navigation FAB shares the desktop dock's layer below
 the sticky header and its popovers. HP/FP endpoints and explanatory text remain
 readable when a short landscape viewport places them over the FAB. Opening the
 navigation raises its flower above the header and its dismissal backdrop;
 native modal dialogs hide the sheet navigation.
+HP/FP adjustment panels also cap their height to the remaining visual viewport,
+with internal scrolling that keeps endpoints, explanations, and controls reachable
+after pinch zoom and rotation.
 
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
 award summaries. These tooltips retain horizontal collision handling, constrain

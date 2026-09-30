@@ -265,7 +265,7 @@ export function LibraryAutocomplete<T>({
             // biome-ignore lint/a11y/useSemanticElements: ARIA listbox is the spec for combobox dropdowns; <select> doesn't support free-text input.
             role="listbox"
             tabIndex={-1}
-            className="fixed z-[100] max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] translate-x-[var(--viewport-overlay-shift-x,0px)] overflow-auto break-words rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
+            className="fixed z-[100] max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] max-h-[calc(100dvh-1rem)] translate-x-[var(--viewport-overlay-shift-x,0px)] overflow-auto break-words rounded-md border border-base-300 bg-base-100 py-1 shadow-lg"
           >
             {options.map((opt, i) => {
               const highlighted = i === highlight;
