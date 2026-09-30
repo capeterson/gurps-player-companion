@@ -764,9 +764,9 @@ function SourcebookSelection({
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         {sources.map((source) => (
-          <label key={source.key} className="flex items-center gap-2">
+          <label key={source.key} className="flex min-w-0 items-start gap-2">
             <input
-              className="checkbox checkbox-sm"
+              className="checkbox checkbox-sm shrink-0"
               type="checkbox"
               disabled={locked}
               checked={
@@ -784,7 +784,9 @@ function SourcebookSelection({
                 )
               }
             />
-            {source.abbreviation} · {source.name}
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              {source.abbreviation} · {source.name}
+            </span>
           </label>
         ))}
       </div>

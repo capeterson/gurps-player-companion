@@ -930,7 +930,8 @@ settings sections; switching sections retains drafts.
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The campaign workspace's **Import & export** tab
   (`/campaigns/:id/library-transfer`) holds whole-library and sourcebook-scoped
-  transfers; `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
+  transfers; long sourcebook selection labels wrap beside their checkboxes within
+  the transfer card. `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.

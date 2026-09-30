@@ -221,6 +221,8 @@ Library source selection and search share a wrapping toolbar. The search input
 and **Clear search** button stay together, taking a separate row when needed.
 Library technique default-penalty and level-cap help wraps within each field on
 narrow screens.
+Sourcebook selection labels wrap long unspaced titles beside fixed-size
+checkboxes within the import/export card.
 
 Adventure-log titles, author names, and locations wrap within their cards even
 when the text contains no spaces.
