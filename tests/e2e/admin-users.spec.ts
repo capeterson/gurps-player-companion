@@ -82,15 +82,46 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
       await expect(dialog).toHaveCSS('opacity', '1');
       await expect(dialog).toContainText('After 30 days');
       await expect(dialog).toContainText(memberEmail);
-      await expect(
+      const modalBox = dialog.locator('.modal-box');
+      const actions = [
+        dialog.getByRole('button', { name: 'Cancel', exact: true }),
         dialog.getByRole('button', { name: 'Schedule purge', exact: true }),
-      ).toBeVisible();
-      const box = await dialog.locator('.modal-box').boundingBox();
-      expect(box).not.toBeNull();
-      expect(box?.x).toBeGreaterThanOrEqual(0);
-      expect(box?.y).toBeGreaterThanOrEqual(0);
-      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
-      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
+      ];
+      for (const action of actions) await action.scrollIntoViewIfNeeded();
+      const modalBounds = await modalBox.boundingBox();
+      expect(modalBounds).not.toBeNull();
+      expect(modalBounds?.x).toBeGreaterThanOrEqual(0);
+      expect(modalBounds?.y).toBeGreaterThanOrEqual(0);
+      expect((modalBounds?.x ?? 0) + (modalBounds?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
+      expect((modalBounds?.y ?? 0) + (modalBounds?.height ?? 0)).toBeLessThanOrEqual(
+        viewport.height,
+      );
+      for (const action of actions) {
+        await expect(action).toBeVisible();
+        const box = await action.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box?.x).toBeGreaterThanOrEqual(modalBounds?.x ?? 0);
+        expect(box?.y).toBeGreaterThanOrEqual(modalBounds?.y ?? 0);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(
+          (modalBounds?.x ?? 0) + (modalBounds?.width ?? 0),
+        );
+        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(
+          (modalBounds?.y ?? 0) + (modalBounds?.height ?? 0),
+        );
+        expect(box?.x ?? 0).toBeGreaterThanOrEqual(0);
+        expect(box?.y ?? 0).toBeGreaterThanOrEqual(0);
+        expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
+        expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
+        const hitTestable = await action.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+          );
+          return hit === element || element.contains(hit);
+        });
+        expect(hitTestable).toBe(true);
+      }
       await page.screenshot({
         path: testInfo.outputPath(`admin-purge-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
