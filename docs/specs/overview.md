@@ -1343,6 +1343,7 @@ docs/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked; generation skips database maintenance)
+  mcp-tools.json Emitted MCP catalog (CI-checked; generation skips database maintenance)
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
