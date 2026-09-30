@@ -32,14 +32,16 @@ export async function withAudit<T>(
   actorId: string,
   batchId: string | null | undefined,
   fn: (tx: AuditTx) => Promise<T>,
+  notificationBatchId: string | null | undefined = batchId,
 ): Promise<T> {
   return runInDbSavepoint(async () => {
     const tx = getDb() as unknown as AuditTx;
     const execution = currentTrustedExecution();
-    // One round-trip for all four GUCs; this runs before every audited write.
+    // One round-trip for all audit GUCs; this runs before every audited write.
     await tx.execute(
       sql`select set_config('app.actor_id', ${actorId}, true),
                  set_config('app.batch_id', ${batchId ?? ''}, true),
+                 set_config('app.notification_batch_id', ${notificationBatchId ?? ''}, true),
                  set_config('app.oauth_client_id', ${execution?.oauthClientDbId ?? ''}, true),
                  set_config('app.oauth_grant_id', ${execution?.oauthGrantId ?? ''}, true)`,
     );

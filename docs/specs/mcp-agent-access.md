@@ -112,7 +112,7 @@ tools. The current covered surface is:
 | History | Character and campaign history, filters/pagination, existing privacy and role restrictions. |
 | Sync cursor/operations and WebSocket | Transport infrastructure excluded as tools; equivalent domain operations remain covered. MCP commits still propagate through the normal cursor/invalidation mechanisms. |
 | Login/register/recovery/refresh/logout, passwords, passkeys, API keys, OAuth consent/token management | Browser/security infrastructure excluded, except the safe current-user read above. |
-| Theme preferences (`GET`/`PATCH /auth/preferences`) | Browser display preference; excluded, and gated to interactive JWT sessions (`requireActiveJwt`). |
+| Theme and notification preferences (`GET`/`PATCH /auth/preferences`, `GET`/`PATCH /auth/notification-preferences`) | Browser display preference; excluded, and gated to interactive JWT sessions (`requireActiveJwt`). |
 | Admin, health, OpenAPI, static assets, MCP/OAuth discovery and transport | Infrastructure/admin excluded from player tools. |
 
 Device-only roll history and solo encounter scratchpads are not raw API
@@ -179,9 +179,9 @@ structured payload, including field errors, conflicts and retry guidance;
 protocol failures and OAuth failures retain their protocol/HTTP meanings. Set
 read-only, destructive, and idempotency annotations accurately; annotations are
 hints, not enforcement. Account- and campaign-bounded operations advertise
-`openWorldHint: false` even though the service is remotely hosted. The campaign
-invitation tool alone advertises `openWorldHint: true` because it sends email to
-an arbitrary external recipient.
+`openWorldHint: false` even though the service is remotely hosted. The campaign invitation tool and the invitation action tool advertise
+`openWorldHint: true`: invitation creation and acceptance may send the two
+user-toggleable invitation emails. No other notification topic supports email.
 See [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
 ### Drift must fail CI

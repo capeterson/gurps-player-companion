@@ -42,6 +42,11 @@ The definition row records `campaign_library_enchantment` history, while affecte
 item rows record the exact old/new owned snapshot; deletion preserves mechanics and
 records the live-ID detachment.
 
+New audited changes also queue notification fan-out transactionally; other-user
+character editing bursts become owner-targeted notices linking back to this
+history. Own edits, private log entries and bookkeeping changes do not notify.
+See [notifications.md](notifications.md) for recipients, preferences and delivery.
+
 Chosen approach: **Postgres triggers** for capture, **paginated REST endpoints** for delivery, **indefinite retention**.
 
 Campaign updates that change only `updated_at`/`revision` (library cursor bookkeeping)

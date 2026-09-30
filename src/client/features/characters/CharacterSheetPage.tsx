@@ -1477,7 +1477,9 @@ export function CharacterSheetPage() {
     ? ({ inventory: 'Inventory', skill: 'Skills', trait: 'Traits', spell: 'Magic' }[
         anchor.kind
       ] as SheetTab)
-    : null;
+    : location.hash === '#history'
+      ? 'History'
+      : null;
 
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -1488,6 +1490,14 @@ export function CharacterSheetPage() {
   // pulls /sync/cursor in the background to keep this fresh; we never
   // hit /characters/{id} directly anymore.
   const character = useCharacterDetail(id);
+  useEffect(() => {
+    if (location.hash !== '#history' || !character?.id) return;
+    const frame = requestAnimationFrame(() => {
+      sectionHeading.current?.focus({ preventScroll: true });
+      sectionHeading.current?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [location.hash, character?.id]);
 
   // Fetch the character's campaign (if any) so the hero can show
   // a `Points / Target` ratio, and so the Identity panel can offer the

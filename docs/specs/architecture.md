@@ -284,7 +284,8 @@ see `0026_languages.sql` for the current template.
 Tables (grouped):
 
 - **Identity/auth**: `users` (including the CHECK-constrained `dark_theme` /
-  `light_theme` palette preferences), `passkey_credentials`, `passkey_challenges`,
+  `light_theme` palette preferences and validated `notification_preferences`),
+  `passkey_credentials`, `passkey_challenges`,
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
   `auth_rate_limits` counters. Registration consumes a source-IP bucket only.
   Password login consumes a source-IP bucket before hashing; failed password
@@ -314,7 +315,9 @@ Tables (grouped):
   request id can recover a lost response for 30 seconds, while conflicting or
   late reuse revokes every still-active token in the family.
 - **Campaigns**: `campaigns`, `campaign_memberships`, `campaign_invitations`,
-  `notifications`.
+  `notifications`, `notification_history_queue`, `notification_email_queue`.
+  Notification queues are processed within the same Bun server; see
+  [notifications.md](notifications.md).
 - **Characters (sync-backed)**: `characters`, `character_traits`,
   `character_skills`, `inventory_items` (self-FK for nesting),
   `character_spells`, `character_languages`, `character_techniques`,

@@ -41,6 +41,7 @@ requirement — not optional documentation.**
   - `media-uploads.md` — portraits, campaign covers, object storage, public caching and offline uploads.
   - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
   - `library-calculation-rules.md` — source editions, bounded declarative pricing, completeness, purchase snapshots and weapon modes.
+  - `notifications.md` — event recipients, inbox/email preferences, desktop opt-in and durable delivery.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.

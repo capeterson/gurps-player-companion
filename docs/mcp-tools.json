@@ -249,6 +249,18 @@
     },
     {
       "kind": "excluded",
+      "method": "GET",
+      "path": "/api/v1/auth/notification-preferences",
+      "reason": "interactive notification-preference infrastructure"
+    },
+    {
+      "kind": "excluded",
+      "method": "PATCH",
+      "path": "/api/v1/auth/notification-preferences",
+      "reason": "interactive notification-preference infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "POST",
       "path": "/api/v1/auth/forgot-password",
       "reason": "account recovery infrastructure"
@@ -522,7 +534,7 @@
       "tool": "invitation",
       "scope": "gpc:manage",
       "destructive": false,
-      "openWorld": false,
+      "openWorld": true,
       "handler": "shared-openapi-handler",
       "schemaSource": "openapi-zod-registry",
       "resultMode": "compact-mutation-ack",
@@ -5600,7 +5612,7 @@
         "readOnlyHint": false,
         "destructiveHint": false,
         "idempotentHint": false,
-        "openWorldHint": false
+        "openWorldHint": true
       },
       "_meta": {
         "actions": [
@@ -5766,6 +5778,9 @@
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "actionable": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
