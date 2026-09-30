@@ -173,8 +173,39 @@ export function LibraryPage({
   // Sticky toolbar under the app header; rows and group headings scroll to
   // just below it.
   const headerBottom = useAppHeaderBottom();
+  const pageRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [toolbarHeight, setToolbarHeight] = useState(0);
+  const [viewportBounds, setViewportBounds] = useState(() => ({
+    top: window.visualViewport?.offsetTop ?? 0,
+    bottom:
+      (window.visualViewport?.offsetTop ?? 0) +
+      (window.visualViewport?.height ?? window.innerHeight),
+  }));
+  useLayoutEffect(() => {
+    const measure = () => {
+      const top = window.visualViewport?.offsetTop ?? 0;
+      const bottom = top + (window.visualViewport?.height ?? window.innerHeight);
+      setViewportBounds((previous) =>
+        previous.top === top && previous.bottom === bottom ? previous : { top, bottom },
+      );
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('resize', measure);
+    window.visualViewport?.addEventListener('scroll', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('resize', measure);
+      window.visualViewport?.removeEventListener('scroll', measure);
+    };
+  }, []);
+  // Preserve the toolbar's document space, but let it scroll when pinning it
+  // would leave less than half the visible space below the app header for edits.
+  const toolbarPinned =
+    toolbarHeight <=
+    Math.max(0, viewportBounds.bottom - Math.max(headerBottom, viewportBounds.top)) / 2;
+  const scrollOffset = headerBottom + (toolbarPinned ? toolbarHeight : 0) + 8;
   useLayoutEffect(() => {
     const toolbar = toolbarRef.current;
     if (!toolbar) return;
@@ -184,6 +215,59 @@ export function LibraryPage({
     observer?.observe(toolbar);
     return () => observer?.disconnect();
   }, []);
+  useEffect(() => {
+    const page = pageRef.current;
+    if (!page) return;
+
+    let frame = 0;
+    const keepFocusedFieldVisible = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => {
+          const active = document.activeElement;
+          const content = page.querySelector('.library-content');
+          if (!(active instanceof HTMLElement) || !content?.contains(active)) return;
+
+          const isEditable =
+            active instanceof HTMLTextAreaElement ||
+            active instanceof HTMLSelectElement ||
+            active.isContentEditable ||
+            (active instanceof HTMLInputElement &&
+              ![
+                'button',
+                'checkbox',
+                'color',
+                'file',
+                'image',
+                'radio',
+                'range',
+                'reset',
+                'submit',
+              ].includes(active.type));
+          if (!isEditable) return;
+
+          const visualViewport = window.visualViewport;
+          const viewportTop = visualViewport?.offsetTop ?? 0;
+          const top = Math.max(viewportTop + 8, scrollOffset);
+          const bottom = viewportTop + (visualViewport?.height ?? window.innerHeight) - 8;
+          const bounds = active.getBoundingClientRect();
+          if (bounds.top >= top && bounds.bottom <= bottom) return;
+          active.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+        });
+      });
+    };
+
+    document.addEventListener('focusin', keepFocusedFieldVisible);
+    window.addEventListener('resize', keepFocusedFieldVisible);
+    window.visualViewport?.addEventListener('resize', keepFocusedFieldVisible);
+    keepFocusedFieldVisible();
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('focusin', keepFocusedFieldVisible);
+      window.removeEventListener('resize', keepFocusedFieldVisible);
+      window.visualViewport?.removeEventListener('resize', keepFocusedFieldVisible);
+    };
+  }, [scrollOffset]);
   const [jumpSlot, setJumpSlot] = useState<HTMLElement | null>(null);
 
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
@@ -424,7 +508,7 @@ export function LibraryPage({
   });
 
   const pageStyle = {
-    '--library-scroll-offset': `${headerBottom + toolbarHeight + 8}px`,
+    '--library-scroll-offset': `${scrollOffset}px`,
   } as CSSProperties;
 
   if (transferOnly)
@@ -606,7 +690,7 @@ export function LibraryPage({
     );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6" style={pageStyle}>
+    <div ref={pageRef} className="mx-auto max-w-5xl space-y-6" style={pageStyle}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           {!campaignIdProp && (
@@ -659,7 +743,11 @@ export function LibraryPage({
         </div>
       )}
 
-      <div ref={toolbarRef} className="library-toolbar" style={{ top: `${headerBottom}px` }}>
+      <div
+        ref={toolbarRef}
+        className="library-toolbar"
+        style={{ top: `${headerBottom}px`, position: toolbarPinned ? undefined : 'static' }}
+      >
         <div className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
           {visibleSections.map(({ key, label }) => (
             <button
@@ -714,7 +802,7 @@ export function LibraryPage({
       {campaignId && localLibrary === undefined && <p className="text-muted">Loading library…</p>}
 
       {campaignId && localLibrary && (
-        <div className="flex flex-col gap-3">
+        <div className="library-content flex flex-col gap-3">
           <CatalogSection section="sources" {...shell('sources')} />
           <CatalogSection section="modifiers" {...shell('modifiers')} />
           <TraitsSection {...shell('traits')} />

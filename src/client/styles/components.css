@@ -695,7 +695,8 @@ body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower-backdrop
 
 /* Campaign library: the section/search toolbar sticks under the app header
    (its `top` is set inline from the measured header) so category, search and
-   group jumps stay reachable in long lists. Rows and group headings scroll
+   group jumps stay reachable in long lists. The page unpins it when it would
+   consume too much of the remaining visual viewport. Rows and headings scroll
    to just below it via --library-scroll-offset, set on the page. */
 .library-toolbar {
   position: sticky;
@@ -734,4 +735,8 @@ body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower-backdrop
 }
 .library-entry-row {
   scroll-margin-top: var(--library-scroll-offset, 8rem);
+}
+.library-content :is(input, select, textarea, [contenteditable="true"]) {
+  scroll-margin-top: calc(var(--library-scroll-offset, 8rem) + 1.5rem);
+  scroll-margin-bottom: 0.5rem;
 }

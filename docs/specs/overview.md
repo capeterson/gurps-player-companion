@@ -924,7 +924,11 @@ settings sections; switching sections retains drafts.
   and a one-line source excerpt that preserves punctuation (including comparison
   symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
-  the app header. On narrow screens the search field and its **Clear search**
+  the app header when they leave enough room for content; if the toolbar would
+  occupy more than half the visible area below the header, it scrolls with the page.
+  Focused library form fields retain their draft and scroll below
+  that toolbar when rotation, viewport resizing, or keyboard focus would conceal
+  the active field. On narrow screens the search field and its **Clear search**
   button wrap together onto a row below the source selector, preserving usable
   input width. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or

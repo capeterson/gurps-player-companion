@@ -225,6 +225,12 @@ Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
 Library group labels and mobile row metadata wrap long unspaced categories.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
+Focused library form fields retain their draft and stay below the sticky toolbar
+after rotation, visual-viewport resizing, and keyboard focus changes. Only an
+obscured active editing field is scrolled into the remaining working area.
+When the toolbar would occupy more than half the visible area below the app
+header, it scrolls with the document and field offsets reserve only the header.
+Pinning returns when the viewport has enough room.
 
 Audit-history summaries wrap long unspaced entity names within their rows,
 preserving the timestamp and actor columns.
