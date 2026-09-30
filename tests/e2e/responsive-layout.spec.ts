@@ -8,6 +8,7 @@ async function enableTurnTracker(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Rules', exact: true }).click();
   await page.getByRole('checkbox', { name: /Enable turn tracker/i }).check();
   await page.getByRole('button', { name: /^save$/i }).click();
+  await page.getByRole('link', { name: 'Encounters', exact: true }).click();
   await expect(page.getByRole('button', { name: /new encounter/i })).toBeVisible();
 }
 
@@ -15,10 +16,11 @@ test('header tooltips and alerts stay within the viewport from mobile through de
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/login');
-  await page.getByLabel(/email/i).fill('seed@example.invalid');
-  await page.getByLabel(/^password\b/i).fill('change-me-please-this-is-a-seed-account');
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(`responsive-header-${suffix()}@example.com`);
+  await page.getByLabel(/display name/i).fill('Responsive Header QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /create account/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
 
   const expectInsideViewport = async (locator: import('@playwright/test').Locator) => {
@@ -212,9 +214,13 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
   await selectCharacterSection(page, 'Magic');
   const spellName = 'Extremely Long Spell Name For Horizontal Testing';
+  await page.getByRole('button', { name: '+ Add spell' }).click();
   const spellForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
   await page.getByLabel(/^spell$/i).fill(spellName);
   await spellForm.getByRole('button', { name: /^add$/i }).click();
+  const spellRow = page.getByRole('rowgroup', { name: spellName });
+  await expect(spellRow).toBeVisible();
+  await spellRow.getByRole('button', { name: `Edit ${spellName}` }).click();
   const spellNameInput = page.getByLabel(`${spellName} name`);
   await expect(spellNameInput).toBeVisible();
   await expect
@@ -254,11 +260,15 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
     .getByLabel('campaign', { exact: true })
     .selectOption({ label: 'Responsive spell library' });
   await selectCharacterSection(page, 'Magic');
+  await page.getByRole('button', { name: '+ Add spell' }).click();
   await page.getByLabel(/^spell$/i).fill(maintainableSpellName);
   await page.getByRole('option', { name: new RegExp(maintainableSpellName) }).click();
   const maintainableForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
   await maintainableForm.getByRole('button', { name: /^add$/i }).click();
 
+  const maintainableRow = page.getByRole('rowgroup', { name: maintainableSpellName });
+  await expect(maintainableRow).toBeVisible();
+  await maintainableRow.getByRole('button', { name: `Edit ${maintainableSpellName}` }).click();
   const maintainableNameInput = page.getByLabel(`${maintainableSpellName} name`);
   await expect(maintainableNameInput).toBeVisible();
   await expect(
@@ -270,6 +280,117 @@ test('spell rows stay readable at narrow mobile and tablet breakpoints', async (
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(640);
+});
+
+test('spell list and reference dialog stay contained across mobile, tablet, and desktop breakpoints', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 700 });
+  const email = `spell-reference-widths-${suffix()}@example.com`;
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill('Spell Layout QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
+  await expect(page).toHaveURL(/(\/|\/characters)$/, { timeout: 15_000 });
+
+  await page.goto('/characters');
+  await page.getByLabel(/new character name/i).fill('Spell Reference Layout');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Traits');
+  await page.getByRole('button', { name: '+ Add trait' }).click();
+  await page.getByLabel('Trait name').fill('Magery');
+  await page.getByRole('button', { name: /^add$/i }).click();
+
+  await selectCharacterSection(page, 'Magic');
+  await page.getByRole('button', { name: '+ Add spell' }).click();
+  const spellName =
+    'Aegis of the Seven Wandering Stars That Protects Travelers Across the Azure Meridian';
+  const addForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
+  await page.getByLabel(/^spell$/i).fill(spellName);
+  await page.getByLabel('College').fill('Protection & Warning');
+  await addForm.getByRole('button', { name: /^add$/i }).click();
+  const spellRow = page.getByRole('rowgroup', { name: spellName });
+  await expect(spellRow).toBeVisible();
+
+  for (const width of [320, 390, 639, 640, 641, 1023, 1024, 1025, 1279, 1280, 1281]) {
+    await page.setViewportSize({ width, height: 700 });
+    const table = page.getByRole('table', { name: 'Spells' });
+    const tableBox = await table.boundingBox();
+    if (!tableBox) throw new Error(`Spell table has no bounding box at ${width}px`);
+    expect(tableBox.x).toBeGreaterThanOrEqual(0);
+    expect(tableBox.x + tableBox.width).toBeLessThanOrEqual(width + 1);
+    const summaryRow = spellRow.getByRole('row').first();
+    const firstCell = summaryRow.locator('td').first();
+    const levelCell = summaryRow.locator('td').nth(2);
+    const firstCellBox = await firstCell.boundingBox();
+    const levelCellBox = await levelCell.boundingBox();
+    if (!firstCellBox || !levelCellBox) throw new Error(`Spell columns are missing at ${width}px`);
+    if (width < 640) {
+      expect(firstCellBox.width).toBeGreaterThanOrEqual(tableBox.width * 0.6);
+      expect(
+        Math.abs(levelCellBox.x + levelCellBox.width - (tableBox.x + tableBox.width)),
+      ).toBeLessThanOrEqual(5);
+    }
+    const lastHeaderRight = await table.locator('thead th').evaluateAll((headers) => {
+      const visible = headers.filter((header) => getComputedStyle(header).display !== 'none');
+      const last = visible.at(-1);
+      return last?.getBoundingClientRect().right ?? null;
+    });
+    if (lastHeaderRight === null)
+      throw new Error(`Visible spell headers are missing at ${width}px`);
+    expect(Math.abs(lastHeaderRight - (tableBox.x + tableBox.width))).toBeLessThanOrEqual(5);
+    await expect(page.getByRole('button', { name: `Read ${spellName}` })).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
+
+    await page.getByRole('button', { name: `Read ${spellName}` }).click();
+    const dialog = page.getByRole('dialog', { name: `Spell reference: ${spellName}` });
+    await expect(dialog).toBeVisible();
+    const modalBox = dialog.locator('.modal-box');
+    await dialog.evaluate(async (element) => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.playState === 'running')
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    });
+    const dialogBox = await modalBox.boundingBox();
+    if (!dialogBox) throw new Error(`Spell reference dialog has no box at ${width}px`);
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.y).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
+    expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(701);
+    const close = dialog.getByRole('button', { name: 'Close spell reference' });
+    const closeBox = await close.boundingBox();
+    if (!closeBox) throw new Error(`Spell reference close control has no box at ${width}px`);
+    expect(closeBox.x).toBeGreaterThanOrEqual(0);
+    expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(width + 1);
+    expect(closeBox.y).toBeGreaterThanOrEqual(0);
+    expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(701);
+    await close.click();
+    await expect(dialog).not.toBeVisible();
+
+    if (width === 320) {
+      await spellRow.getByRole('button', { name: `Edit ${spellName}` }).click();
+      await expect(page.getByRole('heading', { name: `Edit ${spellName}` })).toBeVisible();
+      const nameInput = page.getByLabel(`${spellName} name`);
+      const nameBox = await nameInput.boundingBox();
+      if (!nameBox) throw new Error('Spell editor name input has no bounds at 320px');
+      expect(nameBox.x).toBeGreaterThanOrEqual(0);
+      expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(width + 1);
+      const deleteButton = page.getByRole('button', { name: `Delete spell ${spellName}` });
+      const deleteBox = await deleteButton.boundingBox();
+      if (!deleteBox) throw new Error('Spell delete action has no bounds at 320px');
+      expect(deleteBox.x).toBeGreaterThanOrEqual(0);
+      expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(width + 1);
+      await spellRow.getByRole('button', { name: `Done editing ${spellName}` }).click();
+    }
+  }
 });
 
 test('campaign settings dialog keeps its close control reachable on a short mobile viewport', async ({
@@ -488,7 +609,7 @@ test('effect dialog keeps its actions reachable on a short mobile viewport', asy
     .toBe(true);
 });
 
-test('cast spell dialog keeps its actions reachable on a short mobile viewport', async ({
+test('maintain-payment dialog keeps long resource labels and free-maintenance actions contained', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -501,29 +622,130 @@ test('cast spell dialog keeps its actions reachable on a short mobile viewport',
   await page.getByRole('button', { name: /(create account|sign up|register)/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
 
+  const campaignName = 'Responsive maintenance library';
+  const spellName = 'A Long Maintenance Spell for Responsive Dialog Testing';
+  await page.goto('/campaigns');
+  await page.getByRole('button', { name: /new campaign/i }).click();
+  await page.getByLabel(/campaign name/i).fill(campaignName);
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.getByRole('link', { name: campaignName }).click();
+  await page.getByRole('link', { name: /^library$/i }).click();
+  await page.getByRole('button', { name: /^spells 0$/i }).click();
+  await page.getByRole('button', { name: /add spell/i }).click();
+  await page.getByLabel(/name \*/i).fill(spellName);
+  const longCollege = 'Pneumonoultramicroscopicsilicovolcanoconiosis-responsive spell college';
+  const longCastingTime = 'Pneumonoultramicroscopically40Second';
+  await page.getByLabel('College').fill(longCollege);
+  await page.getByLabel('Upkeep').fill('1');
+  await page.getByLabel('Casting time').fill(longCastingTime);
+  await page.getByLabel('Duration').fill(longCastingTime);
+  await page.getByRole('button', { name: /^add spell$/i }).click();
+  await expect(page.getByText(spellName, { exact: true })).toBeVisible();
+
   await page.goto('/characters');
   await page.getByLabel(/new character name/i).fill('Narrow Caster Sheet');
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
+
+  await selectCharacterSection(page, 'Overview');
+  await page.getByLabel('campaign', { exact: true }).selectOption({ label: campaignName });
   await selectCharacterSection(page, 'Traits');
   await page.getByRole('button', { name: '+ Add trait' }).click();
   await page.getByLabel('Trait name').fill('Magery');
   await page.getByRole('button', { name: /^add$/i }).click();
 
-  await selectCharacterSection(page, 'Magic');
-  await page.getByLabel(/^spell$/i).fill('Reachable spell');
+  await selectCharacterSection(page, 'Inventory');
+  const powerstoneName = 'The Ancient Granite Tower Powerstone of the Northern Highlands';
+  await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
-  await page.getByRole('button', { name: 'Cast Reachable spell' }).click();
+  await page.getByRole('button', { name: `Edit ${powerstoneName}` }).click();
+  await page.getByRole('button', { name: `Add category to ${powerstoneName}` }).click();
+  await page.getByRole('button', { name: '+ Powerstone', exact: true }).click();
+  await page.getByLabel('Current energy').fill('1');
+  await page.getByLabel('Maximum energy').fill('1');
 
-  const castDialog = page.locator('dialog[open]').filter({ hasText: 'Reachable spell' });
-  const cancel = castDialog.getByRole('button', { name: 'Cancel' });
-  await expect(cancel).toBeVisible();
-  await expect
-    .poll(async () => {
-      const box = await cancel.boundingBox();
-      return box ? box.y >= 0 && box.y + box.height <= 568 : false;
-    })
-    .toBe(true);
+  await selectCharacterSection(page, 'Magic');
+  await page.getByRole('button', { name: '+ Add spell' }).click();
+  await page.getByLabel(/^spell$/i).fill(spellName);
+  await page.getByRole('option', { name: new RegExp(spellName) }).click();
+  const spellForm = page.getByLabel(/^spell$/i).locator('xpath=ancestor::form');
+  await spellForm.getByRole('button', { name: /^add$/i }).click();
+  const spellRow = page.getByRole('rowgroup', { name: spellName });
+  await expect(spellRow).toBeVisible();
+  await spellRow.getByRole('button', { name: `Read ${spellName}` }).click();
+  const referenceDialog = page.getByRole('dialog', { name: `Spell reference: ${spellName}` });
+  const referenceBox = referenceDialog.locator('.modal-box');
+  await expect(referenceBox).toContainText(longCollege);
+  await expect(referenceBox).toContainText(longCastingTime);
+  await referenceDialog.getByRole('button', { name: 'Close spell reference' }).click();
+
+  for (const width of [320, 390, 639, 640, 641, 1023, 1024, 1025, 1279, 1280, 1281]) {
+    await page.setViewportSize({ width, height: 568 });
+    await spellRow.getByRole('button', { name: `Maintain ${spellName}` }).click();
+    const dialog = page.getByRole('dialog', { name: `Maintain ${spellName}` });
+    const modalBox = dialog.locator('.modal-box');
+    await expect(modalBox).toBeVisible();
+    await dialog.evaluate(async (element) => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.playState === 'running')
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    });
+    if (width === 320) {
+      await page.screenshot({ path: '/tmp/gpc-spell-visual/payment-dialog-320x568-top.png' });
+    }
+    const bounds = await modalBox.boundingBox();
+    if (!bounds) throw new Error(`Maintain dialog has no box at ${width}px`);
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width + 1);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(569);
+    await expect(modalBox).toContainText(longCollege);
+    await expect(modalBox).toContainText(longCastingTime);
+    for (const content of [longCollege, longCastingTime]) {
+      const contentBox = await modalBox.getByText(content).first().boundingBox();
+      if (!contentBox) throw new Error(`Dialog content has no box at ${width}px: ${content}`);
+      expect(contentBox.x).toBeGreaterThanOrEqual(bounds.x);
+      expect(contentBox.x + contentBox.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+    }
+
+    const stoneSpend = dialog.getByRole('spinbutton', {
+      name: `${powerstoneName} (powerstone)`,
+    });
+    const allocationTable = dialog.getByRole('table', { name: 'Energy allocation' });
+    const sourceCell = stoneSpend.locator('xpath=ancestor::tr').locator('td').first();
+    await stoneSpend.scrollIntoViewIfNeeded();
+    await expect(stoneSpend).toBeVisible();
+    const stoneBounds = await stoneSpend.boundingBox();
+    const sourceCellBox = await sourceCell.boundingBox();
+    const allocationTableBox = await allocationTable.boundingBox();
+    if (!stoneBounds) throw new Error(`Powerstone allocation has no box at ${width}px`);
+    if (!sourceCellBox || !allocationTableBox)
+      throw new Error(`Powerstone source cell has no box at ${width}px`);
+    expect(stoneBounds.x).toBeGreaterThanOrEqual(0);
+    expect(stoneBounds.x + stoneBounds.width).toBeLessThanOrEqual(width + 1);
+    expect(sourceCell).toContainText(powerstoneName);
+    if (width < 640) {
+      expect(sourceCellBox.width).toBeGreaterThanOrEqual(allocationTableBox.width * 0.5);
+    }
+
+    await dialog.getByLabel('Energy to spend').fill('0');
+    const freeMaintenance = dialog.getByRole('button', { name: 'Record free maintenance' });
+    await freeMaintenance.scrollIntoViewIfNeeded();
+    if (width === 320) {
+      await page.screenshot({ path: '/tmp/gpc-spell-visual/payment-dialog-320x568.png' });
+    }
+    const actionBounds = await freeMaintenance.boundingBox();
+    if (!actionBounds) throw new Error(`Free maintenance action has no box at ${width}px`);
+    expect(actionBounds.x).toBeGreaterThanOrEqual(0);
+    expect(actionBounds.x + actionBounds.width).toBeLessThanOrEqual(width + 1);
+    expect(actionBounds.y).toBeGreaterThanOrEqual(0);
+    expect(actionBounds.y + actionBounds.height).toBeLessThanOrEqual(569);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).not.toBeVisible();
+  }
 });
 
 test('long powerstone and magic-item rows stack their controls on a 320px viewport', async ({
@@ -565,17 +787,28 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   const magicItemLabel = page.getByText(magicItemName, { exact: true });
   await expect(powerstoneLabel).toBeVisible();
   await expect(magicItemLabel).toBeVisible();
-  for (const label of [powerstoneLabel, magicItemLabel]) {
+  for (const width of [320, 639, 640, 641]) {
+    await page.setViewportSize({ width, height: 568 });
+    for (const label of [powerstoneLabel, magicItemLabel]) {
+      const table = label.locator('xpath=ancestor::table[1]');
+      const labelCell = label.locator('xpath=ancestor::td[1]');
+      await expect
+        .poll(async () => {
+          const [tableBox, cellBox] = await Promise.all([
+            table.boundingBox(),
+            labelCell.boundingBox(),
+          ]);
+          return tableBox && cellBox ? cellBox.width / tableBox.width : 0;
+        })
+        .toBeGreaterThanOrEqual(0.6);
+    }
+    if (width === 320 || width === 640) {
+      await page.screenshot({ path: `/tmp/gpc-spell-visual/powerstone-items-${width}.png` });
+    }
     await expect
-      .poll(() =>
-        label.locator('xpath=..').evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBeGreaterThan(180);
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
   }
-
-  await expect
-    .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
-    .toBeLessThanOrEqual(320);
 });
 
 test('long recent-character and API-key names stay contained at 320px', async ({ page }) => {

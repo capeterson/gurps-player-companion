@@ -8,6 +8,7 @@ import type { CharacterDetail } from '../../../../../shared/schemas/character.ts
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomplete.tsx';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
+import { useExperimentalActiveEffects } from '../../../../hooks/useExperimentalActiveEffects.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
 import { newClientId } from '../../../../sync/outbox.ts';
@@ -43,6 +44,7 @@ export function ActiveEffectsPanel({
   character,
   canWrite,
 }: { character: CharacterDetail; canWrite: boolean }) {
+  const enabled = useExperimentalActiveEffects(character.campaignId);
   const [sourceInventoryId, setSourceInventoryId] = useState<string | null>(null);
   const [custom, setCustom] = useState(false);
   const [query, setQuery] = useState('');
@@ -68,14 +70,15 @@ export function ActiveEffectsPanel({
     .map((e) => e.id)
     .join(',');
   useEffect(() => {
-    if (!canWrite || !expiredIds) return;
+    if (!enabled || !canWrite || !expiredIds) return;
     void mutateActiveEffects(character.id, 'Expire elapsed active effects', (entries) =>
       entries.map((e) => (effectExpired(e, Date.now()) ? { ...e, state: 'expired' } : e)),
     ).catch((e) => {
       push(`Couldn't save effect expiry — ${e.message}`, { kind: 'error' });
       flash.trigger();
     });
-  }, [character.id, canWrite, expiredIds, push, flash.trigger]);
+  }, [character.id, enabled, canWrite, expiredIds, push, flash.trigger]);
+  if (!enabled) return null;
   return (
     <FoldSection
       title="Active Effects"

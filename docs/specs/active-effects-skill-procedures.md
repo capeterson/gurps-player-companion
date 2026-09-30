@@ -1,12 +1,38 @@
 # Active effects and skill procedures
 
-Campaign owners manage reusable active effects in Library → Active Effects. Each
+Active effects are an experimental campaign feature. The owner opts in through
+**Campaign settings → Rules → Experimental features → Enable active effects**
+(`experimentalActiveEffects`). Migration `0064_experimental_active_effects.sql`
+adds a non-null boolean defaulting to false for every existing campaign; new
+campaigns also default false. Missing cached flags, unresolved campaigns, and
+campaignless characters are disabled.
+
+While disabled, Overview's Conditional effects, Combat's Active Effects, the
+library category/pickers/forms, conditional authoring rows and previews, and the
+experimental help section are hidden. Shared server/player/GM calculations ignore
+active instances and condition-gated declarations (including their capabilities),
+regardless of stored state. Automatic expiry and solo-turn instance advancement
+stop. Manual `tempEffects`, permanent mechanics, skill procedures, and the
+separately gated turn tracker remain independent.
+
+The setting is owner-only, online-only, audited, and propagated through REST and
+the read-only campaign cursor into Dexie. Turning it off retains definitions,
+instances, and selected condition groups. Re-enabling resolves saved state against
+the current time; wall-clock durations are not paused. Dedicated definition CRUD
+and character instance/group writes reject with 403 while disabled, through shared
+REST/sync/MCP handlers. Empty defaults on ordinary character creation remain valid.
+YAML import/export and read/history/sync payloads retain stored data without enabling
+the experiment; import previews omit the disabled category. Archived conditional
+trait/skill declarations may still be stored but cannot contribute while disabled.
+
+When enabled, campaign owners manage reusable active effects in Library → Active Effects. Each
 has description, source, tags, numeric declarations, typed capability declarations,
 duration, and an explicit stacking key/policy. Character effect instances can be applied and managed in the sheet’s
 Combat → Active Effects panel, alongside their API, MCP, sync and calculation model.
 The panel supports library and custom effects, notes, activation/deactivation, expiry,
 independent copies, removal and explicit round advancement. Reactivation starts a new
-duration; advancing the optional turn tracker also advances round effects. Source inventory links are optional; applying an effect
+duration; advancing the optional turn tracker also advances round effects when
+the active-effects experiment is enabled. Source inventory links are optional; applying an effect
 does not consume the item. A deleted source item remains a historical reference and
 does not prevent subsequent instance edits.
 The definition form marks its name and stacking key as required, focuses a missing
@@ -47,7 +73,7 @@ projections clear the entire field; history requires full access.
 Campaign cursor rows carry a validated, read-only `activeEffectDefinitions`
 projection. This uses the existing campaign store, revision invalidation, access
 pruning and logout purge. The picker can use those saved templates after an offline
-reload. Existing applied instances always calculate from their own saved mechanics.
+reload. Enabled applied instances calculate from their own saved mechanics.
 
 ## Resolution and duration
 
@@ -55,8 +81,15 @@ reload. Existing applied instances always calculate from their own saved mechani
 numeric declarations enter the same attribute/skill/weapon pipeline as traits.
 Capabilities have stable keys, labels, optional parameters and sense/resistance/
 capability kinds; they appear in a separate summary, never as guessed numeric stats.
-The existing condition-group controls include active-effect declarations and now
-commit their toggles through the root character outbox.
+Overview → Conditional effects lists named condition groups declared by owned
+trait effects and active-effect numeric/capability declarations. It is absent
+when there are no groups, and its compact disclosure explains these sources.
+Checking a group saves `activeConditionGroups` through the root character outbox
+and enables declarations requiring that group; unchecking disables them. This
+same control is also available inside Combat → Active Effects. The condition
+group is a player-controlled rules gate, independent of Current Status conditions such
+as Stunned. An inactive or expired active-effect instance still requires
+activation in Combat → Active Effects before its checked group can contribute.
 
 Stacking uses explicit keys, never display names. Additive keeps every contribution.
 Highest selects the greatest signed value per exact target/selector and deduplicates

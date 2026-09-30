@@ -827,6 +827,10 @@ rule that has been broken at least once.
   input pulses. Reconciliation, rejection persistence, and outbox removal
   commit atomically; if storage fails, the optimistic row and operation
   remain recoverable. Notification and flash follow the commit.
+  Description drafts use `useDraftField`'s optional `readRollbackValue` to read
+  that committed Dexie field after a rejection, including when a live query
+  missed the brief optimistic value. Reconciliation waits for a local enqueue
+  to settle and ignores reads superseded by newer typing or commits.
   **Toast + flash are both required.**
 - **Speculative creates** (S7) use a client-generated UUID and `revision: -1`;
   the same id is posted to `/sync/operations` and the server adopts it. The UI
@@ -1002,6 +1006,14 @@ until settings are available. Known settings survive reopening offline and
 update reactively in player and GM views when the campaign cursor changes.
 
 ## Active effects
+
+The owner-only `experimentalActiveEffects` campaign setting is an online campaign
+PATCH, mirrored by REST/cursor into Dexie. Missing/false settings hide active and
+conditional controls and suppress their contributions in player/GM local builders,
+matching the server builder. Disabled campaigns keep stored definitions, instances
+and groups; local instance/group mutations check the latest campaign row inside
+their outbox transaction, and shared server REST/sync handlers reject dedicated
+instance/group/definition writes while disabled. YAML archive transfer does not opt in.
 
 `characters.activeEffects` is a validated root-field outbox surface, independent
 of manual `tempEffects`. Its transactional helper composes current local arrays

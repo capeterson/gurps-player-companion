@@ -12,6 +12,7 @@ import { clearAllAttackTablePreferences } from './features/characters/sections/c
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { clearAllSkillTablePreferences } from './features/characters/sections/skillTablePreferences.ts';
+import { clearAllSpellTablePreferences } from './features/characters/sections/spellTablePreferences.ts';
 import { clearAllTraitTablePreferences } from './features/characters/sections/traitTablePreferences.ts';
 import { clearAllLibraryTablePreferences } from './features/library/libraryTablePreferences.ts';
 import { useUnsyncedChangesGuard } from './hooks/useUnsyncedChangesGuard.tsx';
@@ -122,6 +123,7 @@ export function App() {
     clearAllAttackTablePreferences();
     clearAllDefenseTablePreferences();
     clearAllSkillTablePreferences();
+    clearAllSpellTablePreferences();
     clearAllTraitTablePreferences();
     clearAllLibraryTablePreferences();
     clearAllTableFilters();

@@ -185,6 +185,7 @@ router.openapi(
         content: { 'application/json': { schema: characterDetail } },
       },
       401: errorResponse('Unauthorized'),
+      403: errorResponse('Campaign access forbidden or active effects disabled'),
       422: errorResponse('Validation error'),
     },
   }),

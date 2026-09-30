@@ -32,7 +32,10 @@ test('API-seeded campaign effects and skill actions survive offline use and reco
     expect(response.ok(), await response.text()).toBeTruthy();
     return response.json();
   }
-  const campaign = await create('/campaigns', { name: 'Rules campaign' });
+  const campaign = await create('/campaigns', {
+    name: 'Rules campaign',
+    experimentalActiveEffects: true,
+  });
   const definition = await create(`/campaigns/${campaign.id}/library/active-effects`, {
     name: 'Battle Potion',
     effects: [{ target: 'st', value: 2 }],

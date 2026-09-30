@@ -148,7 +148,7 @@ describe('very high mana spending', () => {
       const close = vi.fn();
       render(<CastSpellDialog {...props} onClose={close} />);
       if (!mage) expect(screen.getByText(/Without Magery/)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Pay 3 energy' }));
       await waitFor(() => expect(close).toHaveBeenCalled());
       expect((await getLocalDb().characterCombat.get(id))?.currentFp).toBe(2);
       const message = push.mock.calls.at(-1)?.[0] as string;
@@ -163,7 +163,7 @@ describe('very high mana spending', () => {
 
   it('blocks insufficient initial energy instead of borrowing a future refund', () => {
     render(<CastSpellDialog {...fixture(true, 20, 2, 3)} onClose={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pay 20 energy' })).toBeDisabled();
     expect(screen.getByText('15 more needed')).toBeInTheDocument();
   });
 
@@ -185,7 +185,9 @@ describe('very high mana spending', () => {
       const close = vi.fn();
       render(<CastSpellDialog {...props} mode={mode} onClose={close} />);
       fireEvent.click(
-        screen.getByRole('button', { name: mode === 'cast' ? 'Cast' : 'Pay upkeep' }),
+        screen.getByRole('button', {
+          name: mode === 'cast' ? 'Pay 6 energy' : 'Pay 6 energy',
+        }),
       );
       await waitFor(() => expect(close).toHaveBeenCalled());
       expect(await getLocalDb().characterCombat.get(id)).toMatchObject({
@@ -210,7 +212,7 @@ describe('very high mana spending', () => {
     expect(
       screen.getByText(/FP spent maintaining a spell does not recover next turn/),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Pay upkeep' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 2 energy' }));
     await waitFor(() => expect(close).toHaveBeenCalled());
     expect((await getLocalDb().characterCombat.get(id))?.currentFp).toBe(3);
     expect(push.mock.calls.at(-1)?.[0]).not.toContain('restore');
@@ -221,9 +223,28 @@ describe('very high mana spending', () => {
     props.spell.effectiveCost = 0;
     const close = vi.fn();
     render(<CastSpellDialog {...props} onClose={close} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Record free cast' }));
     await waitFor(() => expect(close).toHaveBeenCalled());
     expect(await getLocalDb().outbox.count()).toBe(0);
+    expect(push.mock.calls.at(-1)?.[0]).toBe('Cast Light (free).');
+  });
+
+  it('does not let a free cast spend energy and records it only with a zero allocation', async () => {
+    const props = fixture();
+    props.spell.effectiveCost = 0;
+    const close = vi.fn();
+    render(<CastSpellDialog {...props} onClose={close} />);
+    const fp = screen.getByRole('spinbutton', { name: 'Fatigue Points (FP)' });
+    fireEvent.change(fp, { target: { value: '1' } });
+    expect(screen.getByRole('button', { name: 'Record free cast' })).toBeDisabled();
+    expect(await getLocalDb().outbox.count()).toBe(0);
+
+    fireEvent.change(fp, { target: { value: '0' } });
+    expect(screen.getByRole('button', { name: 'Record free cast' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Record free cast' }));
+    await waitFor(() => expect(close).toHaveBeenCalled());
+    expect(await getLocalDb().outbox.count()).toBe(0);
+    expect(await getLocalDb().characterCombat.get(id)).toBeUndefined();
     expect(push.mock.calls.at(-1)?.[0]).toBe('Cast Light (free).');
   });
 
@@ -231,7 +252,7 @@ describe('very high mana spending', () => {
     const props = fixture(true, 3, 5, 0);
     const close = vi.fn();
     const view = render(<CastSpellDialog {...props} onClose={close} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cast' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 3 energy' }));
     await waitFor(() => expect(close).toHaveBeenCalled());
     const combat = await getLocalDb().characterCombat.get(id);
     view.unmount();
@@ -242,7 +263,7 @@ describe('very high mana spending', () => {
         onClose={close}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Cast' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pay 3 energy' })).toBeDisabled();
     expect(screen.getByText('1 more needed')).toBeInTheDocument();
     expect(combat?.currentFp).toBe(2);
   });

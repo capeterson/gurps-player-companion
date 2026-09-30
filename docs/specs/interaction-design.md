@@ -68,7 +68,85 @@ Skills does. A missing governing skill leaves the level unavailable rather
 than inventing a roll target. Library-derived level caps remain part of the
 owned technique's calculation.
 
+## Magic collections
+
+Magic uses a full-width shared Spells table and plain section headings, without
+outer folds, nested cards, or per-spell Description disclosures. One toolbar
+shows the spell count, points, and an owner-only Add spell action. The retained
+add form starts closed. Search matches spell names, colleges, and notes; column
+headings sort and expose the shared exact-value filters. Sorting preferences are
+device-local and cleared at logout.
+
+Spell summaries show name, college/difficulty, points, rollable level, effective
+casting cost, effective upkeep, and recorded casting time. Points become name
+metadata below 1024px; time moves into metadata below 1280px. Below 640px the
+name and level stay aligned, costs/time wrap below the name, and Cast/Maintain/
+Edit occupy one horizontal action row. Long names wrap; there is no page-wide
+horizontal scroller. A free upkeep is 0, while absent upkeep is an em dash.
+
+The name opens a bounded, read-only reference dialog with rendered Markdown,
+prerequisites, duration, base-to-effective costs, and level modifiers. The pencil
+opens a labeled inline editor for name, difficulty, points, base cost, and
+Markdown description/notes. Deletion lives in that editor and requires the
+existing confirmation. Editors stay mounted when closed or filtered; Done
+closes rather than atomically saving. Each field uses the canonical draft/outbox
+path, and a hidden editor's rollback also flashes the visible summary. Spell
+anchors reveal and highlight their row through filters without entering edit mode.
+
+The level opens the existing Roll Sheet. Cast and Maintain open a separate
+energy-payment dialog with Source/Available/Spend columns and an explicit Pay N
+energy or Record free cast/maintenance action. Rolling and payment remain
+separate; no automatic success resolution or maintained-spell tracker is added.
+Below 640px, the available pool appears beneath its source name, leaving room
+for readable names beside the Spend input. Short viewports scroll within the
+dialog while keeping its payment and cancellation actions reachable.
+Unknown campaign mana and unlearned legacy spells still hold casting. Existing
+mana, failure-cost, powerstone, and fatigue rules are unchanged.
+
+Powerstones and Magic items use compact shared tables with plain headings and
+Inventory links for full editing. Existing drain/recharge/Max and Use/Refill
+controls remain outbox-backed. An empty Magic items section is absent.
+Below 640px, adjustment controls move to their own row so long item names retain
+the available width beside energy or charges.
+
+## Named protection sources
+
+Incoming attack's **Protection before penetration** lists eligible innate DR by
+its contributing source's actual name, with one row per source ID and source kind.
+Multiple declarations from the same source are summed for the selected location;
+inactive and out-of-location declarations are omitted. Trait, skill, and item
+sources use the sheet's stable entry links; active-effect instances retain named
+plain text. Armor layers and natural skull protection retain their existing rows.
+
+A trait link selects the Traits destination, opens its folded panel, reveals the
+owned row despite search/column filters, and highlights it. Editing remains an
+explicit action. `SheetAnchorLink` shares the router-aware anchor behavior with
+existing equipment links and supports ordinary anchors outside a router.
+
 ## One heading and one interaction per purpose
+
+Overview's Attributes, Secondary attributes, and Status cards are always visible
+inside the outer Sheet overview disclosure. Each owns one heading without an
+individual fold. The adjacent utility column sizes to its content: folded Point
+ledger, Encumbrance, and Conditional effects show only their headings rather
+than stretching to the stat cards' height. Conditional effects owns its fold and
+is absent unless the campaign active-effects experiment is enabled and condition
+groups are declared. Its explanation identifies trait
+effects and Combat → Active Effects as the sources of those optional modifiers.
+Campaign settings has the owner-only **Enable active effects** experiment, off by
+default. Disabled campaigns hide every active/conditional tool, authoring control,
+library category and experimental guide section; permanent effect editors remain.
+Rollback feedback flashes that panel even while its content is folded.
+
+Identity's Description defaults to sanitized markdown with navigable links.
+Owners open the existing rich/source editor through a labeled pencil action;
+Done editing description commits through `useDraftField` and restores the
+rendered view. Once opened, the hidden editor stays mounted to preserve draft
+and mode. The visible description wrapper receives rollback flashes in both
+view and edit mode. Read-only viewers receive no editing action.
+Description rollback reconciliation reads the durable local field through
+`useDraftField` rather than relying on a live query observing every intermediate
+value. A newer draft or commit supersedes an in-flight reconciliation read.
 
 `FoldSection` owns the panel heading, fold button, and device-local fold
 preference. Languages and Techniques do not repeat their title as an eyebrow
@@ -81,7 +159,8 @@ Sorting, filtering, creation, editing, and rolling are distinct actions. Do
 not add a second selector for an action already served by a column heading,
 or another display for the same mechanical utility. Keep movement in movement
 and defenses in defenses. A collection redesign should reuse the existing
-sheet destination and fold rather than introduce another navigation surface.
+sheet destination rather than introduce another navigation surface. Magic
+collections use plain headings; details and editors open only on explicit actions.
 
 ## Tables are shared architecture
 
@@ -206,6 +285,8 @@ are inspected alongside bounding-box and overlap assertions.
 | Sheet composition and panel folds | `src/client/features/characters/CharacterSheetPage.tsx`, `src/client/components/ui/FoldSection.tsx` |
 | Table filters and grouped row lifetime | `src/client/components/ui/Table.tsx` |
 | Skill/trait summary and editor references | `src/client/features/characters/sections/SkillsPanel.tsx`, `TraitsPanel.tsx` |
+| Spells, reference and energy payment | `src/client/features/characters/sections/SpellsPanel.tsx`, `CastSpellDialog.tsx`, `spellTablePreferences.ts` |
+| Stored energy and magic items | `src/client/features/characters/sections/PowerstonesPanel.tsx` |
 | Languages and techniques | `src/client/features/characters/sections/LanguagesPanel.tsx`, `TechniquesPanel.tsx` |
 | Inventory responsive item layout | `src/client/features/characters/sections/InventoryPanel.tsx`, `InventoryRow.tsx`, `inventory/inventory.css` |
 | Draft serialization and rollback feedback | `src/client/hooks/useDraftField.ts`, `src/client/features/characters/sections/useEntityRowPatch.ts` |

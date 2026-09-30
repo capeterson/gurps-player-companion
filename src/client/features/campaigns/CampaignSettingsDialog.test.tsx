@@ -33,7 +33,15 @@ const checkbox = () =>
   screen.getByRole('checkbox', { name: /Armor penetration leaves natural DR intact/ });
 beforeEach(() => vi.clearAllMocks());
 
-function setup(viewerRole: 'owner' | 'manager' = 'owner', onlineAvailable = true) {
+function setup(
+  viewerRole: 'owner' | 'manager' = 'owner',
+  campaignOrAvailability: CampaignOut | boolean = campaign,
+  availability = true,
+) {
+  const initialCampaign =
+    typeof campaignOrAvailability === 'boolean' ? campaign : campaignOrAvailability;
+  const onlineAvailable =
+    typeof campaignOrAvailability === 'boolean' ? campaignOrAvailability : availability;
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   const onClose = vi.fn();
   const component = (value: CampaignOut, available = onlineAvailable) => (
@@ -47,7 +55,7 @@ function setup(viewerRole: 'owner' | 'manager' = 'owner', onlineAvailable = true
       />
     </QueryClientProvider>
   );
-  return { ...render(component(campaign)), component, onClose };
+  return { ...render(component(initialCampaign)), component, onClose };
 }
 
 it('defaults on and saves an explicit off selection, retaining the draft through a refetch', async () => {
@@ -168,6 +176,56 @@ it('does not let managers enable experimental tracking', () => {
   setup('manager');
   fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
   expect(screen.getByRole('checkbox', { name: /Enable turn tracker/ })).toBeDisabled();
+});
+
+it('defaults active effects off, lets the owner enable them, and persists the flag', async () => {
+  const enabled = { ...campaign, experimentalActiveEffects: true } as CampaignOut;
+  vi.mocked(api).mockResolvedValue(enabled);
+  const view = setup();
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  const activeEffects = screen.getByRole('checkbox', { name: /^Enable active effects/ });
+  expect(activeEffects).not.toBeChecked();
+  fireEvent.click(activeEffects);
+  expect(activeEffects).toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({ experimentalActiveEffects: true }),
+      }),
+    ),
+  );
+  await waitFor(() => expect(view.onClose).toHaveBeenCalled());
+});
+
+it('lets the owner disable active effects for a campaign that already has them enabled', async () => {
+  vi.mocked(api).mockResolvedValue({ ...campaign, experimentalActiveEffects: false });
+  setup('owner', { ...campaign, experimentalActiveEffects: true } as CampaignOut);
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  const activeEffects = screen.getByRole('checkbox', { name: /^Enable active effects/ });
+  await waitFor(() => expect(activeEffects).toBeChecked());
+  fireEvent.click(activeEffects);
+  expect(activeEffects).not.toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({ experimentalActiveEffects: false }),
+      }),
+    ),
+  );
+});
+
+it('does not let managers enable active effects', () => {
+  setup('manager');
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  const activeEffects = screen.getByRole('checkbox', { name: /^Enable active effects/ });
+  expect(activeEffects).not.toBeChecked();
+  expect(activeEffects).toBeDisabled();
 });
 
 it('groups settings and preserves form drafts across sections', () => {

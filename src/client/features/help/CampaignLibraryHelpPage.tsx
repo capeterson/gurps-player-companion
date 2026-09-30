@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { renderMarkdown } from '../../components/markdown/markdownProcessor.ts';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
+import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
 import guide from './campaign-library.md?raw';
 
 const sections = guide
@@ -28,6 +29,14 @@ export function CampaignLibraryHelpPage() {
   const headerBottom = useAppHeaderBottom();
   const [ready, setReady] = useState(false);
   const campaign = params.get('campaign');
+  const activeEffectsEnabled = useExperimentalActiveEffects(campaign);
+  const visibleSections = useMemo(
+    () =>
+      sections.filter(
+        (section) => section.id !== 'experimental-active-effects' || activeEffectsEnabled,
+      ),
+    [activeEffectsEnabled],
+  );
   const libraryPath = campaign ? `/campaigns/${encodeURIComponent(campaign)}/library` : '/library';
 
   useEffect(() => {
@@ -44,12 +53,12 @@ export function CampaignLibraryHelpPage() {
 
   useEffect(() => {
     if (!ready || !location.hash) return;
-    const section = sections.find((entry) => `#${entry.id}` === location.hash);
+    const section = visibleSections.find((entry) => `#${entry.id}` === location.hash);
     if (!section) return;
     const heading = document.getElementById(section.id);
     heading?.scrollIntoView({ block: 'start' });
     heading?.focus({ preventScroll: true });
-  }, [ready, location.hash]);
+  }, [ready, location.hash, visibleSections]);
 
   return (
     <article className="mx-auto min-w-0 max-w-3xl space-y-8 pb-8" aria-busy={!ready}>
@@ -68,7 +77,7 @@ export function CampaignLibraryHelpPage() {
       <nav className="card border border-base-300 p-card" aria-label="In this guide">
         <h2 className="font-display text-xl">In this guide</h2>
         <ol className="mt-3 grid list-inside list-decimal gap-3 text-sm sm:grid-cols-2">
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <li key={section.id}>
               <Link
                 className="link"
@@ -86,7 +95,7 @@ export function CampaignLibraryHelpPage() {
       </nav>
 
       {ready ? (
-        sections.map((section) => (
+        visibleSections.map((section) => (
           <section key={section.id} aria-labelledby={section.id} className="min-w-0 space-y-4">
             <h2
               id={section.id}

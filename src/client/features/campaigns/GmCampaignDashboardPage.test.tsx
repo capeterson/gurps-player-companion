@@ -33,6 +33,7 @@ it('settles the GM party query without repeatedly rewriting its campaign mirror'
     shareCharacterSheets: true,
     allowGmCharacterEditing: false,
     experimentalTurnTracker: true,
+    experimentalActiveEffects: false,
     members: [],
     createdAt: '2026-09-19T00:00:00.000Z',
     updatedAt: '2026-09-19T00:00:00.000Z',

@@ -74,7 +74,7 @@ export function SoloTrackerCard({
     void db
       .transaction(
         'rw',
-        [db.soloEncounters, db.characters, db.outbox, ...campaignTransferStores()],
+        [db.campaigns, db.soloEncounters, db.characters, db.outbox, ...campaignTransferStores()],
         async () => {
           const row = await db.soloEncounters.get(characterId);
           if (!row) return;
@@ -83,7 +83,11 @@ export function SoloTrackerCard({
             ...(direction === 'next' ? advanceTurn : previousTurn)(row, row.combatants),
           });
           await db.soloEncounters.put(next);
-          if (next.round > row.round)
+          const character = await db.characters.get(characterId);
+          const effectsEnabled = character?.campaignId
+            ? (await db.campaigns.get(character.campaignId))?.experimentalActiveEffects === true
+            : false;
+          if (effectsEnabled && next.round > row.round)
             await mutateActiveEffects(characterId, 'Advance active effects one round', (entries) =>
               entries.map((e) =>
                 e.state === 'active' && e.remainingRounds !== null

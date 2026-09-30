@@ -63,6 +63,9 @@ export interface UseDraftFieldOptions<V> {
    * the flash bus only handles the *visual* part of AGENTS.md rule 2.
    */
   readonly flashKey?: string;
+  /** Read the reconciled local value after an outbox rejection. A live-query
+   * prop can miss an optimistic write immediately followed by its rollback. */
+  readonly readRollbackValue?: () => Promise<V>;
 }
 
 /**
@@ -144,6 +147,9 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   const editVersionRef = useRef(0);
   const enqueueOnCommitRef = useRef(enqueueOnCommit);
   enqueueOnCommitRef.current = enqueueOnCommit;
+  const readRollbackValueRef = useRef(opts.readRollbackValue);
+  readRollbackValueRef.current = opts.readRollbackValue;
+  const rollbackRequestRef = useRef<{ editVersion: number } | null>(null);
   // The most recently CONFIRMED authoritative value, updated by either
   // an incoming server prop change or the success branch of a save.
   // We compare against this for the commit() no-op short-circuit
@@ -192,6 +198,44 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     };
   }, []);
 
+  const reconcileRollback = useCallback(async () => {
+    const request = rollbackRequestRef.current;
+    const read = readRollbackValueRef.current;
+    if (!request || !read || inflightRef.current !== null) return;
+    if (request.editVersion !== editVersionRef.current || dirtyRef.current) {
+      rollbackRequestRef.current = null;
+      return;
+    }
+    try {
+      const value = await read();
+      if (
+        !isMountedRef.current ||
+        rollbackRequestRef.current !== request ||
+        request.editVersion !== editVersionRef.current ||
+        dirtyRef.current ||
+        inflightRef.current !== null
+      )
+        return;
+      rollbackRequestRef.current = null;
+      lastCommittedRef.current = value;
+      const formatted = formatRef.current(value);
+      setDraft(formatted);
+      draftRef.current = formatted;
+    } catch (error) {
+      if (!isMountedRef.current || rollbackRequestRef.current !== request) return;
+      rollbackRequestRef.current = null;
+      toasts.push(`Couldn't refresh ${nameRef.current} — ${onErrorRef.current(error)}`, {
+        kind: 'error',
+      });
+    }
+  }, [toasts]);
+
+  // An exceptionally fast rejection may arrive before the local enqueue's
+  // promise settles. Reconcile after that save, without replacing newer edits.
+  useEffect(() => {
+    if (!isSaving) void reconcileRollback();
+  }, [isSaving, reconcileRollback]);
+
   // Subscribe to async rollback events from the orchestrator.  When
   // the server rejects an outbox op for THIS field, the orchestrator
   // has already reverted the underlying Dexie row to the prior value;
@@ -205,6 +249,11 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     flashProps,
     trigger: flashRollback,
   } = useFlashState(flashKey, () => {
+    if (readRollbackValueRef.current) {
+      rollbackRequestRef.current = { editVersion: editVersionRef.current };
+      void reconcileRollback();
+      return;
+    }
     const formatted = formatRef.current(lastCommittedRef.current);
     setDraft(formatted);
     draftRef.current = formatted;

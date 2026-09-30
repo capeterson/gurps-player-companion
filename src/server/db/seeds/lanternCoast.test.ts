@@ -60,6 +60,8 @@ describe('Lantern Coast standard seed', () => {
     await isolated(async (ownerId) => {
       const { campaignId, created } = await seedLanternCoast(ownerId);
       expect(created).toBe(true);
+      const [campaign] = await getDb().select().from(campaigns).where(eq(campaigns.id, campaignId));
+      expect(campaign?.experimentalActiveEffects).toBe(false);
       const roster = await rows(campaignId);
       expect(roster).toHaveLength(6);
       expect(new Set(roster.map((row) => row.ownerId)).size).toBe(6);

@@ -5,6 +5,7 @@ import { hasMagery, spellFpRecovery } from '../../../../shared/domain/spellCalc.
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
+import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
@@ -159,7 +160,7 @@ export function CastSpellDialog({
   }
 
   async function performCast() {
-    if (cost > 0 && allocated !== cost) {
+    if (allocated !== cost) {
       toasts.push(`Allocate exactly ${cost} energy (currently ${allocated}).`, { kind: 'error' });
       return;
     }
@@ -216,19 +217,25 @@ export function CastSpellDialog({
   }
 
   return (
-    <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
-      <div className="modal-box max-h-[calc(100dvh-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
+    <dialog
+      ref={ref}
+      className="modal"
+      aria-label={`${maintaining ? 'Maintain' : 'Cast'} ${spell.name}`}
+      onClose={onClose}
+      onCancel={onClose}
+    >
+      <div className="modal-box w-[calc(100dvw-2rem)] max-h-[calc(100dvh-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
         <h3 className="break-words font-display text-2xl">
           {maintaining ? `Maintain ${spell.name}` : spell.name}
         </h3>
-        <p className="text-sm text-base-content/70 mt-1">
+        <p className="text-sm text-base-content/70 mt-1 [overflow-wrap:anywhere]">
           {spell.college ?? 'No college'} · IQ/{spell.difficulty} · effective skill{' '}
           <span className="num text-base-content">{spell.level ?? '—'}</span>
           {character.manaLevel !== 'normal' && (
             <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
           )}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm [overflow-wrap:anywhere] sm:grid-cols-4">
           <div>
             <p className="label-eyebrow">{maintaining ? 'Base upkeep' : 'Base cost'}</p>
             <p className="num text-xl">
@@ -257,6 +264,10 @@ export function CastSpellDialog({
           </div>
         </div>
 
+        <p className="mt-3 text-xs text-base-content/60">
+          Rolling is separate. This dialog records energy spent; it does not determine spell
+          success.
+        </p>
         <div className="divider my-3" />
 
         <div className="mb-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-end sm:gap-3">
@@ -299,30 +310,48 @@ export function CastSpellDialog({
             HP and powerstone energy are not refunded.
           </p>
         )}
-        <ul className="space-y-2">
-          <SourceRow
-            label="Fatigue Points (FP)"
-            available={fpAvailable}
-            value={alloc.fromFp}
-            onChange={setFp}
-          />
-          {stones.map((stone) => (
+        <Table
+          preferenceKey={`${character.id}:spell-energy`}
+          filterable={false}
+          aria-label="Energy allocation"
+          className="table table-sm w-full table-fixed"
+        >
+          <thead>
+            <tr>
+              <th scope="col">Source</th>
+              <th scope="col" className="hidden w-20 text-right sm:table-cell">
+                Available
+              </th>
+              <th scope="col" className="w-24 text-right">
+                Spend
+              </th>
+            </tr>
+          </thead>
+          <TableBody>
             <SourceRow
-              key={stone.id}
-              label={`${stone.name} (powerstone)`}
-              available={stone.powerstoneData.currentEnergy}
-              value={alloc.fromStones.get(stone.id) ?? 0}
-              onChange={(v) => setStone(stone.id, v, stone.powerstoneData.currentEnergy)}
+              label="Fatigue Points (FP)"
+              available={fpAvailable}
+              value={alloc.fromFp}
+              onChange={setFp}
             />
-          ))}
-          <SourceRow
-            label="Hit Points (HP) — risky"
-            available={hpAvailable}
-            value={alloc.fromHp}
-            onChange={setHp}
-            tone="warning"
-          />
-        </ul>
+            {stones.map((stone) => (
+              <SourceRow
+                key={stone.id}
+                label={`${stone.name} (powerstone)`}
+                available={stone.powerstoneData.currentEnergy}
+                value={alloc.fromStones.get(stone.id) ?? 0}
+                onChange={(v) => setStone(stone.id, v, stone.powerstoneData.currentEnergy)}
+              />
+            ))}
+            <SourceRow
+              label="Hit Points (HP) — risky"
+              available={hpAvailable}
+              value={alloc.fromHp}
+              onChange={setHp}
+              tone="warning"
+            />
+          </TableBody>
+        </Table>
 
         {stonesUsed > 1 && (
           <p className="mt-2 text-xs text-warning">
@@ -343,17 +372,23 @@ export function CastSpellDialog({
           )}
         </div>
 
-        <div className="modal-action sticky bottom-0 z-10 -mx-6 border-t border-base-300/60 bg-base-100 px-6 py-3">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
+        <div className="modal-action flex-wrap sticky bottom-0 z-10 -mx-6 border-t border-base-300/60 bg-base-100 px-6 py-3">
+          <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={onClose}>
             Cancel
           </button>
           <button
             type="button"
-            className="btn btn-primary"
-            disabled={casting || (cost > 0 && remaining !== 0)}
+            className="btn btn-primary w-full sm:w-auto"
+            disabled={casting || remaining !== 0}
             onClick={() => void performCast()}
           >
-            {casting ? 'Paying…' : maintaining ? 'Pay upkeep' : 'Cast'}
+            {casting
+              ? 'Paying…'
+              : cost === 0
+                ? maintaining
+                  ? 'Record free maintenance'
+                  : 'Record free cast'
+                : `Pay ${cost} energy`}
           </button>
         </div>
       </div>
@@ -376,28 +411,33 @@ interface SourceRowProps {
 
 function SourceRow({ label, available, value, onChange, tone }: SourceRowProps) {
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-      <span
-        className={`col-span-2 min-w-0 break-words sm:col-span-1 ${
-          tone === 'warning' ? 'text-warning' : ''
-        }`}
+    <tr>
+      <td
+        className={`min-w-0 [overflow-wrap:anywhere] ${tone === 'warning' ? 'text-warning' : ''}`}
       >
         {label}
-      </span>
-      <span className="num text-xs text-base-content/60">avail {available}</span>
-      <input
-        type="number"
-        aria-label={label}
-        className="input input-bordered input-sm num w-20 min-w-0 text-right"
-        value={value}
-        min={0}
-        max={available}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          onChange(Number.isFinite(n) ? n : 0);
-        }}
-      />
-    </li>
+        <span className="block text-xs text-base-content/60 sm:hidden">
+          Available: <span className="num">{available}</span>
+        </span>
+      </td>
+      <td className="num hidden text-right text-xs text-base-content/60 sm:table-cell">
+        {available}
+      </td>
+      <td className="text-right">
+        <input
+          type="number"
+          aria-label={label}
+          className="input input-bordered input-sm num w-20 min-w-0 text-right"
+          value={value}
+          min={0}
+          max={available}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            onChange(Number.isFinite(n) ? n : 0);
+          }}
+        />
+      </td>
+    </tr>
   );
 }
 

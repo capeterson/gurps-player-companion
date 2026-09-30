@@ -15,6 +15,7 @@ import { mutateActiveEffects } from './activeEffectMutations.ts';
 import { ActiveEffectsPanel } from './combat/ActiveEffectsPanel.tsx';
 import { SoloTrackerCard } from './combat/SoloTrackerCard.tsx';
 const id = '00000000-0000-4000-8000-000000000001';
+const campaignId = '00000000-0000-4000-8000-000000000003';
 const effect = instantiateEffect(
   activeEffectDefinitionCreate.parse({
     name: 'Potion',
@@ -24,12 +25,25 @@ const effect = instantiateEffect(
   '00000000-0000-4000-8000-000000000002',
   new Date().toISOString(),
 );
-async function seed() {
+async function seed(experimentalActiveEffects = true) {
+  await getLocalDb().campaigns.put({
+    id: campaignId,
+    ownerId: 'owner',
+    name: 'Effects campaign',
+    description: null,
+    pointTarget: null,
+    disadvantageCap: null,
+    quirkCap: null,
+    experimentalActiveEffects,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    revision: 1,
+  } as never);
   await getLocalDb().characters.put({
     ...characterCreate.parse({ name: 'Hero' }),
     id,
     ownerId: 'owner',
-    campaignId: null,
+    campaignId,
     height: null,
     weight: null,
     age: null,
@@ -178,6 +192,21 @@ it('saves notes, deactivates and reactivates offline without duplicating mechani
   await screen.findByRole('button', { name: 'Deactivate' });
   expect((await getLocalDb().characters.get(id))?.activeEffects).toHaveLength(1);
 });
+
+it('hides retained instances while disabled and restores the combat panel after opt-in', async () => {
+  await seed(false);
+  renderPanel();
+  expect(screen.queryByRole('button', { name: 'Deactivate' })).not.toBeInTheDocument();
+  expect((await getLocalDb().characters.get(id))?.activeEffects).toHaveLength(1);
+
+  await getLocalDb().campaigns.update(campaignId, { experimentalActiveEffects: true });
+  await screen.findByRole('button', { name: 'Deactivate' });
+  await getLocalDb().campaigns.update(campaignId, { experimentalActiveEffects: false });
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'Deactivate' })).not.toBeInTheDocument(),
+  );
+  expect((await getLocalDb().characters.get(id))?.activeEffects).toHaveLength(1);
+});
 it('shows toast and flashes notes when local persistence rejects a save', async () => {
   await seed();
   renderPanel();
@@ -279,4 +308,31 @@ it('expires round effects through the outbox when the solo tracker advances, wit
   fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
   await waitFor(async () => expect((await getLocalDb().soloEncounters.get(id))?.round).toBe(1));
   expect((await getLocalDb().characters.get(id))?.activeEffects?.[0]?.state).toBe('expired');
+});
+
+it('advances the solo tracker without changing active-effect durations when the campaign flag is off', async () => {
+  await seed(false);
+  await getLocalDb().characters.update(id, {
+    activeEffects: [{ ...effect, duration: { kind: 'rounds', amount: 1 }, remainingRounds: 1 }],
+  });
+  await getLocalDb().soloEncounters.put({
+    characterId: id,
+    round: 1,
+    activeCombatantId: 'hero',
+    combatants: [{ id: 'hero', name: 'Hero', orderKey: 1, active: true }],
+    effects: [],
+    updatedAt: new Date().toISOString(),
+  });
+  render(
+    <ToastProvider>
+      <SoloTrackerCard characterId={id} canWrite />
+    </ToastProvider>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Next turn' }));
+  await waitFor(async () => expect((await getLocalDb().soloEncounters.get(id))?.round).toBe(2));
+  expect((await getLocalDb().characters.get(id))?.activeEffects?.[0]).toMatchObject({
+    state: 'active',
+    remainingRounds: 1,
+  });
+  expect(await getLocalDb().outbox.count()).toBe(0);
 });

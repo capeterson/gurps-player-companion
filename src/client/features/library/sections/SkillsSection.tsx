@@ -2,8 +2,8 @@ import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../../../../shared/constan
 import type { LibrarySkillCreate } from '../../../../shared/schemas/campaignLibrary.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import type { LocalLibrarySkill } from '../../../db/dexie.ts';
-import { effectPreview } from '../EffectsEditor.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
+import { MechanicalEffectList } from '../MechanicalEffectList.tsx';
 import { SkillForm } from '../SkillForm.tsx';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
 import { CrudLibrarySection, type LibrarySectionShellProps } from './CrudLibrarySection.tsx';
@@ -55,13 +55,7 @@ export const skillsConfig: LibrarySectionConfig<LocalLibrarySkill> = {
       {row.defaults?.some((rule) => (rule.conditions?.length ?? 0) > 0) && (
         <p className="text-xs text-info">Includes conditional default candidates</p>
       )}
-      {row.effects.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
-          {row.effects.map((effect, index) => (
-            <li key={`${effect.target}-${index}`}>• {effectPreview(effect)}</li>
-          ))}
-        </ul>
-      )}
+      <MechanicalEffectList effects={row.effects} campaignId={row.campaignId} />
     </>
   ),
   deleteTitle: 'Delete library skill',

@@ -197,15 +197,23 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(status).toBeVisible();
     await expect(status.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
     await expect(status.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Character description' })).toBeVisible();
     await expect(page.getByText('Description', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit description', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Notes', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Edit raw markdown' }).click();
+    await page.getByRole('button', { name: 'Edit description', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit raw markdown', exact: true }).click();
     await page
       .getByRole('textbox', { name: 'description', exact: true })
       .fill('**Field guide** description');
-    await page.getByRole('button', { name: 'Back to rich text' }).click();
-    await expect(page.getByLabel('description').locator('strong')).toHaveText('Field guide');
+    await page.getByRole('button', { name: 'Done editing description', exact: true }).click();
+    await expect(
+      page
+        .getByRole('group', { name: 'Character description' })
+        .locator('.markdown-body strong')
+        .first(),
+    ).toHaveText('Field guide');
     await selectCharacterSection(page, 'Combat');
     await expect(overview).toHaveCount(0);
     await expect(status).toBeVisible();
@@ -300,7 +308,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     });
     await expect(defenseRoll.getByText(/^Success · margin/)).toBeVisible();
     await expect(defenseRoll.getByRole('button', { name: 'Incoming damage…' })).toHaveCount(0);
-    await defenseRoll.getByRole('button', { name: 'Roll again' }).evaluate((button) => {
+    await defenseRoll.getByRole('button', { name: /Roll vs \d+/ }).evaluate((button) => {
       const originalRandom = Math.random;
       Math.random = () => 0.99;
       try {
@@ -356,6 +364,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(
       status.getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
+    await selectCharacterSection(page, 'Combat');
     await expect(incomingAttack).toBeVisible();
     await expect(incomingAttack.getByRole('button', { name: /Incoming damage…/ })).toBeVisible();
     await expect
@@ -458,7 +467,7 @@ test('library search and markdown toolbar retain drafts and render formatted des
   await expect(page.getByText('Night Vision', { exact: true })).toBeVisible();
   await expect(page.getByText('Fearfulness', { exact: true })).toHaveCount(0);
   // Collapsed rows show a plain excerpt; opening the entry renders its Markdown.
-  await expect(page.getByText('Darkness vision', { exact: true })).toBeVisible();
+  await expect(page.getByText('**Darkness** vision', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Night Vision', exact: true }).click();
   await expect(page.locator('.markdown-body strong')).toHaveText('Darkness');
   await page.getByRole('button', { name: 'Edit Night Vision' }).click();
@@ -495,4 +504,46 @@ test('library search and markdown toolbar retain drafts and render formatted des
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(375);
+});
+
+test('Protection before penetration links active trait DR to its highlighted trait row', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await register(page);
+  const campaign = await api(page, '/campaigns', { name: 'Innate DR source links' });
+  const definition = await api(page, `/campaigns/${campaign.id}/library/traits`, {
+    name: 'Iron Skin',
+    kind: 'advantage',
+    basePoints: 1,
+    effects: [{ target: 'dr', value: 3, scaling: 'flat' }],
+  });
+  const character = await api(page, '/characters', {
+    name: 'Ironclad scout',
+    campaignId: campaign.id,
+  });
+  const { trait } = await api(page, `/characters/${character.id}/traits`, {
+    name: 'Iron Skin',
+    kind: 'advantage',
+    points: 1,
+    libraryTraitId: definition.id,
+  });
+  await page.goto(`/characters/${character.id}`);
+  await selectCharacterSection(page, 'Combat');
+
+  const sources = page.getByRole('list', { name: 'Protection layers' });
+  const sourceLink = sources.getByRole('link', { name: 'Iron Skin', exact: true });
+  await expect(sourceLink).toHaveAttribute('href', `/characters/${character.id}#trait-${trait.id}`);
+  await sourceLink.click();
+
+  await expect(page).toHaveURL(new RegExp(`#trait-${trait.id}$`));
+  const row = page.locator(`#trait-${trait.id}`);
+  const traitBody = row.locator('xpath=..');
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute('aria-current', 'true');
+  const edit = row.getByRole('button', { name: 'Edit Iron Skin' });
+  await expect(edit).toBeVisible();
+  await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toHaveCount(0);
+  await edit.click();
+  await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toBeVisible();
 });

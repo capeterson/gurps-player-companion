@@ -28,6 +28,7 @@ it('lists real campaign information without implying cover-image support', async
     shareCharacterSheets: true,
     allowGmCharacterEditing: false,
     experimentalTurnTracker: false,
+    experimentalActiveEffects: false,
     houseRules: campaignHouseRules.parse({}),
     members: [{ userId: 'owner', email: 'gm@example.com', displayName: 'GM', role: 'owner' }],
     createdAt: '2026-01-01T00:00:00.000Z',

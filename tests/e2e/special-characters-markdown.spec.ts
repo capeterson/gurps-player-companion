@@ -104,6 +104,9 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   const accessToken = await page.evaluate(
     () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
   );
+  await expect(page.getByRole('group', { name: 'Character description' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit description', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit description', exact: true }).click();
   const initialRichSurface = page.locator('.rich-text-surface[contenteditable="true"]');
   await expect(initialRichSurface).toBeVisible();
   const clipboardPaste = await initialRichSurface.evaluate((node) => {
@@ -196,6 +199,7 @@ test('Markdown source stays inert and readable through editor toggles, save, and
       { timeout: 20_000 },
     )
     .toBe(true);
+  await page.getByRole('button', { name: 'Done editing description', exact: true }).click();
   expect(
     await page.evaluate(() => (window as Window & { __markdownCanary: number }).__markdownCanary),
   ).toBe(0);
@@ -203,6 +207,8 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   expect(
     await page.evaluate(() => (window as Window & { __markdownCanary: number }).__markdownCanary),
   ).toBe(0);
+  await expect(page.getByRole('group', { name: 'Character description' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit description', exact: true }).click();
   await page.getByRole('button', { name: 'Edit raw markdown' }).click();
   await page.locator('.rich-text-preview').last().locator('summary').click();
   const reloadedDescriptionPreview = page.locator('.rich-text-preview .markdown-body').last();

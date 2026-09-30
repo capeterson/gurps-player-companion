@@ -33,6 +33,7 @@ import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
+import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
@@ -578,10 +579,16 @@ function IdentityPanel({
   });
   const appearanceField = useDraftField<string | null>({
     name: 'description',
-    serverValue: character.appearance ?? '',
+    serverValue: character.appearance ?? null,
+    format: (value) => value ?? '',
     parse: nullableTextParser,
     ...buildSave('appearance', { humanName: 'description' }),
+    readRollbackValue: async () =>
+      (await getLocalDb().characters.get(character.id))?.appearance ?? null,
   });
+  // Lazily create the editor, then retain it across view/edit switches so its
+  // source mode and unsaved draft survive. The shared hook owns all saves.
+  const [descriptionMode, setDescriptionMode] = useState<'unopened' | 'view' | 'edit'>('unopened');
   const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
   const campaignFlash = useFieldFlash(campaignFlashKey);
   const [pendingCampaign, setPendingCampaign] = useState<{
@@ -716,24 +723,57 @@ function IdentityPanel({
           )}
         </div>
       </div>
-      <div className="form-control">
-        <span className="label-text-alt label-eyebrow">Description</span>
-        {canWrite ? (
-          <RichTextEditor
-            id="character-description-editor"
-            aria-label="description"
-            value={appearanceField.value}
-            onChange={appearanceField.setValue}
-            onBlur={appearanceField.inputProps.onBlur}
-            className={DRAFT_FIELD_CLASS}
-            placeholder="Appearance, mannerisms, background, and other descriptive details…"
-            data-flashing={appearanceField.inputProps['data-flashing']}
-            data-flash-parity={appearanceField.inputProps['data-flash-parity']}
-          />
-        ) : (
-          <Markdown source={character.appearance ?? ''} />
+      <fieldset
+        aria-label="Character description"
+        className={`form-control min-w-0 ${DRAFT_FIELD_CLASS}`}
+        data-flashing={appearanceField.inputProps['data-flashing']}
+        data-flash-parity={appearanceField.inputProps['data-flash-parity']}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <span className="label-text-alt label-eyebrow">Description</span>
+          {canWrite &&
+            (descriptionMode === 'edit' ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm min-h-11"
+                aria-label="Done editing description"
+                onClick={() => {
+                  appearanceField.commit();
+                  setDescriptionMode('view');
+                }}
+              >
+                Done
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-ghost btn-square min-h-11 min-w-11"
+                aria-label="Edit description"
+                onClick={() => setDescriptionMode('edit')}
+              >
+                <AppIcon name="edit" size={18} />
+              </button>
+            ))}
+        </div>
+        {canWrite && descriptionMode !== 'unopened' && (
+          <div hidden={descriptionMode !== 'edit'}>
+            <RichTextEditor
+              id="character-description-editor"
+              aria-label="description"
+              value={appearanceField.value}
+              onChange={appearanceField.setValue}
+              onBlur={appearanceField.inputProps.onBlur}
+              placeholder="Appearance, mannerisms, background, and other descriptive details…"
+            />
+          </div>
         )}
-      </div>
+        {(!canWrite || descriptionMode !== 'edit') &&
+          ((canWrite ? appearanceField.value : character.appearance)?.trim() ? (
+            <Markdown source={canWrite ? appearanceField.value : (character.appearance ?? '')} />
+          ) : (
+            <p className="text-sm text-muted">No description yet.</p>
+          ))}
+      </fieldset>
       <ConfirmDialog
         open={pendingCampaign !== null}
         title="Change character campaign?"
@@ -859,7 +899,7 @@ function SecondaryModsPanel({
   enforceAttributeCaps: boolean;
 }) {
   return (
-    <StatCard title="Secondary" points={character.points.secondary}>
+    <StatCard title="Secondary attributes" points={character.points.secondary}>
       <div className="grid grid-cols-2 gap-3.5">
         <SecondaryModCell
           label="HP"
@@ -1702,6 +1742,7 @@ export function CharacterSheetPage() {
               character={character}
               canWrite={canWrite}
               experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
+              experimentalActiveEffects={campaign?.experimentalActiveEffects === true}
             />
           )}
           {tab === 'Overview' && (
@@ -1713,33 +1754,21 @@ export function CharacterSheetPage() {
                   icon="identity"
                   summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
                 >
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <FoldSection
-                      preferenceKey={`${character.id}:AttributesPanel`}
-                      title="Attributes"
-                    >
-                      <AttributesPanel
-                        character={character}
-                        canWrite={canWrite}
-                        tempEffects={tempEffects}
-                        enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                      />
-                    </FoldSection>
-                    <FoldSection
-                      preferenceKey={`${character.id}:SecondaryModsPanel`}
-                      title="Secondary attributes"
-                    >
-                      <SecondaryModsPanel
-                        character={character}
-                        canWrite={canWrite}
-                        tempEffects={tempEffects}
-                        enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                      />
-                    </FoldSection>
-                    <FoldSection preferenceKey={`${character.id}:StatusPanel`} title="Status">
-                      <StatusPanel character={character} />
-                    </FoldSection>
-                    <div className="grid grid-cols-1 gap-4">
+                  <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <AttributesPanel
+                      character={character}
+                      canWrite={canWrite}
+                      tempEffects={tempEffects}
+                      enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                    />
+                    <SecondaryModsPanel
+                      character={character}
+                      canWrite={canWrite}
+                      tempEffects={tempEffects}
+                      enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                    />
+                    <StatusPanel character={character} />
+                    <div className="flex min-w-0 flex-col gap-4">
                       <FoldSection
                         preferenceKey={`${character.id}:PointsPanel`}
                         title="Point ledger"
@@ -1754,12 +1783,9 @@ export function CharacterSheetPage() {
                       >
                         <EncumbrancePanel character={character} />
                       </FoldSection>
-                      <FoldSection
-                        preferenceKey={`${character.id}:ActiveConditionsPanel`}
-                        title="Conditional effects"
-                      >
-                        <ActiveConditionsPanel character={character} canWrite={canWrite} />
-                      </FoldSection>
+                      {campaign?.experimentalActiveEffects === true && (
+                        <ActiveConditionsPanel character={character} canWrite={canWrite} foldable />
+                      )}
                     </div>
                   </div>
                 </FoldSection>
@@ -1770,6 +1796,7 @@ export function CharacterSheetPage() {
                 icon="identity"
               >
                 <IdentityPanel
+                  key={character.id}
                   character={character}
                   canWrite={canWrite}
                   campaigns={campaigns.data ?? []}
@@ -1784,7 +1811,11 @@ export function CharacterSheetPage() {
               icon="traits"
               forceOpen={anchor?.kind === 'trait'}
             >
-              <TraitsPanel character={character} canWrite={canWrite} />
+              <TraitsPanel
+                character={character}
+                canWrite={canWrite}
+                anchorTraitId={anchor?.kind === 'trait' ? anchor.id : null}
+              />
             </FoldSection>
           )}
           {tab === 'Skills' && character.libraryEffectsKnown !== false && (
@@ -1806,21 +1837,16 @@ export function CharacterSheetPage() {
             </div>
           )}
           {tab === 'Magic' && character.libraryEffectsKnown !== false && (
-            <div className="space-y-4">
-              <FoldSection
-                preferenceKey={`${character.id}:SpellsPanel`}
-                title="Spells"
-                icon="magic"
-                forceOpen={anchor?.kind === 'spell'}
-              >
-                <SpellsPanel character={character} canWrite={canWrite} />
-              </FoldSection>
-              <FoldSection preferenceKey={`${character.id}:PowerstonesPanel`} title="Powerstones">
+            <div className="min-w-0 space-y-6">
+              <SpellsPanel
+                character={character}
+                canWrite={canWrite}
+                anchorSpellId={anchor?.kind === 'spell' ? anchor.id : null}
+              />
+              <div className="grid min-w-0 items-start gap-6 border-t border-base-300 pt-5 xl:grid-cols-2">
                 <PowerstonesPanel character={character} canWrite={canWrite} />
-              </FoldSection>
-              <FoldSection preferenceKey={`${character.id}:MagicItemsPanel`} title="Magic items">
                 <MagicItemsPanel character={character} canWrite={canWrite} />
-              </FoldSection>
+              </div>
             </div>
           )}
           {tab === 'Inventory' && (

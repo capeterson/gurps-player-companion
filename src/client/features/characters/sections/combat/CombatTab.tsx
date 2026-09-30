@@ -24,12 +24,14 @@ export interface CombatTabProps {
   character: CharacterDetail;
   canWrite: boolean;
   experimentalTurnTracker?: boolean;
+  experimentalActiveEffects?: boolean;
 }
 
 export function CombatTab({
   character,
   canWrite,
   experimentalTurnTracker = false,
+  experimentalActiveEffects = false,
 }: CombatTabProps) {
   const { bumpers, openRoll } = useCombatStatus();
 
@@ -44,7 +46,9 @@ export function CombatTab({
         bumpHp={(delta) => bumpers.bumpHp(delta, { separateGesture: true })}
         openRoll={openRoll}
       />
-      <ActiveEffectsPanel character={character} canWrite={canWrite} />
+      {experimentalActiveEffects && (
+        <ActiveEffectsPanel character={character} canWrite={canWrite} />
+      )}
       {experimentalTurnTracker && (
         <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
       )}

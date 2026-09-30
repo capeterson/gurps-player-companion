@@ -474,6 +474,12 @@ the nightly run; overdue accounts run on the next night after startup.
 
 ## Active effects and skill procedures
 
+The owner-controlled `experimentalActiveEffects` boolean defaults false, including
+for existing campaigns. Shared detail builders gate active and conditional
+mechanics; UI reads the synced campaign preference. Disabled data remains stored,
+with shared instance/group and dedicated definition writes gated across REST, sync
+and MCP. Manual stat modifiers and skill procedures are independent.
+
 Campaign active-effect definitions use the generic library factory and an audited
 Postgres table. Character instances use the root `active_effects` JSONB field and
 its existing outbox/history lifecycle; validated read/modify/write transactions

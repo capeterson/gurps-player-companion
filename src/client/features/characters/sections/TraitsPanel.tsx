@@ -20,6 +20,7 @@ import {
 } from '../../../components/ui/LibraryModifierPicker.tsx';
 import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
+import { useExperimentalActiveEffects } from '../../../hooks/useExperimentalActiveEffects.ts';
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
@@ -524,6 +525,7 @@ interface TraitRowProps {
   position: number;
   dragging: boolean;
   visible: boolean;
+  highlighted: boolean;
   onToggle: () => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
   onDragEnd: () => void;
@@ -664,8 +666,13 @@ function traitEffectSummary(
   return summary;
 }
 
-function TraitConfiguredDetails({ trait }: { trait: TraitOut }) {
-  const libraryEffects = trait.libraryMechanics?.effects;
+function TraitConfiguredDetails({
+  trait,
+  activeEffectsEnabled,
+}: { trait: TraitOut; activeEffectsEnabled: boolean }) {
+  const libraryEffects = trait.libraryMechanics?.effects?.filter(
+    (effect) => activeEffectsEnabled || !effect.conditionGroup,
+  );
   return (
     <div className="space-y-3 text-xs">
       <LibraryMechanicsNote mechanics={trait.libraryMechanics} />
@@ -705,11 +712,15 @@ function TraitConfiguredDetails({ trait }: { trait: TraitOut }) {
 function TraitCustomEffects({
   trait,
   inventory,
+  activeEffectsEnabled,
 }: {
   trait: TraitOut;
   inventory: CharacterDetail['inventory'];
+  activeEffectsEnabled: boolean;
 }) {
-  const effects = trait.customEffects ?? [];
+  const effects = (trait.customEffects ?? []).filter(
+    (effect) => activeEffectsEnabled || !effect.conditionGroup,
+  );
   if (effects.length === 0) return null;
   return (
     <div>
@@ -736,12 +747,14 @@ function TraitRow({
   position,
   dragging,
   visible,
+  highlighted,
   onToggle,
   onDragStart,
   onDragEnd,
   onDrop,
   onMove,
 }: TraitRowProps) {
+  const activeEffectsEnabled = useExperimentalActiveEffects(campaignId);
   const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
   const nameField = useEntityNameField(rowPatch, trait.name);
@@ -762,7 +775,9 @@ function TraitRow({
   });
   const saving = nameField.isSaving || pointsField.isSaving || notesField.isSaving;
   const hasSourceRules = Boolean(trait.libraryMechanics || trait.modifiers.length > 0);
-  const hasCustomEffects = (trait.customEffects?.length ?? 0) > 0;
+  const hasCustomEffects = (trait.customEffects ?? []).some(
+    (effect) => activeEffectsEnabled || !effect.conditionGroup,
+  );
   const canExpand = canWrite || Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
 
   const deletion = useConfirmedEntityDelete({
@@ -775,21 +790,26 @@ function TraitRow({
 
   return (
     <TableBody
-      filterValues={{
-        name: trait.name,
-        kind: traitKindLabel(trait.kind),
-        points: trait.points,
-        level: trait.level,
-      }}
+      {...(!highlighted
+        ? {
+            filterValues: {
+              name: trait.name,
+              kind: traitKindLabel(trait.kind),
+              points: trait.points,
+              level: trait.level,
+            },
+          }
+        : {})}
       aria-label={trait.name}
       className={dragging ? 'opacity-50' : undefined}
-      hidden={!visible}
+      hidden={!visible && !highlighted}
       onDragOver={(event) => event.preventDefault()}
       onDrop={onDrop}
     >
       <tr
         id={`trait-${trait.id}`}
-        className={`${expanded ? 'bg-primary/5 ' : ''}scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary`}
+        aria-current={highlighted ? true : undefined}
+        className={`${highlighted ? 'bg-primary/20 outline outline-2 outline-primary ' : expanded ? 'bg-primary/5 ' : ''}scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary`}
       >
         <td className="w-9 px-1 sm:px-2">
           <DragHandle
@@ -924,7 +944,10 @@ function TraitRow({
                       Source &amp; rules
                     </summary>
                     <div className="pb-2">
-                      <TraitConfiguredDetails trait={trait} />
+                      <TraitConfiguredDetails
+                        trait={trait}
+                        activeEffectsEnabled={activeEffectsEnabled}
+                      />
                     </div>
                   </details>
                 )}
@@ -954,8 +977,19 @@ function TraitRow({
             ) : (
               <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
                 {trait.notes && <Markdown source={trait.notes} />}
-                {hasSourceRules && <TraitConfiguredDetails trait={trait} />}
-                {hasCustomEffects && <TraitCustomEffects trait={trait} inventory={inventory} />}
+                {hasSourceRules && (
+                  <TraitConfiguredDetails
+                    trait={trait}
+                    activeEffectsEnabled={activeEffectsEnabled}
+                  />
+                )}
+                {hasCustomEffects && (
+                  <TraitCustomEffects
+                    trait={trait}
+                    inventory={inventory}
+                    activeEffectsEnabled={activeEffectsEnabled}
+                  />
+                )}
               </div>
             )}
           </td>
@@ -968,23 +1002,45 @@ function TraitRow({
 export function TraitsPanel({
   character,
   canWrite,
+  anchorTraitId = null,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  anchorTraitId?: string | null;
 }) {
-  return <TraitsTable key={character.id} character={character} canWrite={canWrite} />;
+  return (
+    <TraitsTable
+      key={character.id}
+      character={character}
+      canWrite={canWrite}
+      anchorTraitId={anchorTraitId}
+    />
+  );
 }
 
 function TraitsTable({
   character,
   canWrite,
+  anchorTraitId,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
+  anchorTraitId: string | null;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [revealedAnchor, setRevealedAnchor] = useState<string | null>(null);
+  const revealingAnchor = !!anchorTraitId && anchorTraitId !== revealedAnchor;
+  useEffect(() => {
+    if (!anchorTraitId) {
+      setRevealedAnchor(null);
+      return;
+    }
+    if (!revealingAnchor) return;
+    setQuery('');
+    setRevealedAnchor(anchorTraitId);
+  }, [anchorTraitId, revealingAnchor]);
   const {
     preferences,
     saveFailed,
@@ -1000,7 +1056,7 @@ function TraitsTable({
   } = useSortableCharacterRows<TraitOut, TraitSort>({
     rows: character.traits,
     characterId: character.id,
-    query,
+    query: revealingAnchor ? '' : query,
     readPreferences: readTraitTablePreferences,
     savePreferences: saveTraitTablePreferences,
     comparators: {
@@ -1151,6 +1207,9 @@ function TraitsTable({
                   position={visibleTraits.findIndex((candidate) => candidate.id === trait.id)}
                   dragging={draggingId === trait.id}
                   visible={visibleTraitIds.has(trait.id)}
+                  highlighted={
+                    anchorTraitId === trait.id && (revealingAnchor || query.trim() === '')
+                  }
                   onToggle={() =>
                     setExpandedId((current) => (current === trait.id ? null : trait.id))
                   }

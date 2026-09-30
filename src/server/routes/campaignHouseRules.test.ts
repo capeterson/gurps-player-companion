@@ -231,3 +231,64 @@ describe('experimental turn tracker setting', () => {
     ).toMatchObject({ experimentalTurnTracker: false });
   });
 });
+
+describe('experimental active effects setting', () => {
+  it('defaults off and persists owner toggles through REST, cursor, and audit history', async () => {
+    const owner = await user();
+    const member = await user();
+    const campaign = (await (
+      await request(owner.accessToken, '/campaigns', 'POST', { name: 'Experimental effects' })
+    ).json()) as CampaignOut;
+    expect(campaign.experimentalActiveEffects).toBe(false);
+    await request(owner.accessToken, `/campaigns/${campaign.id}/members`, 'POST', {
+      email: member.email,
+    });
+    expect(
+      (
+        await request(member.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+          experimentalActiveEffects: true,
+        })
+      ).status,
+    ).toBe(403);
+    const invalid = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalActiveEffects: 'true',
+    });
+    expect(invalid.status).toBeGreaterThanOrEqual(400);
+    expect(invalid.status).toBeLessThan(500);
+
+    const enabled = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalActiveEffects: true,
+    });
+    expect(enabled.status).toBe(200);
+    expect(await enabled.json()).toMatchObject({ experimentalActiveEffects: true });
+    expect(
+      await (await request(member.accessToken, `/campaigns/${campaign.id}`)).json(),
+    ).toMatchObject({ experimentalActiveEffects: true });
+    const cursor = await request(member.accessToken, '/sync/cursor', 'POST', {
+      cursors: [{ entityClass: 'campaign', sinceRevision: campaign.revision }],
+    });
+    expect(
+      ((await cursor.json()) as SyncCursorResponse).changes.find(
+        (change) => change.entityId === campaign.id,
+      ),
+    ).toMatchObject({ data: { experimentalActiveEffects: true } });
+    const events = await getDb()
+      .select()
+      .from(entityHistory)
+      .where(eq(entityHistory.entityId, campaign.id));
+    expect(
+      events.some(
+        (event) =>
+          event.actorUserId === campaign.ownerId &&
+          (event.newRow as { experimental_active_effects?: boolean } | null)
+            ?.experimental_active_effects === true,
+      ),
+    ).toBe(true);
+
+    const disabled = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalActiveEffects: false,
+    });
+    expect(disabled.status).toBe(200);
+    expect(await disabled.json()).toMatchObject({ experimentalActiveEffects: false });
+  });
+});

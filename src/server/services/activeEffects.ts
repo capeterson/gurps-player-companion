@@ -11,6 +11,18 @@ import {
   inventoryItems,
 } from '../db/schema.ts';
 
+/** Explicit opt-in also guards raw REST, sync, and MCP writes. */
+export async function requireExperimentalActiveEffects(tx: AuditTx, campaignId: string | null) {
+  const [campaign] = campaignId
+    ? await tx
+        .select({ enabled: campaigns.experimentalActiveEffects })
+        .from(campaigns)
+        .where(eq(campaigns.id, campaignId))
+    : [];
+  if (campaign?.enabled !== true)
+    throw new HTTPException(403, { message: 'Active effects are disabled for this campaign' });
+}
+
 /** Shared by REST and sync, inside the owning character's audited write. */
 export async function prepareActiveEffects(
   tx: AuditTx,
@@ -19,6 +31,17 @@ export async function prepareActiveEffects(
   campaignId: string | null,
   updates: Record<string, unknown>,
 ) {
+  if (updates.activeEffects === undefined && updates.activeConditionGroups === undefined) return;
+  // Create schemas supply empty defaults even when callers omit these fields.
+  if (
+    characterId === null &&
+    Array.isArray(updates.activeEffects) &&
+    updates.activeEffects.length === 0 &&
+    Array.isArray(updates.activeConditionGroups) &&
+    updates.activeConditionGroups.length === 0
+  )
+    return;
+  await requireExperimentalActiveEffects(tx, campaignId);
   if (updates.activeEffects === undefined) return;
   const entries = activeEffectsField.parse(updates.activeEffects);
   const [previousCharacter] = characterId

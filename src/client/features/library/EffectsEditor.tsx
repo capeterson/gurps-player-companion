@@ -14,6 +14,7 @@ import {
 import type { InventoryItemOut } from '../../../shared/schemas/inventory.ts';
 import type { SkillOut } from '../../../shared/schemas/skill.ts';
 import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
+import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
 
 const TARGET_LABELS: Record<EffectTarget, string> = {
   st: 'ST',
@@ -153,6 +154,7 @@ export function EffectsEditor<T extends TraitEffect>({
   onChange,
   onValidityChange,
 }: Props<T>) {
+  const activeEffectsEnabled = useExperimentalActiveEffects(campaignId);
   const [drafts, setDrafts] = useState<EffectDraft[]>(() => effects.map(draftFromEffect));
   const [errors, setErrors] = useState<string[][]>(() => effects.map(() => []));
   const externalKey = JSON.stringify(effects);
@@ -314,6 +316,7 @@ export function EffectsEditor<T extends TraitEffect>({
       )}
 
       {drafts.map((draft, index) => {
+        if (!activeEffectsEnabled && draft.conditionGroup) return null;
         const selector = draft.selector;
         return (
           <div key={draft.id} className="space-y-2 rounded-lg bg-base-200/60 p-3">
@@ -627,33 +630,35 @@ export function EffectsEditor<T extends TraitEffect>({
               </div>
             )}
 
-            <details>
-              <summary className="cursor-pointer text-xs text-base-content/70">Condition</summary>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <label className="form-control">
-                  <span className="label-text text-xs">Group key</span>
-                  <input
-                    className="input input-bordered input-sm"
-                    value={draft.conditionGroup}
-                    placeholder="vs_fear"
-                    onChange={(event) =>
-                      update(index, (row) => ({ ...row, conditionGroup: event.target.value }))
-                    }
-                  />
-                </label>
-                <label className="form-control">
-                  <span className="label-text text-xs">Player-facing label</span>
-                  <input
-                    className="input input-bordered input-sm"
-                    value={draft.conditionLabel}
-                    placeholder="Against fear"
-                    onChange={(event) =>
-                      update(index, (row) => ({ ...row, conditionLabel: event.target.value }))
-                    }
-                  />
-                </label>
-              </div>
-            </details>
+            {activeEffectsEnabled && (
+              <details>
+                <summary className="cursor-pointer text-xs text-base-content/70">Condition</summary>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <label className="form-control">
+                    <span className="label-text text-xs">Group key</span>
+                    <input
+                      className="input input-bordered input-sm"
+                      value={draft.conditionGroup}
+                      placeholder="vs_fear"
+                      onChange={(event) =>
+                        update(index, (row) => ({ ...row, conditionGroup: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label className="form-control">
+                    <span className="label-text text-xs">Player-facing label</span>
+                    <input
+                      className="input input-bordered input-sm"
+                      value={draft.conditionLabel}
+                      placeholder="Against fear"
+                      onChange={(event) =>
+                        update(index, (row) => ({ ...row, conditionLabel: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+              </details>
+            )}
 
             {errors[index]?.length ? (
               <ul className="text-xs text-error" aria-label={`Effect ${index + 1} errors`}>

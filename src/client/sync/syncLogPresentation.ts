@@ -100,6 +100,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   db: 'DB',
   protectNaturalDr: 'Protect natural DR',
   experimentalTurnTracker: 'Experimental turn tracker',
+  experimentalActiveEffects: 'Experimental active effects',
   libraryMechanics: 'Library mechanics',
   calculation: 'Calculation rules',
   weaponData: 'Weapon data',

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { activeEffectDefinitionCreate } from '../../../shared/schemas/activeEffects.ts';
 import { type LocalLibrarySkill, type LocalLibraryTrait, getLocalDb } from '../../db/dexie.ts';
 import { api } from '../../lib/api.ts';
 import { LibraryPage } from './LibraryPage.tsx';
@@ -95,6 +96,7 @@ async function seed({ owner = true }: { owner?: boolean } = {}) {
       id: CAMPAIGN,
       ownerId: owner ? 'owner' : 'someone-else',
       name: 'Test',
+      experimentalActiveEffects: false,
       viewerRole: owner ? 'owner' : 'member',
       revision: 1,
     } as never,
@@ -102,6 +104,7 @@ async function seed({ owner = true }: { owner?: boolean } = {}) {
       id: OTHER_CAMPAIGN,
       ownerId: 'owner',
       name: 'Zeta',
+      experimentalActiveEffects: false,
       viewerRole: 'owner',
       revision: 1,
     } as never,
@@ -167,6 +170,33 @@ it('searches descriptions and source across words, reports empty results and cle
   expect(await screen.findByText(/No matches/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
   expect(await screen.findByRole('button', { name: 'Fearfulness' })).toBeVisible();
+});
+
+it('hides stored active-effect definitions from library navigation and search until campaign opt-in', async () => {
+  await seed();
+  await getLocalDb().campaignLibraryActiveEffects.put({
+    ...activeEffectDefinitionCreate.parse({
+      name: 'Hidden draught',
+      stacking: { kind: 'additive', key: 'hidden-draught' },
+      effects: [{ target: 'st', value: 1 }],
+    }),
+    id: '0193b3c0-f1f0-7000-8000-00000000f003',
+    campaignId: CAMPAIGN,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    revision: 1,
+  });
+  setup('/?section=activeEffects&q=Hidden%20draught');
+  await screen.findByRole('status');
+  expect(screen.queryByRole('button', { name: /^Active Effects/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Hidden draught' })).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('0 of 2 traits match');
+
+  await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /^Active Effects/ })).toBeVisible(),
+  );
+  expect(await screen.findByRole('button', { name: 'Hidden draught' })).toBeVisible();
 });
 
 it('groups traits by kind, sorts within groups from the column heading and folds groups', async () => {

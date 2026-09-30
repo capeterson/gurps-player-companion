@@ -1,4 +1,5 @@
 import { normalizePricingWrite } from '../../shared/domain/libraryPricing.ts';
+import { requireExperimentalActiveEffects } from '../services/activeEffects.ts';
 import {
   validateLibraryDeletion,
   validateLibraryPricingChange,
@@ -275,6 +276,7 @@ export async function createLibraryEntry<TTable extends LibraryTable, TCreate, T
   body: TCreate,
   id?: string,
 ): Promise<TTable['$inferSelect']> {
+  if (cfg.yamlKey === 'activeEffects') await requireExperimentalActiveEffects(tx, campaignId);
   cfg.validateCreate?.(body);
   await advanceLibraryCampaignRevision(tx, campaignId);
   const priced = normalizePricingWrite(cfg.yamlKey, body as Record<string, unknown>) as TCreate;
@@ -314,6 +316,7 @@ export async function updateLibraryEntry<TTable extends LibraryTable, TCreate, T
   body: TUpdate,
   options: { readonly baseRevision?: number | undefined } = {},
 ): Promise<LibraryUpdateResult<TTable['$inferSelect']>> {
+  if (cfg.yamlKey === 'activeEffects') await requireExperimentalActiveEffects(tx, campaignId);
   await advanceLibraryCampaignRevision(tx, campaignId);
   const [existing] = (await tx
     .select()
@@ -363,6 +366,7 @@ export async function deleteLibraryEntry<TTable extends LibraryTable, TCreate, T
   campaignId: string,
   itemId: string,
 ): Promise<boolean> {
+  if (cfg.yamlKey === 'activeEffects') await requireExperimentalActiveEffects(tx, campaignId);
   await advanceLibraryCampaignRevision(tx, campaignId);
   await validateLibraryDeletion(tx, campaignId, cfg.yamlKey, itemId);
   await refreshOwnedLibraryMechanics(tx, cfg.pathSegment, campaignId, itemId, true);

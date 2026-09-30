@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { evaluateCalculation } from '../../../shared/domain/calculation.ts';
 import { calculationDefinition } from '../../../shared/schemas/calculation.ts';
+import { getLocalDb } from '../../db/dexie.ts';
 import { CampaignLibraryHelpPage } from './CampaignLibraryHelpPage.tsx';
 import guide from './campaign-library.md?raw';
 
@@ -18,6 +19,19 @@ function Location() {
 
 describe('CampaignLibraryHelpPage', () => {
   it('routes to a section anchor and returns to the selected campaign library', async () => {
+    await getLocalDb().campaigns.put({
+      id: 'campaign-7',
+      ownerId: 'owner',
+      name: 'Test campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      experimentalActiveEffects: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      revision: 1,
+    } as never);
     const scrollIntoView = vi.fn();
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
@@ -34,16 +48,17 @@ describe('CampaignLibraryHelpPage', () => {
       'href',
       '/campaigns/campaign-7/library',
     );
-    fireEvent.click(
-      screen.getByRole('link', { name: 'Advanced: skills, spells, and active effects' }),
-    );
+    const activeEffectsLink = await screen.findByRole('link', {
+      name: 'Experimental: active effects',
+    });
+    fireEvent.click(activeEffectsLink);
     const heading = await screen.findByRole('heading', {
-      name: 'Advanced: skills, spells, and active effects',
+      name: 'Experimental: active effects',
     });
 
     await waitFor(() => expect(heading).toHaveFocus());
     expect(screen.getByLabelText('Current location')).toHaveTextContent(
-      '/help/library?campaign=campaign-7#advanced-skills-spells-and-active-effects',
+      '/help/library?campaign=campaign-7#experimental-active-effects',
     );
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
   });

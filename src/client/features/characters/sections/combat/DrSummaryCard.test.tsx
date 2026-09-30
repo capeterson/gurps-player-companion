@@ -43,6 +43,109 @@ describe('DrSummaryCard', () => {
     render(<DrSummaryCard character={character} />);
     expect(screen.getByRole('link', { name: 'Armor 0' })).toHaveAttribute('href', '#inventory-a0');
   });
+
+  it('names and links active DR sources, groups declarations, and filters inactive or other-location DR', () => {
+    const character = makeCharacter([]);
+    character.effects = [
+      {
+        sourceKind: 'trait',
+        sourceName: 'Iron Skin',
+        sourceId: 'trait-iron-skin',
+        target: 'dr',
+        value: 2,
+        active: true,
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Iron Skin',
+        sourceId: 'trait-iron-skin',
+        target: 'dr',
+        value: 1,
+        active: true,
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Dragon Scales',
+        sourceId: 'trait-dragon-scales',
+        target: 'dr',
+        value: 4,
+        active: true,
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Skull Ward',
+        sourceId: 'trait-skull-ward',
+        target: 'dr',
+        value: 6,
+        hitLocation: 'skull',
+        active: true,
+      },
+      {
+        sourceKind: 'trait',
+        sourceName: 'Inactive Ward',
+        sourceId: 'trait-inactive-ward',
+        target: 'dr',
+        value: 20,
+        active: false,
+      },
+      {
+        sourceKind: 'skill',
+        sourceName: 'Shield Training',
+        sourceId: 'skill-shield-training',
+        target: 'dr',
+        value: 2,
+        active: true,
+      },
+      {
+        sourceKind: 'item',
+        sourceName: 'Wardstone',
+        sourceId: 'item-wardstone',
+        target: 'dr',
+        value: 1,
+        active: true,
+      },
+      {
+        sourceKind: 'active_effect',
+        sourceName: 'Stoneguard Aura',
+        sourceId: 'effect-stoneguard',
+        target: 'dr',
+        value: 1,
+        active: true,
+      },
+    ] as CharacterDetail['effects'];
+
+    render(<DrSummaryCard character={character} />);
+
+    const layers = screen.getByRole('list', { name: 'Protection layers' });
+    expect(within(layers).getByRole('link', { name: 'Iron Skin' })).toHaveAttribute(
+      'href',
+      '#trait-trait-iron-skin',
+    );
+    expect(within(layers).getByRole('link', { name: 'Dragon Scales' })).toHaveAttribute(
+      'href',
+      '#trait-trait-dragon-scales',
+    );
+    expect(within(layers).getByRole('link', { name: 'Shield Training' })).toHaveAttribute(
+      'href',
+      '#skill-skill-shield-training',
+    );
+    expect(within(layers).getByRole('link', { name: 'Wardstone' })).toHaveAttribute(
+      'href',
+      '#inventory-item-wardstone',
+    );
+    expect(within(layers).getByText('Stoneguard Aura')).toBeVisible();
+    expect(within(layers).queryByRole('link', { name: 'Stoneguard Aura' })).not.toBeInTheDocument();
+    expect(within(layers).getAllByRole('link', { name: 'Iron Skin' })).toHaveLength(1);
+    expect(within(layers).getByRole('link', { name: 'Iron Skin' }).closest('li')).toHaveTextContent(
+      '3 DR',
+    );
+    expect(layers).not.toHaveTextContent('Skull Ward');
+    expect(layers).not.toHaveTextContent('Inactive Ward');
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('11');
+
+    fireEvent.change(screen.getByLabelText('Hit location'), { target: { value: 'skull' } });
+    expect(screen.getByRole('list', { name: 'Protection layers' })).toHaveTextContent('Skull Ward');
+  });
   it('combines defense bonus context with damage resistance controls', () => {
     const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
     character.derived = {

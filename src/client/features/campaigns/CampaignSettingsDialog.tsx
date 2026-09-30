@@ -94,6 +94,9 @@ export function CampaignSettingsDialog({
   const [skillPrerequisitePolicy, setSkillPrerequisitePolicy] = useState(
     campaign.skillPrerequisitePolicy ?? 'block',
   );
+  const [experimentalActiveEffects, setExperimentalActiveEffects] = useState(
+    campaign.experimentalActiveEffects ?? false,
+  );
   const [experimentalTurnTracker, setExperimentalTurnTracker] = useState(
     campaign.experimentalTurnTracker ?? false,
   );
@@ -128,6 +131,7 @@ export function CampaignSettingsDialog({
     setShareSheets(campaign.shareCharacterSheets ?? true);
     setAllowGmEditing(campaign.allowGmCharacterEditing ?? false);
     setSkillPrerequisitePolicy(campaign.skillPrerequisitePolicy ?? 'block');
+    setExperimentalActiveEffects(campaign.experimentalActiveEffects ?? false);
     setExperimentalTurnTracker(campaign.experimentalTurnTracker ?? false);
     setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
     setError(null);
@@ -241,6 +245,7 @@ export function CampaignSettingsDialog({
       allowGmCharacterEditing: allowGmEditing,
       skillPrerequisitePolicy,
       experimentalTurnTracker,
+      experimentalActiveEffects,
       houseRules,
     });
   };
@@ -560,6 +565,22 @@ export function CampaignSettingsDialog({
                 className="min-w-0 border-t border-base-300 pt-3"
               >
                 <legend className="label-eyebrow">Experimental features</legend>
+                <label className="flex items-start gap-3 pt-2">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm mt-0.5"
+                    checked={experimentalActiveEffects}
+                    onChange={(e) => setExperimentalActiveEffects(e.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium">Enable active effects</span>
+                    <span className="block text-xs text-base-content/60">
+                      Unfinished, experimental tools for active effects and conditional modifiers.
+                      Off by default. Turning this off hides the tools and stops their bonuses;
+                      saved effects and definitions are kept.
+                    </span>
+                  </span>
+                </label>
                 <label className="flex items-start gap-3 pt-2">
                   <input
                     type="checkbox"

@@ -1,6 +1,6 @@
 ## Start with a small, usable library
 
-A campaign library is the collection of definitions your players can reuse: traits, skills, spells, equipment, languages, techniques, styles, enchantments, and active effects. A library entry describes the rule; a character's copy records that character's choices, points, quantities, and current state.
+A campaign library is the collection of definitions your players can reuse: traits, skills, spells, equipment, languages, techniques, styles, and enchantments. A library entry describes the rule; a character's copy records that character's choices, points, quantities, and current state.
 
 Open **Campaign → your campaign → Library**. Campaign members can browse; the **campaign owner** can add, edit, delete, and import definitions. Being a campaign manager does not grant library-authoring permission.
 
@@ -53,7 +53,7 @@ Keep alternate editions under the same canonical key and different source keys. 
 
 **Languages** describe the language and whether it is signed. The character chooses fluency and pays its points. Selecting a sign-language definition sets written fluency to **N/A**. Review the **Pts** field: its suggested total treats native spoken fluency as free and cannot determine whether this is the character's first or an additional language. Enter the appropriate total for the campaign's rules before adding it. **Techniques** describe a governing skill, default penalty, difficulty, and maximum improvement. **Styles** group skills, perks, and techniques; they are packages of components, not a separate character stat.
 
-**Enchantments** attach equipment-specific mechanics. **Active Effects** are reusable temporary effects applied to a character. A spell's description, an item enchantment, and an active-effect instance serve different purposes; creating one does not automatically create the others.
+**Enchantments** attach equipment-specific mechanics. Spell descriptions and item enchantments serve different purposes; creating one does not automatically create the other.
 
 ## Advanced: pricing and modifiers
 
@@ -117,11 +117,11 @@ Range distinguishes **fixed yards** from **ST multipliers**. Enter the half-dama
 
 Armor uses structured data for coverage and protection. Check the intended hit locations, any damage-type-specific DR, and facing. Test the character's **Incoming attack** workspace with more than one damage type. Armor DB and DR are different: DB affects defense rolls; DR reduces injury.
 
-**Mechanical effects** add supported attribute, skill, defense, DR, or weapon adjustments. Use exact skill or item selectors when required. Conditional effects need the appropriate condition enabled, and equipment effects may require the item to be equipped or carried. A rule that needs GM judgment should say so in its description rather than apply an unconditional bonus.
+**Mechanical effects** add supported attribute, skill, defense, DR, or weapon adjustments. Use exact skill or item selectors when required. Equipment effects may require the item to be equipped or carried. A rule that needs GM judgment should say so in its description rather than apply an unconditional bonus.
 
 For enchantments, check applicability and stacking. Two copies with an additive policy can differ from two effects sharing a highest-only stacking key. Apply only the intended base statistics to the item; avoid baking an enchantment's bonus into the base and then attaching the same bonus again.
 
-## Advanced: skills, spells, and active effects
+## Advanced: skills and spells
 
 Skill authoring separates readable prerequisite text from **Structured prerequisites (JSON)**, **Default rules (JSON)**, and **Structured skill rules**. The readable description explains the rule. Structured fields describe supported conditions and calculations; they cannot interpret arbitrary rules prose.
 
@@ -143,11 +143,17 @@ Use `any` instead of `all` only when satisfying one branch is enough. Skill defa
 
 Alchemy in *GURPS Magic*, p. 210, provides a useful authoring check: choose **IQ** and **Very Hard**, then **Set no defaults**. Leaving defaults unspecified does not express the same rule. For an elixir technique that defaults at Alchemy−1 and cannot exceed Alchemy, choose **Hard**, enter **−1** as the default penalty, and **1** as the maximum levels above default. The cap is measured from the penalized default, not from the governing skill. Test that additional points cannot push it past Alchemy.
 
-A variable-energy spell such as Ignite Fire (*Magic*, p. 73) needs its different cases explained in the description and the final casting energy selected by the player. A spell with a listed duration, such as Daze (*Magic*, p. 134), still needs a separately applied active effect if you want the app to track temporary mechanics. Consult the original rule for its full conditions and exceptions.
+A variable-energy spell such as Ignite Fire (*Magic*, p. 73) needs its different cases explained in the description and the final casting energy selected by the player. A spell with a listed duration, such as Daze (*Magic*, p. 134), still needs its temporary mechanics tracked separately. Consult the original rule for its full conditions and exceptions.
 
 Skill procedures can describe contextual modifiers, actions, and benefits. A calculated roll preview does not automatically resolve an opponent's contest, spend all described resources, or apply a described outcome to another character. Check the visible preview and explain the manual steps.
 
 For variable-cost spells, store a clearly explained base case and describe how the cost changes. At casting time, check **Energy to spend** after any applicable discounts and choices. Casting time, duration, and prerequisites in a spell entry remain descriptive; do not assume a timed condition will appear because the spell was cast.
+
+## Experimental: active effects
+
+The campaign owner can opt in under **Campaign settings → Experimental features → Enable active effects**. This feature is unfinished and off by default. Turning it off hides its tools and disables active instances and conditional modifiers while preserving saved data. Manual stat modifiers and skill procedures work independently.
+
+Conditional modifiers need their condition enabled in **Overview → Conditional effects** or **Combat → Active Effects**. Conditional declarations stay inactive when the experiment is off.
 
 Apply temporary mechanics through the character's **Combat → Active Effects** panel. Choose a campaign effect or create a custom one, optionally identify its source item, and inspect its bonuses and remaining duration. Every definition needs an effect name and a **Stacking key**. Give related effects the same key: **additive** combines their bonuses, **highest** keeps the strongest value per target, and **replace** uses the latest application. Different keys work independently.
 

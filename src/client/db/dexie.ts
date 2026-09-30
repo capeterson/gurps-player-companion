@@ -276,6 +276,7 @@ export interface LocalCampaign {
   /** Missing on older rows; defaults to disabled. */
   allowGmCharacterEditing?: boolean;
   experimentalTurnTracker?: boolean;
+  experimentalActiveEffects?: boolean;
   /** Viewer-specific role mirrored from the authenticated campaigns response. */
   viewerRole?: 'owner' | 'manager' | 'member';
   createdAt: string;

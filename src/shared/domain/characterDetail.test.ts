@@ -1,13 +1,111 @@
 import { describe, expect, it } from 'bun:test';
+import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import { libraryTraitCreate } from '../schemas/campaignLibrary.ts';
 import { characterCreate } from '../schemas/character.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
+import { instantiateEffect } from './activeEffects.ts';
 import {
   type CharacterDetailInput,
   buildCharacterDetail,
   buildSpellOut,
 } from './characterDetail.ts';
 import { resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
+
+it('disables campaign active effects and conditional modifiers by default while keeping manual boosts', () => {
+  const timestamp = '2026-09-10T00:00:00.000Z';
+  const activeDefinition = activeEffectDefinitionCreate.parse({
+    name: 'Battle draught',
+    stacking: { kind: 'additive', key: 'battle-draught' },
+    effects: [
+      {
+        target: 'st',
+        value: 2,
+        conditionGroup: 'focused',
+        conditionLabel: 'Focused',
+      },
+    ],
+    capabilities: [{ kind: 'sense', key: 'true_sight', label: 'True Sight' }],
+  });
+  const instance = instantiateEffect(activeDefinition, 'active-instance', timestamp);
+  const campaign = {
+    pointTarget: null,
+    disadvantageCap: null,
+    quirkCap: null,
+    experimentalActiveEffects: false,
+  };
+  const input: CharacterDetailInput = {
+    character: {
+      ...characterCreate.parse({
+        name: 'Gated hero',
+        tempEffects: [{ id: 'manual', name: 'Manual boost', mods: { st: 5 } }],
+      }),
+      id: 'character',
+      ownerId: 'owner',
+      campaignId: 'campaign',
+      height: null,
+      weight: null,
+      age: null,
+      birthdate: null,
+      appearance: null,
+      dismissedWarnings: [],
+      activeEffects: [instance],
+      activeConditionGroups: ['focused'],
+      revision: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    traits: [
+      {
+        id: 'trait',
+        characterId: 'character',
+        name: 'Focused stance',
+        kind: 'advantage',
+        points: 1,
+        level: 1,
+        notes: null,
+        libraryTraitId: null,
+        modifiers: [],
+        libraryEffects: [
+          {
+            target: 'st',
+            value: 2,
+            scaling: 'flat',
+            conditionGroup: 'focused',
+            conditionLabel: 'Focused',
+          },
+        ],
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: [],
+    combat: null,
+    campaign,
+  };
+
+  const disabled = buildCharacterDetail(input);
+  expect(disabled.derived.effectiveSt).toBe(15);
+  expect(disabled.activeEffects).toHaveLength(1);
+  expect(disabled.capabilities).toEqual([]);
+
+  const enabled = buildCharacterDetail({
+    ...input,
+    campaign: { ...campaign, experimentalActiveEffects: true },
+  });
+  expect(enabled.derived.effectiveSt).toBe(19);
+  expect(enabled.capabilities[0]?.capability.label).toBe('True Sight');
+
+  const disabledAgain = buildCharacterDetail({
+    ...input,
+    campaign: { ...campaign, experimentalActiveEffects: false },
+  });
+  expect(disabledAgain.derived.effectiveSt).toBe(15);
+  expect(disabledAgain.activeEffects).toHaveLength(1);
+});
 
 it('carries YAML damage declarations through the full character builder', () => {
   const library = parseLibraryYaml(

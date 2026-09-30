@@ -449,6 +449,13 @@
       "when": 1800018000000,
       "tag": "0063_notification_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1800019000000,
+      "tag": "0064_experimental_active_effects",
+      "breakpoints": true
     }
   ]
 }
