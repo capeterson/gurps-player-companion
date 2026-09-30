@@ -2,26 +2,48 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { LibraryTraitEffect } from '../../../shared/schemas/effects.ts';
+import { getLocalDb } from '../../db/dexie.ts';
 import { EffectsEditor } from './EffectsEditor.tsx';
+
+const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000ef01';
 
 function renderWithQuery(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
-function renderEditor(initial: LibraryTraitEffect[] = []) {
+async function renderEditor(initial: LibraryTraitEffect[] = [], enabled = true) {
+  await getLocalDb().campaigns.put({
+    id: CAMPAIGN,
+    ownerId: 'owner',
+    name: 'Effects test campaign',
+    description: null,
+    pointTarget: null,
+    disadvantageCap: null,
+    quirkCap: null,
+    experimentalActiveEffects: enabled,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    revision: 1,
+  } as never);
   const onChange = vi.fn();
   const onValidityChange = vi.fn();
   renderWithQuery(
-    <EffectsEditor effects={initial} onChange={onChange} onValidityChange={onValidityChange} />,
+    <EffectsEditor
+      effects={initial}
+      campaignId={CAMPAIGN}
+      onChange={onChange}
+      onValidityChange={onValidityChange}
+    />,
   );
   return { onChange, onValidityChange };
 }
 
 describe('EffectsEditor', () => {
-  it('authors a skill effect with specialty, scaling, condition, and preview', () => {
-    const { onChange } = renderEditor();
+  it('authors a skill effect with specialty, scaling, condition, and preview', async () => {
+    const { onChange } = await renderEditor();
     fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
+    await screen.findByText('Condition', { selector: 'summary' });
     fireEvent.change(screen.getByPlaceholderText('Public Speaking or *'), {
       target: { value: 'Guns' },
     });
@@ -49,10 +71,30 @@ describe('EffectsEditor', () => {
     ]);
   });
 
-  it('retains blank numeric and label-first drafts while reporting field errors', () => {
-    const { onChange, onValidityChange } = renderEditor([
+  it('keeps saved conditional declarations but hides condition editing while the campaign flag is off', async () => {
+    await renderEditor(
+      [
+        {
+          target: 'dx',
+          value: 2,
+          scaling: 'flat',
+          conditionGroup: 'focused',
+          conditionLabel: 'Focused',
+        },
+      ],
+      false,
+    );
+    expect(screen.queryByText('Condition', { selector: 'summary' })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('focused')).not.toBeInTheDocument();
+    await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
+    expect(await screen.findByText('Condition', { selector: 'summary' })).toBeVisible();
+  });
+
+  it('retains blank numeric and label-first drafts while reporting field errors', async () => {
+    const { onChange, onValidityChange } = await renderEditor([
       { target: 'dx', value: 1, scaling: 'flat' },
     ]);
+    await screen.findByText('Condition', { selector: 'summary' });
     const bonus = screen.getByLabelText('Effect 1 bonus');
     fireEvent.change(bonus, { target: { value: '' } });
     expect(bonus).toHaveValue('');
@@ -69,8 +111,8 @@ describe('EffectsEditor', () => {
     );
   });
 
-  it('duplicates, reorders, and deletes without changing effect content', () => {
-    const { onChange } = renderEditor([
+  it('duplicates, reorders, and deletes without changing effect content', async () => {
+    const { onChange } = await renderEditor([
       { target: 'dx', value: 1, scaling: 'flat' },
       { target: 'iq', value: 2, scaling: 'flat' },
     ]);
@@ -85,8 +127,8 @@ describe('EffectsEditor', () => {
     expect(onChange.mock.calls.at(-1)?.[0]).toHaveLength(2);
   });
 
-  it('shows only portable selectors and hides mode for item-level defenses', () => {
-    const { onChange } = renderEditor();
+  it('shows only portable selectors and hides mode for item-level defenses', async () => {
+    const { onChange } = await renderEditor();
     fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
     fireEvent.change(screen.getByLabelText('Effect 1 target'), {
       target: { value: 'weapon_attack' },

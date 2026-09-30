@@ -241,6 +241,8 @@ export interface CharacterDetailInputCombat {
 }
 
 export interface CharacterDetailInputCampaign {
+  /** Active instances and condition groups require explicit campaign opt-in. */
+  experimentalActiveEffects?: boolean;
   skillPrerequisitePolicy?: 'block' | 'warn';
   houseRules?: CampaignHouseRules;
   pointTarget: number | null;
@@ -528,7 +530,8 @@ export function buildCharacterDetail(
   // Resolve trait/skill effects FIRST.  Each character trait/skill carries
   // its libraryEffects (joined by libraryTraitId/librarySkillId at fetch
   // time).  Active conditional groups gate which effects are "on".
-  const activeGroups = new Set(character.activeConditionGroups ?? []);
+  const activeEffectsEnabled = campaign?.experimentalActiveEffects === true;
+  const activeGroups = new Set(activeEffectsEnabled ? (character.activeConditionGroups ?? []) : []);
   const itemEnchantments = new Map(
     inventory.map((item) => [
       item.id,
@@ -542,7 +545,7 @@ export function buildCharacterDetail(
     ]),
   );
   const activeResolution = resolveActiveEffects(
-    character.activeEffects ?? [],
+    activeEffectsEnabled ? (character.activeEffects ?? []) : [],
     activeGroups,
     input.now ?? Date.now(),
   );
@@ -564,7 +567,7 @@ export function buildCharacterDetail(
       activeGroups,
     ),
     ...[...itemEnchantments.values()].flatMap((entry) => entry.effects),
-  ];
+  ].filter((effect) => activeEffectsEnabled || !effect.conditionGroup);
 
   // Apply effects to attrs, THEN compute derived stats — so dodge / parry
   // / block / dr already include the trait contributions when the UI

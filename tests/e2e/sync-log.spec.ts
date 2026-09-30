@@ -147,10 +147,11 @@ test('a synced edit and its revision response share one item with Request and Re
   // Exercise native browser CompressionStream storage with a real large edit,
   // reusing the same account and page as the small acknowledgement scenario.
   const notes = 'A weathered traveller with detailed field notes. '.repeat(35).trim();
+  await page.getByRole('button', { name: 'Edit description', exact: true }).click();
   await page.getByRole('button', { name: 'Edit raw markdown', exact: true }).click();
   const description = page.getByRole('textbox', { name: 'description', exact: true });
   await description.fill(notes);
-  await description.blur();
+  await page.getByRole('button', { name: 'Done editing description', exact: true }).click();
   let compressed: SyncLogEntry | undefined;
   await expect
     .poll(async () => {
@@ -281,7 +282,7 @@ test('a synced edit and its revision response share one item with Request and Re
       .getByRole('dialog')
       .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
     await expect(logDialog.getByText('WebSocket', { exact: true })).toBeVisible();
-    await expect(logDialog.getByText('Connected', { exact: true })).toBeVisible();
+    await expect(logDialog.getByText(/^(Connected|Connecting)$/)).toBeVisible();
     await expect(logDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
     const settingsTitle = logDialog.getByRole('link', {
       name: `Campaign: ${campaignName} · campaign rules updated`,

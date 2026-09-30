@@ -31,11 +31,17 @@ async function registerUser(suffix: string) {
   return { accessToken: body.accessToken, email };
 }
 
-async function createCampaign(accessToken: string): Promise<string> {
+async function createCampaign(
+  accessToken: string,
+  experimentalActiveEffects = false,
+): Promise<string> {
   const res = await app.request('/api/v1/campaigns', {
     method: 'POST',
     headers: jsonHeaders(accessToken),
-    body: JSON.stringify({ name: `Library sync ${Date.now()}-${Math.random()}` }),
+    body: JSON.stringify({
+      name: `Library sync ${Date.now()}-${Math.random()}`,
+      experimentalActiveEffects,
+    }),
   });
   return ((await res.json()) as { id: string }).id;
 }
@@ -476,7 +482,7 @@ describe('library classes through /sync/cursor', () => {
 
   it('emits every library class with its public projection', async () => {
     const owner = await registerUser('cursor-classes');
-    const campaignId = await createCampaign(owner.accessToken);
+    const campaignId = await createCampaign(owner.accessToken, true);
     const creates: Array<[string, string, Record<string, unknown>]> = [
       ['campaign_library_trait', 'traits', { name: 'Luck', kind: 'advantage' }],
       ['campaign_library_spell', 'spells', { name: 'Light' }],

@@ -385,6 +385,11 @@ export function useLibraryEntryMutations<Body extends Record<string, unknown>>(
 
   const createAsync = async (raw: Body): Promise<void> => {
     if (!campaignId) throw new Error('No campaign selected');
+    if (
+      section === 'activeEffects' &&
+      (await getLocalDb().campaigns.get(campaignId))?.experimentalActiveEffects !== true
+    )
+      throw new Error('Active effects are disabled for this campaign');
     const body = config.create.parse(raw) as Record<string, unknown>;
     await validateEntry(section, campaignId, body, null);
     await enqueueCreate({
@@ -398,6 +403,11 @@ export function useLibraryEntryMutations<Body extends Record<string, unknown>>(
 
   const updateAsync = async (id: string, raw: Body): Promise<void> => {
     if (!campaignId) throw new Error('No campaign selected');
+    if (
+      section === 'activeEffects' &&
+      (await getLocalDb().campaigns.get(campaignId))?.experimentalActiveEffects !== true
+    )
+      throw new Error('Active effects are disabled for this campaign');
     const body = config.update.parse(raw) as Record<string, unknown>;
     const table = syncEntityTable(config.entityClass);
     const current = (await table?.get(id)) as Record<string, unknown> | undefined;
@@ -415,6 +425,11 @@ export function useLibraryEntryMutations<Body extends Record<string, unknown>>(
 
   const removeAsync = async (id: string): Promise<void> => {
     if (!campaignId) throw new Error('No campaign selected');
+    if (
+      section === 'activeEffects' &&
+      (await getLocalDb().campaigns.get(campaignId))?.experimentalActiveEffects !== true
+    )
+      throw new Error('Active effects are disabled for this campaign');
     const current = (await syncEntityTable(config.entityClass)?.get(id)) as
       | Record<string, unknown>
       | undefined;

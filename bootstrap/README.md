@@ -62,8 +62,11 @@ reminders for manual adjudication. Seeded rounds
 and indefinite effects are stable across dates; there are no active wall-clock
 expirations that make the fixture decay while it sits unused. HP/FP and conditions
 are seeded explicitly, and the UI will not automatically adjudicate the encounter.
-Active-effect instances remain fixtures for API, calculation, and sync testing;
-the character sheet has no active-effects management section.
+Lantern Coast retains demonstration active-effect instances and definitions, but
+the finished campaign leaves **Enable active effects** off. Its construction
+briefly opts in to use the normal guarded write APIs, then disables the experiment
+before publishing the completed fixture. Reruns preserve an owner’s later choice.
+The owner can enable the experiment to exercise the sheet’s management tools.
 
 ## Fictional sourcebooks
 

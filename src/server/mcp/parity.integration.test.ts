@@ -403,7 +403,7 @@ describe('delegated operation behavioral parity', () => {
     const campaign = (
       await call<{ id: string }>(owner, 'campaign', {
         action: 'create',
-        body: { name: `Matrix ${suffix}` },
+        body: { name: `Matrix ${suffix}`, experimentalActiveEffects: true },
       })
     ).body;
     const campaignId = campaign.id as string;

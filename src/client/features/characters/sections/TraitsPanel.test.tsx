@@ -153,6 +153,44 @@ function renderCharacterTraits(traits: readonly unknown[], canWrite = true) {
   );
 }
 
+it('reveals an anchored trait through the active search filter, then honors a new search', async () => {
+  const other = { ...ownedTrait, id: '01997c5c-8d80-7000-8000-000000000012', name: 'Other trait' };
+  const character = {
+    id: ownedTrait.characterId,
+    campaignId: null,
+    traits: [ownedTrait, other],
+    inventory: [],
+  } as unknown as CharacterDetail;
+  const queryClient = new QueryClient();
+  const view = render(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <TraitsPanel character={character} canWrite anchorTraitId={null} />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+
+  const search = screen.getByRole('searchbox', { name: 'Search traits' });
+  fireEvent.change(search, { target: { value: 'Other trait' } });
+  const row = document.getElementById(`trait-${ownedTrait.id}`);
+  expect(row).not.toBeVisible();
+
+  view.rerender(
+    <QueryClientProvider client={queryClient}>
+      <ToastProvider>
+        <TraitsPanel character={character} canWrite anchorTraitId={ownedTrait.id} />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(row).toBeVisible());
+  expect(row).toHaveAttribute('aria-current', 'true');
+  expect(search).toHaveValue('');
+
+  fireEvent.change(search, { target: { value: 'Other trait' } });
+  await waitFor(() => expect(row).not.toBeVisible());
+  expect(document.getElementById(`trait-${other.id}`)).toBeVisible();
+});
+
 function renderOwnedTrait() {
   return renderCharacterTraits([ownedTrait]);
 }

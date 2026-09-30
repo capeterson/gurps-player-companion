@@ -12,6 +12,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../lib/toast.tsx';
+import { flashBus } from '../sync/flashBus.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from './useDraftField.ts';
 
 function Wrap({ children }: { children: ReactNode }) {
@@ -477,5 +478,104 @@ describe('useDraftField', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
     expect(calls).toEqual([null, 'Bob']);
     await waitFor(() => expect(input.value).toBe('Bob'));
+  });
+
+  it('reads the durable rollback value when the server prop still has the optimistic value', async () => {
+    function ReconciledField() {
+      const field = useDraftField<number>({
+        name: 'ST',
+        serverValue: 12,
+        parse: Number,
+        format: String,
+        onSave: vi.fn().mockResolvedValue(undefined),
+        flashKey: 'character:test:st',
+        readRollbackValue: async () => 10,
+      });
+      return <input aria-label="ST" className={DRAFT_FIELD_CLASS} {...field.inputProps} />;
+    }
+
+    render(
+      <Wrap>
+        <ReconciledField />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST') as HTMLInputElement;
+    expect(input.value).toBe('12');
+
+    act(() => flashBus.emit({ key: 'character:test:st', reason: 'rejected' }));
+
+    await waitFor(() => expect(input.value).toBe('10'));
+    expect(input.dataset.flashing).toBe('true');
+  });
+
+  it('does not let a delayed rollback read overwrite a later same-field commit or another field edit', async () => {
+    let resolveRollbackRead: ((value: number) => void) | null = null;
+    const callsA: number[] = [];
+    const callsB: number[] = [];
+
+    function ReconciledFields() {
+      const [serverA, setServerA] = useState(10);
+      const fieldA = useDraftField<number>({
+        name: 'ST',
+        serverValue: serverA,
+        parse: Number,
+        format: String,
+        onSave: async (value) => {
+          callsA.push(value);
+          setServerA(value);
+        },
+        flashKey: 'character:test:st',
+        readRollbackValue: () =>
+          new Promise<number>((resolve) => {
+            resolveRollbackRead = resolve;
+          }),
+      });
+      const fieldB = useDraftField<number>({
+        name: 'DX',
+        serverValue: 10,
+        parse: Number,
+        format: String,
+        onSave: async (value) => {
+          callsB.push(value);
+        },
+      });
+      return (
+        <>
+          <input aria-label="ST" className={DRAFT_FIELD_CLASS} {...fieldA.inputProps} />
+          <input aria-label="DX" className={DRAFT_FIELD_CLASS} {...fieldB.inputProps} />
+        </>
+      );
+    }
+
+    render(
+      <Wrap>
+        <ReconciledFields />
+      </Wrap>,
+    );
+    const inputA = screen.getByLabelText('ST') as HTMLInputElement;
+    const inputB = screen.getByLabelText('DX') as HTMLInputElement;
+
+    fireEvent.change(inputA, { target: { value: '12' } });
+    fireEvent.blur(inputA);
+    await waitFor(() => expect(callsA).toEqual([12]));
+
+    act(() => flashBus.emit({ key: 'character:test:st', reason: 'rejected' }));
+    await waitFor(() => expect(resolveRollbackRead).not.toBeNull());
+
+    fireEvent.change(inputA, { target: { value: '15' } });
+    fireEvent.blur(inputA);
+    fireEvent.change(inputB, { target: { value: '14' } });
+    fireEvent.blur(inputB);
+    await waitFor(() => {
+      expect(callsA).toEqual([12, 15]);
+      expect(callsB).toEqual([14]);
+    });
+
+    await act(async () => {
+      resolveRollbackRead?.(10);
+    });
+
+    expect(inputA.value).toBe('15');
+    expect(inputB.value).toBe('14');
   });
 });

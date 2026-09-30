@@ -82,6 +82,8 @@ export const campaignOut = z.object({
   skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
   /** Experimental campaign encounters and character turn scratchpads; opt-in. */
   experimentalTurnTracker: z.boolean(),
+  /** Experimental active instances and conditional modifiers; opt-in. */
+  experimentalActiveEffects: z.boolean(),
   houseRules: campaignHouseRules.default({}),
   members: z.array(campaignMemberOut),
   ...timestamps,
@@ -102,6 +104,7 @@ export const campaignCreate = z.object({
   allowGmCharacterEditing: z.boolean().optional(),
   skillPrerequisitePolicy: z.enum(['block', 'warn']).optional(),
   experimentalTurnTracker: z.boolean().optional(),
+  experimentalActiveEffects: z.boolean().optional(),
 });
 
 export const campaignUpdate = campaignCreate

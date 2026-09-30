@@ -79,6 +79,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
   const fetchOptions = useCallback(
     async (q: string): Promise<T[]> => {
       if (!campaignId) return [];
+      if (
+        kind === 'activeEffects' &&
+        (await getLocalDb().campaigns.get(campaignId))?.experimentalActiveEffects !== true
+      )
+        return [];
       const table = syncEntityTable(ENTITY_CLASS[kind]);
       // The caller's `T` is one of the union members; the kind arg
       // discriminates which store we read. TS can't narrow through that

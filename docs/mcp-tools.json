@@ -2977,6 +2977,9 @@
                     "experimentalTurnTracker": {
                       "type": "boolean"
                     },
+                    "experimentalActiveEffects": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -3137,6 +3140,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -3420,6 +3424,9 @@
                   },
                   "experimentalTurnTracker": {
                     "type": "boolean"
+                  },
+                  "experimentalActiveEffects": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -3685,6 +3692,9 @@
                     ]
                   },
                   "experimentalTurnTracker": {
+                    "type": "boolean"
+                  },
+                  "experimentalActiveEffects": {
                     "type": "boolean"
                   },
                   "coverAssetId": {
@@ -4025,6 +4035,9 @@
                   "experimentalTurnTracker": {
                     "type": "boolean"
                   },
+                  "experimentalActiveEffects": {
+                    "type": "boolean"
+                  },
                   "houseRules": {
                     "type": "object",
                     "properties": {
@@ -4185,6 +4198,7 @@
                   "shareCharacterSheets",
                   "allowGmCharacterEditing",
                   "experimentalTurnTracker",
+                  "experimentalActiveEffects",
                   "members",
                   "createdAt",
                   "updatedAt",

@@ -4,8 +4,8 @@ import type { LibraryTraitCreate } from '../../../../shared/schemas/campaignLibr
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import type { LocalLibraryTrait } from '../../../db/dexie.ts';
 import { compareOptionalLevel } from '../../characters/sections/useSortableCharacterRows.tsx';
-import { effectPreview } from '../EffectsEditor.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
+import { MechanicalEffectList } from '../MechanicalEffectList.tsx';
 import { TraitForm } from '../TraitForm.tsx';
 import { pricingDisplayValue } from '../pricingDisplay.ts';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
@@ -62,13 +62,7 @@ export const traitsConfig: LibrarySectionConfig<LocalLibraryTrait> = {
           ))}
         </div>
       )}
-      {row.effects.length > 0 && (
-        <ul className="mt-2 space-y-0.5 text-xs text-base-content/70">
-          {row.effects.map((effect, index) => (
-            <li key={`${effect.target}-${index}`}>• {effectPreview(effect)}</li>
-          ))}
-        </ul>
-      )}
+      <MechanicalEffectList effects={row.effects} campaignId={row.campaignId} />
     </>
   ),
   deleteTitle: 'Delete library trait',

@@ -55,6 +55,7 @@ export function useCampaignCharacterDetails(
           combat: combat[index] ?? null,
           campaign: campaign
             ? {
+                experimentalActiveEffects: campaign.experimentalActiveEffects ?? false,
                 pointTarget: campaign.pointTarget,
                 disadvantageCap: campaign.disadvantageCap,
                 quirkCap: campaign.quirkCap,

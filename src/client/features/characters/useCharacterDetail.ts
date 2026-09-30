@@ -17,6 +17,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../db/dexie.ts';
+import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { characterIdsToMinimize } from '../../sync/minimalViewSweep.ts';
 import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinCharacterMechanics.ts';
@@ -68,6 +69,7 @@ export function useCharacterDetail(
       combat: combat ?? null,
       campaign: campaign
         ? {
+            experimentalActiveEffects: campaign.experimentalActiveEffects ?? false,
             pointTarget: campaign.pointTarget,
             disadvantageCap: campaign.disadvantageCap,
             quirkCap: campaign.quirkCap,
@@ -79,7 +81,8 @@ export function useCharacterDetail(
     });
     return { ...detail, libraryEffectsKnown: joined.libraryEffectsKnown };
   }, [id, clock, options.libraryTraitEffects, options.librarySkillEffects]);
-  const nextExpiry = result?.activeEffects
+  const activeEffectsEnabled = useExperimentalActiveEffects(result?.campaignId);
+  const nextExpiry = (activeEffectsEnabled ? result?.activeEffects : [])
     ?.filter((e) => e.state === 'active' && e.expiresAt && Date.parse(e.expiresAt) > clock)
     .map((e) => Date.parse(e.expiresAt as string))
     .sort((a, b) => a - b)[0];

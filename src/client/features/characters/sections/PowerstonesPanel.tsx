@@ -5,6 +5,8 @@ import type {
   MagicItemData,
   PowerstoneData,
 } from '../../../../shared/schemas/inventory.ts';
+import { Table, TableBody, TableHeader } from '../../../components/ui/Table.tsx';
+import { InventoryAnchorLink } from '../InventoryAnchorLink.tsx';
 import { useClampedJsonbBumper } from './useClampedJsonbBumper.ts';
 
 interface PowerstoneRowProps {
@@ -36,61 +38,64 @@ function PowerstoneRow({ item, characterId, canWrite }: PowerstoneRowProps) {
   });
 
   if (!data) return null;
-  const ratio = data.maxEnergy > 0 ? data.currentEnergy / data.maxEnergy : 0;
+
+  const actions = canWrite ? (
+    <span className="flex flex-wrap justify-end">
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm min-h-11 min-w-11 px-2"
+        onClick={() => bumpEnergy(-1)}
+        disabled={data.currentEnergy <= 0}
+        aria-label={`Drain 1 from ${item.name}`}
+      >
+        −
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm min-h-11 min-w-11 px-2"
+        onClick={() => bumpEnergy(1)}
+        disabled={data.currentEnergy >= data.maxEnergy}
+        aria-label={`Recharge 1 to ${item.name}`}
+      >
+        +
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm min-h-11 min-w-11 px-2"
+        onClick={() => setEnergyTo(data.maxEnergy)}
+        disabled={data.currentEnergy >= data.maxEnergy}
+        aria-label={`Recharge ${item.name} to full`}
+        title="Set to max"
+      >
+        Max
+      </button>
+    </span>
+  ) : null;
 
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:py-2">
-      <span className="col-span-2 flex min-w-0 flex-col sm:col-span-1">
-        <span className="break-words font-medium">{item.name}</span>
-        {data.notes ? (
-          <span className="break-words text-xs text-base-content/60">{data.notes}</span>
-        ) : null}
-      </span>
-      <div
-        className="h-2 w-full min-w-0 overflow-hidden rounded-full bg-base-300/60 sm:w-24"
-        aria-label={`${item.name} energy meter`}
-      >
-        <div
-          className="h-full bg-primary transition-all"
-          style={{ width: `${Math.round(ratio * 100)}%` }}
-        />
-      </div>
-      <span className="num text-right tabular-nums" aria-label={`${item.name} energy`}>
-        {data.currentEnergy} / {data.maxEnergy}
-      </span>
+    <TableBody filterValues={{ name: item.name, energy: data.currentEnergy }}>
+      <tr>
+        <td className="min-w-0 [overflow-wrap:anywhere]">
+          <InventoryAnchorLink itemId={item.id}>{item.name}</InventoryAnchorLink>
+          {data.notes ? (
+            <span className="block text-xs text-base-content/60 [overflow-wrap:anywhere]">
+              {data.notes}
+            </span>
+          ) : null}
+        </td>
+        <td className="num text-right tabular-nums" aria-label={`${item.name} energy`}>
+          {data.currentEnergy} / {data.maxEnergy}
+        </td>
+        <td className="hidden sm:table-cell">{actions}</td>
+      </tr>
       {canWrite && (
-        <span className="join col-span-2 justify-self-end sm:col-span-1">
-          <button
-            type="button"
-            className="btn btn-xs join-item"
-            onClick={() => bumpEnergy(-1)}
-            disabled={data.currentEnergy <= 0}
-            aria-label={`Drain 1 from ${item.name}`}
-          >
-            −
-          </button>
-          <button
-            type="button"
-            className="btn btn-xs join-item"
-            onClick={() => bumpEnergy(1)}
-            disabled={data.currentEnergy >= data.maxEnergy}
-            aria-label={`Recharge 1 to ${item.name}`}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="btn btn-xs join-item"
-            onClick={() => setEnergyTo(data.maxEnergy)}
-            disabled={data.currentEnergy >= data.maxEnergy}
-            aria-label={`Recharge ${item.name} to full`}
-            title="Set to max"
-          >
-            Max
-          </button>
-        </span>
+        <tr className="sm:hidden">
+          <td colSpan={3} className="pt-0">
+            {actions}
+          </td>
+        </tr>
       )}
-    </li>
+    </TableBody>
   );
 }
 
@@ -105,28 +110,42 @@ export function PowerstonesPanel({
   const total = totalPowerstoneEnergy(stones);
 
   return (
-    <section className="card space-y-3 p-4 sm:p-5">
-      <header className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-        <div>
-          <p className="label-eyebrow">Powerstones</p>
-          <h2 className="font-display text-2xl">Stored energy</h2>
-        </div>
-        <p className="num text-base-content/80">
-          <span className="text-primary text-xl font-semibold">{total}</span>
-          <span className="text-xs text-base-content/60"> available</span>
-        </p>
+    <section className="min-w-0 space-y-3" aria-label="Powerstones">
+      <header className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-medium">Powerstones</h2>
+        <p className="num text-xs text-base-content/60">{total} stored energy</p>
       </header>
       {stones.length === 0 ? (
         <p className="text-sm text-base-content/60">
-          No powerstones carried. Add an inventory item and toggle &ldquo;Powerstone&rdquo; on it to
-          track its charge here.
+          No powerstones carried. Add one in Inventory to track its energy here.
         </p>
       ) : (
-        <ul>
-          {stones.map((s) => (
-            <PowerstoneRow key={s.id} item={s} characterId={character.id} canWrite={canWrite} />
+        <Table
+          preferenceKey={`${character.id}:powerstones`}
+          className="table table-sm w-full table-auto"
+          aria-label="Powerstones"
+        >
+          <thead>
+            <tr>
+              <TableHeader column="name" label="Item" />
+              <TableHeader column="energy" label="Energy" className="w-16 text-right" />
+              <th
+                scope="col"
+                className={`hidden sm:table-cell ${canWrite ? 'w-36 text-right' : 'w-0 p-0'}`}
+              >
+                <span className="sr-only">Adjust energy</span>
+              </th>
+            </tr>
+          </thead>
+          {stones.map((item) => (
+            <PowerstoneRow
+              key={item.id}
+              item={item}
+              characterId={character.id}
+              canWrite={canWrite}
+            />
           ))}
-        </ul>
+        </Table>
       )}
     </section>
   );
@@ -144,16 +163,29 @@ export function MagicItemsPanel({
     return null;
   }
   return (
-    <section className="card space-y-3 p-4 sm:p-5">
-      <header>
-        <p className="label-eyebrow">Magic items</p>
-        <h2 className="font-display text-2xl">Wands &amp; relics</h2>
-      </header>
-      <ul>
-        {items.map((it) => (
-          <MagicItemRow key={it.id} item={it} characterId={character.id} canWrite={canWrite} />
+    <section className="min-w-0 space-y-3" aria-label="Magic items">
+      <h2 className="text-base font-medium">Magic items</h2>
+      <Table
+        preferenceKey={`${character.id}:magic-items`}
+        className="table table-sm w-full table-auto"
+        aria-label="Magic items"
+      >
+        <thead>
+          <tr>
+            <TableHeader column="name" label="Item" />
+            <TableHeader column="charges" label="Charges" className="w-20 text-right" />
+            <th
+              scope="col"
+              className={`hidden sm:table-cell ${canWrite ? 'w-28 text-right' : 'w-0 p-0'}`}
+            >
+              <span className="sr-only">Charge actions</span>
+            </th>
+          </tr>
+        </thead>
+        {items.map((item) => (
+          <MagicItemRow key={item.id} item={item} characterId={character.id} canWrite={canWrite} />
         ))}
-      </ul>
+      </Table>
     </section>
   );
 }
@@ -184,49 +216,65 @@ function MagicItemRow({ item, characterId, canWrite }: MagicItemRowProps) {
 
   if (!data) return null;
 
-  return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-base-300 py-3 last:border-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:py-2">
-      <span className="col-span-2 flex min-w-0 flex-col sm:col-span-1">
-        <span className="break-words font-medium">{item.name}</span>
-        <span className="break-words text-xs text-base-content/60">
-          casts <em>{data.spellName}</em> at skill {data.spellSkillLevel}
-          {' · '}
-          {data.mode}
-          {data.energyCost != null && data.mode === 'powered' ? `, ${data.energyCost} FP` : ''}
-        </span>
+  const actions =
+    charged && canWrite ? (
+      <span className="flex flex-wrap justify-end">
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm min-h-11 min-w-11 px-2"
+          onClick={() => bumpCharges(-1)}
+          disabled={(data.chargesCurrent ?? 0) <= 0}
+          aria-label={`Use one charge from ${item.name}`}
+        >
+          Use
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm min-h-11 min-w-11 px-2"
+          onClick={() => setChargesTo(data.chargesMax ?? 0)}
+          disabled={(data.chargesCurrent ?? 0) >= (data.chargesMax ?? 0)}
+          aria-label={`Recharge ${item.name} to full`}
+          title="Refill charges"
+        >
+          Refill
+        </button>
       </span>
-      {charged ? (
-        <span className="num text-right tabular-nums">
-          {data.chargesCurrent ?? 0} / {data.chargesMax ?? 0}
-        </span>
-      ) : (
-        <span className="text-xs text-base-content/60">
-          {data.mode === 'continuous' ? 'always-on' : 'powered by user'}
-        </span>
-      )}
+    ) : null;
+
+  return (
+    <TableBody
+      filterValues={{ name: item.name, charges: charged ? (data.chargesCurrent ?? 0) : data.mode }}
+    >
+      <tr>
+        <td className="min-w-0 [overflow-wrap:anywhere]">
+          <InventoryAnchorLink itemId={item.id}>{item.name}</InventoryAnchorLink>
+          <span className="block text-xs text-base-content/60 [overflow-wrap:anywhere]">
+            casts <em>{data.spellName}</em> at skill {data.spellSkillLevel}
+            {' · '}
+            {data.mode}
+            {data.energyCost != null && data.mode === 'powered' ? `, ${data.energyCost} FP` : ''}
+          </span>
+        </td>
+        <td className="text-right">
+          {charged ? (
+            <span className="num text-right tabular-nums">
+              {data.chargesCurrent ?? 0} / {data.chargesMax ?? 0}
+            </span>
+          ) : (
+            <span className="text-xs text-base-content/60">
+              {data.mode === 'continuous' ? 'always-on' : 'powered by user'}
+            </span>
+          )}
+        </td>
+        <td className="hidden sm:table-cell">{actions}</td>
+      </tr>
       {charged && canWrite && (
-        <span className="join justify-self-end">
-          <button
-            type="button"
-            className="btn btn-xs join-item"
-            onClick={() => bumpCharges(-1)}
-            disabled={(data.chargesCurrent ?? 0) <= 0}
-            aria-label={`Use one charge from ${item.name}`}
-          >
-            Use
-          </button>
-          <button
-            type="button"
-            className="btn btn-xs join-item"
-            onClick={() => setChargesTo(data.chargesMax ?? 0)}
-            disabled={(data.chargesCurrent ?? 0) >= (data.chargesMax ?? 0)}
-            aria-label={`Recharge ${item.name} to full`}
-            title="Refill charges"
-          >
-            Refill
-          </button>
-        </span>
+        <tr className="sm:hidden">
+          <td colSpan={3} className="pt-0">
+            {actions}
+          </td>
+        </tr>
       )}
-    </li>
+    </TableBody>
   );
 }

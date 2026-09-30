@@ -23,6 +23,7 @@ import { formatSigned } from '../../../../../shared/format/number.ts';
 import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
+import { SheetAnchorLink } from '../../SheetAnchorLink.tsx';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
@@ -144,16 +145,19 @@ export function DrSummaryCard({
           armorAppliesToFacing(item.armor, selectedFacing),
       )
     : [];
-  const innate = known
-    ? (character.effects ?? [])
-        .filter(
-          (effect) =>
-            effect.active &&
-            effect.target === 'dr' &&
-            innateDrCoversLocation(effect.hitLocation, location),
-        )
-        .reduce((sum, effect) => sum + effect.value, 0)
-    : 0;
+  const innateSources = new Map<string, CharacterDetail['effects'][number]>();
+  for (const effect of known ? (character.effects ?? []) : []) {
+    if (
+      !effect.active ||
+      effect.target !== 'dr' ||
+      !innateDrCoversLocation(effect.hitLocation, location)
+    )
+      continue;
+    const key = `${effect.sourceKind}:${effect.sourceId}`;
+    const previous = innateSources.get(key);
+    innateSources.set(key, { ...effect, value: (previous?.value ?? 0) + effect.value });
+  }
+  const innateContributions = [...innateSources.values()].filter((effect) => effect.value !== 0);
 
   return (
     <>
@@ -485,12 +489,25 @@ export function DrSummaryCard({
                         </li>
                       );
                     })}
-                    {innate !== 0 && (
-                      <li className="flex justify-between gap-3 py-2">
-                        <span>Active innate DR</span>
-                        <span className="num">{innate} DR</span>
+                    {innateContributions.map((effect) => (
+                      <li
+                        className="flex justify-between gap-3 py-2"
+                        key={`${effect.sourceKind}:${effect.sourceId}`}
+                      >
+                        {effect.sourceKind === 'active_effect' ? (
+                          <span className="min-w-0 break-words">{effect.sourceName}</span>
+                        ) : (
+                          <SheetAnchorLink
+                            kind={effect.sourceKind === 'item' ? 'inventory' : effect.sourceKind}
+                            id={effect.sourceId}
+                            className="link link-hover min-w-0 break-words"
+                          >
+                            {effect.sourceName}
+                          </SheetAnchorLink>
+                        )}
+                        <span className="num shrink-0">{effect.value} DR</span>
                       </li>
-                    )}
+                    ))}
                     {location === 'skull' && naturalSkullDr(type) > 0 && (
                       <li className="flex justify-between gap-3 py-2">
                         <span>Natural skull protection</span>
@@ -499,7 +516,7 @@ export function DrSummaryCard({
                     )}
                   </ul>
                   {layers.length === 0 &&
-                    innate === 0 &&
+                    innateContributions.length === 0 &&
                     (location !== 'skull' || naturalSkullDr(type) === 0) && (
                       <p className="text-sm text-muted">No protection at this location.</p>
                     )}

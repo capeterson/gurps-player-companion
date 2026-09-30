@@ -25,6 +25,7 @@ function campaignRow(overrides: Partial<CampaignOut> = {}): CampaignOut {
     shareCharacterSheets: true,
     allowGmCharacterEditing: false,
     experimentalTurnTracker: true,
+    experimentalActiveEffects: false,
     members: [],
     createdAt: '2026-09-13T01:43:28.831Z',
     updatedAt: '2026-09-13T01:43:28.831Z',

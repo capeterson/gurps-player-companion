@@ -37,6 +37,7 @@ it('shares active effect CRUD, snapshots, sync authorization, privacy, transfer 
   const campaign = await create(token, '/campaigns', {
     name: 'Effects',
     shareCharacterSheets: false,
+    experimentalActiveEffects: true,
   });
   for (const member of [player, other])
     expect(
@@ -128,12 +129,105 @@ it('shares active effect CRUD, snapshots, sync authorization, privacy, transfer 
   await request(player.accessToken, `/characters/${character.id}`, 'PATCH', { campaignId: null });
   detail = await (await request(player.accessToken, `/characters/${character.id}`)).json();
   expect(detail.activeEffects[0].definitionId).toBeNull();
-  expect(detail.derived.effectiveSt).toBe(12);
+  expect(detail.derived.effectiveSt).toBe(10);
+  expect(detail.activeEffects[0].effects[0].value).toBe(2);
   const history = await (
     await request(player.accessToken, `/characters/${character.id}/history`)
   ).text();
   expect(history).toContain('Applied Battle Potion');
 }, 30000);
+
+it('defaults active effects off, preserves saved rows while disabled, and applies the gate through REST and sync', async () => {
+  const owner = await user();
+  const token = owner.accessToken;
+  const campaign = await create(token, '/campaigns', { name: 'Gated effects' });
+  expect(campaign.experimentalActiveEffects).toBe(false);
+  const character = await create(token, '/characters', {
+    name: 'Gated hero',
+    campaignId: campaign.id,
+  });
+  const path = `/campaigns/${campaign.id}/library/active-effects`;
+  const definition = activeEffectDefinitionCreate.parse({
+    name: 'Focused draught',
+    stacking: { kind: 'additive', key: 'focused-draught' },
+    effects: [
+      {
+        target: 'st',
+        value: 2,
+        conditionGroup: 'focused',
+        conditionLabel: 'Focused',
+      },
+    ],
+  });
+  const forbiddenDefinition = await request(token, path, 'POST', definition);
+  expect(forbiddenDefinition.status).toBe(403);
+  expect(await forbiddenDefinition.json()).toMatchObject({
+    error: 'Active effects are disabled for this campaign',
+  });
+  const rejectedCharacterPatch = await request(token, `/characters/${character.id}`, 'PATCH', {
+    activeEffects: [],
+  });
+  expect(rejectedCharacterPatch.status).toBe(403);
+  expect(await rejectedCharacterPatch.json()).toMatchObject({
+    error: 'Active effects are disabled for this campaign',
+  });
+  const sync = async (fieldPath: string, attemptedValue: unknown) =>
+    (
+      await request(token, '/sync/operations', 'POST', {
+        operations: [
+          {
+            clientOpId: randomUUID(),
+            entityClass: 'character',
+            entityId: character.id,
+            command: 'patch',
+            createdAt: new Date().toISOString(),
+            fieldPath,
+            attemptedValue,
+          },
+        ],
+      })
+    ).json();
+  expect((await sync('activeEffects', [])).outcomes[0].status).toBe('unauthorized');
+  expect((await sync('activeConditionGroups', ['focused'])).outcomes[0].status).toBe(
+    'unauthorized',
+  );
+
+  await request(token, `/campaigns/${campaign.id}`, 'PATCH', { experimentalActiveEffects: true });
+  const saved = await create(token, path, definition);
+  let detail = await (
+    await request(token, `/characters/${character.id}`, 'PATCH', {
+      activeEffects: [
+        {
+          ...instantiateEffect(saved, randomUUID(), new Date().toISOString()),
+          definitionId: saved.id,
+          sourceCampaignId: campaign.id,
+          sourceRevision: saved.revision,
+        },
+      ],
+      activeConditionGroups: ['focused'],
+    })
+  ).json();
+  expect(detail.derived.effectiveSt).toBe(12);
+  const retainedInstances = detail.activeEffects;
+  const disabledCampaign = await (
+    await request(token, `/campaigns/${campaign.id}`, 'PATCH', {
+      experimentalActiveEffects: false,
+    })
+  ).json();
+  expect(disabledCampaign.experimentalActiveEffects).toBe(false);
+  detail = await (await request(token, `/characters/${character.id}`)).json();
+  expect(detail.derived.effectiveSt).toBe(10);
+  expect(detail.activeEffects).toEqual(retainedInstances);
+  expect(detail.activeConditionGroups).toEqual(['focused']);
+  const archivedYaml = await (
+    await request(token, `/campaigns/${campaign.id}/library/export`)
+  ).text();
+  expect(parseLibraryYaml(archivedYaml).library.activeEffects?.[0]?.name).toBe('Focused draught');
+  await request(token, `/campaigns/${campaign.id}`, 'PATCH', { experimentalActiveEffects: true });
+  detail = await (await request(token, `/characters/${character.id}`)).json();
+  expect(detail.derived.effectiveSt).toBe(12);
+}, 30000);
+
 it('captures skill procedures in owned snapshots and recalculates benefits after point edits', async () => {
   const owner = await user();
   const token = owner.accessToken;

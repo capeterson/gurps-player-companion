@@ -123,7 +123,13 @@ export function LibraryPage({
   const localLibrary = useLocalLibrary(campaignId);
   const library: LocalLibrary = localLibrary ?? emptyLibrary();
 
-  const section = parseSection(params.get('section'));
+  const activeEffectsEnabled = currentCampaign?.experimentalActiveEffects === true;
+  const requestedSection = parseSection(params.get('section'));
+  const section =
+    requestedSection === 'activeEffects' && !activeEffectsEnabled ? 'traits' : requestedSection;
+  const visibleSections = SECTIONS.filter(
+    ({ key }) => key !== 'activeEffects' || activeEffectsEnabled,
+  );
   const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState(() => params.get('q') ?? '');
   const deferredSearch = useDeferredValue(search);
@@ -323,30 +329,34 @@ export function LibraryPage({
         .flat()
         .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length;
       const selectedSourceKeys = sourceKeys && new Set(sourceKeys.map(canonicalLibraryKey));
-      const preview = sections.flatMap(([label, key, naturalKey]) => {
-        const incomingRows = incoming[key];
-        // Omitted optional sections are intentionally untouched by Replace.
-        if (!incomingRows) return [];
-        const current = localLibrary?.[key];
-        const incomingKeys = new Set(incomingRows.map((entry) => naturalKey(entry as never)));
-        return [
-          {
-            label,
-            incoming: incomingRows.length,
-            removed:
-              mode === 'replace' && current
-                ? current.filter(
-                    (entry) =>
-                      (!selectedSourceKeys ||
-                        (key !== 'sources' &&
-                          'sourceKey' in entry &&
-                          selectedSourceKeys.has(canonicalLibraryKey(String(entry.sourceKey))))) &&
-                      !incomingKeys.has(naturalKey(entry as never)),
-                  ).length
-                : null,
-          },
-        ];
-      });
+      const preview = sections
+        .filter(([, key]) => key !== 'activeEffects' || activeEffectsEnabled)
+        .flatMap(([label, key, naturalKey]) => {
+          const incomingRows = incoming[key];
+          // Omitted optional sections are intentionally untouched by Replace.
+          if (!incomingRows) return [];
+          const current = localLibrary?.[key];
+          const incomingKeys = new Set(incomingRows.map((entry) => naturalKey(entry as never)));
+          return [
+            {
+              label,
+              incoming: incomingRows.length,
+              removed:
+                mode === 'replace' && current
+                  ? current.filter(
+                      (entry) =>
+                        (!selectedSourceKeys ||
+                          (key !== 'sources' &&
+                            'sourceKey' in entry &&
+                            selectedSourceKeys.has(
+                              canonicalLibraryKey(String(entry.sourceKey)),
+                            ))) &&
+                        !incomingKeys.has(naturalKey(entry as never)),
+                    ).length
+                  : null,
+            },
+          ];
+        });
       setImportError(null);
       setImportMessage(null);
       setPendingImport({
@@ -651,7 +661,7 @@ export function LibraryPage({
 
       <div ref={toolbarRef} className="library-toolbar" style={{ top: `${headerBottom}px` }}>
         <div className="flex gap-2 overflow-x-auto pb-0.5 sm:flex-wrap sm:overflow-visible">
-          {SECTIONS.map(({ key, label }) => (
+          {visibleSections.map(({ key, label }) => (
             <button
               key={key}
               type="button"
@@ -713,7 +723,7 @@ export function LibraryPage({
           <TechniquesSection {...shell('techniques')} />
           <StylesSection {...shell('styles')} />
           <EnchantmentsSection {...shell('enchantments')} />
-          <ActiveEffectsSection {...shell('activeEffects')} />
+          {activeEffectsEnabled && <ActiveEffectsSection {...shell('activeEffects')} />}
         </div>
       )}
     </div>

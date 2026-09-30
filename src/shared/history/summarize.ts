@@ -74,6 +74,7 @@ const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
   shareCharacterSheets: 'Sheet sharing',
   allowGmCharacterEditing: 'GM character editing',
   experimentalTurnTracker: 'Experimental turn tracker',
+  experimentalActiveEffects: 'Experimental active effects',
   ownerId: 'Owner',
 };
 
@@ -495,6 +496,8 @@ function summarizeCampaign(
       msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'experimentalTurnTracker') {
       msgs.push(`Experimental turn tracker ${c.newValue ? 'enabled' : 'disabled'}`);
+    } else if (c.field === 'experimentalActiveEffects') {
+      msgs.push(`Experimental active effects ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'enforceAttributeCaps') {
       msgs.push(`Attribute caps ${c.newValue ? 'enabled' : 'disabled'}`);
     } else {

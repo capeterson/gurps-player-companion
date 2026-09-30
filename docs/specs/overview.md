@@ -191,7 +191,10 @@ character URL with one of these hashes selects the matching section, opens its
 panel, and scrolls to the highlighted entry. Inventory links reveal nested
 items inside closed containers. Weapon names in Attacks, armor layers and DB
 sources in Incoming attack, and equipment named in active defenses
-link to their inventory entries without a page reload.
+link to their inventory entries without a page reload. Incoming attack lists innate
+DR by contributing source name and source ID, combining declarations from the same
+source. Trait contributions link to the owned trait row; the target is revealed
+through search and column filters without automatically opening its editor.
 
 First-time users without characters see a **Create your first character** action and
 campaign-invitation guidance instead of returning-user copy. Character creation trims
@@ -235,8 +238,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The Overview section places the foldable sheet overview (attributes, secondary
   stats, status, ledger, encumbrance and conditional effects) above the Identity
   panel; other destinations do not display it. When folded, it shows effective
-  ST/DX/IQ/HT. Every visible sheet panel and main Combat section has a keyboard-accessible
-  folding header. On Combat, Attacks, Incoming attack, and the optional Turn
+  ST/DX/IQ/HT. Attributes, Secondary attributes, and Status stay expanded inside
+  it, with one heading each. Point ledger, Encumbrance, and Conditional effects
+  fold independently and shrink to their headings without stretching to fill
+  neighboring cards. Conditional effects is absent unless the campaign active-effects
+  experiment is enabled and condition groups exist. Skills, Traits, Inventory, and main Combat sections have keyboard-accessible
+  folding headers. Magic collections instead have plain headings and compact tables. On Combat, Attacks, Incoming attack, and the optional Turn
   tracker fold independently. Incoming attack groups the body map, target/facing
   controls, active defenses, DR, and damage application in one open-by-default
   section. Main section headers use matching outline icons where the
@@ -249,7 +256,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 - **Markdown descriptions.** Library traits, skills and spells render sanitized
   CommonMark/GFM descriptions; their spacious add/edit forms (including skill
   specialization description overrides) use the shared formatting toolbar and
-  raw-markdown mode. Character skill/spell copied notes have expandable markdown
+  raw-markdown mode. Character skill copied notes have expandable markdown
   descriptions. Trait notes render markdown for readers and offer a markdown
   preview beside the compact source editor for owners. Only safe links retain
   link styling and navigation after sanitization.
@@ -260,7 +267,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   tracked — the character's owner (the authenticated user who created
   it) is the player. **Tech level** is likewise not set per character:
   it's read-only here, sourced from the parent campaign (or an em dash
-  when campaignless). Description is edited with the same
+  when campaignless). Description opens as sanitized markdown with clickable
+  links. Owners use its pencil **Edit description** action to open the editor;
+  **Done editing description** commits the current draft and returns to the
+  rendered view. The editor stays mounted once opened so closing it preserves
+  its draft and source/rich mode. Rollbacks flash the description in either mode.
+  Description is edited with the same
   WYSIWYG **markdown editor** (`RichTextEditor`/`Markdown`,
   `src/client/components/markdown/`) used by the adventure log, with a
   raw-markdown/source toggle and sanitized rendering. It has no separate
@@ -268,7 +280,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 - **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt. Pending confirmation clears when the displayed character or its campaign changes.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
-  damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary** card
+  damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary attributes** card
   surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
   Move) with their effective values and per-stat ✦ temp-modifier
   popovers. The **Status** card shows derived combat values not displayed
@@ -312,7 +324,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v14. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Active effects and conditional modifiers are behind the owner-only **Campaign settings → Experimental features → Enable active effects** (`experimentalActiveEffects`), off for new and existing campaigns. Disabled campaigns hide all related controls/library authoring and ignore their calculations while retaining stored data; manual temporary stat modifiers and skill procedures remain available. When enabled, campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v14. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -483,11 +495,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   with confirmed deletion. Closing either disclosure preserves drafts. Languages
   and Techniques use the shared filterable table and their outer fold heading
   without repeating inner titles. See [interaction-design.md](interaction-design.md).
-- **Magic**: spells (college, difficulty, energy cost), a **cast-spell**
-  helper, **mana level** from campaign, and **powerstones / magic items**.
-  On mobile, the add form, spell fields, stored-energy controls, magic-item
-  controls, and cast-dialog resource rows stack in place with visible labels;
-  the spell list never falls back to a desktop-width horizontal scroller.
+- **Magic**: a full-width shared spell table, **mana level** from campaign,
+  and compact **powerstones / magic items** tables with Inventory links. There
+  are no outer collection folds or nested description cards. Spells show college,
+  difficulty, points, rollable level, discounted energy cost/upkeep and casting
+  time, with search, sorting and column filters. Names open read-only Markdown
+  reference dialogs; pencils open retained inline editors. Add spell starts
+  closed. Spell anchors reveal filtered rows without opening editing.
+  Below 640px names/levels remain aligned, costs/time become metadata, and
+  mutation actions share a horizontal row. Cast/Maintain open a separate
+  Source/Available/Spend payment table, whose confirmation names the energy spent.
+  Rolling and energy payment remain separate, with no automatic spell resolution.
+  Every dialog fits the dynamic viewport; long names wrap without page scrolling.
   Spells have no default: a 0-point (legacy) spell row has a null level,
   gets no energy discount, and its Cast/Maintain actions are held. The
   cast dialog suggests drawing from a single powerstone and warns when
@@ -875,7 +894,7 @@ there is no decorative cover slot or implied image-upload feature.
   whole-entry patches, AGENTS.md S13) with the standard rejection toast and row
   flash. **Restricted** entries remain GM-only across library reads, export,
   sync and history; existing character snapshots remain usable. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
-  CRUD forms for all eleven categories, including **languages, techniques and styles**.
+  CRUD forms for ten standard categories plus the opt-in Active Effects experiment, including **languages, techniques and styles**.
   The dedicated character-sheet Languages and Techniques panels consume their
   definitions through autocompletes; styles remain library reference packages. Built for
   libraries with hundreds of entries: each category is one compact table with
@@ -883,7 +902,7 @@ there is no decorative cover slot or implied image-upload feature.
   light category groups that fold (traits by kind, skills by attribute, spells
   by college, items by category, languages by spoken/sign form, techniques by
   default skill, styles by first component skill, enchantments by applicability,
-  active effects by first tag) and a jump strip to any group. Group anchors retain
+  enabled active effects by first tag) and a jump strip to any group. Group anchors retain
   distinct identities for Unicode, case and punctuation variations. Rows show the name, key numbers
   and a one-line source excerpt that preserves punctuation (including comparison
   symbols and literal Markdown characters); opening a row renders its full Markdown
@@ -1148,7 +1167,7 @@ src/
       help/      CampaignLibraryHelpPage and campaign-library.md (in-app authoring guide)
       characters/CharacterCard.tsx  Shared character cards for home, listing, campaign roster and GM dashboard
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
-      characters/sheetAnchors.ts and InventoryAnchorLink.tsx  Stable entry hashes and routed equipment links
+      characters/sheetAnchors.ts, SheetAnchorLink.tsx and InventoryAnchorLink.tsx  Stable entry hashes and routed source/equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       structured Range inputs and transactional JSON-property mutations
       characters/sections/  Sheet-panel form plumbing shared across
@@ -1313,7 +1332,8 @@ Full detail: [architecture.md](architecture.md).
 The standard `bun run db:seed` refreshes the Sample library and creates a populated
 Lantern Coast campaign with six separately owned characters, eleven library categories,
 four fictional sourcebooks with distinct abbreviations, current pricing snapshots,
-shared/private adventure logs, and an experimental encounter. See the
+shared/private adventure logs, and an experimental encounter. Active-effect
+demonstrations remain stored with the active-effects experiment off. See the
 [seed guide](../../bootstrap/README.md) for credentials and test cases. Creation is
 transactional and serialized; existing Lantern campaigns are skipped by owner/name
 so test edits survive reruns. Campaign/character fixtures use the normal API

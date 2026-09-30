@@ -124,6 +124,20 @@ The client mirrors the switch into Dexie and tightens the existing draft input
 bounds immediately; the server remains authoritative and an asynchronous sync
 rejection still uses the standard toast + rollback flash path.
 
+### Experimental active effects
+
+`experimentalActiveEffects` is owner-controlled and defaults false for new and
+existing campaigns (migration 0063). **Experimental features → Enable active
+effects** exposes active instance management, the library category, conditional
+modifier controls/authoring and the experimental guide section. Disabled campaigns
+and campaignless or unresolved local campaigns neither display these tools nor
+apply active instances or conditional declarations in shared calculations. Stored
+data is retained. Dedicated instance/group and definition mutations are gated in
+shared REST/sync/MCP handlers; YAML transfer remains available for archived data.
+Campaign PATCH is online-only and audited; REST/cursor mirrors preserve the saved
+choice offline. Manual temporary stat modifiers and skill procedures are independent.
+See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).
+
 ### Experimental turn tracking
 
 `experimentalTurnTracker` is an owner-controlled campaign setting, default false

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { Link, useInRouterContext } from 'react-router-dom';
-import { sheetAnchorHash } from './sheetAnchors.ts';
+import { SheetAnchorLink } from './SheetAnchorLink.tsx';
 
 export function InventoryAnchorLink({
   itemId,
@@ -11,15 +10,9 @@ export function InventoryAnchorLink({
   children: ReactNode;
   className?: string;
 }) {
-  const hash = sheetAnchorHash('inventory', itemId);
-  const inRouter = useInRouterContext();
-  return inRouter ? (
-    <Link to={{ hash }} className={className}>
+  return (
+    <SheetAnchorLink kind="inventory" id={itemId} className={className}>
       {children}
-    </Link>
-  ) : (
-    <a href={hash} className={className}>
-      {children}
-    </a>
+    </SheetAnchorLink>
   );
 }

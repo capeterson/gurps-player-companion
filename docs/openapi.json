@@ -8008,6 +8008,9 @@
                       "experimentalTurnTracker": {
                         "type": "boolean"
                       },
+                      "experimentalActiveEffects": {
+                        "type": "boolean"
+                      },
                       "houseRules": {
                         "type": "object",
                         "properties": {
@@ -8168,6 +8171,7 @@
                       "shareCharacterSheets",
                       "allowGmCharacterEditing",
                       "experimentalTurnTracker",
+                      "experimentalActiveEffects",
                       "members",
                       "createdAt",
                       "updatedAt",
@@ -8368,6 +8372,9 @@
                   },
                   "experimentalTurnTracker": {
                     "type": "boolean"
+                  },
+                  "experimentalActiveEffects": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -8454,6 +8461,9 @@
                       ]
                     },
                     "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
+                    "experimentalActiveEffects": {
                       "type": "boolean"
                     },
                     "houseRules": {
@@ -8616,6 +8626,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -8749,6 +8760,9 @@
                     "experimentalTurnTracker": {
                       "type": "boolean"
                     },
+                    "experimentalActiveEffects": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -8909,6 +8923,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -9130,6 +9145,9 @@
                   "experimentalTurnTracker": {
                     "type": "boolean"
                   },
+                  "experimentalActiveEffects": {
+                    "type": "boolean"
+                  },
                   "coverAssetId": {
                     "type": "string",
                     "nullable": true,
@@ -9217,6 +9235,9 @@
                       ]
                     },
                     "experimentalTurnTracker": {
+                      "type": "boolean"
+                    },
+                    "experimentalActiveEffects": {
                       "type": "boolean"
                     },
                     "houseRules": {
@@ -9379,6 +9400,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -9579,6 +9601,9 @@
                     "experimentalTurnTracker": {
                       "type": "boolean"
                     },
+                    "experimentalActiveEffects": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -9739,6 +9764,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -9913,6 +9939,9 @@
                     "experimentalTurnTracker": {
                       "type": "boolean"
                     },
+                    "experimentalActiveEffects": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -10073,6 +10102,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -10301,6 +10331,9 @@
                     "experimentalTurnTracker": {
                       "type": "boolean"
                     },
+                    "experimentalActiveEffects": {
+                      "type": "boolean"
+                    },
                     "houseRules": {
                       "type": "object",
                       "properties": {
@@ -10461,6 +10494,7 @@
                     "shareCharacterSheets",
                     "allowGmCharacterEditing",
                     "experimentalTurnTracker",
+                    "experimentalActiveEffects",
                     "members",
                     "createdAt",
                     "updatedAt",
@@ -35419,6 +35453,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Campaign access forbidden or active effects disabled",
             "content": {
               "application/json": {
                 "schema": {

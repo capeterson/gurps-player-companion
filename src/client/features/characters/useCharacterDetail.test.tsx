@@ -1,12 +1,25 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { useEffect } from 'react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import type { LibraryMechanics } from '../../../shared/schemas/libraryMechanics.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { tokenStore } from '../../lib/tokenStore.ts';
-import { getSyncOrchestrator, resetSyncOrchestratorForTests } from '../../sync/orchestrator.ts';
+import {
+  getSyncOrchestrator,
+  resetSyncOrchestratorForTests,
+  setRejectionNotifier,
+} from '../../sync/orchestrator.ts';
 import { enqueueFieldPatch } from '../../sync/outbox.ts';
 import { GmCampaignDashboardPage } from '../campaigns/GmCampaignDashboardPage.tsx';
 import { GmCharacterCard } from '../campaigns/GmCharacterCard.tsx';
@@ -100,10 +113,31 @@ async function seed(mechanics: LibraryMechanics | undefined = snapshot) {
 }
 
 afterEach(() => {
+  const scrollMethod = originalScrollIntoView;
+  if (scrollMethod) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollMethod);
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
   vi.unstubAllGlobals();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
+  setRejectionNotifier(null);
 });
+
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'scrollIntoView',
+);
+
+function RouteLocationProbe() {
+  const location = useLocation();
+  return (
+    <output aria-label="Current route">
+      {`${location.pathname}${location.search}${location.hash}`}
+    </output>
+  );
+}
 
 describe('durable character mechanics', () => {
   it.each([true, false])('retains a detached owned copy offline, known=%s', async (known) => {
@@ -244,6 +278,8 @@ describe('durable character mechanics', () => {
       pointTarget: null,
       disadvantageCap: null,
       quirkCap: null,
+      houseRules: campaignHouseRules.parse({ protectNaturalDr: true }),
+      experimentalActiveEffects: false,
       revision: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -256,6 +292,7 @@ describe('durable character mechanics', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+    client.setQueryData(['campaigns'], []);
 
     render(
       <QueryClientProvider client={client}>
@@ -277,13 +314,355 @@ describe('durable character mechanics', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
     expect(screen.getByRole('button', { name: /^Sheet overview/ })).toBeVisible();
-    await waitFor(() => expect(screen.getByText('Description')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Character description' })).toBeInTheDocument(),
+    );
     expect(screen.getByRole('complementary', { name: 'Current Status' })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
-    expect(screen.getByLabelText('description')).toHaveAttribute('contenteditable', 'true');
-    expect(screen.getByRole('button', { name: 'Bold' })).toBeVisible();
+    expect(screen.getByText('No description yet.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Edit description' })).toBeVisible();
+    expect(screen.queryByLabelText('description')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bold' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument();
+  });
+
+  it('links active innate DR to the named trait and reveals its row without opening edit mode', async () => {
+    await seed({
+      ...snapshot,
+      effects: [{ target: 'dr', value: 2, scaling: 'flat' }],
+    });
+    await getLocalDb().campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      houseRules: campaignHouseRules.parse({ protectNaturalDr: true }),
+      experimentalActiveEffects: false,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+    client.setQueryData(['campaigns'], []);
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+          <RouteLocationProbe />
+          <Routes>
+            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Open character navigation' })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Combat' }));
+    const incomingAttack = await screen.findByRole('button', { name: 'Incoming attack' });
+    if (incomingAttack.getAttribute('aria-expanded') === 'false') {
+      fireEvent.click(incomingAttack);
+    }
+    const protection = await screen.findByRole('list', { name: 'Protection layers' });
+    const source = within(protection).getByRole('link', { name: 'Reflexes' });
+    expect(source).toHaveAttribute('href', `/characters/${CID}#trait-${TRAIT}`);
+    fireEvent.click(source);
+
+    const traitRow = document.getElementById(`trait-${TRAIT}`);
+    expect(traitRow).toBeVisible();
+    expect(traitRow).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByLabelText('Current route')).toHaveTextContent(
+      `/characters/${CID}#trait-${TRAIT}`,
+    );
+    expect(screen.getByRole('button', { name: 'Edit Reflexes' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Edit Reflexes' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Reflexes' }));
+    expect(screen.getByText('Source & rules')).toBeVisible();
+  });
+
+  it('shows description Markdown by default, retains its editor draft, and queues a clear as empty text', async () => {
+    await seed(undefined);
+    await getLocalDb().outbox.clear();
+    await getLocalDb().rejectionToasts.clear();
+    await getLocalDb().campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+    client.setQueryData(['campaigns'], []);
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+          <Routes>
+            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const description = await screen.findByRole('group', { name: 'Character description' });
+    expect(description).toBeVisible();
+    expect(screen.getByText('Description', { exact: true })).toBeVisible();
+    expect(screen.getByText('No description yet.')).toBeVisible();
+    expect(screen.queryByLabelText('description')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit raw markdown' }));
+    const editor = screen.getByRole('textbox', { name: 'description' });
+    fireEvent.change(editor, {
+      target: { value: '[A useful reference](https://example.com/reference)' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done editing description' }));
+    expect(await screen.findByRole('link', { name: 'A useful reference' })).toHaveAttribute(
+      'href',
+      'https://example.com/reference',
+    );
+    await waitFor(async () => {
+      const op = (await getLocalDb().outbox.toArray()).find(
+        (row) => row.fieldPath === 'appearance',
+      );
+      expect(op?.attemptedValue).toBe('[A useful reference](https://example.com/reference)');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }));
+    expect(screen.getByRole('button', { name: 'Back to rich text' })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'description' })).toHaveValue(
+      '[A useful reference](https://example.com/reference)',
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: 'description' }), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done editing description' }));
+    expect(screen.getByText('No description yet.')).toBeVisible();
+    await waitFor(async () => {
+      const op = (await getLocalDb().outbox.toArray()).find(
+        (row) => row.fieldPath === 'appearance',
+      );
+      expect(op?.attemptedValue).toBeNull();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }));
+    expect(screen.getByRole('textbox', { name: 'description' })).toHaveValue('');
+  });
+
+  it('rolls a rejected description back visibly and reports the reason', async () => {
+    await seed(undefined);
+    await getLocalDb().outbox.clear();
+    await getLocalDb().rejectionToasts.clear();
+    await getLocalDb().campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    const fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/v1/campaigns')) {
+        return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map(({ clientOpId }) => ({
+              clientOpId,
+              status: 'rejected',
+              reason: 'description rejected in test',
+            })),
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (url.includes('/sync/cursor')) {
+        return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const realToast =
+      await vi.importActual<typeof import('../../lib/toast.tsx')>('../../lib/toast.tsx');
+    function ToastRejectionBridge() {
+      const toasts = realToast.useToasts();
+      useEffect(() => {
+        setRejectionNotifier((record) => {
+          toasts.push(`Couldn't sync ${record.humanName} — ${record.reason}`, {
+            kind: 'error',
+            persistent: true,
+            id: record.id,
+          });
+        });
+        return () => setRejectionNotifier(null);
+      }, [toasts]);
+      return null;
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+    client.setQueryData(['campaigns'], []);
+    render(
+      <QueryClientProvider client={client}>
+        <realToast.ToastProvider>
+          <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+            <Routes>
+              <Route path="/characters/:id" element={<CharacterSheetPage />} />
+            </Routes>
+          </MemoryRouter>
+          <ToastRejectionBridge />
+        </realToast.ToastProvider>
+      </QueryClientProvider>,
+    );
+    const description = await screen.findByRole('group', { name: 'Character description' });
+    expect(description).toBeVisible();
+    getSyncOrchestrator().start();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit raw markdown' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'description' }), {
+      target: { value: 'Unsaved description' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Done editing description' }));
+    await waitFor(async () => {
+      expect(await getLocalDb().outbox.count()).toBe(0);
+      expect(await getLocalDb().characters.get(CID)).toMatchObject({ appearance: null });
+    });
+    expect(await screen.findByText('No description yet.')).toBeVisible();
+    await waitFor(() => expect(description).toHaveAttribute('data-flashing', 'true'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't sync description — description rejected in test",
+    );
+    getSyncOrchestrator().stop();
+    setRejectionNotifier(null);
+  });
+
+  it('shows condition controls only for effect groups and applies their modifiers when enabled', async () => {
+    await seed(snapshot);
+    await getLocalDb().outbox.clear();
+    await getLocalDb().rejectionToasts.clear();
+    await getLocalDb().campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      viewerRole: 'owner',
+      name: 'Local Campaign',
+      description: null,
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      experimentalActiveEffects: false,
+      revision: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    tokenStore.write({
+      accessToken: `header.${btoa(JSON.stringify({ sub: 'owner' }))}.signature`,
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 3600,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['auth', 'me'], { id: 'owner', displayName: 'Owner' });
+    client.setQueryData(['campaigns'], []);
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/characters/${CID}`]}>
+          <Routes>
+            <Route path="/characters/:id" element={<CharacterSheetPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Attributes' })).toBeVisible());
+    expect(screen.queryByRole('button', { name: 'Conditional effects' })).not.toBeInTheDocument();
+
+    const conditionalMechanics: LibraryMechanics = {
+      ...snapshot,
+      effects: [
+        {
+          target: 'dx',
+          value: 2,
+          scaling: 'flat',
+          conditionGroup: 'focused',
+          conditionLabel: 'Focused',
+        },
+      ],
+    };
+    await getLocalDb().characterTraits.update(TRAIT, { libraryMechanics: conditionalMechanics });
+    expect(screen.queryByRole('button', { name: 'Conditional effects' })).not.toBeInTheDocument();
+    await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Conditional effects' })).toBeVisible(),
+    );
+    const focused = screen.getByRole('checkbox', { name: 'Focused' });
+    expect(focused).not.toBeChecked();
+    fireEvent.click(focused);
+    await waitFor(async () =>
+      expect((await getLocalDb().characters.get(CID))?.activeConditionGroups).toEqual(['focused']),
+    );
+    await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: false });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Conditional effects' })).not.toBeInTheDocument(),
+    );
+    expect((await getLocalDb().characters.get(CID))?.activeConditionGroups).toEqual(['focused']);
+    const sheetOverview = screen.getByRole('button', { name: /^Sheet overview/ });
+    fireEvent.click(sheetOverview);
+    expect(sheetOverview).toHaveTextContent('ST 10 · DX 10');
+    await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
+    await waitFor(() => expect(sheetOverview).toHaveTextContent('ST 10 · DX 12'));
+    fireEvent.click(sheetOverview);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Conditional effects' })).toBeVisible(),
+    );
+    const reenabledFocused = screen.getByRole('checkbox', { name: 'Focused' });
+    expect(reenabledFocused).toBeChecked();
+    fireEvent.click(reenabledFocused);
+    await waitFor(async () =>
+      expect((await getLocalDb().characters.get(CID))?.activeConditionGroups).toEqual([]),
+    );
   });
 
   it('renders human labels for active and legacy dismissed warning codes', async () => {

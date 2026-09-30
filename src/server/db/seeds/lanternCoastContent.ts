@@ -59,6 +59,8 @@ export async function populateLanternCoast({
       name: LANTERN_CAMPAIGN_NAME,
       shareCharacterSheets: true,
       experimentalTurnTracker: true,
+      // Author the retained demonstrations through the normal guarded API.
+      experimentalActiveEffects: true,
       allowGmCharacterEditing: false,
     }),
   );
@@ -253,5 +255,7 @@ export async function populateLanternCoast({
     maintenanceCost: 1,
     notes: 'Tracker-only reminder; intentionally not linked to an automatic sheet bonus.',
   });
+  // Finished demo campaigns follow the same off-by-default active-effects policy.
+  await request(ownerActor, campaignPath, 'PATCH', { experimentalActiveEffects: false });
   return { campaignId: campaign.id, characterIds };
 }
