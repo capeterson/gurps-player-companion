@@ -426,6 +426,23 @@ export function lastSuccessfulSyncKey(): string {
   return `lastSuccessfulSyncOperation:${readUserIdFromToken() ?? 'session'}`;
 }
 
+/** A requested HTTP check counts even when the server has no new rows. */
+export async function rememberSuccessfulManualSync(): Promise<void> {
+  const db = getLocalDb();
+  const key = lastSuccessfulSyncKey();
+  const at = new Date().toISOString();
+  await db.transaction('rw', db.syncMeta, async () => {
+    const previous = (await db.syncMeta.get(key))?.value;
+    if (
+      typeof previous !== 'string' ||
+      !Number.isFinite(Date.parse(previous)) ||
+      Date.parse(previous) < Date.parse(at)
+    ) {
+      await db.syncMeta.put({ key, value: at });
+    }
+  });
+}
+
 export function isSuccessfulSyncOperation(entry: SyncLogEntry): boolean {
   if (entry.result !== 'synced') return false;
   if (entry.direction === 'push') return true;

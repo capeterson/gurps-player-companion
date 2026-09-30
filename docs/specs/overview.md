@@ -1009,10 +1009,12 @@ settings sections; switching sections retains drafts.
   remain separate. Subject titles show names and link to existing entities;
   before/after focuses on changed fields and nested settings. Campaign creation,
   settings, ownership changes, deletion, and aggregate YAML imports journal their
-  online-only writes. WebSocket status and relative last-connection/last-successful
-  operation times remain independent of HTTP sync; empty polls do not reset the
-  successful-operation time. Larger diagnostic payloads use device-local gzip storage and load
-  when a change opens; closed rows/folds do not format their bodies. Debug
+  online-only writes. WebSocket status and its relative last-connection time
+  stay separate from the HTTP last-successful-sync time. The log's **Sync now**
+  button runs an HTTP outbox/cursor cycle and refreshes the last-sync time after
+  success, even when nothing changed. Automatic empty polls leave that time alone.
+  Larger diagnostic payloads use device-local gzip storage and load when a
+  change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
 - **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
   share horizontal collision handling, dynamic-viewport width limits, and content
