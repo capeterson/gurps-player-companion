@@ -27,7 +27,7 @@ export function HomePage() {
       <section className="card overflow-hidden p-card sm:p-8">
         <div className="max-w-2xl space-y-3">
           <p className="label-eyebrow">Welcome</p>
-          <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl">
+          <h1 className="font-display text-4xl font-semibold leading-tight [overflow-wrap:anywhere] sm:text-5xl">
             {me.data?.displayName ?? 'Adventurer'}
           </h1>
           {characters?.length === 0 ? (

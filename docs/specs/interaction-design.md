@@ -225,8 +225,9 @@ narrow screens.
 Adventure-log titles, author names, and locations wrap within their cards even
 when the text contains no spaces.
 
-Long account names remain width-bounded in the shared header through tablet
-widths; opening the account menu must not horizontally scroll the page.
+Long account names remain width-bounded in the shared header at all breakpoints;
+opening the account menu must not horizontally scroll the page. The home welcome
+heading wraps unbroken account names within its card.
 
 Detailed encounter NPC and effect forms open in the native dialog top layer, above the
 sticky app header. Their height stays within the dynamic viewport, with internal

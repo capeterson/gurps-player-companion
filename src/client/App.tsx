@@ -328,7 +328,7 @@ export function App() {
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
               <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
                 <span className="hidden sm:inline text-muted">Signed in as</span>
-                <span className="max-w-[8rem] truncate sm:max-w-[12rem] lg:max-w-none">
+                <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
                   {me.data?.displayName ?? 'Account'}
                 </span>
                 <AppIcon name="chevronDown" size={14} />
