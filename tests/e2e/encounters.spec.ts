@@ -33,6 +33,7 @@ async function createCampaign(page: import('@playwright/test').Page, name: strin
   // Tracking is experimental and must be explicitly enabled by the owner.
   await expect(page.getByRole('button', { name: /new encounter/i })).toHaveCount(0);
   await page.getByRole('button', { name: /settings/i }).click();
+  await page.getByRole('button', { name: 'Rules', exact: true }).click();
   const tracker = page.getByRole('checkbox', { name: /Enable turn tracker/ });
   await expect(tracker).not.toBeChecked();
   await tracker.check();

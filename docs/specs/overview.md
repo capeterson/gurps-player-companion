@@ -68,7 +68,11 @@ checklists for extending sync/history) live in
 
 With object storage configured in production (or automatic local storage in
 development/test), character editors can add portraits and campaign owners can
-add covers. Selections and replacements queue locally,
+add covers. The Overview Identity panel shows a portrait or neutral silhouette;
+clicking it opens a portrait editor with upload/removal controls and image help.
+Campaign cover controls and help live in the Campaign section of the centered
+settings dialog, alongside separate Rules and Members sections. Workspace headers
+only display covers. Selections and replacements queue locally,
 including offline, and sync independently of text edits. Portraits also appear
 in minimal campaign views. Images are sanitized into two WebP sizes and served
 through public, unguessable, immutable URLs; browser caches may retain them after
@@ -836,8 +840,10 @@ character in the campaign is listed there, regardless of the share gate; rows a
 viewer only sees minimally deep-link to `/characters/:id`, which renders
 `CharacterMinimalView`. Adventure Log and History have dedicated sibling routes.
 Encounters appears when the experimental turn tracker is enabled, and GM dashboard
-appears for owners and managers. Campaign cards contain only real campaign data;
-there is no decorative cover slot or implied image-upload feature.
+appears for owners and managers. Campaign cards show stored covers when available, without a decorative cover
+slot when no image is assigned. Cover uploads and their help live in the
+Campaign section of the centered settings dialog. Rules and Members have separate
+settings sections; switching sections retains drafts.
 
 - Owner-editable **House rule sets** in campaign settings: None, J Talisar, or
   Custom. Named sets load their bundles; moving to Custom preserves all loaded
@@ -931,7 +937,7 @@ there is no decorative cover slot or implied image-upload feature.
    sheet in a new tab. The REST
    campaign mirror input stays stable across local subscription renders so
    the party query can settle instead of being invalidated by repeated mirror writes.
-- **Experimental turn tracking**: the owner enables **Campaign settings →
+- **Experimental turn tracking**: the owner enables **Campaign settings → Rules →
   Experimental features → Enable turn tracker** (`experimentalTurnTracker`).
   Defaults off for existing/new campaigns; campaignless characters also hide
   their local tracker. Missing pre-upgrade/offline settings count as off.
