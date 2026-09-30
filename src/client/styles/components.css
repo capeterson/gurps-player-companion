@@ -693,6 +693,20 @@ body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower-backdrop
   visibility: hidden;
 }
 
+/* Native dialogs retain their top layer and focus trap, while their grid follows
+   the visible viewport during pinch zoom, panning, and keyboard resizing. */
+dialog.modal[data-viewport-bounded="true"] {
+  inset: var(--dialog-viewport-top, 0px) auto auto var(--dialog-viewport-left, 0px);
+  width: var(--dialog-viewport-width, 100dvw);
+  height: var(--dialog-viewport-height, 100dvh);
+}
+@layer components {
+  dialog.modal[data-viewport-bounded="true"] > .modal-box {
+    max-height: calc(var(--dialog-viewport-height, 100dvh) - 2rem);
+    overflow-wrap: anywhere;
+  }
+}
+
 /* Campaign library: the section/search toolbar sticks under the app header
    (its `top` is set inline from the measured header) so category, search and
    group jumps stay reachable in long lists. The page unpins it when it would
@@ -738,5 +752,9 @@ body:has([aria-modal="true"]:not([hidden]), dialog[open]) .sheet-flower-backdrop
 }
 .library-content :is(input, select, textarea, [contenteditable="true"]) {
   scroll-margin-top: calc(var(--library-scroll-offset, 8rem) + 1.5rem);
+  scroll-margin-bottom: 0.5rem;
+}
+.library-content :is(button, a[href]) {
+  scroll-margin-top: var(--library-scroll-offset, 8rem);
   scroll-margin-bottom: 0.5rem;
 }

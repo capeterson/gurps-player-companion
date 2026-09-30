@@ -543,7 +543,7 @@ function SpellReferenceDialog({
       onClose={onClose}
       onCancel={onClose}
     >
-      <div className="modal-box w-[calc(100dvw-2rem)] max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-base-300 bg-base-100">
+      <div className="modal-box w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] max-w-xl max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] overflow-y-auto border border-base-300 bg-base-100">
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0 [overflow-wrap:anywhere]">
             <h3 className="break-words font-display text-xl">{spell.name}</h3>

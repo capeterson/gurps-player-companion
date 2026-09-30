@@ -228,6 +228,10 @@ Fold chevrons and counts retain their width; description excerpts stay truncated
 Focused library form fields retain their draft and stay below the sticky toolbar
 after rotation, visual-viewport resizing, and keyboard focus changes. Only an
 obscured active editing field is scrolled into the remaining working area.
+Long rich-text and raw Markdown editors use the editing caret rather than the
+whole editor's bounds, preserving the selection and draft while resizing, moving
+the selection, and typing, including horizontal panning during pinch zoom.
+Form actions reserve the same toolbar offset when scrolled or focused.
 When the toolbar would occupy more than half the visible area below the app
 header, it scrolls with the document and field offsets reserve only the header.
 Pinning returns when the viewport has enough room.
@@ -301,9 +305,10 @@ handling; each overlay combines that cap with its existing width limit so pinch
 zoom can shrink it and zooming out can restore it. Ref attachment installs the
 measurement listeners even when a panel mounts after its parent hook.
 Downward-opening panels can opt into the shared overlay hook's available-height
-measurement. The notification bell, account menu, and compact character/app menu
-use it to scroll within the remaining visual viewport below either a single-row
-or wrapped mobile header, including after rotation and pinch zoom. Menu items
+measurement. The notification bell, account menu, compact character/app menu,
+and posture/maneuver/conditions panels use it to scroll within the remaining
+visual viewport below either a single-row or wrapped mobile header, including
+after rotation and pinch zoom. Menu items
 remain in one column while their panel scrolls.
 
 The closed mobile sheet-navigation FAB shares the desktop dock's layer below
@@ -314,6 +319,12 @@ native modal dialogs hide the sheet navigation.
 HP/FP adjustment panels also cap their height to the remaining visual viewport,
 with internal scrolling that keeps endpoints, explanations, and controls reachable
 after pinch zoom and rotation.
+Temporary modifier popovers also use shared vertical collision handling and
+visual-viewport height caps below the sticky header so their Clear and Apply
+controls remain reachable.
+Native dialogs retain `showModal()` and its focus trap; the shared dialog hook
+centers their grid within the visual viewport during zoom, panning, and resizing.
+Dialog size preferences are capped by that visible area, with internal scrolling.
 
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
 award summaries. These tooltips retain horizontal collision handling, constrain

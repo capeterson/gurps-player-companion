@@ -1,6 +1,7 @@
 /**
  * Keeps an anchored overlay inside the visible horizontal viewport, with an
- * optional available-height constraint for downward-opening panels.
+ * optional available-height constraint for downward-opening panels and vertical
+ * collision handling for popovers that can lift above their triggers.
  *
  * Width constraints alone are not enough: a 296px dropdown anchored to a
  * bell in the middle of a 320px header can still start far off-screen. Every
@@ -26,6 +27,7 @@ export const VIEWPORT_OVERLAY_MARGIN = 8;
 export const VIEWPORT_OVERLAY_SHIFT_PROPERTY = '--viewport-overlay-shift-x';
 export const VIEWPORT_OVERLAY_WIDTH_PROPERTY = '--viewport-overlay-available-width';
 export const VIEWPORT_OVERLAY_HEIGHT_PROPERTY = '--viewport-overlay-available-height';
+export const VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY = '--viewport-overlay-shift-y';
 
 interface HorizontalBounds {
   left: number;
@@ -70,11 +72,13 @@ function visibleViewport(): ViewportBounds {
 export function useViewportBoundedOverlay<T extends HTMLElement>(
   active = true,
   externalRef?: RefObject<T | null>,
-  options?: { constrainHeight?: boolean },
+  options?: { constrainHeight?: boolean; shiftVertically?: boolean; minimumTop?: number },
 ): RefObject<T | null> | (RefCallback<T> & { readonly current: T | null }) {
   const elementRef = useRef<T | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const constrainHeight = options?.constrainHeight ?? false;
+  const shiftVertically = options?.shiftVertically ?? false;
+  const minimumTop = options?.minimumTop ?? 0;
 
   const update = useCallback(() => {
     if (!active) return;
@@ -93,14 +97,29 @@ export function useViewportBoundedOverlay<T extends HTMLElement>(
     );
     let rect = element.getBoundingClientRect();
     if (rect.width === 0) return;
-    if (constrainHeight) {
+    if (constrainHeight || shiftVertically) {
       const visual = window.visualViewport;
-      const bottom = visual ? visual.offsetTop + visual.height : window.innerHeight;
+      const viewportTop = visual?.offsetTop ?? 0;
+      const bottom = viewportTop + (visual?.height ?? window.innerHeight);
+      const top = Math.max(viewportTop, minimumTop);
+      const height = Math.max(0, bottom - top);
       element.style.setProperty(
         VIEWPORT_OVERLAY_HEIGHT_PROPERTY,
-        `${Math.max(0, bottom - rect.top - VIEWPORT_OVERLAY_MARGIN)}px`,
+        `${Math.max(0, shiftVertically ? height - 2 * VIEWPORT_OVERLAY_MARGIN : bottom - rect.top - VIEWPORT_OVERLAY_MARGIN)}px`,
       );
       rect = element.getBoundingClientRect();
+      if (shiftVertically) {
+        const current =
+          Number.parseFloat(
+            element.style.getPropertyValue(VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY),
+          ) || 0;
+        const next = horizontalViewportShift(
+          { left: rect.top, right: rect.bottom },
+          { left: top, width: height },
+          current,
+        );
+        element.style.setProperty(VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY, `${next}px`);
+      }
     }
     const currentShift =
       Number.parseFloat(element.style.getPropertyValue(VIEWPORT_OVERLAY_SHIFT_PROPERTY)) || 0;
@@ -111,7 +130,7 @@ export function useViewportBoundedOverlay<T extends HTMLElement>(
     // after the logical shift changes but before the DOM style does, which can
     // double the correction on an opening transition.
     element.style.setProperty(VIEWPORT_OVERLAY_SHIFT_PROPERTY, `${next}px`);
-  }, [active, constrainHeight, externalRef]);
+  }, [active, constrainHeight, shiftVertically, minimumTop, externalRef]);
 
   const release = useCallback(() => {
     cleanupRef.current?.();

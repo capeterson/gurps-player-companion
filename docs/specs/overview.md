@@ -928,7 +928,9 @@ settings sections; switching sections retains drafts.
   occupy more than half the visible area below the header, it scrolls with the page.
   Focused library form fields retain their draft and scroll below
   that toolbar when rotation, viewport resizing, or keyboard focus would conceal
-  the active field. On narrow screens the search field and its **Clear search**
+  the active field. Long rich-text and raw Markdown editors track the editing
+  caret, and form actions reserve the same toolbar offset. On narrow screens the
+  search field and its **Clear search**
   button wrap together onto a row below the source selector, preserving usable
   input width. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or
@@ -1074,7 +1076,11 @@ settings sections; switching sections retains drafts.
   tooltip and notifications panel use this shared behavior; the account and
   compact character/app menus clamp to the remaining
   visual viewport height and scroll internally, including after rotation or
-  pinch zoom. HP/FP adjustment panels use the same remaining-height constraint.
+  pinch zoom. HP/FP adjustment and posture/maneuver/conditions panels use the
+  same remaining-height constraint. Temporary modifier popovers also correct
+  vertical collisions so Clear and Apply stay reachable. Native dialogs center
+  and cap their boxes within the visual viewport during zoom and panning while
+  retaining the browser's modal focus trap.
   Growing overlays also clamp to dynamic viewport height and scroll
   internally where needed. A source guard rejects raw `data-tip` tooltips and
   anchored dropdown content that bypasses the collision helper.
@@ -1251,6 +1257,7 @@ src/
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
     lib/desktopNotifications.ts  Per-user browser opt-in, permission and delivery deduplication
+    lib/editingFocusBounds.ts  Rich-text selection and textarea caret geometry for library focus scrolling
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor, LibraryAdvancedFields, SkillRequirementsEditor,
                  ArmorFacetEditor, LibraryPackagesForms (language/technique/style authoring),

@@ -297,7 +297,7 @@ export function MediaImage({
             aria-labelledby={titleId}
             onClose={() => setEditorOpen(false)}
           >
-            <div className="modal-box max-h-[calc(100dvh-2rem)] w-[32rem] max-w-[calc(100dvw-2rem)] space-y-5 overflow-y-auto p-4 sm:p-6">
+            <div className="modal-box max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] w-[32rem] max-w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] space-y-5 overflow-y-auto p-4 sm:p-6">
               <header className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 id={titleId} className="font-display text-2xl font-semibold">

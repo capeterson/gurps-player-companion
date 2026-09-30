@@ -379,8 +379,14 @@ function ChoicePanel({
   alignEnd?: boolean;
   children: ReactNode;
 }) {
-  const panelStyle = { '--status-panel-top': `${panelTop}px` } as CSSProperties;
-  const panelRef = useViewportBoundedOverlay<HTMLElement>();
+  const panelStyle = {
+    '--status-panel-top': `${panelTop}px`,
+    maxHeight:
+      'min(calc(100dvh - var(--status-panel-top) - 1rem), var(--viewport-overlay-available-height, 100dvh))',
+  } as CSSProperties;
+  const panelRef = useViewportBoundedOverlay<HTMLElement>(true, undefined, {
+    constrainHeight: true,
+  });
   return (
     <section
       ref={panelRef}

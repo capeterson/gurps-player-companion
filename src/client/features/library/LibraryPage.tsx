@@ -37,6 +37,7 @@ import { getLocalDb } from '../../db/dexie.ts';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
+import { editingFocusBounds } from '../../lib/editingFocusBounds.ts';
 import { readActiveUser } from '../../sync/activeUser.ts';
 import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
@@ -229,6 +230,8 @@ export function LibraryPage({
           if (!(active instanceof HTMLElement) || !content?.contains(active)) return;
 
           const isEditable =
+            active instanceof HTMLButtonElement ||
+            active instanceof HTMLAnchorElement ||
             active instanceof HTMLTextAreaElement ||
             active instanceof HTMLSelectElement ||
             active.isContentEditable ||
@@ -250,20 +253,55 @@ export function LibraryPage({
           const viewportTop = visualViewport?.offsetTop ?? 0;
           const top = Math.max(viewportTop + 8, scrollOffset);
           const bottom = viewportTop + (visualViewport?.height ?? window.innerHeight) - 8;
-          const bounds = active.getBoundingClientRect();
-          if (bounds.top >= top && bounds.bottom <= bottom) return;
-          active.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+          const left = (visualViewport?.offsetLeft ?? 0) + 8;
+          const right = left + (visualViewport?.width ?? window.innerWidth) - 16;
+          const bounds = editingFocusBounds(active);
+          if (
+            bounds.top >= top &&
+            bounds.bottom <= bottom &&
+            bounds.left >= left &&
+            bounds.right <= right
+          )
+            return;
+
+          // A whole editor can intersect the screen while its caret is clipped.
+          // Native scrolling of the editing point can also pan a pinch-zoomed
+          // visual viewport when the layout document has no horizontal overflow.
+          const marker = document.createElement('span');
+          marker.setAttribute('aria-hidden', 'true');
+          Object.assign(marker.style, {
+            position: 'absolute',
+            pointerEvents: 'none',
+            visibility: 'hidden',
+            left: `${bounds.left + window.scrollX}px`,
+            top: `${bounds.top + window.scrollY}px`,
+            width: `${Math.max(1, bounds.width)}px`,
+            height: `${bounds.height}px`,
+            scrollMarginTop: `${Math.max(8, top - viewportTop)}px`,
+            scrollMarginBottom: '8px',
+            scrollMarginInline: '8px',
+          });
+          document.body.append(marker);
+          try {
+            marker.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
+          } finally {
+            marker.remove();
+          }
         });
       });
     };
 
     document.addEventListener('focusin', keepFocusedFieldVisible);
+    page.addEventListener('input', keepFocusedFieldVisible);
+    document.addEventListener('selectionchange', keepFocusedFieldVisible);
     window.addEventListener('resize', keepFocusedFieldVisible);
     window.visualViewport?.addEventListener('resize', keepFocusedFieldVisible);
     keepFocusedFieldVisible();
     return () => {
       cancelAnimationFrame(frame);
       document.removeEventListener('focusin', keepFocusedFieldVisible);
+      page.removeEventListener('input', keepFocusedFieldVisible);
+      document.removeEventListener('selectionchange', keepFocusedFieldVisible);
       window.removeEventListener('resize', keepFocusedFieldVisible);
       window.visualViewport?.removeEventListener('resize', keepFocusedFieldVisible);
     };

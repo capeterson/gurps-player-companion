@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { horizontalViewportShift, useViewportBoundedOverlay } from './useViewportBoundedOverlay.ts';
+import {
+  VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY,
+  horizontalViewportShift,
+  useViewportBoundedOverlay,
+} from './useViewportBoundedOverlay.ts';
 
 function LateOverlay({ mounted }: { mounted: boolean }) {
   const ref = useViewportBoundedOverlay<HTMLUListElement>(true, undefined, {
@@ -15,6 +19,13 @@ function LateOverlay({ mounted }: { mounted: boolean }) {
       </ul>
     </details>
   ) : null;
+}
+
+function VerticalOverlay() {
+  const ref = useViewportBoundedOverlay<HTMLDivElement>(true, undefined, {
+    shiftVertically: true,
+  });
+  return <div ref={ref} role="dialog" aria-label="Vertical overlay" />;
 }
 
 afterEach(() => {
@@ -49,6 +60,44 @@ describe('horizontalViewportShift', () => {
 });
 
 describe('useViewportBoundedOverlay', () => {
+  it('clamps height and repositions a popover when the visual viewport shrinks or moves', () => {
+    const visual = Object.assign(new EventTarget(), {
+      offsetLeft: 0,
+      offsetTop: 0,
+      width: 320,
+      height: 300,
+    });
+    vi.stubGlobal('visualViewport', visual);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const shift =
+        Number.parseFloat(this.style.getPropertyValue(VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY)) ||
+        0;
+      return {
+        left: 40,
+        top: 50 + shift,
+        right: 240,
+        bottom: 150 + shift,
+        width: 200,
+        height: 100,
+        x: 40,
+        y: 50 + shift,
+        toJSON: () => ({}),
+      };
+    });
+
+    const overlay = render(<VerticalOverlay />).getByRole('dialog', { name: 'Vertical overlay' });
+    expect(overlay.style.getPropertyValue('--viewport-overlay-available-height')).toBe('284px');
+    expect(overlay.style.getPropertyValue(VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY)).toBe('0px');
+
+    visual.offsetTop = 90;
+    visual.height = 120;
+    visual.dispatchEvent(new Event('resize'));
+    expect(overlay.style.getPropertyValue('--viewport-overlay-available-height')).toBe('104px');
+    expect(overlay.style.getPropertyValue(VIEWPORT_OVERLAY_VERTICAL_SHIFT_PROPERTY)).toBe('48px');
+  });
+
   it('tracks visual viewport resize and scroll offsets, then releases listeners', () => {
     const visual = Object.assign(new EventTarget(), {
       offsetLeft: 30,
