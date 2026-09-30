@@ -251,7 +251,9 @@ export function LibraryPage({
 
           const visualViewport = window.visualViewport;
           const viewportTop = visualViewport?.offsetTop ?? 0;
-          const top = Math.max(viewportTop + 8, scrollOffset);
+          const labelSpace =
+            active instanceof HTMLInputElement || active instanceof HTMLSelectElement ? 24 : 0;
+          const top = Math.max(viewportTop + 8, scrollOffset + labelSpace);
           const bottom = viewportTop + (visualViewport?.height ?? window.innerHeight) - 8;
           const left = (visualViewport?.offsetLeft ?? 0) + 8;
           const right = left + (visualViewport?.width ?? window.innerWidth) - 16;
