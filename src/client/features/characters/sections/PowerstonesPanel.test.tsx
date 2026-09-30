@@ -86,7 +86,9 @@ describe('compact powerstone and magic-item summaries', () => {
     expect(screen.getByText('A compact reserve')).toBeVisible();
     expect(screen.getByLabelText('Amber focus energy')).toHaveTextContent('3 / 5');
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Recharge 1 to Amber focus' })[0]);
+    const recharge = screen.getAllByRole('button', { name: 'Recharge 1 to Amber focus' })[0];
+    if (!recharge) throw new Error('Missing powerstone recharge action');
+    fireEvent.click(recharge);
     expect(enqueueFieldPatch).toHaveBeenCalledWith(
       expect.objectContaining({
         entityClass: 'character_inventory',
@@ -111,7 +113,9 @@ describe('compact powerstone and magic-item summaries', () => {
     expect(screen.queryByRole('button', { name: /Sun talisman/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Glow ring/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Use one charge from Ash wand' })[0]);
+    const useCharge = screen.getAllByRole('button', { name: 'Use one charge from Ash wand' })[0];
+    if (!useCharge) throw new Error('Missing magic-item charge action');
+    fireEvent.click(useCharge);
     expect(enqueueFieldPatch).toHaveBeenCalledWith(
       expect.objectContaining({
         entityClass: 'character_inventory',
