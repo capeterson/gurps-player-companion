@@ -241,6 +241,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   available header width; long breadcrumbs remain truncated and the campaign
   dropdown stays attached to its group.
 - **Compact combat view and folding.** Combat uses a smaller identity header.
+  Other editable identity names use smaller display type below 640px so ordinary
+  names fit on phones; unusually long names remain scrollable within the input.
+  Read-only identity headings wrap long names within the content width.
   The Overview section places the foldable sheet overview (attributes, secondary
   stats, status, ledger, encumbrance and conditional effects) above the Identity
   panel; other destinations do not display it. When folded, it shows effective

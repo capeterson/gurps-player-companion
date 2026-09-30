@@ -212,6 +212,11 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+The editable identity name remains a single-line field, using 30px display type
+below 640px and 48px from 640px up. Compact Combat retains its 24px name size.
+Long editable names scroll within the input; read-only identity headings wrap
+long unspaced names within the content width.
+
 Library source selection and search share a wrapping toolbar. The search input
 and **Clear search** button stay together, taking a separate row when needed.
 

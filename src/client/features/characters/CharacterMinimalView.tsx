@@ -39,7 +39,9 @@ export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
           assetId={data.portraitAssetId}
           name={data.name}
         />
-        <h1 className="font-name text-5xl leading-none">{data.name}</h1>
+        <h1 className="font-name [overflow-wrap:anywhere] text-3xl leading-tight sm:text-5xl">
+          {data.name}
+        </h1>
         <p className="mt-3 text-sm text-base-content/60 max-w-prose">
           The campaign owner has hidden detailed sheet information from other players. Ask the owner
           to enable sheet sharing in the campaign settings if you need full access.

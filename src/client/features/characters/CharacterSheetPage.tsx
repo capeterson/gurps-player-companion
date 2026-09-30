@@ -1468,11 +1468,13 @@ function IdentityHero({
         {canWrite ? (
           <input
             aria-label="character name"
-            className={`${DRAFT_FIELD_CLASS} font-name w-full bg-transparent border-0 outline-0 px-0 ${compact ? 'text-2xl' : 'text-5xl'} leading-tight focus:ring-2 focus:ring-primary/40 rounded`}
+            className={`${DRAFT_FIELD_CLASS} font-name w-full bg-transparent border-0 outline-0 px-0 ${compact ? 'text-2xl' : 'text-3xl sm:text-5xl'} leading-tight focus:ring-2 focus:ring-primary/40 rounded`}
             {...nameField.inputProps}
           />
         ) : (
-          <h1 className={`font-name ${compact ? 'text-2xl' : 'text-5xl'} leading-tight`}>
+          <h1
+            className={`font-name [overflow-wrap:anywhere] ${compact ? 'text-2xl' : 'text-3xl sm:text-5xl'} leading-tight`}
+          >
             {character.name}
           </h1>
         )}
