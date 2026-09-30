@@ -226,7 +226,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   selecting a section closes the flower and focuses/scrolls its visible heading.
   Escape, outside click, and leaving the navigation close it. Closed petals are
   hidden from keyboard and assistive technology. Safe-area spacing and bottom
-  content padding protect controls from the dock/FAB; navigation yields to modal
+  content padding protect controls from the dock/FAB. The closed FAB stays below
+  header popovers so pool labels and explanations remain readable; the open
+  flower and its backdrop rise above the header. Navigation yields to modal
   dialogs. Reduced motion disables the flower entrance and sync rotation.
   `SheetNavigation.tsx` owns this responsive control. Overview appears first in
   the dock and mobile navigation and Overview is the initial view.

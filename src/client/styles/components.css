@@ -566,11 +566,14 @@
   cursor: default;
 }
 .sheet-flower {
-  z-index: 60;
+  z-index: 40;
   right: max(1rem, env(safe-area-inset-right, 0px));
   bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   width: 3.5rem;
   height: 3.5rem;
+}
+.sheet-flower[data-open="true"] {
+  z-index: 60;
 }
 .sheet-flower > .sheet-nav-toggle {
   width: 3.5rem;

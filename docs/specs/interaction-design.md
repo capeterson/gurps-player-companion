@@ -294,6 +294,12 @@ Downward-opening panels can opt into the shared overlay hook's available-height
 measurement. The notification bell uses it to scroll within the remaining visual
 viewport below either a single-row or wrapped mobile header.
 
+The closed mobile sheet-navigation FAB shares the desktop dock's layer below
+the sticky header and its popovers. HP/FP endpoints and explanatory text remain
+readable when a short landscape viewport places them over the FAB. Opening the
+navigation raises its flower above the header and its dismissal backdrop;
+native modal dialogs hide the sheet navigation.
+
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
 award summaries. These tooltips retain horizontal collision handling, constrain
 height and vertical position to the visual viewport below the sticky app header,
