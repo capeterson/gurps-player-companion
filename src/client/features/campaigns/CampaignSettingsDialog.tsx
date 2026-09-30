@@ -306,7 +306,6 @@ export function CampaignSettingsDialog({
                   setSection(item.id);
                   if (bodyRef.current) bodyRef.current.scrollTop = 0;
                 }}
-
               >
                 {item.label}
               </button>
@@ -576,9 +575,9 @@ export function CampaignSettingsDialog({
                   <span>
                     <span className="block text-sm font-medium">Enable active effects</span>
                     <span className="block text-xs text-base-content/60">
-                      Unfinished, experimental tools for active effects and conditional modifiers. Off
-                      by default. Turning this off hides the tools and stops their bonuses; saved
-                      effects and definitions are kept.
+                      Unfinished, experimental tools for active effects and conditional modifiers.
+                      Off by default. Turning this off hides the tools and stops their bonuses;
+                      saved effects and definitions are kept.
                     </span>
                   </span>
                 </label>
