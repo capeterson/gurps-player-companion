@@ -77,6 +77,23 @@ test('a synced edit and its revision response share one item with Request and Re
     const dialog = page
       .getByRole('dialog')
       .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
+    const syncButton = dialog.getByRole('button', { name: 'Sync now' });
+    await expect(syncButton).toBeVisible();
+    if (width === 390) {
+      const manualPull = page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/v1/sync/cursor') && response.request().method() === 'POST',
+      );
+      await syncButton.click();
+      expect((await manualPull).ok()).toBe(true);
+      await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
+      await expect(
+        dialog
+          .getByText('Last successful sync', { exact: true })
+          .locator('..')
+          .getByText('just now', { exact: true }),
+      ).toBeVisible();
+    }
     const recent = dialog
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: 'Recently synced' }) });
@@ -111,6 +128,7 @@ test('a synced edit and its revision response share one item with Request and Re
     await expect(dialog.getByText('Raw', { exact: true })).toHaveCount(0);
     for (const locator of [
       dialog.locator('.modal-box'),
+      syncButton,
       request.locator('pre'),
       response.locator('pre'),
     ]) {
@@ -343,6 +361,19 @@ test('a synced edit and its revision response share one item with Request and Re
     }),
   ).toBeVisible();
   await expect(disconnectedDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
+  const manualPull = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/v1/sync/cursor') && response.request().method() === 'POST',
+  );
+  await disconnectedDialog.getByRole('button', { name: 'Sync now' }).click();
+  expect((await manualPull).ok()).toBe(true);
+  await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
+  await expect(
+    disconnectedDialog
+      .getByText('Last successful sync', { exact: true })
+      .locator('..')
+      .getByText('just now', { exact: true }),
+  ).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath('sync-log-websocket-disconnected.png'),
     animations: 'disabled',

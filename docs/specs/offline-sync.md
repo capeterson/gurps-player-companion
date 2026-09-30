@@ -163,7 +163,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to focused before/after values, metadata, and adjacent folded Request/Response payloads. Subject names link to existing local entities using supported sheet anchors or library section/open routes. The dialog shows independent WebSocket status, relative last-connected time when disconnected, and the last successful transferred operation. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to focused before/after values, metadata, and adjacent folded Request/Response payloads. Subject names link to existing local entities using supported sheet anchors or library section/open routes. The dialog shows independent WebSocket status, relative last-connected time when disconnected, and the last successful sync time. **Sync now** explicitly runs the HTTP outbox drain and cursor pull; a completed empty check updates that time, while an error leaves it unchanged. Automatic empty polls do not change it. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -571,8 +571,9 @@ Last connected is the last
 successful socket-open time, persisted under an account-scoped `syncMeta` key and
 shown relatively when disconnected; an unknown time says **Not yet connected**.
 The last successful sync time means an applied upload or downloaded data change,
-including aggregate online campaign/import writes. Empty cursor polls, revision-only
-echoes, retries, rollbacks, and failed cycles do not advance it. Its monotonic
+including aggregate online campaign/import writes, or a completed explicit
+**Sync now** HTTP check. An empty manual check advances it; automatic empty cursor
+polls, revision-only echoes, retries, rollbacks, and failed checks do not. Its monotonic
 account-scoped metadata survives journal pruning; logout/resync purges both timestamp
 keys with all local stores. Relative times refresh every 30 seconds while the dialog
 is open and retain exact timestamps on the corresponding `time` elements.

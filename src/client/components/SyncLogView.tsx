@@ -118,6 +118,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   const [resyncOpen, setResyncOpen] = useState(false);
   const pendingImages = useLiveQuery(() => getLocalDb().mediaUploads.count(), [], 0);
   const [working, setWorking] = useState(false);
+  const [syncingNow, setSyncingNow] = useState(false);
 
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
   const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
@@ -181,6 +182,19 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
       URL.revokeObjectURL(url);
     } catch (err) {
       toasts.push(`Couldn't build debug log — ${errorMessage(err)}`, { kind: 'error' });
+    }
+  };
+
+  const syncNow = async () => {
+    setSyncingNow(true);
+    try {
+      await getSyncOrchestrator().syncNow();
+      setNow(Date.now());
+      toasts.push('Sync completed', { kind: 'success' });
+    } catch (err) {
+      toasts.push(`Couldn't sync — ${errorMessage(err)}`, { kind: 'error' });
+    } finally {
+      setSyncingNow(false);
     }
   };
 
@@ -453,6 +467,14 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <button
                 type="button"
+                className="btn btn-primary btn-sm h-auto whitespace-normal py-2"
+                disabled={!online || syncingNow || working}
+                onClick={() => void syncNow()}
+              >
+                {syncingNow ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
                 className="btn btn-outline btn-sm h-auto whitespace-normal py-2"
                 onClick={() => void downloadDebugLog()}
               >
@@ -470,7 +492,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
               <button
                 type="button"
                 className="btn btn-error btn-outline btn-sm h-auto whitespace-normal py-2"
-                disabled={!online}
+                disabled={!online || syncingNow || working}
                 onClick={() => setResyncOpen(true)}
               >
                 Abandon local changes and re-sync from server

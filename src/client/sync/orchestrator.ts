@@ -74,6 +74,7 @@ import {
   enqueueEntityPatch,
   enqueueFieldPatch,
   nextOutboxAttemptDelay,
+  readDrainableOps,
   recoverStaleInFlight,
   setOutboxStatus,
 } from './outbox.ts';
@@ -88,6 +89,7 @@ import {
   redactSyncLogForCharacters,
   rememberRevokedCampaigns,
   rememberRevokedCharacters,
+  rememberSuccessfulManualSync,
   snapshotValue,
 } from './syncLog.ts';
 
@@ -127,6 +129,8 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
 const BOOTSTRAP_RETRY_MS = 5_000;
+// An explicit retry may skip the outbox's maximum five-minute backoff.
+const MANUAL_RETRY_WINDOW_MS = 5 * 60_000 + 1_000;
 
 /** Cursor bookkeeping is useful in `details`, but it is not a user-data patch. */
 const PULL_LOG_METADATA_FIELDS = new Set([
@@ -377,6 +381,32 @@ class SyncOrchestrator {
     this.wake();
   }
 
+  /** Run an explicit HTTP outbox/cursor cycle and wait for its result. */
+  async syncNow(): Promise<void> {
+    if (!tokenStore.read()) throw new Error('Sign in to sync');
+    if (typeof navigator !== 'undefined' && navigator.onLine === false)
+      throw new Error('Reconnect to sync');
+    if (this.recoveryInProgress) throw new Error('A full re-sync is already in progress');
+    if (this.isClientOutdated()) throw new Error('App update required before syncing');
+    const generation = this.sessionGeneration;
+    do {
+      await this.maybeDrainOnce(true);
+    } while (
+      this.sessionIsCurrent(generation) &&
+      tokenStore.read() &&
+      !this.recoveryInProgress &&
+      !this.isClientOutdated() &&
+      (typeof navigator === 'undefined' || navigator.onLine !== false) &&
+      (await readDrainableOps(1, Date.now() + MANUAL_RETRY_WINDOW_MS)).length > 0
+    );
+    if (!this.sessionIsCurrent(generation) || !tokenStore.read())
+      throw new Error('Session changed while syncing');
+    await this.triggerCursorPull(false, true);
+    if (!this.sessionIsCurrent(generation) || this.isClientOutdated())
+      throw new Error('Sync was interrupted');
+    await rememberSuccessfulManualSync();
+  }
+
   /**
    * Record who is signed in.  Called on every authenticated mount, not
    * just at bootstrap -- see `currentUserId`.  Switching users re-arms
@@ -431,12 +461,13 @@ class SyncOrchestrator {
    * interleave with bootstrap's cursor-clear (the race would persist
    * a stale pre-clear cursor and leave a permanent gap in local data).
    */
-  async triggerCursorPull(force = false): Promise<void> {
+  async triggerCursorPull(force = false, requireRun = false): Promise<void> {
     const generation = this.sessionGeneration;
-    await runWithLock(CURSOR_LOCK, async () => {
-      if (!this.sessionIsCurrent(generation)) return;
-      await this.pullInner(force, generation);
+    const ran = await runWithLock(CURSOR_LOCK, async () => {
+      if (!this.sessionIsCurrent(generation)) return false;
+      return this.pullInner(force, generation);
     });
+    if (requireRun && !ran) throw new Error('Sync was interrupted');
   }
 
   /**
@@ -902,7 +933,7 @@ class SyncOrchestrator {
     }
   }
 
-  private async maybeDrainOnce(): Promise<number | undefined> {
+  private async maybeDrainOnce(manual = false): Promise<number | undefined> {
     const generation = this.sessionGeneration;
     if (!this.sessionIsCurrent(generation)) return;
     if (this.recoveryInProgress) return;
@@ -938,14 +969,14 @@ class SyncOrchestrator {
       // Selection and deadline calculation share one clock snapshot. Otherwise
       // a deadline crossing between those reads could look neither drainable
       // nor future and fall through to the five-second safety poll.
-      const schedulingNow = Date.now();
+      const schedulingNow = Date.now() + (manual ? MANUAL_RETRY_WINDOW_MS : 0);
       const ops = await claimDrainableOps(DRAIN_BATCH_SIZE, schedulingNow);
       if (ops.length === 0) {
         const delayedBy = await nextOutboxAttemptDelay(schedulingNow);
         if (delayedBy !== undefined) return delayedBy;
         // Nothing to drain -- but if /sync/cursor hasn't run recently,
         // do that now to keep Dexie fresh.
-        await this.triggerCursorPull();
+        if (!manual) await this.triggerCursorPull();
         return;
       }
       syncStateStore.set('syncing');
@@ -1010,9 +1041,23 @@ class SyncOrchestrator {
         await reportCycleFailure(err, 'Uploading changes failed', 'push', {
           operationCount: ops.length,
         });
+        if (manual) throw err;
         return;
       }
       await this.applyOutcomes(ops, outcomes);
+      if (manual) {
+        if (
+          ops.some(
+            (op) =>
+              !outcomes.some(
+                (outcome) => outcome.clientOpId === op.clientOpId && outcome.status === 'applied',
+              ),
+          )
+        ) {
+          throw new Error('Some changes could not be saved');
+        }
+        return;
+      }
       // Pull server-side changes immediately after draining so edits from
       // other devices appear right away rather than waiting up to 5 seconds
       // for the next loop iteration.  triggerCursorPull handles its own
