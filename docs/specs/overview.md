@@ -936,6 +936,8 @@ settings sections; switching sections retains drafts.
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v14 retains them.
+  Technique form explanations for default penalties and level caps wrap within
+  their fields on narrow screens, keeping the examples readable without horizontal scrolling.
 - **Adventure log**: session log entries attached to Campaign (shared, default)
   or an owned character (private), with an attachment dropdown and explanatory
   tooltip, an optional **session number** (running

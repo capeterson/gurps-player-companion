@@ -220,7 +220,9 @@ export function TechniqueForm(props: FormProps<LibraryTechniqueCreate, LibraryTe
             value={defaultModifier}
             onChange={(event) => setDefaultModifier(event.target.value)}
           />
-          <span className="label">For example, Karate-1 starts one level below Karate.</span>
+          <span className="label min-w-0 w-full whitespace-normal">
+            For example, Karate-1 starts one level below Karate.
+          </span>
         </label>
         <label className="form-control">
           <span className="label-text">Maximum levels above default</span>
@@ -234,7 +236,7 @@ export function TechniqueForm(props: FormProps<LibraryTechniqueCreate, LibraryTe
             placeholder="No cap"
             onChange={(event) => setMaxLevel(event.target.value)}
           />
-          <span className="label">
+          <span className="label min-w-0 w-full whitespace-normal">
             A cap of +1 lets a Karate-1 technique reach full Karate. Leave blank for no cap.
           </span>
         </label>
