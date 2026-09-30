@@ -48,7 +48,10 @@ describe('CampaignLibraryHelpPage', () => {
       'href',
       '/campaigns/campaign-7/library',
     );
-    fireEvent.click(screen.getByRole('link', { name: 'Experimental: active effects' }));
+    const activeEffectsLink = await screen.findByRole('link', {
+      name: 'Experimental: active effects',
+    });
+    fireEvent.click(activeEffectsLink);
     const heading = await screen.findByRole('heading', {
       name: 'Experimental: active effects',
     });
