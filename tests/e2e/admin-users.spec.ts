@@ -5,7 +5,7 @@ import type { Tokens } from '../../src/client/lib/tokenStore.ts';
 test('admin account controls confirm purge, expose nightly timing, cancel and unsuspend', async ({
   page,
   request,
-}) => {
+}, testInfo) => {
   test.skip(
     !process.env.ADMIN_E2E_DATABASE_URL,
     'Set ADMIN_E2E_DATABASE_URL to this worktree test database',
@@ -63,8 +63,18 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     await page.getByPlaceholder('Search by email or display name…').fill(memberEmail);
     await page.getByRole('link', { name: memberEmail, exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Purge browser fixture' })).toBeVisible();
-    for (const width of [320, 639, 640, 641, 1280]) {
-      await page.setViewportSize({ width, height: 900 });
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 667 },
+      { width: 390, height: 844 },
+      { width: 639, height: 900 },
+      { width: 640, height: 900 },
+      { width: 641, height: 900 },
+      { width: 667, height: 375 },
+      { width: 844, height: 390 },
+      { width: 1280, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
       await page.getByRole('button', { name: 'Schedule purge (30 d)', exact: true }).click();
       const dialog = page.getByRole('dialog', { name: 'Schedule account purge?' });
       await expect(dialog).toBeVisible();
@@ -79,10 +89,10 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
       expect(box).not.toBeNull();
       expect(box?.x).toBeGreaterThanOrEqual(0);
       expect(box?.y).toBeGreaterThanOrEqual(0);
-      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
-      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(900);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
+      expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
       await page.screenshot({
-        path: `test-results/admin-purge-${width}.png`,
+        path: testInfo.outputPath(`admin-purge-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
       });
       await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
