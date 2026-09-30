@@ -344,24 +344,32 @@ export function LibrarySection<R extends LibraryListRow>({
                             className="library-group-heading"
                           >
                             {searching ? (
-                              <span className="flex items-center gap-2 px-1 py-1">
-                                <span className="label-eyebrow">{group.label}</span>{' '}
-                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                              <span className="flex min-w-0 items-center gap-2 px-1 py-1">
+                                <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
+                                  {group.label}
+                                </span>{' '}
+                                <span className="num shrink-0 text-xs text-dim">
+                                  {group.rows.length}
+                                </span>
                               </span>
                             ) : (
                               <button
                                 type="button"
-                                className="flex w-full items-center gap-2 px-1 py-1 text-left"
+                                className="flex w-full min-w-0 items-center gap-2 px-1 py-1 text-left"
                                 aria-expanded={open}
                                 onClick={() => folds.toggle(group.label)}
                               >
                                 <AppIcon
                                   name={open ? 'chevronDown' : 'chevronRight'}
                                   size={14}
-                                  className="text-muted"
+                                  className="shrink-0 text-muted"
                                 />
-                                <span className="label-eyebrow">{group.label}</span>{' '}
-                                <span className="num text-xs text-dim">{group.rows.length}</span>
+                                <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
+                                  {group.label}
+                                </span>{' '}
+                                <span className="num shrink-0 text-xs text-dim">
+                                  {group.rows.length}
+                                </span>
                               </button>
                             )}
                           </th>
@@ -499,7 +507,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
             </span>
           </button>
           {meta && (
-            <span className="block pl-5 text-[10px] uppercase tracking-wider text-base-content/60 sm:hidden">
+            <span className="block pl-5 text-[10px] uppercase tracking-wider text-base-content/60 [overflow-wrap:anywhere] sm:hidden">
               {meta}
             </span>
           )}

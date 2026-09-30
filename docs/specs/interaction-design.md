@@ -223,6 +223,8 @@ Library technique default-penalty and level-cap help wraps within each field on
 narrow screens.
 Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
+Library group labels and mobile row metadata wrap long unspaced categories.
+Fold chevrons and counts retain their width; description excerpts stay truncated.
 
 Audit-history summaries wrap long unspaced entity names within their rows,
 preserving the timestamp and actor columns.

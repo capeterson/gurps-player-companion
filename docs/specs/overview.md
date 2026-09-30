@@ -916,7 +916,9 @@ settings sections; switching sections retains drafts.
   by college, items by category, languages by spoken/sign form, techniques by
   default skill, styles by first component skill, enchantments by applicability,
   enabled active effects by first tag) and a jump strip to any group. Group anchors retain
-  distinct identities for Unicode, case and punctuation variations. Rows show the name, key numbers
+  distinct identities for Unicode, case and punctuation variations. Group labels
+  and mobile row metadata wrap long unspaced category names while preserving the
+  count and fold control. Rows show the name, key numbers
   and a one-line source excerpt that preserves punctuation (including comparison
   symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
