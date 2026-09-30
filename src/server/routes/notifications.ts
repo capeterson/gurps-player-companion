@@ -13,7 +13,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { uuid } from '../../shared/schemas/common.ts';
 import { type NotificationOut, notificationOut } from '../../shared/schemas/notification.ts';
@@ -70,13 +70,19 @@ router.openapi(
       ? and(eq(notifications.userId, user.id), isNull(notifications.readAt))
       : eq(notifications.userId, user.id);
     const rows = await db
-      .select()
+      .select({
+        notification: notifications,
+        actionable: sql<boolean>`exists(select 1 from campaign_invitations i where i.id = ${notifications.relatedId} and i.invitee_id = ${notifications.userId} and i.status = 'pending')`,
+      })
       .from(notifications)
       .where(where)
       .orderBy(desc(notifications.createdAt), desc(notifications.id))
       .limit(limit ?? 500)
       .offset(offset ?? 0);
-    return c.json(rows.map(toOut), 200);
+    return c.json(
+      rows.map((row) => ({ ...toOut(row.notification), actionable: row.actionable })),
+      200,
+    );
   },
 );
 

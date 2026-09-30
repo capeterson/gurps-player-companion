@@ -1,5 +1,6 @@
 /**
- * Keeps an anchored overlay inside the visible horizontal viewport.
+ * Keeps an anchored overlay inside the visible horizontal viewport, with an
+ * optional available-height constraint for downward-opening panels.
  *
  * Width constraints alone are not enough: a 296px dropdown anchored to a
  * bell in the middle of a 320px header can still start far off-screen. Every
@@ -16,6 +17,7 @@ import { type RefObject, useCallback, useLayoutEffect, useRef } from 'react';
 
 export const VIEWPORT_OVERLAY_MARGIN = 8;
 export const VIEWPORT_OVERLAY_SHIFT_PROPERTY = '--viewport-overlay-shift-x';
+export const VIEWPORT_OVERLAY_HEIGHT_PROPERTY = '--viewport-overlay-available-height';
 
 interface HorizontalBounds {
   left: number;
@@ -60,9 +62,11 @@ function visibleViewport(): ViewportBounds {
 export function useViewportBoundedOverlay<T extends HTMLElement>(
   active = true,
   externalRef?: RefObject<T | null>,
+  options?: { constrainHeight?: boolean },
 ): RefObject<T | null> {
   const internalRef = useRef<T>(null);
   const ref = externalRef ?? internalRef;
+  const constrainHeight = options?.constrainHeight ?? false;
 
   const update = useCallback(() => {
     const element = ref.current;
@@ -72,6 +76,14 @@ export function useViewportBoundedOverlay<T extends HTMLElement>(
 
     const rect = element.getBoundingClientRect();
     if (rect.width === 0) return;
+    if (constrainHeight) {
+      const visual = window.visualViewport;
+      const bottom = visual ? visual.offsetTop + visual.height : window.innerHeight;
+      element.style.setProperty(
+        VIEWPORT_OVERLAY_HEIGHT_PROPERTY,
+        `${Math.max(0, bottom - rect.top - VIEWPORT_OVERLAY_MARGIN)}px`,
+      );
+    }
     const currentShift =
       Number.parseFloat(element.style.getPropertyValue(VIEWPORT_OVERLAY_SHIFT_PROPERTY)) || 0;
     const next = horizontalViewportShift(rect, visibleViewport(), currentShift);
@@ -81,7 +93,7 @@ export function useViewportBoundedOverlay<T extends HTMLElement>(
     // after the logical shift changes but before the DOM style does, which can
     // double the correction on an opening transition.
     element.style.setProperty(VIEWPORT_OVERLAY_SHIFT_PROPERTY, `${next}px`);
-  }, [ref]);
+  }, [ref, constrainHeight]);
 
   useLayoutEffect(() => {
     if (!active) return;

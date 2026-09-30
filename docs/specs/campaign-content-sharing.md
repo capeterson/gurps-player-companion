@@ -127,7 +127,7 @@ rejection still uses the standard toast + rollback flash path.
 ### Experimental active effects
 
 `experimentalActiveEffects` is owner-controlled and defaults false for new and
-existing campaigns (migration 0063). **Experimental features → Enable active
+existing campaigns (migration 0064). **Experimental features → Enable active
 effects** exposes active instance management, the library category, conditional
 modifier controls/authoring and the experimental guide section. Disabled campaigns
 and campaignless or unresolved local campaigns neither display these tools nor
@@ -159,7 +159,11 @@ Joining is invite-based (`src/server/routes/invitations.ts`):
   `member` tier; inviting a `manager` requires the owner.
 - Invitees are resolved by **handle** via `findUserByHandle` — exact email
   match wins, then exact display-name match, both case-insensitive.
-- A **notification** (`notifications` table + the header bell) tells the invitee.
+- A **notification** (`notifications` table + the header bell) tells the invitee
+  unless their invitation inbox topic is disabled. Invitation email and acceptance
+  email to the original sender are independently toggleable, both default on.
+  Declines notify the original sender in-app only. Reading an invitation does
+  not remove Accept/Decline while it remains pending. See [notifications.md](notifications.md).
 - The invitee lists their pending invites (`GET /invitations`) and
   **accepts** (`POST /invitations/{id}/accept`, which creates the membership)
   or **rejects** (`.../reject`). Owner/manager can cancel a pending invite.

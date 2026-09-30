@@ -4,6 +4,7 @@ import { type AppConfig, loadConfig } from './config.ts';
 import { closeDb } from './db/client.ts';
 import { beginDraining } from './lifecycle.ts';
 import { stopMediaMaintenance } from './services/media/maintenance.ts';
+import { stopNotificationMaintenance } from './services/notificationMaintenance.ts';
 import { stopUserPurgeMaintenance } from './services/userPurge.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
 
@@ -30,7 +31,11 @@ export interface ShutdownDeps {
 }
 
 async function stopBackgroundMaintenance(): Promise<void> {
-  await Promise.all([stopMediaMaintenance(), stopUserPurgeMaintenance()]);
+  await Promise.all([
+    stopMediaMaintenance(),
+    stopUserPurgeMaintenance(),
+    stopNotificationMaintenance(),
+  ]);
 }
 
 /**

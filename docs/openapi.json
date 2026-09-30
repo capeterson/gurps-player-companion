@@ -11332,6 +11332,211 @@
         }
       }
     },
+    "/api/v1/auth/notification-preferences": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Read notification preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "emailInvitations": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "emailInvitationAccepted": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "invitations": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "membership": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "characterChanges": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "points": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "campaignChanges": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "adventureLog": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "libraryChanges": {
+                      "type": "boolean",
+                      "default": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Update notification preferences",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emailInvitations": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "emailInvitationAccepted": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "invitations": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "membership": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "characterChanges": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "points": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "campaignChanges": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "adventureLog": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "libraryChanges": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification preferences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "emailInvitations": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "emailInvitationAccepted": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "invitations": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "membership": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "characterChanges": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "points": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "campaignChanges": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "adventureLog": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "libraryChanges": {
+                      "type": "boolean",
+                      "default": true
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -11418,6 +11623,9 @@
                       "createdAt": {
                         "type": "string",
                         "format": "date-time"
+                      },
+                      "actionable": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -11497,6 +11705,9 @@
                     "createdAt": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "actionable": {
+                      "type": "boolean"
                     }
                   },
                   "required": [

@@ -54,6 +54,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [media-uploads.md](media-uploads.md) | Portraits, campaign covers, S3-compatible storage, public immutable caching and queued offline uploads. |
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
 | [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
+| [notifications.md](notifications.md) | Notification recipients, account settings, email policy, desktop opt-in and durable delivery. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
@@ -188,7 +189,8 @@ view of a non-magical character; owners always have it available to add magic.
 Inventory items, traits, skills, and spells have stable ID-based URL anchors
 (`#inventory-<id>`, `#trait-<id>`, `#skill-<id>`, `#spell-<id>`). Opening a
 character URL with one of these hashes selects the matching section, opens its
-panel, and scrolls to the highlighted entry. Inventory links reveal nested
+panel, and scrolls to the highlighted entry. Notification links use `#history`
+  to select and focus the History section. Inventory links reveal nested
 items inside closed containers. Weapon names in Attacks, armor layers and DB
 sources in Incoming attack, and equipment named in active defenses
 link to their inventory entries without a page reload. Incoming attack lists innate
@@ -1036,9 +1038,15 @@ there is no decorative cover slot or implied image-upload feature.
   behavior; growing overlays also clamp to dynamic viewport height and scroll
   internally where needed. A source guard rejects raw `data-tip` tooltips and
   anchored dropdown content that bypasses the collision helper.
-- **Notifications bell**: invitations and other events. Its panel stays inside the
-  visible viewport even when the bell sits near the middle of a wrapped mobile
-  header.
+- **Notifications**: the bell receives invitations/responses, membership/access changes,
+  other-user character edits, points changes, campaign rules, shared logs and linked
+  library updates. Character editing bursts group into one notice. Settings offers
+  account-synced topic switches and two email switches (invitations and acceptance,
+  both default on). Password/passkey/API-key security email is unconditional; no
+  other topics support email. Desktop is per-user on this browser, default off,
+  and only its explicit enable gesture can request permission. It delivers new
+  notices while the app is open in the background; no closed-app push. The bell
+  panel stays within the dynamic viewport. See [notifications.md](notifications.md).
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
@@ -1058,7 +1066,7 @@ there is no decorative cover slot or implied image-upload feature.
   that does not change with the theme.
 - Installable PWA; works offline for the character surface.
 - **Settings** page: theme palettes (synced), account-scoped device-local
-  Current Status display switches, profile, password, passkeys, API keys. Long credential and
+  Current Status display switches, notification controls, profile, password, passkeys, API keys. Long credential and
   connected-app names wrap inside their cards, with destructive actions stacked
   below them on narrow screens rather than overlapping the metadata.
 
@@ -1112,7 +1120,7 @@ src/
     https.ts     Production HTTPS redirects and HSTS
     routes/health.ts  Liveness, database/migration readiness and release probes
     routes/      One file per resource group (auth, characters, campaigns,
-                 campaignLibrary, invitations, notifications, sync, syncWs,
+                 campaignLibrary, invitations, notifications, notificationPreferences, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
                  health, encounters). campaignLibrary.ts is now a thin factory wiring:
                  campaignLibraryEntities.ts (per-entity-kind config: schemas,
@@ -1128,6 +1136,8 @@ src/
     mcp/         exact operation manifest/catalog, SDK transport, checked
                  snapshot, and same-process shared-handler executor
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
+                 notificationEvents, notificationEmails, notificationMaintenance
+                 (durable audit fan-out, invitation/security mail and lifecycle),
                  userPurge (nightly account deletion and refresh-token expiry cleanup at 03:00 UTC),
                  defaultCampaignSources (new-campaign GURPS 4e source list),
                  libraryReferences (transactional source authorization for all
@@ -1199,6 +1209,8 @@ src/
                  palette preferences store, server read/push and rejection toasts
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
     features/settings/AppearanceSection.tsx  Settings theme pickers
+    features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
+    lib/desktopNotifications.ts  Per-user browser opt-in, permission and delivery deduplication
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor, LibraryAdvancedFields, SkillRequirementsEditor,
                  ArmorFacetEditor, LibraryPackagesForms (language/technique/style authoring),

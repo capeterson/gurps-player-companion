@@ -71,7 +71,8 @@ The two deliberate exceptions (`notifications.payload`,
 | `campaign_library_enchantments.effects` | `enchantmentEffect[]` (inventory.ts): typed attack/damage/Accuracy/Parry/Block/armor-divisor/DR/DB/weight-reduction/skill flat contributions; skill target requires `skillName` | Owner-only library REST/MCP CRUD and YAML v10 import/export; snapshotted onto linked items |
 | `campaign_library_enchantments.levels` | `enchantmentLevel[]` (inventory.ts): unique selectable integer levels, optional label, and typed effect arrays | Same definition boundaries; the selected item instance level activates its matching row in addition to base effects |
 | `campaign_library_enchantments.stacking_policy` | `enchantmentStackingPolicy` (inventory.ts): strict `stack` or `highest` plus a non-empty combination key | Same definition boundaries; the shared resolver chooses the highest aggregate contribution per instance/target/key |
-| `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` (notification.ts) for `type='campaign_invitation'` | Emit site (`invitations.ts` parses before insert); consume site (`NotificationsBell` `safeParse`s) |
+| `notifications.payload` | Per-type: `campaignInvitationNotificationPayload` for invitations; `eventNotificationPayload` for `type='event'` (notification.ts) | Invitation route, validated invitation-response route helper and notification event worker; bell/desktop consumers safe-parse per type |
+| `users.notification_preferences` | `notificationPreferences` (notificationPreferences.ts) | Settings GET/PATCH and event/email delivery parse; SQL default is the same validated field set |
 | `entity_history.old_row` / `new_row` | *Intentionally schemaless* — raw `to_jsonb(OLD/NEW)` row snapshots written by DB triggers | Read-only; exposed as `z.record(z.unknown())` in `historyEventOut` and only with `?detail=1` + full access (see history-tracking.md) |
 
 Notes on the exceptions:
@@ -80,8 +81,9 @@ Notes on the exceptions:
   column stays `Record<string, unknown>` at the DB layer because rows of many
   types share it. Each type gets its own payload schema in
   `src/shared/schemas/notification.ts`; both the emitting router and the
-  consuming component must go through it. Payload keys are **snake_case**
-  (rows predate the schema); do not rename keys without a data migration.
+  consuming component must go through it. Existing invitation payload keys are
+  **snake_case** (rows predate the schema); do not rename them without a migration.
+  New generic event payloads use their schema's camelCase fields.
 - **`entity_history.old_row` / `new_row`** are trigger-written snapshots of
   whole rows across all syncable tables — their shape is "whatever the table
   looked like at write time", which is exactly what an audit log wants.

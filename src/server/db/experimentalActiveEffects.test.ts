@@ -5,11 +5,11 @@ import { configureIntegrationTestEnvironment } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
 
-it('migration 0063 defaults existing and new campaigns off and preserves later opt-ins on rerun', async () => {
+it('migration 0064 defaults existing and new campaigns off and preserves later opt-ins on rerun', async () => {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   const client = await pool.connect();
   const sql = readFileSync(
-    `${import.meta.dir}/migrations/0063_experimental_active_effects.sql`,
+    `${import.meta.dir}/migrations/0064_experimental_active_effects.sql`,
     'utf8',
   );
   try {
