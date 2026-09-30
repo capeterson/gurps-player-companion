@@ -962,7 +962,8 @@ settings sections; switching sections retains drafts.
   Campaign/library/log/history reads show a retryable error when their request
   fails, rather than presenting a failed request as an empty collection.
 - **Campaign history view**: campaign-level audit log (settings, membership,
-  library, log), plus an owner/manager roll-up across member characters.
+  library, log), plus an owner/manager roll-up across member characters. Audit
+  summaries wrap long unspaced entity names within their rows without clipping.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.

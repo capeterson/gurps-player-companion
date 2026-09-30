@@ -224,6 +224,9 @@ narrow screens.
 Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
 
+Audit-history summaries wrap long unspaced entity names within their rows,
+preserving the timestamp and actor columns.
+
 Adventure-log titles, author names, and locations wrap within their cards even
 when the text contains no spaces.
 
