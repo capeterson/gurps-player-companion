@@ -189,7 +189,10 @@ Joining is invite-based (`src/server/routes/invitations.ts`):
 
 The campaigns page shows pending invite cards above the campaign list. Long
 campaign names wrap inside the card, including names without spaces, so the
-Accept and Reject actions remain inside narrow viewports.
+Accept and Reject actions remain inside narrow viewports. The workspace label
+and campaign Members settings also keep long unspaced display names and email
+addresses within their content areas while keeping invitation and membership
+actions reachable.
 
 Client surfaces: `CampaignInvitePanel`, `CampaignMembersPanel`,
 `InvitationsInbox`, `TransferOwnershipDialog`, `NotificationsBell`.
