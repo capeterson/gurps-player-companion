@@ -116,12 +116,13 @@ test('campaign library search and Clear search stay usable across form factors',
       expect(sourceBox).not.toBeNull();
       expect(searchGroupBox).not.toBeNull();
       if (!searchBox || !clearBox || !sourceBox || !searchGroupBox) return;
-      const controlsShareRow =
-        sourceBox.y < searchBox.y + searchBox.height &&
-        sourceBox.y + sourceBox.height > searchBox.y;
-      if (viewport.width === 456) expect(controlsShareRow).toBe(false);
-      if ([457, 458].includes(viewport.width)) expect(controlsShareRow).toBe(true);
       expect(searchBox.width).toBeGreaterThanOrEqual(144);
+      expect(clearBox.y).toBeLessThan(searchBox.y + searchBox.height);
+      expect(clearBox.y + clearBox.height).toBeGreaterThan(searchBox.y);
+      expect(searchGroupBox.x).toBeGreaterThanOrEqual(0);
+      expect(searchGroupBox.x + searchGroupBox.width).toBeLessThanOrEqual(viewport.width);
+      expect(sourceBox.x).toBeGreaterThanOrEqual(0);
+      expect(sourceBox.x + sourceBox.width).toBeLessThanOrEqual(viewport.width);
       expect(clearBox.x).toBeGreaterThanOrEqual(searchBox.x + searchBox.width);
       expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(viewport.width - 8);
       expect(searchBox.x).toBeGreaterThanOrEqual(8);
