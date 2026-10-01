@@ -824,7 +824,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     variants sharing one shell. Check rolls show the effective target and a
     `Roll vs N` action. Attack rolls combine range, Aim, hit location, rule
     bonuses and an Other modifier; the controls remain independently adjustable.
-    The footer stays reachable while the content scrolls. Defense and skill
+    Long roll labels wrap inside the sheet, and the Roll action stays reachable
+    while controls and results scroll. Defense and skill
     rolls retain the generic modifier stepper and optional presets. Defense
     rows use the same success-roll evaluator as skills, an existing rules
     simplification.
