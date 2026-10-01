@@ -15,6 +15,7 @@ import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 import { SkillRequirementsEditor } from './SkillRequirementsEditor.tsx';
+import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 interface SkillFormProps {
@@ -74,7 +75,7 @@ export function SkillForm({
       initial?.specializationPolicy.kind === 'optional_catalog'
       ? initial.specializationPolicy.options.map((option) => ({
           ...option,
-          editorKey: crypto.randomUUID(),
+          editorKey: newEditorId(),
         }))
       : [],
   );
@@ -301,7 +302,7 @@ export function SkillForm({
               onClick={() =>
                 setSpecializations((current) => [
                   ...current,
-                  { name: '', editorKey: crypto.randomUUID() },
+                  { name: '', editorKey: newEditorId() },
                 ])
               }
             >

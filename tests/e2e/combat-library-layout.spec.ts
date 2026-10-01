@@ -461,6 +461,12 @@ test('library search and markdown toolbar retain drafts and render formatted des
     kind: 'disadvantage',
     basePoints: -2,
   });
+  await page.addInitScript(() => {
+    Object.defineProperty(Crypto.prototype, 'randomUUID', {
+      configurable: true,
+      value: undefined,
+    });
+  });
   await page.goto(`/campaigns/${campaign.id}/library`);
   const search = page.getByRole('searchbox', { name: 'Search library' });
   await search.fill('darkness B71');

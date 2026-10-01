@@ -3,6 +3,7 @@ import { parse, stringify } from 'yaml';
 import { normalizeWeaponData } from '../../../shared/domain/weaponModes.ts';
 import { type WeaponData, weaponData } from '../../../shared/schemas/inventory.ts';
 import { RangedRangeInputs } from '../characters/sections/inventory/RangedRangeField.tsx';
+import { newEditorId } from './editorId.ts';
 
 /** A single editor, with lossless source mode for imported structures. */
 export function WeaponModesEditor({
@@ -13,7 +14,7 @@ export function WeaponModesEditor({
   function identity(mode: object): string {
     const known = identities.current.get(mode);
     if (known) return known;
-    const id = crypto.randomUUID();
+    const id = newEditorId();
     identities.current.set(mode, id);
     return id;
   }
@@ -209,7 +210,7 @@ export function WeaponModesEditor({
                 onClick={() =>
                   update({
                     ...data,
-                    modes: [...(data.modes ?? []), { key: crypto.randomUUID(), name: 'New mode' }],
+                    modes: [...(data.modes ?? []), { key: newEditorId(), name: 'New mode' }],
                   })
                 }
               >
