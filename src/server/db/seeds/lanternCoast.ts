@@ -7,6 +7,7 @@ import { closeDb, getDb, runInDbSavepoint, runInDbTransaction } from '../client.
 import { campaigns, users } from '../schema.ts';
 import { ensureDemoUser } from './accounts.ts';
 import { LANTERN_CAMPAIGN_NAME, populateLanternCoast } from './lanternCoastContent.ts';
+import { recordLanternSeedVersion } from './lanternCoastRevision.ts';
 export { LANTERN_CAMPAIGN_NAME } from './lanternCoastContent.ts';
 
 /**
@@ -74,6 +75,7 @@ export async function seedLanternCoast(ownerId: string, libraryText?: string) {
         return id;
       },
     });
+    await recordLanternSeedVersion(result.campaignId, ownerId);
     return { campaignId: result.campaignId, created: true };
   });
 }
