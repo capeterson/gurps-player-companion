@@ -127,8 +127,8 @@ export function CampaignInvitePanel({ campaignId, viewerRole }: Props) {
             key={inv.id}
             className="flex items-center justify-between gap-2 rounded border border-base-300 bg-base-100 px-3 py-2 text-sm"
           >
-            <div className="min-w-0">
-              <span className="font-medium truncate">{inv.inviteeDisplayName}</span>
+            <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+              <span className="font-medium">{inv.inviteeDisplayName}</span>
               <span className="ml-2 text-xs text-base-content/60">{inv.inviteeEmail}</span>
               <span className="ml-2 badge badge-sm badge-ghost">{inv.role}</span>
             </div>

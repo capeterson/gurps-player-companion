@@ -122,6 +122,7 @@ async function change(label: string, value: string) {
 }
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   selection.mockClear();
 });
 
@@ -279,6 +280,29 @@ describe('inline inventory editing', () => {
     await user.click(screen.getByRole('button', { name: 'Remove' }));
     await waitFor(async () => expect((await stored()).weaponData).toBeNull());
     expect((await stored()).armor?.dr).toBe(2);
+  });
+
+  it('adds an alternate attack mode when randomUUID is unavailable', async () => {
+    const user = await setup({ weaponData: weaponData.parse({ damage: 'sw cut' }) });
+    await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    await user.type(screen.getByRole('textbox', { name: 'New attack mode name' }), 'Thrust');
+    vi.stubGlobal('crypto', {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.fill(7);
+        return bytes;
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add attack mode' }));
+
+    await waitFor(async () => {
+      const modes = (await stored()).weaponData?.modes;
+      expect(modes?.[1]).toMatchObject({ name: 'Thrust' });
+      expect(modes?.[1]?.key).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+    });
   });
 
   it('shows populated ranged fields, shield side, DB zero and alternate modes without More options', async () => {

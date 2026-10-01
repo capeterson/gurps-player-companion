@@ -10,6 +10,7 @@ import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomple
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
+import { newClientId } from '../../../../sync/outbox.ts';
 import { RepriceEntry } from '../../../library/RepriceEntry.tsx';
 import { ItemField, type ItemFieldSpec } from './ItemField.tsx';
 import {
@@ -459,7 +460,7 @@ function ItemListEditor({
                     ...current.weaponData,
                     modes: [
                       ...weaponModes(current.weaponData),
-                      { key: crypto.randomUUID(), name: name.trim() },
+                      { key: newClientId(), name: name.trim() },
                     ],
                   },
                 };
@@ -771,8 +772,8 @@ export function InventoryItemEditor({
       {...flash.flashProps}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="label-eyebrow">{item.name}</div>
+        <div className="min-w-0">
+          <div className="label-eyebrow [overflow-wrap:anywhere]">{item.name}</div>
           <h3 className="font-display text-lg">
             {section === 'basics'
               ? 'Item details'

@@ -507,9 +507,16 @@
   outline: none;
 }
 .rich-text-preview {
+  max-width: 100%;
+  overflow-x: auto;
   border-top: 1px solid var(--color-base-300);
   padding: 0.5rem 0.75rem;
   background: var(--color-base-200);
+}
+.log-entry-body .markdown-body table,
+.rich-text-preview .markdown-body table {
+  width: max(100%, 36rem);
+  table-layout: fixed;
 }
 
 /* Character navigation extends daisyUI's flower to seven destinations.
@@ -700,10 +707,69 @@ dialog.modal[data-viewport-bounded="true"] {
   width: var(--dialog-viewport-width, 100dvw);
   height: var(--dialog-viewport-height, 100dvh);
 }
+dialog.modal:not([open]) {
+  display: none;
+}
 @layer components {
   dialog.modal[data-viewport-bounded="true"] > .modal-box {
     max-height: calc(var(--dialog-viewport-height, 100dvh) - 2rem);
     overflow-wrap: anywhere;
+  }
+}
+
+/* Campaign settings keeps its title and section tabs fixed on short screens,
+   while the campaign name and cover details remain in the scrollable body. */
+.campaign-settings-dialog__context {
+  display: none;
+}
+@media (max-height: 500px) {
+  .campaign-settings-dialog {
+    max-height: calc(var(--dialog-viewport-height, 100dvh) - 0.5rem);
+  }
+  .campaign-settings-dialog__header {
+    min-height: 3rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+  }
+  .campaign-settings-dialog__label {
+    margin: 0;
+  }
+  .campaign-settings-dialog__header-name {
+    display: none;
+  }
+  .campaign-settings-dialog__close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .campaign-settings-dialog__sections {
+    gap: 0.25rem;
+    padding-right: 0.75rem;
+    padding-bottom: 0.375rem;
+    padding-left: 0.75rem;
+  }
+  .campaign-settings-dialog__body {
+    padding: 0.5rem 0.75rem;
+  }
+  .campaign-settings-dialog__context {
+    display: block;
+    margin-bottom: 0.5rem;
+    overflow-wrap: anywhere;
+  }
+  .campaign-settings-dialog #settings-campaign > :not(:first-child),
+  .campaign-settings-dialog [aria-labelledby="settings-cover-title"] > :not(:first-child),
+  .campaign-settings-dialog .campaign-cover-media > :not(:first-child) {
+    margin-block-start: 0.5rem;
+  }
+  .campaign-settings-dialog__footer {
+    padding: 0.25rem 0.75rem;
+  }
+  .campaign-settings-dialog [aria-labelledby="settings-cover-title"] {
+    gap: 0.5rem;
+  }
+  .campaign-settings-dialog .campaign-cover-media > div:first-child {
+    width: min(12rem, 100%);
+    height: auto;
   }
 }
 

@@ -114,6 +114,23 @@ const processor = unified()
   .use(rehypeSanitize, defaultSchema)
   .use(rehypeStringify);
 
+const markdownParser = unified().use(remarkParse).use(remarkGfm);
+
+/**
+ * Whether a Markdown document contains GFM tables, which tiptap-markdown
+ * cannot round-trip. Keep those documents in source mode so loading or
+ * switching editor surfaces never rewrites their table syntax.
+ */
+export function containsGfmTableSyntax(src: string): boolean {
+  if (!src) return false;
+  const root = markdownParser.parse(src) as Node;
+  return hasTable(root);
+
+  function hasTable(node: Node): boolean {
+    return node.type === 'table' || !!node.children?.some(hasTable);
+  }
+}
+
 /**
  * Bounded LRU of rendered output keyed by source. Long lists (the campaign
  * library, the adventure log) remount the same descriptions on every filter,

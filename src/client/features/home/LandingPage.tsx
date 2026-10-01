@@ -29,9 +29,9 @@ export function LandingPage() {
       <main className="relative mx-auto max-w-6xl px-5 pb-16 sm:px-8">
         <section className="hero py-12 sm:py-20">
           <div className="hero-content w-full flex-col gap-10 p-0 lg:flex-row lg:items-start">
-            <div className="max-w-xl flex-1 space-y-6">
+            <div className="max-w-xl flex-1 space-y-6 xl:max-w-3xl">
               <p className="label-eyebrow">For GURPS 4e · At the table and on the go</p>
-              <h1 className="font-display text-4xl font-semibold leading-tight sm:text-6xl">
+              <h1 className="font-display text-4xl font-semibold leading-tight sm:text-5xl xl:text-6xl">
                 Your next adventure.
                 <br />
                 All on one sheet.

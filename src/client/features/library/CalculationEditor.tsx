@@ -7,6 +7,7 @@ import {
 } from '../../../shared/schemas/calculation.ts';
 
 import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
+import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 export function CalculationEditor({
@@ -46,7 +47,7 @@ export function CalculationEditor({
   const [step, setStep] = useState('1');
   const [inputUnit, setInputUnit] = useState<'level' | 'dice' | 'count' | 'divisor'>('level');
   const [options, setOptions] = useState([
-    { editorId: crypto.randomUUID(), key: 'option-a', label: 'Option A', amount: '0' },
+    { editorId: newEditorId(), key: 'option-a', label: 'Option A', amount: '0' },
   ]);
   const [weightDraft, setWeight] = useState<string | null>(null);
   const weightOutput = value?.outputs.find((entry) => entry.key === 'weightLbs');
@@ -288,7 +289,7 @@ export function CalculationEditor({
                 setOptions([
                   ...options,
                   {
-                    editorId: crypto.randomUUID(),
+                    editorId: newEditorId(),
                     key: `option-${options.length + 1}`,
                     label: 'New option',
                     amount: '0',

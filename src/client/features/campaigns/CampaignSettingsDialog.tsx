@@ -264,22 +264,22 @@ export function CampaignSettingsDialog({
       >
         <form
           method="dialog"
-          className="modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)-1rem)] w-[60rem] max-w-[calc(var(--dialog-viewport-width,100dvw)-1rem)] flex-col overflow-hidden p-0"
+          className="campaign-settings-dialog modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)_-_1rem)] w-[60rem] max-w-[calc(var(--dialog-viewport-width,100dvw)_-_1rem)] flex-col overflow-hidden p-0"
           onSubmit={onSubmit}
         >
-          <header className="flex shrink-0 items-start justify-between gap-3 px-4 pt-5 pb-4 sm:px-7">
+          <header className="campaign-settings-dialog__header flex shrink-0 items-start justify-between gap-3 px-4 pt-5 pb-4 sm:px-7">
             <div className="min-w-0">
-              <p className="label-eyebrow">Campaign settings</p>
+              <p className="campaign-settings-dialog__label label-eyebrow">Campaign settings</p>
               <h2
                 id="campaign-settings-title"
-                className="font-display text-2xl font-semibold [overflow-wrap:anywhere]"
+                className="campaign-settings-dialog__header-name font-display text-2xl font-semibold [overflow-wrap:anywhere]"
               >
                 {campaign.name}
               </h2>
             </div>
             <button
               type="button"
-              className="btn btn-ghost btn-square shrink-0"
+              className="campaign-settings-dialog__close btn btn-ghost btn-square shrink-0"
               onClick={onClose}
               aria-label="Close"
             >
@@ -289,7 +289,7 @@ export function CampaignSettingsDialog({
 
           <nav
             aria-label="Settings sections"
-            className="flex shrink-0 flex-wrap gap-1 border-b border-base-300 px-4 pb-3 sm:px-7"
+            className="campaign-settings-dialog__sections flex shrink-0 flex-wrap gap-1 border-b border-base-300 px-4 pb-3 sm:px-7"
           >
             {[
               ...(viewerRole === 'owner' ? [{ id: 'campaign' as const, label: 'Campaign' }] : []),
@@ -313,8 +313,11 @@ export function CampaignSettingsDialog({
           </nav>
           <div
             ref={bodyRef}
-            className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7"
+            className="campaign-settings-dialog__body min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-7"
           >
+            <h2 className="campaign-settings-dialog__context mb-3 break-words text-base font-semibold">
+              {campaign.name}
+            </h2>
             {!onlineAvailable && (
               <p className="alert mb-5 text-sm">
                 Connect to change campaign rules or manage members. Cover changes can still queue on
@@ -660,7 +663,7 @@ export function CampaignSettingsDialog({
               )}
             </section>
           </div>
-          <footer className="shrink-0 border-t border-base-300 px-4 py-3 sm:px-7">
+          <footer className="campaign-settings-dialog__footer shrink-0 border-t border-base-300 px-4 py-3 sm:px-7">
             {error && (
               <p role="alert" className="alert alert-error mb-3 text-sm">
                 {error}

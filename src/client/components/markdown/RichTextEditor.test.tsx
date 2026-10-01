@@ -70,4 +70,68 @@ describe('RichTextEditor — markdown safety and round trips', () => {
     );
     expect(updatedPreview?.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
   });
+
+  it('preserves GFM tables in source mode when loading, editing, and opening preview', async () => {
+    const user = userEvent.setup();
+    const value = [
+      '| Participant | Observation |',
+      '| --- | --- |',
+      '| Scout | The eastern gate is open |',
+    ].join('\n');
+    const onChange = vi.fn();
+    const { container } = render(
+      <RichTextEditor value={value} onChange={onChange} aria-label="Adventure body" />,
+    );
+
+    const source = screen.getByRole('textbox', { name: 'Adventure body' });
+    expect(source).toHaveValue(value);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'This entry has a table. Edit it in Markdown mode to keep the table.',
+    );
+    expect(screen.getByRole('button', { name: 'Rich text unavailable for tables' })).toBeDisabled();
+
+    const edited = `${value}\n| Healer | The party is ready |`;
+    fireEvent.change(source, { target: { value: edited } });
+    expect(onChange).toHaveBeenLastCalledWith(edited);
+
+    await user.click(container.querySelector('.rich-text-preview summary') as HTMLElement);
+    const preview = container.querySelector('.rich-text-preview .markdown-body');
+    await waitFor(() => expect(preview).toBeVisible());
+    expect(preview?.querySelectorAll('table tr')).toHaveLength(3);
+    expect(preview?.textContent).toContain('The party is ready');
+    expect(source).toHaveValue(edited);
+  });
+
+  it('locks rich mode when a table is entered in source and unlocks after removal', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { container } = render(
+      <RichTextEditor value="An observation." onChange={onChange} aria-label="Adventure body" />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Edit raw markdown' }));
+
+    const value = [
+      'An observation.',
+      '',
+      '| Participant | Observation |',
+      '| --- | --- |',
+      '| Scout | The eastern gate is open |',
+    ].join('\n');
+    const source = screen.getByRole('textbox', { name: 'Adventure body' });
+    fireEvent.change(source, { target: { value } });
+    expect(source).toHaveValue(value);
+    expect(onChange).toHaveBeenLastCalledWith(value);
+    expect(screen.getByRole('button', { name: 'Rich text unavailable for tables' })).toBeDisabled();
+
+    const withoutTable = 'An observation.\n\nThe eastern gate is open.';
+    fireEvent.change(source, { target: { value: withoutTable } });
+    const richToggle = screen.getByRole('button', { name: 'Back to rich text' });
+    expect(richToggle).toBeEnabled();
+    await user.click(richToggle);
+    await waitFor(() =>
+      expect(container.querySelector('.rich-text-surface')).toHaveTextContent(
+        'The eastern gate is open.',
+      ),
+    );
+  });
 });

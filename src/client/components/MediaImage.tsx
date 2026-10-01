@@ -268,7 +268,7 @@ export function MediaImage({
   const portraitEditor = editable && targetType === 'character';
   return (
     <div
-      className={`min-w-0 space-y-2 ${targetType === 'character' ? 'shrink-0' : ''} ${editable ? 'field-rollback-flash rounded-box' : ''}`}
+      className={`min-w-0 space-y-2 ${targetType === 'character' ? 'shrink-0' : 'campaign-cover-media'} ${editable ? 'field-rollback-flash rounded-box' : ''}`}
       {...flash.flashProps}
     >
       {portraitEditor ? (

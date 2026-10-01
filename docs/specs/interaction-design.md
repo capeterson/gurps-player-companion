@@ -20,6 +20,8 @@ Masked rows awaiting rehydration also omit attribute placeholders. The GM
 wrapper supplies effective attributes and appends pools, secondary stats,
 conditions and lookup results inside the same shell. Its name link opens a new
 tab; missing mechanics show the existing unavailable notice and hide numbers.
+Long unspaced names in character change summaries wrap inside the GM activity
+feed, including when it appears below the cards on narrow viewports.
 
 ## Identity images and campaign settings
 
@@ -42,6 +44,10 @@ form drafts. Owner cover editing and image help live only in Campaign; covers in
 workspace headers are display-only. Offline owners can enter the dialog to edit
 covers, with unavailable online preferences disabled and member actions hidden.
 Cover selection queues immediately and separately from the settings Save action.
+At viewport heights of 500px or less, the fixed header compacts to the settings
+label and a 44px Close control. The complete campaign name moves into the
+scrollable body, which also contains a reduced cover preview so the labeled
+upload input remains usable above the persistent Save/Cancel actions.
 
 ## Read first, edit on demand
 
@@ -85,7 +91,10 @@ Edit occupy one horizontal action row. Long names wrap; there is no page-wide
 horizontal scroller. A free upkeep is 0, while absent upkeep is an em dash.
 
 The name opens a bounded, read-only reference dialog with rendered Markdown,
-prerequisites, duration, base-to-effective costs, and level modifiers. The pencil
+prerequisites, duration, base-to-effective costs, and level modifiers. Its
+compact close control stays pinned on an opaque surface that reaches the
+dialog's inner top edge while the full spell heading and long reference content
+scroll inside the dialog. The pencil
 opens a labeled inline editor for name, difficulty, points, base cost, and
 Markdown description/notes. Deletion lives in that editor and requires the
 existing confirmation. Editors stay mounted when closed or filtered; Done
@@ -108,6 +117,11 @@ Inventory links for full editing. Existing drain/recharge/Max and Use/Refill
 controls remain outbox-backed. An empty Magic items section is absent.
 Below 640px, adjustment controls move to their own row so long item names retain
 the available width beside energy or charges.
+
+Adventure-log Markdown tables keep a readable 36rem minimum width and scroll
+horizontally inside the log body or raw-Markdown preview. This local scroller
+keeps the final columns reachable on narrow screens without imposing wide
+tables on other Markdown surfaces.
 
 ## Named protection sources
 
@@ -212,6 +226,11 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+The public landing hero scales its headline through the 640px breakpoint so
+the two advertised phrases remain on their intended lines at tablet and desktop
+widths. The desktop heading grows when its text column has enough room; short
+landscape layouts keep the heading inside the initial viewport.
+
 The editable identity name remains a single-line field, using 30px display type
 below 640px and 48px from 640px up. Compact Combat retains its 24px name size.
 Long editable names scroll within the input; read-only identity headings wrap
@@ -225,6 +244,7 @@ Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
 Library group labels and mobile row metadata wrap long unspaced categories.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
+Help and About prose wraps long external links inside its content column.
 Focused library form fields retain their draft and stay below the sticky toolbar
 after rotation, visual-viewport resizing, and keyboard focus changes. Only an
 obscured active editing field is scrolled into the remaining working area.
@@ -236,8 +256,9 @@ When the toolbar would occupy more than half the visible area below the app
 header, it scrolls with the document and field offsets reserve only the header.
 Pinning returns when the viewport has enough room.
 
-Audit-history summaries wrap long unspaced entity names within their rows,
-preserving the timestamp and actor columns.
+Audit-history summaries and actor names wrap without truncation. On phone
+widths, the actor uses an indented second line so the timestamp and summary keep
+their reading width; wider rows keep the actor beside the summary.
 
 Adventure-log titles, author names, and locations wrap within their cards even
 when the text contains no spaces.
@@ -249,6 +270,12 @@ heading wraps unbroken account names within its card.
 Detailed encounter NPC and effect forms open in the native dialog top layer, above the
 sticky app header. Their height stays within the dynamic viewport, with internal
 scrolling for long forms, and Escape closes the dialog and its controlled state.
+Closed native dialogs are removed from layout, so their previous viewport
+dimensions cannot widen the page.
+
+Encounter initiative cards keep long unspaced combatant names within their grid
+column at phone, tablet, and desktop widths; names wrap while the acting badge
+and combatant controls remain available without page-wide horizontal scrolling.
 
 Summary rows use a fluid name column and compact value/action columns. Long
 names and references wrap rather than shrinking to a few letters or forcing
@@ -257,7 +284,9 @@ can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
 Expanded trait and skill editors also wrap their complete **Edit** headings,
-including long unspaced names, within the editor's content width.
+including long unspaced names, within the editor's content width. Trait modifier
+names and descriptions wrap inside the expanded editor when they contain long
+unbroken text.
 
 Expanded editors use a responsive grid with full field labels such as
 **Difficulty**, **Default modifier**, and **Points**. Creation uses the same
@@ -271,6 +300,10 @@ below 640px: name and chips on the left, weight over quantity and cost on the
 right, then the edit action. Quantity 1 is implied rather than repeated, and
 the units (`lb`, `$`, `×`) replace per-row column labels. Long names and chip
 text wrap at every width so the table also fits at the desktop breakpoint.
+Expanded inventory editors wrap long unspaced item names in the header while
+keeping the **+ Category** and **Done** actions inside the viewport. At the
+desktop-table breakpoint, item names and category chips may flow onto separate
+lines so a narrow item column does not compress a chip into one letter per line.
 
 Each row leads with a 20px slot holding the container chevron (whose hit area
 extends to a touch-sized target) or an item-type icon. Each nesting level
@@ -282,6 +315,12 @@ keep room for names. A collapsed container shows its contained-item count.
 Containers carry only a faint tint, not another typeface or palette. The tree
 is presentation over flat table rows, rather than an invalid nested table or a
 second editing surface.
+
+Character inventory alternate attack modes and the device-only solo tracker
+generate client IDs through the shared safe ID helper, so creating them also
+works on non-secure HTTP IP origins where `crypto.randomUUID()` is unavailable.
+Long unspaced solo-tracker combatant names wrap inside the tracker, and armor
+names in the protection-layer breakdown shrink and wrap beside their DR values.
 
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide

@@ -6,6 +6,7 @@ import {
 import { libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { EffectsEditor } from './EffectsEditor.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 export function ActiveEffectForm({
@@ -27,7 +28,7 @@ export function ActiveEffectForm({
   const [effects, setEffects] = useState(initial?.effects ?? []);
   const [valid, setValid] = useState(true);
   const [capabilities, setCapabilities] = useState(
-    (initial?.capabilities ?? []).map((c) => ({ ...c, editorId: crypto.randomUUID() })),
+    (initial?.capabilities ?? []).map((c) => ({ ...c, editorId: newEditorId() })),
   );
   const [duration, setDuration] = useState(initial?.duration.kind ?? 'indefinite');
   const [amount, setAmount] = useState(
@@ -247,7 +248,7 @@ export function ActiveEffectForm({
           onClick={() =>
             setCapabilities((cs) => [
               ...cs,
-              { kind: 'capability', key: '', label: '', editorId: crypto.randomUUID() },
+              { kind: 'capability', key: '', label: '', editorId: newEditorId() },
             ])
           }
         >
