@@ -15,6 +15,7 @@ import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { ApiKeysSection } from './ApiKeysSection.tsx';
 import { AppearanceSection } from './AppearanceSection.tsx';
 import { ConnectedAppsSection } from './ConnectedAppsSection.tsx';
+import { ExperimentalFeaturesSection } from './ExperimentalFeaturesSection.tsx';
 import { NotificationsSection } from './NotificationsSection.tsx';
 
 export function SettingsPage() {
@@ -123,6 +124,7 @@ export function SettingsPage() {
 
       <AppearanceSection />
       <NotificationsSection userId={me.data?.id} />
+      <ExperimentalFeaturesSection userId={me.data?.id} />
 
       <section className="max-w-lg">
         <div className="card gap-4 p-card">

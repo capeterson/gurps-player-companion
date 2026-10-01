@@ -35,7 +35,7 @@ import { modifierEntity, sourceEntity } from './campaignLibraryEntities.ts';
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
 import { canonicalLibraryKey } from '../../shared/domain/libraryIdentity.ts';
@@ -54,6 +54,7 @@ import {
   libraryTraitOut,
 } from '../../shared/schemas/campaignLibrary.ts';
 import { uuid } from '../../shared/schemas/common.ts';
+import { librarySkillDetail } from '../../shared/schemas/details.ts';
 import {
   LibraryYamlError,
   emitLibraryYaml,
@@ -232,6 +233,44 @@ router.openapi(
 );
 
 // ===================== PER-ENTITY CRUD =====================
+
+router.openapi(
+  createRoute({
+    method: 'get',
+    path: '/campaigns/{id}/library/skills/{skillId}',
+    tags: ['campaigns'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Get one campaign-library skill definition, without the rest of the library',
+    request: { params: z.object({ id: uuid, skillId: uuid }) },
+    responses: {
+      200: {
+        description: 'Skill definition',
+        content: { 'application/json': { schema: librarySkillDetail } },
+      },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not found or restricted'),
+    },
+  }),
+  async (c) => {
+    const { id, skillId } = c.req.valid('param');
+    const user = c.get('user');
+    const { campaign } = await requireCampaignMember(id, user.id);
+    const [row] = await getDb()
+      .select()
+      .from(skillEntity.table)
+      .where(and(eq(skillEntity.table.campaignId, id), eq(skillEntity.table.id, skillId)));
+    if (!row || (row.restricted && campaign.ownerId !== user.id))
+      throw new HTTPException(404, { message: 'library skill not found' });
+    return c.json(
+      {
+        kind: 'library_skill' as const,
+        skill: skillEntity.toOut(row),
+        experimentalActiveEffects: campaign.experimentalActiveEffects,
+      },
+      200,
+    );
+  },
+);
 
 registerLibraryCrud(router, sourceEntity);
 registerLibraryCrud(router, modifierEntity);

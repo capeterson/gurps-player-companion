@@ -5,11 +5,13 @@ import { effectPreview } from './EffectsEditor.tsx';
 export function MechanicalEffectList({
   effects,
   campaignId,
+  activeEffectsSnapshot,
 }: {
   effects: readonly TraitEffect[];
   campaignId: string;
+  activeEffectsSnapshot?: boolean | undefined;
 }) {
-  const enabled = useExperimentalActiveEffects(campaignId);
+  const enabled = useExperimentalActiveEffects(campaignId, activeEffectsSnapshot);
   const visible = effects.filter((effect) => enabled || !effect.conditionGroup);
   if (!visible.length) return null;
   return (

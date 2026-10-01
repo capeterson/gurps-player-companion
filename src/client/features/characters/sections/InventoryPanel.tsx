@@ -535,7 +535,9 @@ export function InventoryPanel({
         <TableHeader column="qty" label="Qty" className="text-right" />
         <TableHeader column="wt" label="Wt" className="text-right" />
         <TableHeader column="cost" label="Cost" className="text-right" />
-        {canWrite && <th />}
+        <th scope="col">
+          <span className="sr-only">Item details</span>
+        </th>
       </tr>
     </thead>
   );

@@ -13,6 +13,7 @@ import {
   mutationAcknowledgement,
   readBoundedMcpJson,
 } from './transport.ts';
+import { CHARACTER_UI_URI, MCP_APP_MIME_TYPE, characterUiResource } from './ui.ts';
 
 const document = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
 const config = { ...integrationTestConfig, appHostname: 'localhost', port: 3001 };
@@ -34,6 +35,7 @@ function principal(): OAuthPrincipal {
     scopes: ['gpc:read'],
     expiresAt: new Date(Date.now() + 60_000),
     resource,
+    experimentalMcpUi: true,
   };
 }
 function request(body: unknown, headers: Record<string, string> = {}) {
@@ -55,11 +57,18 @@ function handler(
     resolveFailure?: Error;
     executeFailure?: Error;
     executeResponse?: () => Response;
+    readUiFailure?: boolean;
   } = {},
 ) {
   const actor = options.principal ?? principal();
   let executed = 0;
+  let readUiCalls = 0;
   const handle = createMcpHandler(config, createOpenApiApp(), document, {
+    async readUi() {
+      readUiCalls++;
+      if (options.readUiFailure) throw new Error('private filesystem error');
+      return { contents: [{ ...characterUiResource, text: '<html>Generic character UI</html>' }] };
+    },
     async resolvePrincipal() {
       if (options.resolveFailure) throw options.resolveFailure;
       return actor;
@@ -71,7 +80,7 @@ function handler(
       return Response.json([]);
     },
   });
-  return { handle, executed: () => executed, actor };
+  return { handle, executed: () => executed, readUiCalls: () => readUiCalls, actor };
 }
 const listing = { jsonrpc: '2.0', id: 1, method: 'tools/list' };
 const readCall = {
@@ -80,6 +89,183 @@ const readCall = {
   method: 'tools/call',
   params: { name: 'list_characters', arguments: {} },
 };
+
+describe('MCP Apps character resource', () => {
+  test('advertises shared and focused detail UIs and preserves tool hints', async () => {
+    const { handle } = handler();
+    const result = await (await handle(request(listing))).json();
+    const tools = result.result.tools as Array<{
+      name: string;
+      _meta: Record<string, unknown>;
+      annotations: Record<string, unknown>;
+    }>;
+    expect(tools.find((tool) => tool.name === 'get_character')).toMatchObject({
+      _meta: { ui: { resourceUri: CHARACTER_UI_URI } },
+      annotations: { readOnlyHint: true },
+    });
+    expect(
+      tools
+        .filter((tool) => tool._meta.ui)
+        .map((tool) => tool.name)
+        .sort(),
+    ).toEqual(['get_campaign_library_skill', 'get_character', 'get_character_inventory_item']);
+  });
+
+  test('initialization advertises resources and reads a generic, uncached shell without domain execution', async () => {
+    const { handle, executed } = handler();
+    const initialized = await (
+      await handle(
+        request({
+          jsonrpc: '2.0',
+          id: 8,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-11-25',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '1' },
+          },
+        }),
+      )
+    ).json();
+    expect(initialized.result.capabilities).toMatchObject({ tools: {}, resources: {} });
+    const listed = await (
+      await handle(request({ jsonrpc: '2.0', id: 9, method: 'resources/list' }))
+    ).json();
+    expect(listed.result.resources).toEqual([characterUiResource]);
+    const response = await handle(
+      request({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'resources/read',
+        params: { uri: CHARACTER_UI_URI },
+      }),
+    );
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({
+      result: {
+        contents: [
+          {
+            uri: CHARACTER_UI_URI,
+            mimeType: MCP_APP_MIME_TYPE,
+            text: '<html>Generic character UI</html>',
+            _meta: { ui: { csp: { connectDomains: [], resourceDomains: [] } } },
+          },
+        ],
+      },
+    });
+    expect(executed()).toBe(0);
+  });
+
+  test('resource access requires read scope and unknown resources never touch the filesystem', async () => {
+    const actor = principal();
+    actor.scopes = ['gpc:write'];
+    const { handle } = handler({ principal: actor });
+    const listed = await (
+      await handle(request({ jsonrpc: '2.0', id: 11, method: 'resources/list' }))
+    ).json();
+    expect(listed.result.resources).toEqual([]);
+    const denied = await handle(
+      request({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'resources/read',
+        params: { uri: CHARACTER_UI_URI },
+      }),
+    );
+    expect(denied.status).toBe(403);
+    expect(denied.headers.get('www-authenticate')).toContain('gpc:read');
+    const unknown = await handler().handle(
+      request({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'resources/read',
+        params: { uri: 'file:///etc/passwd' },
+      }),
+    );
+    const unknownResult = await unknown.json();
+    expect(unknownResult.error.code).toBe(-32602);
+    expect(unknownResult.error.message).toContain('Unknown UI resource');
+  });
+
+  test('account feature gate hides UI metadata/resources but leaves ordinary tools available', async () => {
+    const actor = principal();
+    actor.experimentalMcpUi = false;
+    const { handle, executed, readUiCalls } = handler({ principal: actor });
+    const listedTools = await (await handle(request(listing))).json();
+    const tools = listedTools.result.tools as Array<{ name: string; _meta?: { ui?: unknown } }>;
+    expect(tools.find((tool) => tool.name === 'get_character')).toBeDefined();
+    expect(tools.filter((tool) => tool._meta?.ui)).toEqual([]);
+
+    const listedResources = await (
+      await handle(request({ jsonrpc: '2.0', id: 21, method: 'resources/list' }))
+    ).json();
+    expect(listedResources.result.resources).toEqual([]);
+    const denied = await handle(
+      request({
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'resources/read',
+        params: { uri: CHARACTER_UI_URI },
+      }),
+    );
+    expect(denied.status).toBe(200);
+    const deniedResult = await denied.json();
+    expect(deniedResult.error.code).toBe(-32602);
+    expect(deniedResult.error.message).toContain('Unknown UI resource');
+    expect(readUiCalls()).toBe(0);
+
+    const ordinary = await handle(request(readCall));
+    expect(ordinary.status).toBe(200);
+    expect(executed()).toBe(1);
+  });
+
+  test('refreshes the MCP UI gate on every request on the same handler', async () => {
+    const actor = principal();
+    actor.experimentalMcpUi = false;
+    const { handle } = handler({ principal: actor });
+    const toolList = async () =>
+      (await handle(request({ jsonrpc: '2.0', id: 31, method: 'tools/list' }))).json();
+    const resourceList = async () =>
+      (await handle(request({ jsonrpc: '2.0', id: 32, method: 'resources/list' }))).json();
+    expect(
+      (await toolList()).result.tools.filter(
+        (tool: { _meta?: { ui?: unknown } }) => tool._meta?.ui,
+      ),
+    ).toEqual([]);
+    expect((await resourceList()).result.resources).toEqual([]);
+
+    actor.experimentalMcpUi = true;
+    expect(
+      (await toolList()).result.tools
+        .filter((tool: { _meta?: { ui?: unknown } }) => tool._meta?.ui)
+        .map((tool: { name: string }) => tool.name)
+        .sort(),
+    ).toEqual(['get_campaign_library_skill', 'get_character', 'get_character_inventory_item']);
+    expect((await resourceList()).result.resources).toEqual([characterUiResource]);
+
+    actor.experimentalMcpUi = false;
+    expect(
+      (await toolList()).result.tools.filter(
+        (tool: { _meta?: { ui?: unknown } }) => tool._meta?.ui,
+      ),
+    ).toEqual([]);
+    expect((await resourceList()).result.resources).toEqual([]);
+  });
+
+  test('missing builds produce an actionable error without server paths', async () => {
+    const response = await handler({ readUiFailure: true }).handle(
+      request({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'resources/read',
+        params: { uri: CHARACTER_UI_URI },
+      }),
+    );
+    const result = await response.json();
+    expect(result.error.message).toContain('build the MCP UI assets');
+    expect(JSON.stringify(result)).not.toContain('private filesystem');
+  });
+});
 
 describe('MCP streaming request boundary', () => {
   test('stops an oversized chunked request before reading the remaining stream', async () => {
@@ -230,7 +416,9 @@ describe('MCP protocol and OAuth transport', () => {
     const response = await handle(request(listing));
     expect(response.status).toBe(200);
     const body = (await response.json()) as { result: { tools: unknown[] } };
-    const expected = toolsForScopes(buildToolCatalog(document), actor.scopes).map(describeMcpTool);
+    const expected = toolsForScopes(buildToolCatalog(document), actor.scopes).map((tool) =>
+      describeMcpTool(tool, actor.experimentalMcpUi),
+    );
     expect(body.result.tools).toEqual(expected);
     expect(body.result.tools).toContainEqual(expect.objectContaining({ name: 'list_characters' }));
     expect(body.result.tools).not.toContainEqual(

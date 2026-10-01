@@ -20,6 +20,7 @@ import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
 import { sheetAnchor } from '../sheetAnchors.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
+import { InventoryItemDetails } from './inventory/InventoryItemDetails.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
 import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
 import { readContainerExpanded, writeContainerExpanded } from './inventoryContainerState.ts';
@@ -118,6 +119,7 @@ export function InventoryRow(props: InventoryRowProps) {
   const sel = isSelected(item.id);
   const highlighted = highlightItemId === item.id;
   const [section, setSection] = useState<ItemSection | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [visited, setVisited] = useState<ItemSection[]>([]);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const editorId = `inventory-editor-${item.id}`;
@@ -444,6 +446,20 @@ export function InventoryRow(props: InventoryRowProps) {
         >
           {item.cost.toFixed(0)}
         </td>
+        {!canEdit && (
+          <td className="text-right align-top sm:align-middle">
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              aria-label={`View ${item.name}`}
+              aria-expanded={detailsOpen}
+              aria-controls={editorId}
+              onClick={() => setDetailsOpen((open) => !open)}
+            >
+              {detailsOpen ? 'Done' : 'Details'}
+            </button>
+          </td>
+        )}
         {canEdit && (
           // The Edit button below already stopPropagation()s clicks, so the cell
           // itself doesn't need an onClick handler to keep row-selection inert.
@@ -465,6 +481,18 @@ export function InventoryRow(props: InventoryRowProps) {
           </td>
         )}
       </TableRow>
+      {!canEdit && detailsOpen && (
+        <TableRow
+          hidden={ancestorHidden || filteredOut}
+          id={editorId}
+          className="inventory-editor-row"
+          style={rowStyle}
+        >
+          <td colSpan={5} className="!p-3">
+            <InventoryItemDetails item={item} />
+          </td>
+        </TableRow>
+      )}
       {canEdit && visited.length > 0 && (
         <TableRow
           className="inventory-editor-row"

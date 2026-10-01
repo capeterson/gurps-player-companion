@@ -1,20 +1,14 @@
 import { SKILL_ATTRIBUTES, SKILL_DIFFICULTIES } from '../../../../shared/constants/skills.ts';
 import type { LibrarySkillCreate } from '../../../../shared/schemas/campaignLibrary.ts';
-import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import type { LocalLibrarySkill } from '../../../db/dexie.ts';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
-import { MechanicalEffectList } from '../MechanicalEffectList.tsx';
+import { LibrarySkillDetails, librarySkillMeta } from '../LibrarySkillDetails.tsx';
 import { SkillForm } from '../SkillForm.tsx';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
 import { CrudLibrarySection, type LibrarySectionShellProps } from './CrudLibrarySection.tsx';
 
 const difficultyRank = (difficulty: string) =>
   (SKILL_DIFFICULTIES as readonly string[]).indexOf(difficulty);
-
-function techLevelLabel(row: LocalLibrarySkill): string {
-  if (row.techLevelPolicy?.kind === 'required') return '/TL';
-  return row.techLevel != null ? `TL${row.techLevel}` : '';
-}
 
 export const skillsConfig: LibrarySectionConfig<LocalLibrarySkill> = {
   key: 'skills',
@@ -33,31 +27,8 @@ export const skillsConfig: LibrarySectionConfig<LocalLibrarySkill> = {
   ],
   group: (row) => row.attribute,
   groupOrder: SKILL_ATTRIBUTES,
-  meta: (row) =>
-    [`${row.attribute}/${row.difficulty}`, techLevelLabel(row)].filter(Boolean).join(' · '),
-  detail: (row) => (
-    <>
-      {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
-      {row.specializationPolicy.kind !== 'none' && (
-        <p className="text-xs text-dim">
-          Specialization ·{' '}
-          {row.specializationPolicy.kind.startsWith('required') ? 'required' : 'optional'}
-          {(row.specializationPolicy.kind === 'required_catalog' ||
-            row.specializationPolicy.kind === 'optional_catalog') &&
-            ` · ${row.specializationPolicy.options.map((option) => option.name).join(', ')}`}
-        </p>
-      )}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
-      {row.prerequisites && <p className="text-xs text-dim">Prerequisites · {row.prerequisites}</p>}
-      {row.prerequisiteRules && (
-        <p className="text-xs text-warning">Structured prerequisite rules active</p>
-      )}
-      {row.defaults?.some((rule) => (rule.conditions?.length ?? 0) > 0) && (
-        <p className="text-xs text-info">Includes conditional default candidates</p>
-      )}
-      <MechanicalEffectList effects={row.effects} campaignId={row.campaignId} />
-    </>
-  ),
+  meta: librarySkillMeta,
+  detail: (row) => <LibrarySkillDetails skill={row} />,
   deleteTitle: 'Delete library skill',
   deleteNote: 'Existing characters that use this skill are not affected.',
 };
