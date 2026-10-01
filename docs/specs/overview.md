@@ -890,7 +890,8 @@ settings sections; switching sections retains drafts.
 - **Membership management**: add/remove members, change roles, **transfer
   ownership**, delete campaign.
 - **Invitations**: invite by handle (email or display name), inbox to
-  accept/reject, notifications.
+  accept/reject, notifications. Pending invitation cards wrap long campaign
+  names on narrow screens. See [campaign-content-sharing.md](campaign-content-sharing.md).
 - **Character-sheet sharing gate** (`shareCharacterSheets`): when off, only the
   owner (GM) and a character's own player see full sheets; other members get a
   "minimal view" (identity columns only — no stats, temp effects, HP/FP,

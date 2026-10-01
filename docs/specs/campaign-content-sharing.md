@@ -187,6 +187,10 @@ Joining is invite-based (`src/server/routes/invitations.ts`):
   **accepts** (`POST /invitations/{id}/accept`, which creates the membership)
   or **rejects** (`.../reject`). Owner/manager can cancel a pending invite.
 
+The campaigns page shows pending invite cards above the campaign list. Long
+campaign names wrap inside the card, including names without spaces, so the
+Accept and Reject actions remain inside narrow viewports.
+
 Client surfaces: `CampaignInvitePanel`, `CampaignMembersPanel`,
 `InvitationsInbox`, `TransferOwnershipDialog`, `NotificationsBell`.
 
