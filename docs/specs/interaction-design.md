@@ -44,6 +44,10 @@ form drafts. Owner cover editing and image help live only in Campaign; covers in
 workspace headers are display-only. Offline owners can enter the dialog to edit
 covers, with unavailable online preferences disabled and member actions hidden.
 Cover selection queues immediately and separately from the settings Save action.
+At viewport heights of 500px or less, the fixed header compacts to the settings
+label and a 44px Close control. The complete campaign name moves into the
+scrollable body, which also contains a reduced cover preview so the labeled
+upload input remains usable above the persistent Save/Cancel actions.
 
 ## Read first, edit on demand
 

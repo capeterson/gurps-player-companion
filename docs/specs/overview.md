@@ -74,7 +74,10 @@ clicking it opens a portrait editor with upload/removal controls and image help.
 Campaign cover controls and help live in the Campaign section of the centered
 settings dialog, alongside separate Rules and Members sections. Workspace headers
 only display covers. Selections and replacements queue locally,
-including offline, and sync independently of text edits. Portraits also appear
+including offline, and sync independently of text edits. At heights up to 500px,
+the settings dialog keeps a compact label, Close button, section tabs and Save/Cancel
+visible while the full campaign name and reduced cover preview scroll with the
+upload controls. Portraits also appear
 in minimal campaign views. Images are sanitized into two WebP sizes and served
 through public, unguessable, immutable URLs; browser caches may retain them after
 logout or removal. See [media-uploads.md](media-uploads.md) for access, limits and
