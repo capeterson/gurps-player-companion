@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -69,7 +70,7 @@ test('a combat weapon link reveals nested inventory and survives reload', async 
   expect(
     await page.evaluate(() => (window as Window & { __anchorPage?: boolean }).__anchorPage),
   ).toBe(true);
-  await page.screenshot({ path: 'test-results/inventory-anchor-visible.png' });
+  await captureReviewScreenshot(page, { path: 'test-results/inventory-anchor-visible.png' });
 
   await page.reload();
   await expect(swordRow).toBeVisible();

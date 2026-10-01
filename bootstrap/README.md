@@ -121,6 +121,10 @@ pricing, snapshots, nested items, effects, logs, XP and encounter content. It
 normalizes generated IDs/revisions/timestamps and the allowed owner/author
 change, asserts no additional users, and verifies delegated audit provenance.
 It obeys the real MCP rate budget, so this test may take over a minute.
+It is an explicit agent pre-PR acceptance check outside CI; run
+`bun run test:acceptance:mcp-seed` and record the tested commit/result before
+opening a PR or pushing code changes to it. The normal seed and focused MCP
+parity/security tests remain in CI.
 
 ## Repeat runs and isolation
 
@@ -154,7 +158,7 @@ It obeys the real MCP rate budget, so this test may take over a minute.
   used by both adapters.
 - [lanternCoastMcp.ts](../src/server/db/seeds/lanternCoastMcp.ts): exact tool mapping
   and acknowledgement adapter.
-- [lanternCoastMcp.integration.test.ts](../src/server/db/seeds/lanternCoastMcp.integration.test.ts):
+- [lantern-coast-mcp.test.ts](../tests/acceptance/lantern-coast-mcp.test.ts):
   authenticated MCP acceptance against the complete REST graph.
 - [lanternCoast.test.ts](../src/server/db/seeds/lanternCoast.test.ts): PostgreSQL
   integration coverage for usable mechanics, library ownership, nested items,
@@ -162,5 +166,6 @@ It obeys the real MCP rate budget, so this test may take over a minute.
   followed by a successful repair. Test-created campaigns and history roll back.
 
 ```sh
-./scripts/dev-worktree.sh exec -T app bun test src/server/db/seeds/lanternCoast.test.ts src/server/db/seeds/lanternCoastMcp.integration.test.ts
+./scripts/dev-worktree.sh exec -T app bun test src/server/db/seeds/lanternCoast.test.ts
+./scripts/dev-worktree.sh exec -T app bun run test:acceptance:mcp-seed
 ```

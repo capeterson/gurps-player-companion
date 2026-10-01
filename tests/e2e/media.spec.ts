@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import sharp from 'sharp';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -125,7 +126,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     await expectInsideViewport(page, portraitEditor.locator('.modal-box'), width);
     await expectInsideViewport(page, portraitInput, width);
     await expect(portraitEditor.getByText(/JPEG, PNG or WebP/)).toBeVisible();
-    await page.screenshot({ path: `test-results/media-portrait-${width}.png`, fullPage: true });
+    await captureReviewScreenshot(page, {
+      path: `test-results/media-portrait-${width}.png`,
+      fullPage: true,
+    });
   }
 
   // The app shell and immutable image are now under service-worker control.
@@ -154,7 +158,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await expect
     .poll(() => portrait.evaluate((element: HTMLImageElement) => element.naturalWidth))
     .toBeGreaterThan(0);
-  await page.screenshot({ path: 'test-results/media-portrait-offline.png', fullPage: true });
+  await captureReviewScreenshot(page, {
+    path: 'test-results/media-portrait-offline.png',
+    fullPage: true,
+  });
 
   await page.setViewportSize({ width: 320, height: 900 });
   const mobileNavigation = page.getByRole('navigation', { name: 'Character and app navigation' });
@@ -204,7 +211,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     await expectInsideViewport(page, settings.locator('.modal-box'), width);
     await expectInsideViewport(page, coverInput, width);
     await expect(settings.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
-    await page.screenshot({ path: `test-results/media-cover-${width}.png`, fullPage: true });
+    await captureReviewScreenshot(page, {
+      path: `test-results/media-cover-${width}.png`,
+      fullPage: true,
+    });
   }
 
   await context.setOffline(true);

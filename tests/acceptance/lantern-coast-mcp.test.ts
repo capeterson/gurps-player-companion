@@ -2,14 +2,10 @@ import { afterAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { eq, inArray } from 'drizzle-orm';
-import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
-import { createApp } from '../../app.ts';
-import { signAccessToken } from '../../auth/jwt.ts';
-import { mcpResource } from '../../oauth/service.ts';
-import { DEFAULT_CAMPAIGN_SOURCES } from '../../services/defaultCampaignSources.ts';
-import { configureIntegrationTestEnvironment, integrationTestConfig } from '../../testConfig.ts';
-import { withAudit } from '../auditContext.ts';
-import { closeDb, getDb, runInDbTransaction } from '../client.ts';
+import { createApp } from '../../src/server/app.ts';
+import { signAccessToken } from '../../src/server/auth/jwt.ts';
+import { withAudit } from '../../src/server/db/auditContext.ts';
+import { closeDb, getDb, runInDbTransaction } from '../../src/server/db/client.ts';
 import {
   campaigns,
   characters,
@@ -18,12 +14,22 @@ import {
   oauthClients,
   oauthGrants,
   users,
-} from '../schema.ts';
-import { ensureDemoUser } from './accounts.ts';
-import { seedLanternCoast } from './lanternCoast.ts';
-import { type LanternRequest, populateLanternCoast } from './lanternCoastContent.ts';
-import { lanternCharacters } from './lanternCoastData.ts';
-import { lanternMcpRequest } from './lanternCoastMcp.ts';
+} from '../../src/server/db/schema.ts';
+import { ensureDemoUser } from '../../src/server/db/seeds/accounts.ts';
+import { seedLanternCoast } from '../../src/server/db/seeds/lanternCoast.ts';
+import {
+  type LanternRequest,
+  populateLanternCoast,
+} from '../../src/server/db/seeds/lanternCoastContent.ts';
+import { lanternCharacters } from '../../src/server/db/seeds/lanternCoastData.ts';
+import { lanternMcpRequest } from '../../src/server/db/seeds/lanternCoastMcp.ts';
+import { mcpResource } from '../../src/server/oauth/service.ts';
+import { DEFAULT_CAMPAIGN_SOURCES } from '../../src/server/services/defaultCampaignSources.ts';
+import {
+  configureIntegrationTestEnvironment,
+  integrationTestConfig,
+} from '../../src/server/testConfig.ts';
+import { parseLibraryYaml } from '../../src/shared/yaml/library.ts';
 
 configureIntegrationTestEnvironment();
 afterAll(closeDb);
@@ -157,7 +163,7 @@ function normalize(value: unknown) {
 describe('Lantern Coast MCP seed acceptance', () => {
   it('creates the same complete campaign graph through authenticated MCP, with one existing owner', async () => {
     const yaml = await readFile(
-      new URL('../../../../bootstrap/lantern_coast.yaml', import.meta.url),
+      new URL('../../bootstrap/lantern_coast.yaml', import.meta.url),
       'utf8',
     );
     const document = parseLibraryYaml(yaml);

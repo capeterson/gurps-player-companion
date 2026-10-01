@@ -26,12 +26,15 @@ const config: AppConfig = {
   authRateLimitLoginMax: 10_000,
 };
 
+// Reuse the route graph for identical configuration; actors and grants stay per-test.
+const sharedApp = createApp(config);
+
 function challenge(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
 async function issueGrant(scopes = 'gpc:read gpc:write') {
-  const app = createApp(config);
+  const app = sharedApp;
   const email = `oauth-${randomUUID()}@example.com`;
   const registered = await app.request('/api/v1/auth/register', {
     method: 'POST',
@@ -119,7 +122,7 @@ describe('delegated OAuth and MCP', () => {
   });
 
   it('requires recent primary authentication before returning consent details', async () => {
-    const app = createApp(config);
+    const app = sharedApp;
     const email = `oauth-reauth-${randomUUID()}@example.com`;
     const registered = await app.request('/api/v1/auth/register', {
       method: 'POST',
@@ -359,7 +362,7 @@ describe('delegated OAuth and MCP', () => {
   });
 
   it('rejects unsafe or confidential dynamic client registrations', async () => {
-    const app = createApp(config);
+    const app = sharedApp;
     const insecure = await app.request('/oauth/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -599,7 +602,7 @@ describe('delegated OAuth and MCP', () => {
         if (pulls === 2) controller.close();
       },
     });
-    const response = await createApp(config).fetch(
+    const response = await sharedApp.fetch(
       new Request('http://localhost:3001/oauth/token', {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded' },

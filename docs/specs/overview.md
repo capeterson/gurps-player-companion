@@ -1345,6 +1345,9 @@ src/
                  navigation fallback. Mutable worker/bootstrap/HTML entrypoints
                  are served no-store; hashed assets remain cacheable. Outbox
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
+tests/
+  acceptance/    Explicit full Lantern MCP seed check, outside normal CI discovery
+  e2e/           Real browser acceptance, geometry and local-first interaction regressions
 docs/
   specs/         These design specs
   screenshots/   Screenshot capture notes; canonical images are in public/screenshots/
@@ -1355,6 +1358,7 @@ docs/
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
+  run-bun-tests.ts, run-client-tests.mjs  Test execution with native case reports and command wall timings
   check-pwa-package.ts  Mandatory post-build manifest/icon/precache/admin-isolation verification
   capture-screenshots.mjs  Refresh canonical captures from a seeded local app
   release-image.sh  Pin and verify a candidate image, then promote its tested digest
@@ -1483,9 +1487,16 @@ Things that repeatedly surprise people working in this repo:
    covers e2e. `bun run check` = lint + typecheck + **`bun test`
    (server+shared only)** + OpenAPI and MCP drift checks — it does **not** run the client
    vitest or Playwright suites, so run those separately for client changes.
-   Per-PR GitHub CI includes client tests and the production build but
-   intentionally omits browser installation/automation. PR authors run relevant
-   Playwright coverage locally; promotion to a named image release runs the
+   Per-PR GitHub CI includes client tests and the production build, and
+   runs the client job alongside server/build with only one PostgreSQL service;
+   the existing required `build` check waits for both. Test commands retain timings
+   under `.local/test-results/`, uploaded by CI. The complete Lantern MCP seed
+   scenario lives in `tests/acceptance/lantern-coast-mcp.test.ts` and runs via
+   `bun run test:acceptance:mcp-seed` as a mandatory agent pre-PR check outside CI.
+   CI intentionally omits browser installation/automation. PR authors run relevant
+   Playwright coverage locally, using `bun run test:e2e:built` after building for
+   broad passes and `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for required visual review;
+   promotion to a named image release runs the
    delegated OAuth/MCP/offline Chromium acceptance against the selected source
    image before creating any release tags or aliases.
 

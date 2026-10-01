@@ -182,6 +182,14 @@ docker compose -f docker-compose.dev.yml exec app bun run check
 docker compose -f docker-compose.dev.yml --profile test run --rm client-tests
 ```
 
+The full Lantern Coast MCP recipe has a separate `bun run test:acceptance:mcp-seed`
+command. Agents run it before opening a PR or pushing code changes to it;
+focused MCP parity/security tests remain in CI. Test commands save timing reports
+in `.local/test-results/`. For broad browser checks, build first and use
+`bun run test:e2e:built` with the checkout's database and origin configured and no
+other server on that port. Set `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for success
+screenshots when visually reviewing UI changes; failure screenshots remain on.
+
 The first command runs lint, type checking, server/shared tests, and API/MCP
 contract checks. The client test service runs Vitest with Node 22 and fails if
 it discovers no tests; the Bun-only app image cannot run this suite correctly.

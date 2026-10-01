@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation.ts';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'CorrectHorseBatteryStaple1';
 const API = '/api/v1';
@@ -170,7 +171,9 @@ test('library preserves special text and each Unicode group jump reaches its own
   expect(geometry.targetTop).toBeGreaterThan(geometry.toolbarBottom);
   expect(geometry.targetTop - geometry.toolbarBottom).toBeLessThan(24);
   expect(geometry.toolbarBottom).toBeGreaterThan(geometry.headerBottom);
-  await page.screenshot({ path: testInfo.outputPath('special-library-group-jump.png') });
+  await captureReviewScreenshot(page, {
+    path: testInfo.outputPath('special-library-group-jump.png'),
+  });
 
   await page.getByRole('button', { name: visibleName, exact: true }).click();
   await expect(page.locator('.markdown-body')).toContainText(
@@ -222,7 +225,7 @@ test('library preserves special text and each Unicode group jump reaches its own
       width,
     );
     if (width === 320)
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('library-transfer-mobile.png'),
         animations: 'disabled',
       });

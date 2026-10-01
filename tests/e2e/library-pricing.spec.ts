@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation.ts';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const itemRule = (unitCost: number) => ({
   version: 1,
@@ -175,7 +176,7 @@ outputs:
   await page.getByLabel('Advanced rule (YAML)').evaluate((field) => {
     field.scrollTop = 0;
   });
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('calculation-editor-320.png'),
     fullPage: false,
   });
@@ -319,7 +320,7 @@ outputs:
   expect(traitDialogBox.x + traitDialogBox.width).toBeLessThanOrEqual(320);
   expect(traitDialogBox.y).toBeGreaterThanOrEqual(0);
   expect(traitDialogBox.y + traitDialogBox.height).toBeLessThanOrEqual(800);
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('trait-resolver-selected-modifier-320.png'),
     fullPage: false,
   });
@@ -355,7 +356,7 @@ outputs:
     expect(box.y + box.height).toBeLessThanOrEqual(800);
     await expect(dialog.getByRole('button', { name: 'Use these values' })).toBeVisible();
     if (width === 320 || width === 640) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`pricing-resolver-${width}.png`),
         fullPage: true,
       });

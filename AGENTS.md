@@ -591,6 +591,11 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   and above). Value-sensitive math is checked across the schema-supported
   range, with rendered/browser cases for representative values; a fixture such
   as HP 15 must never become an assumed product maximum.
+- Broad Playwright passes use the production build (`bun run build`, then
+  `bun run test:e2e:built`) with the same worktree database and no existing server
+  on its configured port. Success screenshots are opt-in review artifacts: set
+  `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for required visual inspection of UI changes.
+  Failure screenshots and all assertions remain enabled in ordinary runs.
 - **Visually inspect layout fixes.** For responsive or geometry changes,
   inspect screenshots or a headed-browser rendering at the affected sizes in
   addition to automated assertions before handoff.
@@ -609,6 +614,13 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   `mcp:check`, and `build`. Focused tests are useful while developing, but do
   not substitute for this full parity run. Do not push while any step is
   failing.
+- **The full MCP seed recipe is an agent pre-PR check.** Run
+  `bun run test:acceptance:mcp-seed` before opening a PR or pushing code changes
+  to that PR, against the worktree's existing Postgres database. Run it
+  serially with integration/browser tests, retain the production MCP rate budget,
+  and record the tested commit and result in the PR validation evidence. This
+  acceptance lives outside normal test discovery/CI; focused parity, OAuth and
+  the named-image browser gate remain required.
 - **A pending remote check is not completion.** After every PR push, watch the
   GitHub checks through completion and do not report the PR ready until all
   required checks are green and the PR is mergeable. If CI fails, inspect the

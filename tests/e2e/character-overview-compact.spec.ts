@@ -1,6 +1,6 @@
-import { writeFile } from 'node:fs/promises';
 import { type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot, captureReviewScreenshot } from './review-artifacts';
 
 async function register(
   page: Page,
@@ -89,10 +89,7 @@ test('identity name remains readable and editable across narrow sheet widths', a
     if (width === 320 || width === 640) {
       await page.evaluate(() => window.scrollTo(0, 0));
       await expect(ownerName).toBeInViewport();
-      await testInfo.attach(`editable-name-${width}`, {
-        body: await page.screenshot(),
-        contentType: 'image/png',
-      });
+      await attachReviewScreenshot(page, testInfo, `editable-name-${width}`);
     }
   }
   const longOwnerName =
@@ -146,10 +143,7 @@ test('identity name remains readable and editable across narrow sheet widths', a
     expect(geometry.right).toBeLessThanOrEqual(321);
     expect(geometry.height).toBeGreaterThan(geometry.fontSize * 1.2);
     expect(geometry.scrollWidth).toBeLessThanOrEqual(320);
-    await testInfo.attach('minimal-view-long-name-320', {
-      body: await viewer.screenshot(),
-      contentType: 'image/png',
-    });
+    await attachReviewScreenshot(viewer, testInfo, 'minimal-view-long-name-320');
 
     const enableSharing = await page.request.patch(`/api/v1/campaigns/${campaign.id}`, {
       data: { shareCharacterSheets: true },
@@ -188,12 +182,8 @@ test('identity name remains readable and editable across narrow sheet widths', a
       expect(sharedGeometry.height).toBeGreaterThan(sharedGeometry.fontSize * 1.2);
       expect(sharedGeometry.scrollWidth).toBeLessThanOrEqual(width);
       if (width === 320 || width === 640) {
-        const screenshot = await viewer.screenshot();
-        const screenshotPath = testInfo.outputPath(`shared-view-long-name-${width}.png`);
-        await writeFile(screenshotPath, screenshot);
-        await testInfo.attach(`shared-view-long-name-${width}`, {
-          path: screenshotPath,
-          contentType: 'image/png',
+        await attachReviewScreenshot(viewer, testInfo, `shared-view-long-name-${width}`, {
+          path: testInfo.outputPath(`shared-view-long-name-${width}.png`),
         });
       }
     }
@@ -458,7 +448,7 @@ test('overview stays compact and description and conditional effects work at sup
     }
     const documentWidth = await page.locator('html').evaluate((node) => node.scrollWidth);
     expect(documentWidth).toBeLessThanOrEqual(width);
-    await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`) });
+    await captureReviewScreenshot(page, { path: testInfo.outputPath(`overview-${width}.png`) });
   }
 
   const emptyCharacter = await create('/characters', { name: 'No conditions hero' });

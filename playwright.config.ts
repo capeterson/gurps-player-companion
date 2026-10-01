@@ -1,12 +1,14 @@
 /**
  * Playwright configuration for end-to-end smoke tests.
  *
- * Tests run against the worktree's host-mapped Docker port,
- * `http://localhost:3001`; spin the dev stack with
- * `docker compose -f docker-compose.dev.yml up` before invoking
- * `bun run test:e2e`.
+ * Tests target PLAYWRIGHT_BASE_URL (default http://localhost:3001).
+ * Use ./scripts/dev-worktree.sh info for this checkout's ports and
+ * ./scripts/dev-worktree.sh up -d --build for its isolated dev stack.
+ * Broad acceptance uses the built application; see docs/specs/architecture.md.
  *
- * MCP_E2E_START_SERVER=1 starts the app for local delegated-access acceptance.
+ * PLAYWRIGHT_START_SERVER=1 starts the app; PLAYWRIGHT_BUILT_SERVER=1 selects
+ * the prebuilt application and rejects an already-running server. Legacy
+ * MCP_E2E_START_SERVER/MCP_E2E_BUILT_SERVER flags remain supported.
  * Its public origin and registered OAuth client come from the environment.
  * Named image promotion instead starts the candidate container itself and
  * points this suite at it without asking Playwright to start a server.
@@ -45,23 +47,35 @@ try {
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3001';
 const CHROMIUM_EXECUTABLE = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const START_SERVER =
+  process.env.PLAYWRIGHT_START_SERVER === '1' || process.env.MCP_E2E_START_SERVER === '1';
+const BUILT_SERVER =
+  process.env.PLAYWRIGHT_BUILT_SERVER === '1' || process.env.MCP_E2E_BUILT_SERVER === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? [['github'], ['list']] : 'list',
-  ...(process.env.MCP_E2E_START_SERVER === '1'
+  ...(process.env.CI ? { workers: 1 } : {}),
+  reporter: [
+    ...(process.env.CI ? [['github'] as const] : []),
+    ['list'],
+    [
+      'json',
+      {
+        outputFile:
+          process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ??
+          join(process.env.TEST_RESULTS_DIR ?? '.local/test-results', 'playwright.json'),
+      },
+    ],
+  ],
+  ...(START_SERVER
     ? {
         webServer: {
-          command:
-            process.env.MCP_E2E_BUILT_SERVER === '1'
-              ? 'bun run dist/server/index.js'
-              : 'bun run dev',
+          command: BUILT_SERVER ? 'bun run dist/server/index.js' : 'bun run dev',
           url: new URL('/api/v1/healthz', BASE_URL).toString(),
-          reuseExistingServer: !process.env.CI,
+          reuseExistingServer: !BUILT_SERVER && !process.env.CI,
           timeout: 60_000,
         },
       }

@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  server:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -38,7 +38,46 @@ jobs:
       - run: bun run typecheck
       - run: bun run db:migrate
       - run: bun run test
-      - run: bun run test:client
       - run: bun run openapi:check
       - run: bun run mcp:check
       - run: bun run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-test-timings
+          path: .local/test-results/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: bun install --frozen-lockfile
+      - run: bun run test:client
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: client-test-timings
+          path: .local/test-results/
+          include-hidden-files: true
+          if-no-files-found: ignore
+
+  # Keep the existing required check name, and fail it if either suite fails or
+  # is skipped/cancelled. Only the server job starts PostgreSQL.
+  build:
+    if: always()
+    needs: [server, client]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all validation jobs
+        env:
+          SERVER_RESULT: ${{ needs.server.result }}
+          CLIENT_RESULT: ${{ needs.client.result }}
+        run: test "$SERVER_RESULT" = success && test "$CLIENT_RESULT" = success

@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -132,7 +133,7 @@ test('campaign library search and Clear search stay usable across form factors',
       if (
         [320, 375, 390, 455, 456, 457, 568, 639, 640, 641, 768, 1024, 1280].includes(viewport.width)
       ) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`library-search-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'change-me-please-this-is-a-seed-account';
 
@@ -46,7 +47,10 @@ test('skill reference suggestions stay inside the viewport at supported widths',
     expect(await popup.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await popup.evaluate((element) => element.clientHeight),
     );
-    await page.screenshot({ path: `test-results/skill-reference-${width}.png`, fullPage: false });
+    await captureReviewScreenshot(page, {
+      path: `test-results/skill-reference-${width}.png`,
+      fullPage: false,
+    });
     await page.keyboard.press('Escape');
   }
 

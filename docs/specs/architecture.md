@@ -452,21 +452,37 @@ the nightly run; overdue accounts run on the next night after startup.
 
 ## Testing & CI
 
-- `bun test src/server src/shared` — server + shared unit/integration
+- `bun run test` — server + shared unit/integration
   (`sync.test.ts`, `syncDispatch.test.ts`, `historyTriggers.test.ts`, and the
   domain math suites). Server tests hit a real Postgres. Live-Postgres suites
   share `src/server/testConfig.ts`: they use `DATABASE_URL` when provided
   (Compose app container: `db:5432`) and otherwise default to the CI/host URL
-  at `localhost:5432`.
-- `vitest run` — client component/hook tests (happy-dom DOM environment;
-  `fake-indexeddb` for Dexie). The development Compose `client-tests`
+  at `localhost:5432`. Non-auth route suites use fresh synthetic actors from
+  `src/server/testFixtures.ts`, sharing one real password hash while exercising
+  normal JWT authorization. OAuth cases reuse an app only for identical configuration;
+  distinct configurations and startup tests retain separate app construction.
+- `bun run test:client` — client component/hook tests (happy-dom DOM environment;
+  `fake-indexeddb` for Dexie). An explicit list of pure helper/source tests runs in
+  Node without the browser setup. Browser tests retain per-file isolation and
+  `src/test/setupBrowser.ts` cleanup; timer-specific cases advance controlled clocks
+  while leaving IndexedDB completion real. The development Compose `client-tests`
   profile runs these under Node 22; the Bun-only app container's `node`
   fallback is incompatible with Vitest and must not be used to claim a
   passing client suite. Zero discovered tests fail the full-suite command.
   A one-shot `deps` service fills the project-local dependency volume from the
   frozen lockfile; it runs in parallel with PostgreSQL startup, and client
   tests depend only on `deps`, so they do not boot PostgreSQL.
-- `playwright test` — end-to-end. Its configuration checks runtime `TMPDIR`
+- `playwright test` — end-to-end. Broad local passes use the built app: run
+  `bun run build` then `bun run test:e2e:built`, with the checkout's database/public
+  origin configured and no other server on that port. Generic
+  `PLAYWRIGHT_START_SERVER`/`PLAYWRIGHT_BUILT_SERVER` and the legacy MCP flags
+  control managed server startup; externally managed candidate runs remain supported.
+  The MCP seed acceptance, integration suites and browser suites share one worktree
+  database and run serially. Independent responsive scenarios reuse a worker-specific
+  synthetic actor but retain fresh token sessions, browser contexts and entity rows.
+  `PLAYWRIGHT_REVIEW_ARTIFACTS=1` enables success screenshots for required visual
+  review; default runs retain failure screenshots and all geometry/UI assertions.
+  Its configuration checks runtime `TMPDIR`
   permissions and a real write before Chromium starts, so an inaccessible
   shared-memory directory fails immediately. Docker browser runs use a writable
   worktree-specific disk volume. Server/shared integration tests and OAuth/MCP
@@ -476,8 +492,18 @@ the nightly run; overdue accounts run on the next night after startup.
   (**server + shared only**) + OpenAPI/MCP contract checks. It does **not**
   run the client vitest or Playwright suites — run those separately for client
   changes. This is the baseline gate before finishing a change.
+- `bun run test:acceptance:mcp-seed` — the complete authenticated Lantern Coast
+  MCP/REST graph comparison in `tests/acceptance/lantern-coast-mcp.test.ts`. It is
+  outside normal server/shared discovery and CI. Agents must run it before
+  opening a PR or pushing code changes to that PR, recording the tested
+  commit and result in the PR validation evidence. It retains the production MCP
+  rate budget, real commits, full graph assertions and audit provenance; focused
+  MCP parity and OAuth tests remain in CI.
 - Per-PR GitHub CI runs lint, typechecking, server/shared tests, client tests,
-  contract drift checks, and the production build; it deliberately does not
+  contract drift checks, and the production build. Server/build and Node 22 client
+  jobs run independently; only the server job starts PostgreSQL. The existing
+  required `build` check aggregates both and fails for failure, cancellation or
+  skipped jobs. It deliberately does not
   install Playwright or a browser. PR authors run relevant browser automation
   locally. The heavyweight delegated OAuth/MCP/offline Chromium acceptance is a
   mandatory named-image promotion gate: it runs against the selected source
@@ -488,6 +514,13 @@ the nightly run; overdue accounts run on the next night after startup.
   Migration, the candidate server and image alias publication all use the same
   pinned reference. Promotion currently accepts only one linux/amd64 runnable
   image (plus attestations); additional platforms need their own acceptance.
+- Test commands save native Bun JUnit case durations and command wall-time JSON,
+  Vitest case/file JSON and command wall time, and Playwright JSON in
+  `.local/test-results/` (override `TEST_RESULTS_DIR` or
+  `PLAYWRIGHT_JSON_OUTPUT_FILE`). CI uploads server/client reports on success or
+  failure. Compare wall time separately from accumulated case/worker durations;
+  explicit reporter flags remain available for focused client diagnostics. These
+  artifacts remain excluded from Git and Docker build contexts.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in

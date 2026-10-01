@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { type Page, expect, test } from '@playwright/test';
 import { SignJWT, decodeJwt } from 'jose';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 /**
  * Full delegated-access acceptance test. The app must be started with a
@@ -76,7 +77,8 @@ async function register(page: Page, email: string): Promise<void> {
 }
 
 async function requireBuiltServiceWorker(page: Page): Promise<void> {
-  if (process.env.MCP_E2E_BUILT_SERVER !== '1') return;
+  if (process.env.MCP_E2E_BUILT_SERVER !== '1' && process.env.PLAYWRIGHT_BUILT_SERVER !== '1')
+    return;
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
@@ -439,7 +441,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
           }),
         )
         .toBe(true);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: 'test-results/connected-app-revoke-confirmation-320.png',
         fullPage: false,
       });
