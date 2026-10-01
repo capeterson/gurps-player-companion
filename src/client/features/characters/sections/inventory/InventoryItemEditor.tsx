@@ -772,8 +772,8 @@ export function InventoryItemEditor({
       {...flash.flashProps}
     >
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="label-eyebrow">{item.name}</div>
+        <div className="min-w-0">
+          <div className="label-eyebrow [overflow-wrap:anywhere]">{item.name}</div>
           <h3 className="font-display text-lg">
             {section === 'basics'
               ? 'Item details'

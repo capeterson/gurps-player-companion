@@ -252,7 +252,7 @@ export function InventoryRow(props: InventoryRowProps) {
         {...rowFlash.flashProps}
       >
         <td className="align-top sm:align-middle">
-          <div className="inventory-item-heading flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+          <div className="inventory-item-heading flex flex-col flex-wrap items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span className="inventory-item-name flex min-w-0 items-start gap-2">
               {hasChildren && !contentsForcedOpen ? (
                 <button
