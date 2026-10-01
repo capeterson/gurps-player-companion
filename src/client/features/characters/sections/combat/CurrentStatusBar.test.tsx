@@ -406,7 +406,7 @@ describe('Current Status', () => {
       'fixed!',
       'left-1/2!',
       'w-[calc(100dvw_-_2rem)]',
-      'max-w-lg',
+      'max-w-[min(32rem,var(--viewport-overlay-available-width,calc(100dvw-1rem)))]',
       'translate-x-[calc(-50%+var(--viewport-overlay-shift-x,0px))]',
       'min-[1280px]:absolute!',
       'min-[1280px]:left-0!',

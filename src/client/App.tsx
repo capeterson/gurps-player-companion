@@ -54,8 +54,12 @@ export function App() {
   const { mode } = useThemeState();
   const mobileCharacterMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);
-  const mobileCharacterMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
-  const userMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>();
+  const mobileCharacterMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>(true, undefined, {
+    constrainHeight: true,
+  });
+  const userMenuPanelRef = useViewportBoundedOverlay<HTMLUListElement>(true, undefined, {
+    constrainHeight: true,
+  });
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
@@ -151,8 +155,12 @@ export function App() {
         </summary>
         <ul
           ref={mobileCharacterMenuPanelRef}
-          style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
-          className="menu dropdown-content z-50 mt-1 w-52 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
+          style={{
+            marginLeft: 'var(--viewport-overlay-shift-x, 0px)',
+            maxHeight:
+              'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, calc(100dvh - 5rem)))',
+          }}
+          className="menu dropdown-content z-50 mt-1 w-52 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
         >
           <li className="menu-title px-3 py-2">
             <span>{characterName ?? 'Character'}</span>
@@ -328,15 +336,19 @@ export function App() {
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
               <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
                 <span className="hidden sm:inline text-muted">Signed in as</span>
-                <span className="max-w-[8rem] truncate sm:max-w-none">
+                <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
                   {me.data?.displayName ?? 'Account'}
                 </span>
                 <AppIcon name="chevronDown" size={14} />
               </summary>
               <ul
                 ref={userMenuPanelRef}
-                style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
-                className="menu dropdown-content z-50 mt-2 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
+                style={{
+                  marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
+                  maxHeight:
+                    'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, calc(100dvh - 5rem)))',
+                }}
+                className="menu dropdown-content z-50 mt-2 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
               >
                 <li className="menu-title px-3 py-2">
                   <span>{me.data?.email ?? 'Loading account…'}</span>

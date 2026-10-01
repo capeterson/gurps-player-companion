@@ -1,8 +1,8 @@
 /**
  * Encounter tracker happy paths against the running Docker stack.
  *
- * The GM flows use the browser UI. Timed-effect controls are not currently
- * rendered by the encounter page, so that lifecycle uses its REST endpoints.
+ * The GM flows use the browser UI. This suite exercises timed-effect lifecycle
+ * through REST; encounter-effect-dialog-responsive.spec.ts covers the forms.
  */
 
 import { expect, test } from '@playwright/test';
@@ -189,6 +189,7 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
   expect(response.status()).toBe(201);
   const character = (await response.json()) as { id: string };
   await page.goto(`/characters/${character.id}`);
+  await selectCharacterSection(page, 'Combat');
   await expect(page.getByRole('button', { name: 'Start tracker' })).toBeVisible();
   await page.getByRole('button', { name: 'Start tracker' }).click();
   await expect(page.getByRole('button', { name: 'Next turn' })).toBeVisible();
@@ -202,6 +203,7 @@ test('mobile combat preserves an opt-in tracker across disabling', async ({ page
   });
   await page.reload();
   await expectCharacterNavigationReady(page);
+  await selectCharacterSection(page, 'Combat');
   await expect(page.getByText('Solo tracker', { exact: true })).toHaveCount(0);
 
   await api(page, `/campaigns/${campaignId}`, {

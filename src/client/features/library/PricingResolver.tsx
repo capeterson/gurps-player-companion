@@ -253,7 +253,7 @@ export function PricingResolver({
         onCancel();
       }}
     >
-      <div className="modal-box max-h-[calc(100dvh-2rem)] w-[48rem] max-w-[calc(100dvw-2rem)] overflow-y-auto break-words">
+      <div className="modal-box max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] w-[48rem] max-w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] overflow-y-auto break-words">
         <h2 id={titleId} className="font-display text-xl">
           Resolve {entry.name}
         </h2>

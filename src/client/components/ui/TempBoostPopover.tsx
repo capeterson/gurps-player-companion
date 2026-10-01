@@ -13,8 +13,9 @@
  * an empty field don't snap back to 0 mid-typing.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatScaled } from '../../../shared/format/number.ts';
+import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
 import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 
 interface ModifierField {
@@ -61,7 +62,8 @@ export function TempBoostPopover({
   permCostLabel,
 }: TempBoostPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useViewportBoundedOverlay(true, ref);
+  const headerBottom = useAppHeaderBottom();
+  useViewportBoundedOverlay(true, ref, { shiftVertically: true, minimumTop: headerBottom });
 
   const fmt = (n: number) => formatScaled(n, displayScale);
   // Not formatScaled: `d` here is already in display units (pre-scaled),
@@ -95,25 +97,6 @@ export function TempBoostPopover({
   const fmtBound = (n: number) => formatScaled(n, displayScale);
   const rangeMsg = (f: ModifierField): string =>
     `must be between ${fmtBound(f.min ?? Number.NEGATIVE_INFINITY)} and ${fmtBound(f.max ?? Number.POSITIVE_INFINITY)}`;
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0) return;
-    const margin = 8;
-    // Attribute chips near the bottom of a short phone viewport used to
-    // anchor this popover entirely below its trigger, hiding its actions.
-    // Keep the familiar below-trigger placement when it fits, but lift it
-    // just enough to leave the full popover usable when it does not.
-    const vh = window.innerHeight;
-    if (rect.bottom > vh - margin) {
-      const currentMarginTop = Number.parseFloat(window.getComputedStyle(el).marginTop) || 0;
-      const shiftedMarginTop = currentMarginTop + (vh - margin - rect.bottom);
-      const minMarginTop = margin - rect.top;
-      el.style.marginTop = `${Math.max(shiftedMarginTop, minMarginTop)}px`;
-    }
-  }, []);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -155,8 +138,13 @@ export function TempBoostPopover({
       // to the trigger chip, which role="dialog" describes correctly.
       role="dialog"
       aria-label={`Modifiers for ${label}`}
-      style={{ marginLeft: 'var(--viewport-overlay-shift-x, 0px)' }}
-      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
+      style={{
+        marginLeft: 'var(--viewport-overlay-shift-x, 0px)',
+        marginTop: 'calc(0.5rem + var(--viewport-overlay-shift-y, 0px))',
+        maxHeight: 'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, 100dvh))',
+        padding: 'min(0.75rem, calc(var(--viewport-overlay-available-height, 100dvh) / 8))',
+      }}
+      className="absolute z-50 left-1/2 -translate-x-1/2 top-full mt-2 max-h-[calc(100dvh-1rem)] w-64 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] overflow-y-auto rounded-lg border border-base-300 bg-base-100 p-3 shadow-xl"
     >
       <div className="label-eyebrow mb-2">{label} modifiers</div>
       {perm && (

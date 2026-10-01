@@ -41,7 +41,7 @@ describe('ToastProvider persistent option', () => {
     );
     act(() => dialog.close());
     await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
-    expect(screen.getByRole('alert')).toHaveTextContent('Image rejected');
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Image rejected'));
     fireEvent.click(screen.getByLabelText('Dismiss notification'));
     expect(screen.queryByText('Image rejected')).toBeNull();
   });

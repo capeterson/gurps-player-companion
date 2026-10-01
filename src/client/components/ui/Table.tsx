@@ -381,7 +381,7 @@ function ColumnFilterMenu({
       open
       ref={ref}
       aria-label={`Filter ${label}`}
-      className="dropdown-content fixed m-0 z-[100] flex w-72 max-w-[calc(100dvw-1rem)] max-h-[calc(100dvh-1rem)] flex-col gap-2 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-3 text-base-content shadow-xl"
+      className="dropdown-content fixed m-0 z-[100] flex w-72 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] max-h-[calc(100dvh-1rem)] flex-col gap-2 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-3 text-base-content shadow-xl"
       style={{
         left: trigger.getBoundingClientRect().left,
         transform: 'translateX(var(--viewport-overlay-shift-x, 0px))',

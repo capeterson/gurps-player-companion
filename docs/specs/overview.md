@@ -226,7 +226,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   selecting a section closes the flower and focuses/scrolls its visible heading.
   Escape, outside click, and leaving the navigation close it. Closed petals are
   hidden from keyboard and assistive technology. Safe-area spacing and bottom
-  content padding protect controls from the dock/FAB; navigation yields to modal
+  content padding protect controls from the dock/FAB. The closed FAB stays below
+  header popovers so pool labels and explanations remain readable; the open
+  flower and its backdrop rise above the header. Navigation yields to modal
   dialogs. Reduced motion disables the flower entrance and sync rotation.
   `SheetNavigation.tsx` owns this responsive control. Overview appears first in
   the dock and mobile navigation and Overview is the initial view.
@@ -241,6 +243,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   available header width; long breadcrumbs remain truncated and the campaign
   dropdown stays attached to its group.
 - **Compact combat view and folding.** Combat uses a smaller identity header.
+  Other editable identity names use smaller display type below 640px so ordinary
+  names fit on phones; unusually long names remain scrollable within the input.
+  Read-only identity headings wrap long names within the content width.
   The Overview section places the foldable sheet overview (attributes, secondary
   stats, status, ledger, encumbrance and conditional effects) above the Identity
   panel; other destinations do not display it. When folded, it shows effective
@@ -376,7 +381,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   row on narrow screens, and the shared row handle supports drag and keyboard
   ordering. Sort and custom order are device-only per-character preferences.
   Adding is collapsed until requested, and one full-width row editor opens at a
-  time. Notes, source rules, modifiers, and custom mechanics remain available
+  time. Its **Edit** heading wraps the full trait name, including unspaced names.
+  Notes, source rules, modifiers, and custom mechanics remain available
   there; advanced sections appear only when configured or when an owner chooses
   to add effects. Read-only campaign viewers retain search, sorting,
   ordering, and configured details without seeing mutation controls. Unsaved
@@ -391,7 +397,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The shared row handle supports drag and keyboard ordering. Sort and custom
   order are device-only per-character preferences, survive reloads, and clear on
   logout. A row opens one full-width inline editor; the add form stays collapsed
-  until requested, and Source & rules is absent unless that skill has configured
+  until requested. The **Edit** heading wraps long skill names and specializations
+  within the editor. Source & rules is absent unless that skill has configured
   TL or owned mechanics to show. Read-only viewers keep search, sorting, custom
   presentation order, details, and rolls without receiving mutation controls.
   Library definitions explicitly declare whether specialization is forbidden,
@@ -911,11 +918,21 @@ settings sections; switching sections retains drafts.
   by college, items by category, languages by spoken/sign form, techniques by
   default skill, styles by first component skill, enchantments by applicability,
   enabled active effects by first tag) and a jump strip to any group. Group anchors retain
-  distinct identities for Unicode, case and punctuation variations. Rows show the name, key numbers
+  distinct identities for Unicode, case and punctuation variations. Group labels
+  and mobile row metadata wrap long unspaced category names while preserving the
+  count and fold control. Rows show the name, key numbers
   and a one-line source excerpt that preserves punctuation (including comparison
   symbols and literal Markdown characters); opening a row renders its full Markdown
   entry in place. The category chips, search and jump strip stay pinned under
-  the app header. Search matches every word across names, descriptions, sources
+  the app header when they leave enough room for content; if the toolbar would
+  occupy more than half the visible area below the header, it scrolls with the page.
+  Focused library form fields retain their draft and scroll below
+  that toolbar when rotation, viewport resizing, or keyboard focus would conceal
+  the active field. Long rich-text and raw Markdown editors track the editing
+  caret, and form actions reserve the same toolbar offset. On narrow screens the
+  search field and its **Clear search**
+  button wrap together onto a row below the source selector, preserving usable
+  input width. Search matches every word across names, descriptions, sources
   and categories. `?section=`, `?q=` and `?open=` make a category, search or
   entry linkable. Drafts survive category switches, searches and folded groups,
   and a draft the client can already tell is invalid (schema, specialization
@@ -923,12 +940,15 @@ settings sections; switching sections retains drafts.
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The campaign workspace's **Import & export** tab
   (`/campaigns/:id/library-transfer`) holds whole-library and sourcebook-scoped
-  transfers; `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
+  transfers; long sourcebook selection labels wrap beside their checkboxes within
+  the transfer card. `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v14 retains them.
+  Technique form explanations for default penalties and level caps wrap within
+  their fields on narrow screens, keeping the examples readable without horizontal scrolling.
 - **Adventure log**: session log entries attached to Campaign (shared, default)
   or an owned character (private), with an attachment dropdown and explanatory
   tooltip, an optional **session number** (running
@@ -943,6 +963,8 @@ settings sections; switching sections retains drafts.
   offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
   can be **edited or deleted** by their author or the campaign owner. Editing
   replaces the selected card in place, with Save changes and Cancel beside the draft.
+  Titles, author names, and locations wrap within their entry cards, including
+  values without spaces, so narrow screens do not gain horizontal page overflow.
   Award summaries show the points per recipient (or the total for varied legacy awards);
   the character count opens a bounded, scrollable tooltip of the saved recipients
   and their amounts. Private badges name the attached character when available. See
@@ -950,7 +972,8 @@ settings sections; switching sections retains drafts.
   Campaign/library/log/history reads show a retryable error when their request
   fails, rather than presenting a failed request as an empty collection.
 - **Campaign history view**: campaign-level audit log (settings, membership,
-  library, log), plus an owner/manager roll-up across member characters.
+  library, log), plus an owner/manager roll-up across member characters. Audit
+  summaries wrap long unspaced entity names within their rows without clipping.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
@@ -976,10 +999,14 @@ settings sections; switching sections retains drafts.
     - **Encounter tracker**: campaign pages list active and ended encounters;
      owners/managers can select PCs from the campaign roster, create and fully
      edit NPC combatants, reorder combatants (including Wait reslots), end
-      combat, advance turns while combat is active, and maintain or
+     combat. Detailed NPC creation/editing uses a native modal above the sticky
+     header, with viewport-bounded height and internal scrolling; Escape closes it.
+      Owners/managers can advance turns while combat is active and maintain or
     acknowledge timed effects. Effect add/edit supports templates, manual
     round/minute/hour/indefinite durations, known-spell prefills, maintenance
-    costs, and optional PC-sheet links; expiry acknowledgement/removal confirms
+    costs, and optional PC-sheet links. Effect forms also use native modals above
+    the sticky header, with internal scrolling and Escape dismissal.
+    Expiry acknowledgement/removal confirms
      and, after the REST acknowledgement succeeds, clears linked sheet values through the character outbox. Members receive the server's privacy-safe
    projection; a player can use local-first HP/FP and condition quick actions
     only for their own PC. Each character's Combat tab also has its own
@@ -1004,8 +1031,12 @@ settings sections; switching sections retains drafts.
   selection into `Campaign › <campaign name> › Log/Library`. The first level
   returns to its collection and the named level returns to that entity's main
   page. Campaign sub-navigation carries the current campaign into Log/Library.
+  Long account names stay truncated at every width so the user-menu
+  trigger fits alongside the other header controls; the menu retains the account
+  email within viewport bounds.
 - **Logged-in home**: a compact welcome and the four most recently updated
-  characters. Global Character, Campaign, Log, and Library destinations stay in the
+  characters. The welcome heading wraps long unspaced account names within its
+  card. Global Character, Campaign, Log, and Library destinations stay in the
   persistent header instead of being repeated as homepage buttons or shortcut
   cards.
 - **Sync status indicator and log** (header): a quiet etched arrow orbit replaces
@@ -1038,10 +1069,19 @@ settings sections; switching sections retains drafts.
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
 - **Viewport-safe overlays**: trigger-anchored tooltips, popovers, and dropdowns
-  share horizontal collision handling, dynamic-viewport width limits, and content
-  wrapping so their full surface remains reachable on narrow screens and after
-  resize or zoom. The sync status tooltip and notifications panel use this shared
-  behavior; growing overlays also clamp to dynamic viewport height and scroll
+  share horizontal collision handling, measured visual-viewport width limits, and
+  content wrapping so their full surface remains reachable on narrow screens and after
+  resize or zoom. Width caps shrink during pinch zoom and recover on zoom-out;
+  measurement listeners attach when a delayed panel mounts. The sync status
+  tooltip and notifications panel use this shared behavior; the account and
+  compact character/app menus clamp to the remaining
+  visual viewport height and scroll internally, including after rotation or
+  pinch zoom. HP/FP adjustment and posture/maneuver/conditions panels use the
+  same remaining-height constraint. Temporary modifier popovers also correct
+  vertical collisions so Clear and Apply stay reachable. Native dialogs center
+  and cap their boxes within the visual viewport during zoom and panning while
+  retaining the browser's modal focus trap.
+  Growing overlays also clamp to dynamic viewport height and scroll
   internally where needed. A source guard rejects raw `data-tip` tooltips and
   anchored dropdown content that bypasses the collision helper.
 - **Notifications**: the bell receives invitations/responses, membership/access changes,
@@ -1217,6 +1257,7 @@ src/
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
     lib/desktopNotifications.ts  Per-user browser opt-in, permission and delivery deduplication
+    lib/editingFocusBounds.ts  Rich-text selection and textarea caret geometry for library focus scrolling
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor, LibraryAdvancedFields, SkillRequirementsEditor,
                  ArmorFacetEditor, LibraryPackagesForms (language/technique/style authoring),
@@ -1301,7 +1342,8 @@ docs/
   screenshots/   Screenshot capture notes; canonical images are in public/screenshots/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
-  openapi.json   Emitted OpenAPI contract (CI-checked)
+  openapi.json   Emitted OpenAPI contract (CI-checked; generation skips database maintenance)
+  mcp-tools.json Emitted MCP catalog (CI-checked; generation skips database maintenance)
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/

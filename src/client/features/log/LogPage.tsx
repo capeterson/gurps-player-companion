@@ -729,7 +729,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               ) : (
                 <>
                   <div className="mb-1 flex min-h-6 flex-wrap items-baseline justify-between gap-3">
-                    <span className="num text-xs uppercase tracking-widest text-dim">
+                    <span className="num min-w-0 max-w-full text-xs uppercase tracking-widest text-dim [overflow-wrap:anywhere]">
                       {formatDate(entry.sessionDate)}
                       {entry.sessionNumber !== null && (
                         <span> · Session {entry.sessionNumber}</span>
@@ -768,7 +768,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                       )}
                     </div>
                   </div>
-                  <h3 className="font-display text-2xl font-semibold leading-tight">
+                  <h3 className="min-w-0 font-display text-2xl font-semibold leading-tight [overflow-wrap:anywhere]">
                     {entry.title}
                   </h3>
                   {(entry.pointsGained != null || entry.xpAwards.length > 0) && (
@@ -799,7 +799,11 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
                       </InfoTooltip>
                     </div>
                   )}
-                  {entry.location && <p className="mt-1 text-sm text-muted">{entry.location}</p>}
+                  {entry.location && (
+                    <p className="mt-1 text-sm text-muted [overflow-wrap:anywhere]">
+                      {entry.location}
+                    </p>
+                  )}
                   <div className="log-entry-body mt-3">
                     <Markdown source={entry.body} className="text-sm leading-relaxed" />
                   </div>

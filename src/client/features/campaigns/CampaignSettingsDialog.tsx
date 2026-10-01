@@ -264,7 +264,7 @@ export function CampaignSettingsDialog({
       >
         <form
           method="dialog"
-          className="modal-box flex max-h-[calc(100dvh-1rem)] w-[60rem] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden p-0"
+          className="modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)-1rem)] w-[60rem] max-w-[calc(var(--dialog-viewport-width,100dvw)-1rem)] flex-col overflow-hidden p-0"
           onSubmit={onSubmit}
         >
           <header className="flex shrink-0 items-start justify-between gap-3 px-4 pt-5 pb-4 sm:px-7">

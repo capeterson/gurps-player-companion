@@ -212,12 +212,52 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+The editable identity name remains a single-line field, using 30px display type
+below 640px and 48px from 640px up. Compact Combat retains its 24px name size.
+Long editable names scroll within the input; read-only identity headings wrap
+long unspaced names within the content width.
+
+Library source selection and search share a wrapping toolbar. The search input
+and **Clear search** button stay together, taking a separate row when needed.
+Library technique default-penalty and level-cap help wraps within each field on
+narrow screens.
+Sourcebook selection labels wrap long unspaced titles beside fixed-size
+checkboxes within the import/export card.
+Library group labels and mobile row metadata wrap long unspaced categories.
+Fold chevrons and counts retain their width; description excerpts stay truncated.
+Focused library form fields retain their draft and stay below the sticky toolbar
+after rotation, visual-viewport resizing, and keyboard focus changes. Only an
+obscured active editing field is scrolled into the remaining working area.
+Long rich-text and raw Markdown editors use the editing caret rather than the
+whole editor's bounds, preserving the selection and draft while resizing, moving
+the selection, and typing, including horizontal panning during pinch zoom.
+Form actions reserve the same toolbar offset when scrolled or focused.
+When the toolbar would occupy more than half the visible area below the app
+header, it scrolls with the document and field offsets reserve only the header.
+Pinning returns when the viewport has enough room.
+
+Audit-history summaries wrap long unspaced entity names within their rows,
+preserving the timestamp and actor columns.
+
+Adventure-log titles, author names, and locations wrap within their cards even
+when the text contains no spaces.
+
+Long account names remain width-bounded in the shared header at all breakpoints;
+opening the account menu must not horizontally scroll the page. The home welcome
+heading wraps unbroken account names within its card.
+
+Detailed encounter NPC and effect forms open in the native dialog top layer, above the
+sticky app header. Their height stays within the dynamic viewport, with internal
+scrolling for long forms, and Escape closes the dialog and its controlled state.
+
 Summary rows use a fluid name column and compact value/action columns. Long
 names and references wrap rather than shrinking to a few letters or forcing
 the whole page to scroll horizontally. At narrow widths, secondary metadata
 can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
+Expanded trait and skill editors also wrap their complete **Edit** headings,
+including long unspaced names, within the editor's content width.
 
 Expanded editors use a responsive grid with full field labels such as
 **Difficulty**, **Default modifier**, and **Points**. Creation uses the same
@@ -260,9 +300,31 @@ keep suggestions above navigation and inside the visual viewport. A closed
 form or folded section must not leave an autocomplete floating over the page.
 See the overlay rules in [AGENTS.md](../../AGENTS.md): dynamic viewport size
 limits alone do not establish containment.
+The shared overlay hook measures available visual-viewport width before collision
+handling; each overlay combines that cap with its existing width limit so pinch
+zoom can shrink it and zooming out can restore it. Ref attachment installs the
+measurement listeners even when a panel mounts after its parent hook.
 Downward-opening panels can opt into the shared overlay hook's available-height
-measurement. The notification bell uses it to scroll within the remaining visual
-viewport below either a single-row or wrapped mobile header.
+measurement. The notification bell, account menu, compact character/app menu,
+and posture/maneuver/conditions panels use it to scroll within the remaining
+visual viewport below either a single-row or wrapped mobile header, including
+after rotation and pinch zoom. Menu items
+remain in one column while their panel scrolls.
+
+The closed mobile sheet-navigation FAB shares the desktop dock's layer below
+the sticky header and its popovers. HP/FP endpoints and explanatory text remain
+readable when a short landscape viewport places them over the FAB. Opening the
+navigation raises its flower above the header and its dismissal backdrop;
+native modal dialogs hide the sheet navigation.
+HP/FP adjustment panels also cap their height to the remaining visual viewport,
+with internal scrolling that keeps endpoints, explanations, and controls reachable
+after pinch zoom and rotation.
+Temporary modifier popovers also use shared vertical collision handling and
+visual-viewport height caps below the sticky header so their Clear and Apply
+controls remain reachable.
+Native dialogs retain `showModal()` and its focus trap; the shared dialog hook
+centers their grid within the visual viewport during zoom, panning, and resizing.
+Dialog size preferences are capped by that visible area, with internal scrolling.
 
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
 award summaries. These tooltips retain horizontal collision handling, constrain

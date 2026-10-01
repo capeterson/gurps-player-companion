@@ -75,7 +75,7 @@ function SingleRow({
         </span>
       )}
       <span className="flex-1 min-w-0">
-        <span className="text-base-content">{event.summary}</span>
+        <span className="text-base-content [overflow-wrap:anywhere]">{event.summary}</span>
       </span>
       {actor && (
         <span className="text-base-content/50 text-xs truncate max-w-24 shrink-0 pt-0.5">

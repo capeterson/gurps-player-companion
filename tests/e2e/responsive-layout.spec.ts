@@ -14,11 +14,13 @@ async function enableTurnTracker(page: import('@playwright/test').Page) {
 
 test('header tooltips and alerts stay within the viewport from mobile through desktop', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/register');
-  await page.getByLabel(/email/i).fill(`responsive-header-${suffix()}@example.com`);
-  await page.getByLabel(/display name/i).fill('Responsive Header QA');
+  const displayName = 'Responsive Header QA With A Deliberately Long Display Name For Narrow Menus';
+  const email = `responsive-header-${suffix()}-${'long-account-'.repeat(3)}@example.com`;
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/display name/i).fill(displayName);
   await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
   await page.getByRole('button', { name: /create account/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
@@ -36,15 +38,19 @@ test('header tooltips and alerts stay within the viewport from mobile through de
       .toBe(true);
   };
 
-  // 640px is where the header's desktop labels appear. Reuse one account and
-  // page while checking just below, at, and above that layout boundary, then
-  // representative desktop widths in the dark theme from the reported state.
+  // Reuse one account and page through phone landscape, the 640px header-label
+  // boundary, tablet, and desktop widths with long account text in the header.
   const viewportCases = [
     { width: 320, height: 568 },
+    { width: 667, height: 375 },
+    { width: 768, height: 1024 },
+    { width: 844, height: 390 },
     { width: 639, height: 700 },
     { width: 640, height: 700 },
     { width: 641, height: 700 },
+    { width: 1023, height: 768 },
     { width: 1024, height: 768 },
+    { width: 1025, height: 768 },
     { width: 1280, height: 800 },
     { width: 1440, height: 900 },
     { width: 1920, height: 1080 },
@@ -74,9 +80,142 @@ test('header tooltips and alerts stay within the viewport from mobile through de
     await expectInsideViewport(alerts);
     await notifications.click();
 
+    const userMenu = page.locator('details.dropdown > summary[aria-label="Open user menu"]');
+    await userMenu.click();
+    const accountMenu = page.locator(
+      'details.dropdown[open]:has(> summary[aria-label="Open user menu"]) ul.dropdown-content',
+    );
+    await expect(accountMenu).toBeVisible();
+    await expect(accountMenu).toContainText(email);
+    await expect
+      .poll(async () => {
+        const box = await accountMenu.boundingBox();
+        const size = page.viewportSize();
+        return box && size
+          ? box.x >= 8 &&
+              box.x + box.width <= size.width - 8 &&
+              box.y >= 8 &&
+              box.y + box.height <= size.height - 8
+          : false;
+      })
+      .toBe(true);
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
+    if ([667, 768, 844].includes(viewport.width)) {
+      await page.screenshot({
+        path: testInfo.outputPath(`long-account-menu-${viewport.width}.png`),
+        animations: 'disabled',
+      });
+    }
+    await userMenu.click();
+
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+  }
+
+  const maxLengthDisplayName = 'W'.repeat(80);
+  await page.route('**/api/v1/auth/me', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.displayName = maxLengthDisplayName;
+    await route.fulfill({ response, body: JSON.stringify(body) });
+  });
+  await page.goto('/');
+  const welcomeName = page.getByRole('heading', { name: maxLengthDisplayName, exact: true });
+  await expect(welcomeName).toBeVisible();
+
+  const maxNameViewportCases = [
+    { width: 320, height: 568 },
+    { width: 375, height: 667 },
+    { width: 390, height: 844 },
+    { width: 639, height: 768 },
+    { width: 640, height: 768 },
+    { width: 641, height: 768 },
+    { width: 667, height: 375 },
+    { width: 844, height: 390 },
+    { width: 1023, height: 768 },
+    { width: 1024, height: 768 },
+    { width: 1025, height: 768 },
+    { width: 1280, height: 800 },
+    { width: 1920, height: 1080 },
+  ];
+  for (const viewport of maxNameViewportCases) {
+    await page.setViewportSize(viewport);
+    await expect(welcomeName).toBeVisible();
+    const headingGeometry = await welcomeName.evaluate((heading) => {
+      const style = getComputedStyle(heading);
+      return {
+        clientWidth: heading.clientWidth,
+        scrollWidth: heading.scrollWidth,
+        height: heading.clientHeight,
+        lineHeight: Number.parseFloat(style.lineHeight),
+      };
+    });
+    expect(headingGeometry.scrollWidth).toBeLessThanOrEqual(headingGeometry.clientWidth);
+    expect(headingGeometry.height).toBeGreaterThan(headingGeometry.lineHeight);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+      .toBe(true);
+
+    const headerControls = [
+      page.locator('header.app-header button').filter({ visible: true }).first(),
+      page
+        .locator('header.app-header summary[aria-label^="Notifications"]')
+        .filter({ visible: true })
+        .first(),
+      page.locator('header.app-header button[aria-label^="Switch to "]').filter({ visible: true }),
+      page.locator('header.app-header summary[aria-label="Open user menu"]'),
+    ];
+    for (const control of headerControls) {
+      await expect(control).toBeVisible();
+      const box = await control.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
+      expect(
+        await control.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            rect.left + rect.width / 2,
+            rect.top + rect.height / 2,
+          );
+          return hit === element || element.contains(hit);
+        }),
+      ).toBe(true);
+      await control.click({ trial: true });
+    }
+
+    const userMenu = page.locator('header.app-header summary[aria-label="Open user menu"]');
+    await userMenu.click();
+    const accountMenu = page.locator(
+      'details.dropdown[open]:has(> summary[aria-label="Open user menu"]) ul.dropdown-content',
+    );
+    await expect(accountMenu).toContainText(email);
+    await expect
+      .poll(async () => {
+        const box = await accountMenu.boundingBox();
+        return box
+          ? box.x >= 8 &&
+              box.y >= 8 &&
+              box.x + box.width <= viewport.width - 8 &&
+              box.y + box.height <= viewport.height - 8
+          : false;
+      })
+      .toBe(true);
+    for (const label of ['About', 'Settings']) {
+      const link = accountMenu.getByRole('link', { name: label, exact: true });
+      await link.click({ trial: true });
+    }
+    await accountMenu.getByRole('button', { name: 'Logout', exact: true }).click({ trial: true });
+    if ([667, 1025, 1920].includes(viewport.width)) {
+      await page.screenshot({
+        path: testInfo.outputPath(`max-name-user-menu-${viewport.width}.png`),
+        animations: 'disabled',
+      });
+    }
+    await userMenu.click();
   }
 });
 

@@ -224,7 +224,7 @@ export function CastSpellDialog({
       onClose={onClose}
       onCancel={onClose}
     >
-      <div className="modal-box w-[calc(100dvw-2rem)] max-h-[calc(100dvh-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
+      <div className="modal-box w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] max-h-[calc(var(--dialog-viewport-height,100dvh)-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
         <h3 className="break-words font-display text-2xl">
           {maintaining ? `Maintain ${spell.name}` : spell.name}
         </h3>

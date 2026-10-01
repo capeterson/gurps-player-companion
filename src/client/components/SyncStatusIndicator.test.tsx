@@ -121,7 +121,9 @@ describe('SyncStatusIndicator recovery action', () => {
     const tooltip = screen.getByRole('tooltip');
     expect(tooltip).toHaveTextContent('Saving Notes failed');
     expect(tooltip).toHaveTextContent('Offline');
-    expect(tooltip).toHaveClass('max-w-[calc(100dvw-1rem)]');
+    expect(tooltip).toHaveClass(
+      'max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))]',
+    );
     await user.click(indicator);
     expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
     online.mockRestore();

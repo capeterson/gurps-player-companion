@@ -247,6 +247,9 @@ infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
 against the original Zod response schemas retained by the registry.
+The catalog check and emit commands build their metadata with test configuration
+and `ENVIRONMENT=test`, so application maintenance jobs do not start or keep
+these commands alive after generation.
 
 REST and MCP execute the same Hono/OpenAPI handler graph through the in-process
 executor. A private Request object-identity capability supplies the validated

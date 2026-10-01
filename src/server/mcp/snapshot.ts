@@ -5,7 +5,7 @@ import { OPERATION_POLICY } from './operationManifest.ts';
 import { describeMcpTool } from './transport.ts';
 
 export const snapshotConfig: AppConfig = {
-  environment: 'development',
+  environment: 'test',
   port: 3000,
   host: '0.0.0.0',
   databaseUrl: 'postgres://emit-only-no-db@localhost/none',
@@ -28,6 +28,8 @@ export const snapshotConfig: AppConfig = {
 };
 
 export function generateMcpSnapshot() {
+  // Catalog generation must not start database maintenance workers.
+  process.env.ENVIRONMENT = 'test';
   const app = createApp(snapshotConfig);
   const document = app.getOpenAPIDocument({
     openapi: '3.0.0',

@@ -227,7 +227,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           onClose();
         }}
       >
-        <div className="modal-box flex max-h-[88dvh] max-w-[min(56rem,calc(100dvw-2rem))] flex-col border border-base-300 bg-base-100 p-0">
+        <div className="modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)*0.88)] max-w-[min(56rem,calc(var(--dialog-viewport-width,100dvw)-2rem))] flex-col border border-base-300 bg-base-100 p-0">
           <header className="flex items-start justify-between border-b border-base-300 px-5 py-4">
             <div>
               <h2 className="font-display text-xl font-semibold">Sync log</h2>

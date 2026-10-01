@@ -10,7 +10,7 @@ import { createApp } from '../app.ts';
 import type { AppConfig } from '../config.ts';
 
 const config: AppConfig = {
-  environment: 'development',
+  environment: 'test',
   port: 3000,
   host: '0.0.0.0',
   databaseUrl: 'postgres://emit-only-no-db@localhost/none',
@@ -32,6 +32,8 @@ const config: AppConfig = {
   shutdownGraceSeconds: 15,
 };
 
+// Construct route metadata without starting database maintenance workers.
+process.env.ENVIRONMENT = 'test';
 const app = createApp(config);
 const doc = app.getOpenAPIDocument({
   openapi: '3.0.0',

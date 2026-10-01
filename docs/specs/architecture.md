@@ -32,6 +32,11 @@ doesn't reject the token-in-query handshake) → raw bounded MCP transport →
 OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
 
+The OpenAPI and MCP catalog check and emit commands construct this route graph
+with test configuration and `ENVIRONMENT=test`. They generate metadata without
+starting media, notification, or account-purge maintenance, so they need no database
+connection and terminate after producing or checking the snapshot.
+
 Every request receives a server-generated UUID in `X-Request-ID`; incoming
 values are never trusted. Unhandled server failures log that request ID, the
 verified user ID when authentication already resolved, the method, and the

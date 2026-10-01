@@ -732,7 +732,7 @@ export function InventoryPanel({
             <ul
               ref={bulkMoveMenuRef}
               style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
-              className="dropdown-content menu menu-sm z-30 max-h-72 w-56 max-w-[calc(100dvw-1rem)] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300/60 bg-base-100 shadow-lg"
+              className="dropdown-content menu menu-sm z-30 max-h-72 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300/60 bg-base-100 shadow-lg"
             >
               <li>
                 <button
