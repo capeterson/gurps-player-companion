@@ -379,9 +379,8 @@ changes; collection-specific behavior also belongs in the overview catalog.
 ## Account experimental features
 
 Settings has one **Experimental Features** section with an **MCP UI** toggle.
-The description explains the embedded character/item/container/skill cards;
-the footer says the preference follows the account and clients must refresh
-their tools after changing it. Features start off. Loading, read-error/retry,
+The description explains the embedded character/item/container/skill cards.
+Features start off. Loading, read-error/retry,
 and rollback feedback use the standard settings patterns. `useDraftToggle`
 retains rapid same-field changes and flashes the visible checkbox with a toast
 on failure. This online account preference is outside the local-first sheet

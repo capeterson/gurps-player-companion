@@ -67,10 +67,6 @@ export function ExperimentalFeaturesSection({ userId }: { userId: string | undef
       {preferences.data && (
         <McpUiToggle key={userId} value={preferences.data.mcpUi} onSave={save} />
       )}
-      <p className="text-xs text-muted">
-        Saved to your account for all connected clients. Refresh your client's tools after changing
-        MCP UI.
-      </p>
     </section>
   );
 }
