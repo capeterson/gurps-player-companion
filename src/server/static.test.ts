@@ -138,7 +138,6 @@ describe('static HTTP response security and cache headers', () => {
     for (const [path, content] of [
       ['/index.html', '<!doctype html><main>shell</main>'],
       ['/sw.js', 'self.addEventListener("fetch", () => {});'],
-      ['/assets/missing-Ab1Cd2Ef.js', '<!doctype html><main>shell</main>'],
       ['/characters/01a0ea9d-0000-7000-8000-000000000001', '<!doctype html><main>shell</main>'],
       ['/admin/people', '<!doctype html><main>admin shell</main>'],
     ] as const) {
@@ -147,6 +146,23 @@ describe('static HTTP response security and cache headers', () => {
       expect(await response.text()).toBe(content);
       expect(response.headers.get('cache-control')).toBe('no-store, no-cache, must-revalidate');
       expect(response.headers.get('cdn-cache-control')).toBe('no-store');
+      expectFramingBlocked(response);
+    }
+  });
+
+  it('returns uncached 404s for missing package assets instead of HTML', async () => {
+    for (const path of [
+      '/assets/missing-Ab1Cd2Ef.js',
+      '/assets/app-icon-512-Ab1Cd2Ef.png',
+      '/screenshots/missing.png',
+      '/manifest.webmanifest',
+      '/icon-512.png',
+      `/media/${'f'.repeat(64)}/thumb.webp`,
+    ]) {
+      const response = await app.request(path);
+      expect(response.status).toBe(404);
+      expect(response.headers.get('content-type') ?? '').not.toContain('text/html');
+      expect(response.headers.get('cache-control')).toContain('no-store');
       expectFramingBlocked(response);
     }
   });
