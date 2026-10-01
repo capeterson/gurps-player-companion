@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -107,7 +108,7 @@ test('focused library fields remain reachable below the sticky toolbar after pho
       }),
     )
     .toBe(true);
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('library-focused-name-after-phone-rotation.png'),
     animations: 'disabled',
   });
@@ -160,7 +161,7 @@ test('focused library fields remain reachable below the sticky toolbar after pho
     await expectFocusedAndHittable(editName);
     await expect(editName).toHaveValue('An edited trait draft retained through rotation');
     await expect(page.getByRole('textbox', { name: 'Name *' })).toBeVisible();
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`library-focused-name-short-${width}.png`),
       animations: 'disabled',
     });
@@ -183,7 +184,7 @@ test('focused library fields remain reachable below the sticky toolbar after pho
       }),
     )
     .toBe(true);
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('library-toolbar-sticky-restored-portrait.png'),
     animations: 'disabled',
   });

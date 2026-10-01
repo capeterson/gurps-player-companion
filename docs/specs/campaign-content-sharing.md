@@ -813,3 +813,14 @@ cover changes require campaign ownership. These checks control discovery and
 editing: published image URLs themselves grant public access and use long-lived
 public caching. Leaving a campaign does not revoke a previously learned image
 URL or cached copy. See [media-uploads.md](media-uploads.md).
+
+### Focused delegated reads
+
+The focused inventory read (`GET /characters/{id}/inventory/{itemId}`, MCP
+`get_character_inventory_item`) requires the same full-view decision as the
+sheet before returning the selected effective item and its container subtree.
+Minimal viewers receive 403. The focused campaign-skill read
+(`GET /campaigns/{id}/library/skills/{skillId}`, MCP `get_campaign_library_skill`)
+requires campaign membership and a matching campaign ID; restricted definitions
+are owner-only and otherwise return 404. Both use the canonical read handlers,
+with no browser-side mirror or direct HTTP calls in the embedded MCP card.

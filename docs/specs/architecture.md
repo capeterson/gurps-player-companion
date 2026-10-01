@@ -51,9 +51,11 @@ The static handler marks `sw.js`, its registration bootstrap, the manifest, and
 both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
 under `/assets/` use `Cache-Control: public, max-age=31536000, immutable`.
 Only existing files with Vite's content-hash naming pattern get this policy;
-missing assets and SPA fallbacks remain `no-store`. The service worker's
+missing package assets return uncached 404s instead of successful HTML, and SPA
+fallbacks remain `no-store`. The service worker's
 navigation fallback excludes `/api/*`,
-`/admin/*`, `/mcp`, `/.well-known/*`, and the OAuth protocol endpoints. This is
+`/admin/*` and `/admin.html`, static asset/screenshot/package URLs, `/mcp`,
+`/.well-known/*`, and every OAuth path except the player `/oauth/consent` page. This is
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
 
@@ -99,6 +101,33 @@ The final image copies only the production dependency tree plus built output
 and migrations; development/test tools such as happy-dom, Vite and Playwright
 are absent. The image's health probe uses IPv4 loopback to match the default
 `0.0.0.0` server listener, avoiding IPv6 `localhost` resolution failures.
+
+### PWA installation package
+
+`vite.config.ts` emits one manifest link in the player HTML. The manifest fixes
+`id`, `scope` and `start_url` at `/`, preserving the previous inferred identity,
+and uses standalone display without locking orientation. Existing mobile combat
+and desktop campaign captures supply labeled narrow/wide installation screenshots.
+The default launch background/theme color is Gilded Tome; `lib/theme.ts` updates
+the page's browser-chrome color as the selected palette changes.
+
+`src/build/pwaAssets.ts` derives installation artwork from the opaque brand PNGs
+in `public/`: unchanged 192/512px general icons, a separate 512px adaptive icon,
+180px Apple touch icon, and 32px favicon. Adaptive artwork fits inside a centered
+circle of radius 38% of the canvas, leaving margin inside Android's 40% safe zone.
+Generated files use content-hashed `/assets/` URLs and immutable HTTP caching;
+changed artwork changes the manifest URLs so installed browsers can detect it.
+The same plugin serves these URLs under Vite development. Existing unversioned
+brand PNGs remain available to visible branding and desktop notifications.
+
+`build:client` runs `scripts/check-pwa-package.ts` after Vite: one manifest link,
+stable identity, real decoded icon/screenshot dimensions, opaque icons, icon
+precache coverage, and admin exclusion are build requirements. The opt-in
+`tests/e2e/pwa-package.spec.ts` runs with `PWA_E2E=1` against the built Bun server
+to exercise Chromium installability, real-worker offline launch and queued edits.
+Development Vite intentionally does not install a worker. Native Android launcher
+and iOS installation appearance still need device checks; browser emulation does
+not verify OS packaging. See [the package audit](../pwa-package-audit.md).
 
 ## MCP and delegated authorization
 
@@ -151,7 +180,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |
 | Lint/format | Biome |
-| Build/bundler | Vite 6 (client + admin entries), `bun build` (server) |
+| Build/bundler | Vite 6 (client + admin entries and separate inline MCP Apps resource), `bun build` (server) |
 
 ## The three-layer source tree
 
@@ -289,7 +318,8 @@ see `0026_languages.sql` for the current template.
 Tables (grouped):
 
 - **Identity/auth**: `users` (including the CHECK-constrained `dark_theme` /
-  `light_theme` palette preferences and validated `notification_preferences`),
+  `light_theme` palette preferences, validated `notification_preferences`, and
+  the default-off `experimental_mcp_ui` account opt-in),
   `passkey_credentials`, `passkey_challenges`,
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
   `auth_rate_limits` counters. Registration consumes a source-IP bucket only.
@@ -423,21 +453,46 @@ the nightly run; overdue accounts run on the next night after startup.
 
 ## Testing & CI
 
-- `bun test src/server src/shared` — server + shared unit/integration
+- `bun run test` — server + shared unit/integration
   (`sync.test.ts`, `syncDispatch.test.ts`, `historyTriggers.test.ts`, and the
   domain math suites). Server tests hit a real Postgres. Live-Postgres suites
   share `src/server/testConfig.ts`: they use `DATABASE_URL` when provided
   (Compose app container: `db:5432`) and otherwise default to the CI/host URL
-  at `localhost:5432`.
-- `vitest run` — client component/hook tests (happy-dom DOM environment;
-  `fake-indexeddb` for Dexie). The development Compose `client-tests`
+  at `localhost:5432`. Non-auth route suites use fresh synthetic actors from
+  `src/server/testFixtures.ts`, sharing one real password hash while exercising
+  normal JWT authorization. OAuth cases reuse an app only for identical configuration;
+  distinct configurations and startup tests retain separate app construction.
+- `bun run test:client` — client component/hook tests (happy-dom DOM environment;
+  `fake-indexeddb` for Dexie). An explicit list of pure helper/source tests runs in
+  Node without the browser setup. Browser tests retain per-file isolation and
+  `src/test/setupBrowser.ts` cleanup; timer-specific cases advance controlled clocks
+  while leaving IndexedDB completion real. The development Compose `client-tests`
   profile runs these under Node 22; the Bun-only app container's `node`
   fallback is incompatible with Vitest and must not be used to claim a
   passing client suite. Zero discovered tests fail the full-suite command.
   A one-shot `deps` service fills the project-local dependency volume from the
   frozen lockfile; it runs in parallel with PostgreSQL startup, and client
   tests depend only on `deps`, so they do not boot PostgreSQL.
-- `playwright test` — end-to-end. Its configuration checks runtime `TMPDIR`
+- `playwright test` — end-to-end. Broad local passes use the built app: run
+  `bun run build` then `bun run test:e2e:built`, with the checkout's database/public
+  origin configured and no other server on that port. Generic
+  `PLAYWRIGHT_START_SERVER`/`PLAYWRIGHT_BUILT_SERVER` and the legacy MCP flags
+  control managed server startup; externally managed candidate runs remain supported.
+  Managed built runs set `ENVIRONMENT=test` so the compiled entry serves the built
+  client; externally managed servers must use test or production mode as appropriate.
+  The broad command first runs the idempotent standard `db:seed`, providing Sample
+  and Lantern Coast fixtures without resetting the database or existing Lantern
+  play state. `scripts/start-built-test-server.ts` runs the compiled server and the
+  real notification worker in one Bun process so background-delivery browser checks
+  work despite ordinary test-mode servers intentionally disabling maintenance.
+  Built acceptance defaults to one browser worker because legacy scenarios mutate
+  shared seeded actors; independent focused scenarios can explicitly select more.
+  The MCP seed acceptance, integration suites and browser suites share one worktree
+  database and run serially. Independent responsive scenarios reuse a worker-specific
+  synthetic actor but retain fresh token sessions, browser contexts and entity rows.
+  `PLAYWRIGHT_REVIEW_ARTIFACTS=1` enables success screenshots for required visual
+  review; default runs retain failure screenshots and all geometry/UI assertions.
+  Its configuration checks runtime `TMPDIR`
   permissions and a real write before Chromium starts, so an inaccessible
   shared-memory directory fails immediately. Docker browser runs use a writable
   worktree-specific disk volume. Server/shared integration tests and OAuth/MCP
@@ -447,8 +502,18 @@ the nightly run; overdue accounts run on the next night after startup.
   (**server + shared only**) + OpenAPI/MCP contract checks. It does **not**
   run the client vitest or Playwright suites — run those separately for client
   changes. This is the baseline gate before finishing a change.
+- `bun run test:acceptance:mcp-seed` — the complete authenticated Lantern Coast
+  MCP/REST graph comparison in `tests/acceptance/lantern-coast-mcp.test.ts`. It is
+  outside normal server/shared discovery and CI. Agents must run it before
+  opening a PR or pushing code changes to that PR, recording the tested
+  commit and result in the PR validation evidence. It retains the production MCP
+  rate budget, real commits, full graph assertions and audit provenance; focused
+  MCP parity and OAuth tests remain in CI.
 - Per-PR GitHub CI runs lint, typechecking, server/shared tests, client tests,
-  contract drift checks, and the production build; it deliberately does not
+  contract drift checks, and the production build. Server/build and Node 22 client
+  jobs run independently; only the server job starts PostgreSQL. The existing
+  required `build` check aggregates both and fails for failure, cancellation or
+  skipped jobs. It deliberately does not
   install Playwright or a browser. PR authors run relevant browser automation
   locally. The heavyweight delegated OAuth/MCP/offline Chromium acceptance is a
   mandatory named-image promotion gate: it runs against the selected source
@@ -459,6 +524,13 @@ the nightly run; overdue accounts run on the next night after startup.
   Migration, the candidate server and image alias publication all use the same
   pinned reference. Promotion currently accepts only one linux/amd64 runnable
   image (plus attestations); additional platforms need their own acceptance.
+- Test commands save native Bun JUnit case durations and command wall-time JSON,
+  Vitest case/file JSON and command wall time, and Playwright JSON in
+  `.local/test-results/` (override `TEST_RESULTS_DIR` or
+  `PLAYWRIGHT_JSON_OUTPUT_FILE`). CI uploads server/client reports on success or
+  failure. Compare wall time separately from accumulated case/worker durations;
+  explicit reporter flags remain available for focused client diagnostics. These
+  artifacts remain excluded from Git and Docker build contexts.
 - **Guard tests** enforce the extension invariants: `historyTriggers.test.ts`
   (every syncable table has a history trigger), `auditContext.test.ts` (no bare
   `getDb().insert/update/delete` in mutating route files). A forgotten step in

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -322,7 +323,7 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
       await expect(editor).toContainText(viewport.marker);
       await expectCollapsedCaretReachable(page);
       if ([320, 639, 640, 641].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`library-caret-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -339,7 +340,7 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
     await page.keyboard.type(marker);
     await expect(editor).toContainText(marker);
     await expectCollapsedCaretReachable(page);
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`library-caret-zoom-${scale}.png`),
       animations: 'disabled',
     });
@@ -359,7 +360,7 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
     await page.keyboard.type(marker);
     await expect(source).toHaveValue(new RegExp(marker));
     await expectTextareaCaretReachable(source);
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`library-source-caret-zoom-${scale}.png`),
       animations: 'disabled',
     });
@@ -394,7 +395,7 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
     .fill('Synthetic multiline caret regression trait saved from edit');
   const saveChanges = page.getByRole('button', { name: 'Save changes', exact: true });
   await expectFooterPointerReachable(saveChanges);
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('library-edit-save-changes-reachable.png'),
     animations: 'disabled',
   });

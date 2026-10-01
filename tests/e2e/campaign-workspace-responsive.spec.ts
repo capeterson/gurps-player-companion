@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -105,7 +106,7 @@ test('campaign workspace pages and settings stay within supported form factors',
           .toBeLessThanOrEqual(viewport.width);
 
         if ([320, 568, 1280].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(
               `campaign-${route.heading.toLowerCase().replaceAll(' ', '-')}-${viewport.width}x${viewport.height}.png`,
             ),
@@ -155,7 +156,7 @@ test('campaign workspace pages and settings stay within supported form factors',
       }
 
       if ([320, 568, 768, 1023, 1024, 1025, 1280].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`campaign-settings-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });

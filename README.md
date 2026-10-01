@@ -4,6 +4,14 @@
 
 Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with customizable light and dark palettes (including classic Arcane purple) and an installable app that keeps character edits available offline.
 
+To install on Android, open the app in Chrome and use **Install app** from the
+browser menu (the wording varies by browser). Open your characters online once
+before relying on offline access. After an artwork update is deployed, open the
+installed app online and accept **Review app update** if Chrome offers it.
+Only reinstall after all pending edits and images have synced; uninstalling can
+remove device-local data. [Chrome's app-update behavior](https://developer.chrome.com/blog/improvements-to-web-app-updates)
+explains why an existing installation can retain its previous icon.
+
 **[Play on the official hosted instance → gurps.abundant.zip](https://gurps.abundant.zip)**
 
 ![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](public/screenshots/armor-desktop.png)
@@ -173,6 +181,16 @@ Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (def
 docker compose -f docker-compose.dev.yml exec app bun run check
 docker compose -f docker-compose.dev.yml --profile test run --rm client-tests
 ```
+
+The full Lantern Coast MCP recipe has a separate `bun run test:acceptance:mcp-seed`
+command. Agents run it before opening a PR or pushing code changes to it;
+focused MCP parity/security tests remain in CI. Test commands save timing reports
+in `.local/test-results/`. For broad browser checks, build first and use
+`bun run test:e2e:built` with the checkout's database and origin configured and no
+other server on that port. This command seeds the standard Sample/Lantern Coast
+fixtures without resetting existing Lantern play state, then starts the compiled
+server with its real notification worker. Set `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for success
+screenshots when visually reviewing UI changes; failure screenshots remain on.
 
 The first command runs lint, type checking, server/shared tests, and API/MCP
 contract checks. The client test service runs Vitest with Node 22 and fails if

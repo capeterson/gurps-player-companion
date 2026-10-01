@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -90,7 +91,7 @@ test('library help and About prose, links, code, and navigation fit responsive v
       }
 
       if ([320, 568].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`library-help-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -143,7 +144,7 @@ test('library help and About prose, links, code, and navigation fit responsive v
       }
       if ([320, 568].includes(viewport.width)) {
         await source.scrollIntoViewIfNeeded();
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`about-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });

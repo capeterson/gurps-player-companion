@@ -154,16 +154,26 @@ describe('auth dispatch via API key', () => {
     };
     expect(apiKey.lastUsedAt).toBeNull();
 
-    await app.request('/api/v1/auth/me', { headers: bearer(plaintextKey) });
-    // Allow the fire-and-forget DB write to settle
-    await new Promise((r) => setTimeout(r, 200));
-
-    const listRes = await app.request('/api/v1/auth/api-keys', {
-      headers: bearer(accessToken),
-    });
-    const keys = (await listRes.json()) as { id: string; lastUsedAt: string | null }[];
-    const row = keys.find((k) => k.id === apiKey.id);
-    expect(row?.lastUsedAt).not.toBeNull();
+    const meRes = await app.request('/api/v1/auth/me', { headers: bearer(plaintextKey) });
+    expect(meRes.status).toBe(200);
+    // Observe completion of the fire-and-forget write through the real endpoint.
+    // Retry only while it is unsettled, with room for slower CI database work.
+    const deadline = performance.now() + 2_000;
+    let row: { id: string; lastUsedAt: string | null } | undefined;
+    do {
+      const listRes = await app.request('/api/v1/auth/api-keys', {
+        headers: bearer(accessToken),
+      });
+      expect(listRes.status).toBe(200);
+      const keys = (await listRes.json()) as { id: string; lastUsedAt: string | null }[];
+      row = keys.find((key) => key.id === apiKey.id);
+      expect(row, 'The created API key remains in the owner key list').toBeDefined();
+      if (row?.lastUsedAt != null || performance.now() >= deadline) break;
+      await Bun.sleep(10);
+    } while (performance.now() < deadline);
+    expect(row?.lastUsedAt, 'API-key usage is recorded within two seconds').toEqual(
+      expect.any(String),
+    );
   });
 
   it('JWT auth on /auth/me does not set lastUsedAt on key row', async () => {

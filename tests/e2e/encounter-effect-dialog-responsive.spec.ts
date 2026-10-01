@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -79,7 +80,7 @@ test('Add effect dialog stays above the sticky header and closes after create or
       await expect(name).toBeVisible();
       await expect(target).toBeVisible();
       if ([320, 568, 640].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`effect-dialog-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -101,6 +102,21 @@ test('Add effect dialog stays above the sticky header and closes after create or
 
       await cancel.scrollIntoViewIfNeeded();
       await expectTopmost(cancel);
+      await expect
+        .poll(
+          async () => {
+            const cancelBox = await cancel.boundingBox();
+            return (
+              cancelBox !== null &&
+              cancelBox.x >= 0 &&
+              cancelBox.y >= 0 &&
+              cancelBox.x + cancelBox.width <= viewport.width &&
+              cancelBox.y + cancelBox.height <= viewport.height
+            );
+          },
+          { message: `Cancel remains fully reachable at ${viewport.width}×${viewport.height}` },
+        )
+        .toBe(true);
     });
   }
 

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { expectCharacterNavigationReady } from './character-navigation';
+import { captureReviewScreenshot, reviewArtifactsEnabled } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 const missedCharacterName =
@@ -152,7 +153,7 @@ test('landing hero headline keeps its intended two lines across responsive break
     }
 
     if ([639, 640, 641].includes(viewport.width) || viewport.height <= 390) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`landing-hero-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
       });
@@ -186,7 +187,10 @@ test('public landing, classic palette, Overview default, and campaign reassignme
 
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.screenshot({ path: `test-results/landing-${width}.png`, fullPage: true });
+    await captureReviewScreenshot(page, {
+      path: `test-results/landing-${width}.png`,
+      fullPage: true,
+    });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
@@ -267,8 +271,8 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await expect(dialog).toContainText(/rejoining the campaign later/i);
     await expectDialogInsideViewport(page, width, height);
     if (width === 320 || width === 768) {
-      await page.waitForTimeout(350);
-      await page.screenshot({
+      if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+      await captureReviewScreenshot(page, {
         path: `test-results/campaign-warning-${width}.png`,
         animations: 'disabled',
       });
@@ -327,8 +331,8 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await expect(recipients).toContainText('Leave out characters whose players missed the session');
     await expectDialogInsideViewport(page, width, height);
     if (width === 320 || width === 768) {
-      await page.waitForTimeout(350);
-      await page.screenshot({
+      if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+      await captureReviewScreenshot(page, {
         path: `test-results/recipient-subset-${width}.png`,
         animations: 'disabled',
       });
@@ -364,8 +368,8 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await expect(leaveDialog).toBeVisible();
     await expectDialogInsideViewport(page, width, 900);
     if (width === 320) {
-      await page.waitForTimeout(350);
-      await page.screenshot({
+      if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+      await captureReviewScreenshot(page, {
         path: 'test-results/campaign-leave-320.png',
         animations: 'disabled',
       });
@@ -382,8 +386,8 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   const leaveConfirmed = page.getByRole('dialog', { name: 'Change character campaign?' });
   await expect(leaveConfirmed).toBeVisible();
   await expectDialogInsideViewport(page, 768, 900);
-  await page.waitForTimeout(350);
-  await page.screenshot({
+  if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+  await captureReviewScreenshot(page, {
     path: 'test-results/campaign-leave-768.png',
     animations: 'disabled',
   });

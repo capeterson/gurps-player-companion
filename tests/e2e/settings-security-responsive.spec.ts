@@ -1,5 +1,6 @@
 import { type Locator, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -208,7 +209,7 @@ test('account security, API key and connected app controls fit responsive viewpo
           viewport,
         );
         if ([320, 568].includes(viewport.width)) {
-          await keyDialog.screenshot({
+          await captureReviewScreenshot(keyDialog, {
             path: testInfo.outputPath(`api-key-dialog-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

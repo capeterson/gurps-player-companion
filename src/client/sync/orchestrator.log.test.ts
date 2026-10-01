@@ -102,6 +102,7 @@ afterEach(async () => {
   tokenStore.clear();
   resetSyncOrchestratorForTests();
   syncStateStore.reset('synced');
+  vi.useRealTimers();
   await resetLocalDb();
 });
 
@@ -926,11 +927,13 @@ describe('whole-cycle failures', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
+    // Keep IndexedDB work real; only advance the indicator/loop timers.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     getSyncOrchestrator().start();
     try {
-      await waitFor(() => expect(syncStateStore.status.state).toBe('error'));
+      await vi.waitFor(() => expect(syncStateStore.status.state).toBe('error'));
       // Give the post-drain fallback every chance to clobber it.
-      await new Promise((r) => setTimeout(r, 1_500));
+      await vi.advanceTimersByTimeAsync(1_500);
       expect(syncStateStore.status.state).toBe('error');
       expect(syncStateStore.status.error?.reason).toContain('530');
     } finally {
@@ -1070,11 +1073,25 @@ describe('rejection housekeeping without a fresh bootstrap', () => {
       createdAt: new Date().toISOString(),
     });
 
+    // An attributable rejection proves the replay ran before the negative
+    // assertion; a fixed sleep could pass even if replay had not started.
+    await getLocalDb().rejectionToasts.put({
+      id: 'rej-own',
+      clientOpId: 'rej-own',
+      userId: USER_ID,
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      humanName: 'ST',
+      reason: 'rejected',
+      status: 'rejected',
+      createdAt: new Date().toISOString(),
+    });
+
     const seen: string[] = [];
     setRejectionNotifier((rec) => seen.push(rec.id));
     try {
       getSyncOrchestrator().setCurrentUser(USER_ID);
-      await new Promise((r) => setTimeout(r, 200));
+      await waitFor(() => expect(seen).toContain('rej-own'));
       expect(seen).not.toContain('rej-other');
     } finally {
       setRejectionNotifier(null);

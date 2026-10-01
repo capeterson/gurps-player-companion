@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+import { createTestActor } from '../testFixtures.ts';
 
 configureIntegrationTestEnvironment();
 
@@ -25,14 +26,7 @@ function jsonHeaders(token: string) {
 }
 
 async function registerUser(suffix: string) {
-  const email = `subres-test-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
-  const res = await app.request('/api/v1/auth/register', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: 'TestPassword1!', displayName: `Test ${suffix}` }),
-  });
-  const body = (await res.json()) as { accessToken: string };
-  return { accessToken: body.accessToken, email };
+  return createTestActor(suffix);
 }
 
 async function createCharacter(

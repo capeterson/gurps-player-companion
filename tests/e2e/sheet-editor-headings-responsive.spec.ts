@@ -1,6 +1,6 @@
-import { writeFile } from 'node:fs/promises';
 import { type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 async function register(page: Page) {
   await page.goto('/register');
@@ -103,12 +103,9 @@ test('expanded Traits and Skills editor headings wrap long names at mobile break
 
     if (viewport.width === 320 || viewport.name === '568x320') {
       await heading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      const screenshotPath = testInfo.outputPath(`trait-editor-heading-${viewport.name}.png`);
-      const screenshot = await page.screenshot({ animations: 'disabled' });
-      await writeFile(screenshotPath, screenshot);
-      await testInfo.attach(`trait-editor-heading-${viewport.name}`, {
-        path: screenshotPath,
-        contentType: 'image/png',
+      await attachReviewScreenshot(page, testInfo, `trait-editor-heading-${viewport.name}`, {
+        animations: 'disabled',
+        path: testInfo.outputPath(`trait-editor-heading-${viewport.name}.png`),
       });
     }
   }
@@ -181,12 +178,9 @@ test('expanded Traits and Skills editor headings wrap long names at mobile break
 
     if (viewport.width === 320 || viewport.name === '568x320') {
       await skillHeading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      const screenshotPath = testInfo.outputPath(`skills-editor-heading-${viewport.name}.png`);
-      const screenshot = await page.screenshot({ animations: 'disabled' });
-      await writeFile(screenshotPath, screenshot);
-      await testInfo.attach(`skills-editor-heading-${viewport.name}`, {
-        path: screenshotPath,
-        contentType: 'image/png',
+      await attachReviewScreenshot(page, testInfo, `skills-editor-heading-${viewport.name}`, {
+        animations: 'disabled',
+        path: testInfo.outputPath(`skills-editor-heading-${viewport.name}.png`),
       });
     }
   }

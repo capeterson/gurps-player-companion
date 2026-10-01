@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 const PASSWORD = 'CorrectHorseBatteryStaple1';
@@ -162,7 +163,7 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
     await page.setViewportSize({ width, height });
     const dialog = await openLogoutDialog(page, width);
     await expect(dialog).toBeVisible();
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       animations: 'disabled',
       path: testInfo.outputPath(`logout-confirm-${width}.png`),
     });
@@ -208,7 +209,7 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
   await expect(
     passwordDialog.getByRole('button', { name: 'Discard and change password' }),
   ).toBeVisible();
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     animations: 'disabled',
     path: testInfo.outputPath('password-confirm-320.png'),
   });
@@ -274,7 +275,7 @@ test('logout keeps queued edits on cancel and explicitly discards them on confir
     await page.setViewportSize({ width, height });
     const dialog = await openLogoutDialog(page, width);
     await expect(dialog).toBeVisible();
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       animations: 'disabled',
       path: testInfo.outputPath(`logout-confirm-${width}.png`),
     });

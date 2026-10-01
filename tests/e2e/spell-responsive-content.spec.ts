@@ -1,7 +1,7 @@
-import { writeFile } from 'node:fs/promises';
 import { type Locator, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -198,15 +198,12 @@ test('unbroken spell names and descriptions remain readable in the sheet and cas
           viewport.height + 1,
         );
         if ([320, 568, 640, 1440].includes(viewport.width)) {
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(
-            `spell-reference-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `spell-reference-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await writeFile(path, screenshot);
-          await testInfo.attach(`spell-reference-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
         }
         await referenceClose.click();
 
@@ -232,13 +229,12 @@ test('unbroken spell names and descriptions remain readable in the sheet and cas
         expect(payBounds.y).toBeGreaterThanOrEqual(0);
         expect(payBounds.y + payBounds.height).toBeLessThanOrEqual(viewport.height + 1);
         if ([320, 568, 640, 1440].includes(viewport.width)) {
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(`spell-cast-${viewport.width}x${viewport.height}.png`);
-          await writeFile(path, screenshot);
-          await testInfo.attach(`spell-cast-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `spell-cast-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
+          );
         }
         await castDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
         await expect(castDialog).not.toBeVisible();

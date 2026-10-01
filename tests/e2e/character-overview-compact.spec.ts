@@ -1,7 +1,7 @@
-import { writeFile } from 'node:fs/promises';
 import { type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot, captureReviewScreenshot } from './review-artifacts';
 
 const responsiveViewports = [
   { width: 320, height: 568 },
@@ -123,10 +123,7 @@ test('identity name remains readable and editable across narrow sheet widths', a
       if (width === 320 || width === 640) {
         await page.evaluate(() => window.scrollTo(0, 0));
         await expect(ownerName).toBeInViewport();
-        await testInfo.attach(`editable-name-${width}`, {
-          body: await page.screenshot(),
-          contentType: 'image/png',
-        });
+        await attachReviewScreenshot(page, testInfo, `editable-name-${width}`);
       }
     }
     const longOwnerName =
@@ -210,15 +207,12 @@ test('identity name remains readable and editable across narrow sheet widths', a
         .toBeLessThanOrEqual(viewport.width);
       if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
         await viewer.evaluate(() => window.scrollTo(0, 0));
-        const screenshot = await viewer.screenshot({ fullPage: true, animations: 'disabled' });
-        const screenshotPath = testInfo.outputPath(
-          `minimal-roster-${viewport.width}x${viewport.height}.png`,
+        await attachReviewScreenshot(
+          viewer,
+          testInfo,
+          `minimal-roster-${viewport.width}x${viewport.height}`,
+          { fullPage: true, animations: 'disabled' },
         );
-        await writeFile(screenshotPath, screenshot);
-        await testInfo.attach(`minimal-roster-${viewport.width}x${viewport.height}`, {
-          path: screenshotPath,
-          contentType: 'image/png',
-        });
       }
     }
 
@@ -246,15 +240,12 @@ test('identity name remains readable and editable across narrow sheet widths', a
       await expect(minimalHeading).toBeVisible();
       if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
         await viewer.evaluate(() => window.scrollTo(0, 0));
-        const screenshot = await viewer.screenshot({ fullPage: true, animations: 'disabled' });
-        const screenshotPath = testInfo.outputPath(
-          `minimal-view-long-name-${viewport.width}x${viewport.height}.png`,
+        await attachReviewScreenshot(
+          viewer,
+          testInfo,
+          `minimal-view-long-name-${viewport.width}x${viewport.height}`,
+          { fullPage: true, animations: 'disabled' },
         );
-        await writeFile(screenshotPath, screenshot);
-        await testInfo.attach(`minimal-view-long-name-${viewport.width}x${viewport.height}`, {
-          path: screenshotPath,
-          contentType: 'image/png',
-        });
       }
     }
 
@@ -296,13 +287,7 @@ test('identity name remains readable and editable across narrow sheet widths', a
       expect(sharedGeometry.height).toBeGreaterThan(sharedGeometry.fontSize * 1.2);
       expect(sharedGeometry.scrollWidth).toBeLessThanOrEqual(width);
       if (width === 320 || width === 640) {
-        const screenshot = await viewer.screenshot();
-        const screenshotPath = testInfo.outputPath(`shared-view-long-name-${width}.png`);
-        await writeFile(screenshotPath, screenshot);
-        await testInfo.attach(`shared-view-long-name-${width}`, {
-          path: screenshotPath,
-          contentType: 'image/png',
-        });
+        await attachReviewScreenshot(viewer, testInfo, `shared-view-long-name-${width}`);
       }
     }
     expect(viewerToken).toBeTruthy();
@@ -590,7 +575,7 @@ test('overview stays compact and description and conditional effects work at sup
     }
     const documentWidth = await page.locator('html').evaluate((node) => node.scrollWidth);
     expect(documentWidth).toBeLessThanOrEqual(width);
-    await page.screenshot({ path: testInfo.outputPath(`overview-${width}.png`) });
+    await captureReviewScreenshot(page, { path: testInfo.outputPath(`overview-${width}.png`) });
   }
 
   const emptyCharacter = await create('/characters', { name: 'No conditions hero' });

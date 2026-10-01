@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { type Page, expect, test } from '@playwright/test';
 import { SignJWT, decodeJwt } from 'jose';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 /**
  * Full delegated-access acceptance test. The app must be started with a
@@ -76,7 +77,8 @@ async function register(page: Page, email: string): Promise<void> {
 }
 
 async function requireBuiltServiceWorker(page: Page): Promise<void> {
-  if (process.env.MCP_E2E_BUILT_SERVER !== '1') return;
+  if (process.env.MCP_E2E_BUILT_SERVER !== '1' && process.env.PLAYWRIGHT_BUILT_SERVER !== '1')
+    return;
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
@@ -244,11 +246,70 @@ test.describe('delegated MCP OAuth acceptance', () => {
           'get_character_history',
         ]),
       );
-      expect(tools.tools).toHaveLength(49);
+      expect(tools.tools).toHaveLength(51);
       expect(tools.tools.some((tool) => tool.name.startsWith('gpc_'))).toBe(false);
       expect(
         tools.tools.find((tool) => tool.name === 'get_character')?.annotations?.readOnlyHint,
       ).toBe(true);
+      expect(tools.tools.every((tool) => !tool._meta?.ui)).toBe(true);
+      expect((await client.listResources()).resources).toEqual([]);
+      await expect(
+        client.readResource({ uri: 'ui://gurps-player-companion/character.html' }),
+      ).rejects.toThrow();
+
+      await page.goto('/settings');
+      const experiments = page
+        .locator('section')
+        .filter({ has: page.getByRole('heading', { name: 'Experimental Features', exact: true }) });
+      const mcpUiToggle = experiments.getByRole('checkbox', { name: 'MCP UI', exact: true });
+      await expect(mcpUiToggle).not.toBeChecked();
+      for (const width of [320, 639, 640, 641, 767, 768, 769]) {
+        await page.setViewportSize({ width, height: 900 });
+        await experiments.scrollIntoViewIfNeeded();
+        await expect(mcpUiToggle).toBeVisible();
+        const box = await mcpUiToggle.boundingBox();
+        expect(box).not.toBeNull();
+        if (!box) throw new Error('MCP UI toggle geometry unavailable');
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(
+          await page.locator('html').evaluate((root) => root.scrollWidth <= root.clientWidth),
+        ).toBe(true);
+        await experiments.screenshot({
+          path: test.info().outputPath(`experimental-features-${width}.png`),
+        });
+      }
+      const enabledSave = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/v1/auth/experimental-features') &&
+          response.request().method() === 'PATCH',
+      );
+      await mcpUiToggle.check();
+      expect((await enabledSave).status()).toBe(200);
+      const enabledTools = await client.listTools();
+      expect(enabledTools.tools.find((tool) => tool.name === 'get_character')?._meta?.ui).toEqual({
+        resourceUri: 'ui://gurps-player-companion/character.html',
+      });
+      expect((await client.listResources()).resources).toHaveLength(1);
+      const ui = await client.readResource({ uri: 'ui://gurps-player-companion/character.html' });
+      expect(ui.contents[0]?.mimeType).toBe('text/html;profile=mcp-app');
+      expect(ui.contents[0] && 'text' in ui.contents[0] ? ui.contents[0].text : '').toContain(
+        '<!doctype html>',
+      );
+      await page.reload();
+      await expect(mcpUiToggle).toBeChecked();
+      const disabledSave = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/v1/auth/experimental-features') &&
+          response.request().method() === 'PATCH',
+      );
+      await mcpUiToggle.uncheck();
+      expect((await disabledSave).status()).toBe(200);
+      expect((await client.listTools()).tools.every((tool) => !tool._meta?.ui)).toBe(true);
+      expect((await client.listResources()).resources).toEqual([]);
+      await expect(
+        client.readResource({ uri: 'ui://gurps-player-companion/character.html' }),
+      ).rejects.toThrow();
       const characterTool = tools.tools.find((tool) => tool.name === 'character');
       expect(characterTool?.annotations?.readOnlyHint).toBe(false);
       expect(characterTool?.inputSchema.anyOf).toEqual(
@@ -439,7 +500,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
           }),
         )
         .toBe(true);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: 'test-results/connected-app-revoke-confirmation-320.png',
         fullPage: false,
       });

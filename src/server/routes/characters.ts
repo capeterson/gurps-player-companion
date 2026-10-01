@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { selectInventoryItemDetail } from '../../shared/domain/inventoryDetails.ts';
 import {
   type CharacterMinimalOut,
   characterCreate,
@@ -12,6 +13,7 @@ import {
   dismissWarningRequest,
 } from '../../shared/schemas/character.ts';
 import { listQuery, uuid } from '../../shared/schemas/common.ts';
+import { inventoryItemDetail } from '../../shared/schemas/details.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCampaignOr403, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
@@ -239,6 +241,35 @@ router.openapi(
       return c.json(await loadMinimalCharacter(id), 200);
     }
     return c.json(await loadCharacterDetail(id), 200);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'get',
+    path: '/characters/{id}/inventory/{itemId}',
+    tags: ['characters'],
+    security: [{ bearerAuth: [] }],
+    summary: 'Get one inventory item and its nested contents, without the character sheet',
+    request: { params: z.object({ id: uuid, itemId: uuid }) },
+    responses: {
+      200: {
+        description: 'Item and container subtree',
+        content: { 'application/json': { schema: inventoryItemDetail } },
+      },
+      403: errorResponse('Full character access required'),
+      404: errorResponse('Not found'),
+    },
+  }),
+  async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const user = c.get('user');
+    const access = await loadCharacterOr403(id, user.id);
+    if ((await resolveCharacterView(user.id, access.character)) !== 'full')
+      throw new HTTPException(403, { message: 'full character access required' });
+    const detail = selectInventoryItemDetail(await loadCharacterDetail(id), itemId);
+    if (!detail) throw new HTTPException(404, { message: 'inventory item not found' });
+    return c.json(detail, 200);
   },
 );
 

@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'change-me-please-this-is-a-seed-account';
 
@@ -229,7 +230,7 @@ test('trait table and expanded editor wrap long names, notes, and modifiers resp
             expect(box.y + box.height).toBeLessThanOrEqual(visible.bottom + 1);
           }
         }
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`traits-editor-${width}x${viewport.height}.png`),
           animations: 'disabled',
         });

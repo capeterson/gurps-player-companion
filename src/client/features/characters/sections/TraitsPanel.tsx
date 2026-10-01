@@ -515,6 +515,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
 }
 
 interface TraitRowProps {
+  activeEffectsSnapshot?: boolean | undefined;
   characterId: string;
   campaignId: string | null;
   characterSkills: CharacterDetail['skills'];
@@ -743,6 +744,7 @@ function TraitRow({
   trait,
   inventory,
   canWrite,
+  activeEffectsSnapshot,
   expanded,
   position,
   dragging,
@@ -754,7 +756,7 @@ function TraitRow({
   onDrop,
   onMove,
 }: TraitRowProps) {
-  const activeEffectsEnabled = useExperimentalActiveEffects(campaignId);
+  const activeEffectsEnabled = useExperimentalActiveEffects(campaignId, activeEffectsSnapshot);
   const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
 
   const nameField = useEntityNameField(rowPatch, trait.name);
@@ -1005,10 +1007,12 @@ export function TraitsPanel({
   character,
   canWrite,
   anchorTraitId = null,
+  activeEffectsSnapshot,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   anchorTraitId?: string | null;
+  activeEffectsSnapshot?: boolean | undefined;
 }) {
   return (
     <TraitsTable
@@ -1016,6 +1020,7 @@ export function TraitsPanel({
       character={character}
       canWrite={canWrite}
       anchorTraitId={anchorTraitId}
+      activeEffectsSnapshot={activeEffectsSnapshot}
     />
   );
 }
@@ -1024,10 +1029,12 @@ function TraitsTable({
   character,
   canWrite,
   anchorTraitId,
+  activeEffectsSnapshot,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   anchorTraitId: string | null;
+  activeEffectsSnapshot?: boolean | undefined;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
@@ -1203,6 +1210,7 @@ function TraitsTable({
                   campaignId={character.campaignId ?? null}
                   characterSkills={character.skills}
                   trait={trait}
+                  activeEffectsSnapshot={activeEffectsSnapshot}
                   inventory={character.inventory}
                   canWrite={canWrite}
                   expanded={expandedId === trait.id}

@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const LONG_NAME = 'UnbrokenEncounterName'.repeat(5);
 const VIEWPORTS = [
@@ -148,7 +149,7 @@ test('encounter initiative and effect rows contain long names at supported width
         ).toBeVisible();
         await expect(effectCard.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
         if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`encounter-list-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
             fullPage: true,

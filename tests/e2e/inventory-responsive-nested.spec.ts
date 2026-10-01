@@ -1,7 +1,7 @@
-import { writeFile } from 'node:fs/promises';
 import { type Locator, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'CorrectHorseBatteryStaple1';
 const VIEWPORTS = [
@@ -171,15 +171,12 @@ test('nested inventory names and expanded item controls stay in view at supporte
           .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
           .toBeLessThanOrEqual(viewport.width);
         if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
-          const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
-          const screenshotPath = testInfo.outputPath(
-            `inventory-nested-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `inventory-nested-${viewport.width}x${viewport.height}`,
+            { fullPage: true, animations: 'disabled' },
           );
-          await writeFile(screenshotPath, screenshot);
-          await testInfo.attach(`inventory-nested-${viewport.width}x${viewport.height}`, {
-            path: screenshotPath,
-            contentType: 'image/png',
-          });
         }
       });
     }

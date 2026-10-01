@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -89,7 +90,7 @@ test('login, registration, and password recovery forms remain reachable on respo
         viewport.width,
       );
       if ([320, 568].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`login-error-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -137,7 +138,7 @@ test('login, registration, and password recovery forms remain reachable on respo
         viewport.width,
       );
       if ([320, 568].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`register-error-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -175,7 +176,7 @@ test('login, registration, and password recovery forms remain reachable on respo
         viewport.width,
       );
       if ([320, 568].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`forgot-success-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });

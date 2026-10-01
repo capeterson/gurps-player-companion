@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -80,7 +81,7 @@ test('detailed NPC dialog stays above the sticky header and inside every viewpor
       await expectTopmost(name);
       await expectTopmost(basicSpeed);
       if ([320, 568, 640, 768, 1024, 1920].includes(viewport.width)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`npc-dialog-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });
@@ -99,6 +100,21 @@ test('detailed NPC dialog stays above the sticky header and inside every viewpor
       await cancel.scrollIntoViewIfNeeded();
       await expect(cancel).toBeVisible();
       await expectTopmost(cancel);
+      await expect
+        .poll(
+          async () => {
+            const cancelBox = await cancel.boundingBox();
+            return (
+              cancelBox !== null &&
+              cancelBox.x >= 0 &&
+              cancelBox.y >= 0 &&
+              cancelBox.x + cancelBox.width <= viewport.width &&
+              cancelBox.y + cancelBox.height <= viewport.height
+            );
+          },
+          { message: `Cancel remains fully reachable at ${viewport.width}×${viewport.height}` },
+        )
+        .toBe(true);
     });
   }
 

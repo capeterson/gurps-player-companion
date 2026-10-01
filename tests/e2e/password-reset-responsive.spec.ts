@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const invalidResetMessage = 'This reset link is invalid or has expired. Please request a new one.';
 
@@ -53,7 +54,7 @@ test('expired reset links offer a reachable request-new-link action on mobile an
       expect((linkBox?.y ?? 0) + (linkBox?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
 
       if (viewport.height <= 390) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(
             `expired-reset-${mode}-${viewport.width}x${viewport.height}.png`,
           ),

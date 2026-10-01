@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3001';
 const PASSWORD = 'CorrectHorseBatteryStaple1';
@@ -126,7 +127,7 @@ test('OAuth consent stays usable across narrow, short, and breakpoint viewports'
         `login horizontal overflow at ${viewport.width}x${viewport.height}`,
       ).toBeLessThanOrEqual(viewport.width);
       if (viewport.width === 568 && viewport.height === 320) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath('oauth-login-568x320.png'),
           fullPage: true,
         });
@@ -171,7 +172,7 @@ test('OAuth consent stays usable across narrow, short, and breakpoint viewports'
       ).toBeLessThanOrEqual(viewport.width);
 
       if (viewport.width === 320 || (viewport.width === 568 && viewport.height === 320)) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`oauth-consent-${viewport.width}x${viewport.height}.png`),
           fullPage: true,
         });

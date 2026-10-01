@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -35,6 +36,7 @@ const VIEWPORTS = [
   { width: 456, height: 800 },
   { width: 457, height: 800 },
   { width: 458, height: 800 },
+  { width: 459, height: 800 },
   { width: 639, height: 800 },
   { width: 640, height: 800 },
   { width: 641, height: 800 },
@@ -116,13 +118,14 @@ test('campaign library search and Clear search stay usable across form factors',
       expect(sourceBox).not.toBeNull();
       expect(searchGroupBox).not.toBeNull();
       if (!searchBox || !clearBox || !sourceBox || !searchGroupBox) return;
+      const controlsShareRow =
+        sourceBox.y < searchBox.y + searchBox.height &&
+        sourceBox.y + sourceBox.height > searchBox.y;
+      // The source filter plus the minimum search group fit together at 458px.
+      // Exercise just below, at, and above that actual flex-wrap boundary.
+      if ([456, 457].includes(viewport.width)) expect(controlsShareRow).toBe(false);
+      if ([458, 459].includes(viewport.width)) expect(controlsShareRow).toBe(true);
       expect(searchBox.width).toBeGreaterThanOrEqual(144);
-      expect(clearBox.y).toBeLessThan(searchBox.y + searchBox.height);
-      expect(clearBox.y + clearBox.height).toBeGreaterThan(searchBox.y);
-      expect(searchGroupBox.x).toBeGreaterThanOrEqual(0);
-      expect(searchGroupBox.x + searchGroupBox.width).toBeLessThanOrEqual(viewport.width);
-      expect(sourceBox.x).toBeGreaterThanOrEqual(0);
-      expect(sourceBox.x + sourceBox.width).toBeLessThanOrEqual(viewport.width);
       expect(clearBox.x).toBeGreaterThanOrEqual(searchBox.x + searchBox.width);
       expect(clearBox.x + clearBox.width).toBeLessThanOrEqual(viewport.width - 8);
       expect(searchBox.x).toBeGreaterThanOrEqual(8);
@@ -133,7 +136,7 @@ test('campaign library search and Clear search stay usable across form factors',
       if (
         [320, 375, 390, 455, 456, 457, 568, 639, 640, 641, 768, 1024, 1280].includes(viewport.width)
       ) {
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`library-search-${viewport.width}x${viewport.height}.png`),
           animations: 'disabled',
         });

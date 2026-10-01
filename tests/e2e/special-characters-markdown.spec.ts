@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -382,7 +383,9 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   await expect(
     reloadedArticle.getByRole('link', { name: 'unsafe markdown link', exact: true }),
   ).toHaveCount(0);
-  await reloadedArticle.screenshot({ path: testInfo.outputPath('markdown-log-links.png') });
+  await captureReviewScreenshot(reloadedArticle, {
+    path: testInfo.outputPath('markdown-log-links.png'),
+  });
   expect(
     await page.evaluate(() => (window as Window & { __markdownCanary: number }).__markdownCanary),
   ).toBe(0);

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -101,7 +102,7 @@ test('long item categories wrap in the group heading and mobile row summary', as
         }
         if (mode === 'all' && (viewport.width === 320 || viewport.width === 568)) {
           await groupLabel.scrollIntoViewIfNeeded();
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(
               `long-item-category-${viewport.width}x${viewport.height}.png`,
             ),

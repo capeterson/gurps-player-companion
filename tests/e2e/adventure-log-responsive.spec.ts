@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -144,7 +145,7 @@ test('unbroken adventure-log titles wrap inside their cards', async ({ page }, t
           .toBeLessThanOrEqual(viewport.width);
 
         if ([320, 375, 390, 568, 639, 640, 641, 768, 1024, 1280].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`log-title-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });
@@ -202,7 +203,7 @@ test('unbroken adventure-log titles wrap inside their cards', async ({ page }, t
             expect(box.x + box.width).toBeLessThanOrEqual(visible.right + 1);
             expect(box.y + box.height).toBeLessThanOrEqual(visible.bottom + 1);
           }
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath('log-edit-long-body-568x320.png'),
             animations: 'disabled',
           });
@@ -271,7 +272,7 @@ test('unbroken adventure-log titles wrap inside their cards', async ({ page }, t
         await expect(table).toBeVisible();
         if ([320, 568].includes(viewport.width)) {
           await preview.scrollIntoViewIfNeeded();
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(
               `log-markdown-table-preview-${viewport.width}x${viewport.height}.png`,
             ),

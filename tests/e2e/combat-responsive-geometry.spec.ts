@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const widths = [
   { width: 320, height: 568 },
@@ -165,14 +166,12 @@ test('Combat keeps extreme pools and long equipment names reachable across viewp
           if (item.parent) expect(item.right).toBeLessThanOrEqual(item.parent.right);
         }
         if ([320, 568, 640, 1024, 1440].includes(viewport.width)) {
-          const screenshotPath = testInfo.outputPath(
-            `combat-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `combat-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await page.screenshot({ path: screenshotPath, animations: 'disabled' });
-          await testInfo.attach(`combat-${viewport.width}x${viewport.height}`, {
-            path: screenshotPath,
-            contentType: 'image/png',
-          });
         }
       });
     }

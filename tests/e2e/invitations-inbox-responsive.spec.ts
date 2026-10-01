@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -155,7 +156,7 @@ test('campaign invitations and member rows wrap long names and emails responsive
           expect(cancelBox.y + cancelBox.height).toBeLessThanOrEqual(viewport.height + 1);
         }
         if ([320, 568].includes(viewport.width)) {
-          await settings.screenshot({
+          await captureReviewScreenshot(settings, {
             path: testInfo.outputPath(`campaign-members-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });
@@ -171,7 +172,7 @@ test('campaign invitations and member rows wrap long names and emails responsive
         expect(inviteTextMetrics.right).toBeLessThanOrEqual(viewport.width + 1);
 
         if ([320, 568].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`invitations-inbox-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

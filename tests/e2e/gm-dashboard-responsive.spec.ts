@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -123,7 +124,7 @@ test('GM dashboard wraps long character names in cards and the live activity fee
         }
 
         if ([320, 568, 640, 1024, 1440].some((width) => width === viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`gm-dashboard-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

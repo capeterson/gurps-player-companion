@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -108,13 +109,13 @@ test('character cards wrap long names and keep sheet and campaign links reachabl
             await page.evaluate(() => document.documentElement.scrollWidth),
           ).toBeLessThanOrEqual(viewport.width);
           if (destination === '/' && [320, 568].includes(viewport.width)) {
-            await page.screenshot({
+            await captureReviewScreenshot(page, {
               path: testInfo.outputPath(`recent-cards-${viewport.width}x${viewport.height}.png`),
               animations: 'disabled',
             });
           }
           if (destination === '/characters' && [320, 568].includes(viewport.width)) {
-            await page.screenshot({
+            await captureReviewScreenshot(page, {
               path: testInfo.outputPath(`character-list-${viewport.width}x${viewport.height}.png`),
               animations: 'disabled',
             });

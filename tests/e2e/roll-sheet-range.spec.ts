@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot, reviewArtifactsEnabled } from './review-artifacts';
 
 async function create(page: Page, path: string, data: object) {
   const token = await page.evaluate(
@@ -64,8 +65,8 @@ test('ranged attack sheet combines Aim, bounded range, body map and a reachable 
         'aria-pressed',
         'true',
       );
-      await page.waitForTimeout(250);
-      await page.screenshot({ path: '/tmp/gpc-roll-sheet-compact-575.png' });
+      if (reviewArtifactsEnabled) await page.waitForTimeout(250);
+      await captureReviewScreenshot(page, { path: '/tmp/gpc-roll-sheet-compact-575.png' });
     }
     await sheet.getByRole('button', { name: /Choose on map/ }).click();
     if (width <= 520) {
@@ -92,7 +93,7 @@ test('ranged attack sheet combines Aim, bounded range, body map and a reachable 
     }
     if (width === 320) {
       await sheet.locator('.roll-hit-map').scrollIntoViewIfNeeded();
-      await page.screenshot({ path: '/tmp/gpc-roll-sheet-map-320.png' });
+      await captureReviewScreenshot(page, { path: '/tmp/gpc-roll-sheet-map-320.png' });
     }
     const skull = sheet.getByRole('button', { name: 'Skull -7' }).last();
     await skull.click();
@@ -115,7 +116,7 @@ test('ranged attack sheet combines Aim, bounded range, body map and a reachable 
       await sheet.getByLabel('Distance').fill('30');
       await sheet.getByRole('button', { name: /Choose on map/ }).click();
       await sheet.getByRole('group', { name: 'Choose hit location' }).scrollIntoViewIfNeeded();
-      await page.screenshot({ path: '/tmp/gpc-roll-sheet-range-575.png' });
+      await captureReviewScreenshot(page, { path: '/tmp/gpc-roll-sheet-range-575.png' });
     }
     await sheet.getByRole('button', { name: 'Close' }).last().click();
   }
@@ -132,17 +133,22 @@ test('ranged attack sheet combines Aim, bounded range, body map and a reachable 
     'aria-pressed',
     'true',
   );
-  await page.waitForTimeout(250);
-  await page.screenshot({ path: '/tmp/gpc-roll-sheet-compact-dark-575.png' });
+  if (reviewArtifactsEnabled) await page.waitForTimeout(250);
+  await captureReviewScreenshot(page, { path: '/tmp/gpc-roll-sheet-compact-dark-575.png' });
   await darkSheet.getByRole('button', { name: /Choose on map/ }).click();
   await darkSheet.getByRole('group', { name: 'Choose hit location' }).scrollIntoViewIfNeeded();
-  await page.waitForTimeout(250);
   const darkRoll = darkSheet.getByRole('button', { name: /Roll vs \d+/ });
   await expect(darkRoll).toBeVisible();
-  const darkRollBox = await darkRoll.boundingBox();
-  expect(darkRollBox).not.toBeNull();
-  if (darkRollBox) expect(darkRollBox.y + darkRollBox.height).toBeLessThanOrEqual(900);
-  await page.screenshot({ path: '/tmp/gpc-roll-sheet-expanded-dark-575.png' });
+  await expect
+    .poll(
+      async () => {
+        const darkRollBox = await darkRoll.boundingBox();
+        return darkRollBox !== null && darkRollBox.y + darkRollBox.height <= 900;
+      },
+      { message: 'Expanded dark-mode Roll action remains inside the viewport' },
+    )
+    .toBe(true);
+  await captureReviewScreenshot(page, { path: '/tmp/gpc-roll-sheet-expanded-dark-575.png' });
   await darkSheet.getByRole('button', { name: 'Close' }).last().click();
 
   const longSkill = 'Pistol with an exceptionally long precision training specialization';

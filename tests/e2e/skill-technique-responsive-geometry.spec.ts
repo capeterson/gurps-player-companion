@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -166,14 +167,12 @@ test('Skills and techniques keep long names and default references inside the sh
           expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width);
         }
         if ([320, 568, 640, 1024, 1440].includes(viewport.width)) {
-          const screenshotPath = testInfo.outputPath(
-            `skill-technique-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `skill-technique-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await page.screenshot({ path: screenshotPath, animations: 'disabled' });
-          await testInfo.attach(`skill-technique-${viewport.width}x${viewport.height}`, {
-            path: screenshotPath,
-            contentType: 'image/png',
-          });
         }
       });
     }

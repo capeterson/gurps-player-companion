@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const timestamp = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
@@ -128,7 +129,7 @@ test('notification controls stay opt-in, save preferences, and keep the inbox in
   await page.setViewportSize({ width: 1280, height: 2000 });
   await page.evaluate(() => window.scrollTo(0, 0));
   if (screenshotDir) {
-    await settings.screenshot({
+    await captureReviewScreenshot(settings, {
       path: `${screenshotDir}/notification-settings-desktop.png`,
       animations: 'disabled',
     });
@@ -137,7 +138,7 @@ test('notification controls stay opt-in, save preferences, and keep the inbox in
   await page.evaluate(() => window.scrollTo(0, 0));
   await expect(settings.getByRole('checkbox', { name: 'Desktop notifications' })).not.toBeChecked();
   if (screenshotDir) {
-    await settings.screenshot({
+    await captureReviewScreenshot(settings, {
       path: `${screenshotDir}/notification-settings-mobile.png`,
       animations: 'disabled',
     });
@@ -257,7 +258,7 @@ test('notification controls stay opt-in, save preferences, and keep the inbox in
     await expect(panel.getByText('A fellow campaign member updated your character')).toBeVisible();
     await expect(panel).toHaveCSS('opacity', '1');
     if (screenshotDir && width === 320) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: `${screenshotDir}/notification-inbox-mobile.png`,
         fullPage: false,
         animations: 'disabled',

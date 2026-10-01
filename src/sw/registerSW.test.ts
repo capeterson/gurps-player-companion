@@ -320,6 +320,7 @@ describe('requestClientUpdate (server refused this build)', () => {
   });
 
   it('waits for the user to leave an input so the draft is committed first', async () => {
+    vi.useFakeTimers();
     const reload = vi.fn();
     const input = document.createElement('input');
     document.body.append(input);
@@ -327,11 +328,16 @@ describe('requestClientUpdate (server refused this build)', () => {
     expect(document.activeElement).toBe(input);
 
     requestClientUpdate({ reload });
-    await wait(700);
+    await vi.advanceTimersByTimeAsync(700);
     expect(reload).not.toHaveBeenCalled();
 
     input.blur();
-    await vi.waitFor(() => expect(reload).toHaveBeenCalledTimes(1), { timeout: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(499);
+    expect(reload).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('does not reload in a loop when still outdated right after a forced reload', async () => {

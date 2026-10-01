@@ -13,17 +13,9 @@ import { MediaImage } from '../../components/MediaImage.tsx';
 
 import { Link } from 'react-router-dom';
 import type { CharacterMinimalOut } from '../../../shared/schemas/character.ts';
-import { Markdown } from '../../components/markdown/Markdown.tsx';
+import { CharacterIdentityDetails } from './CharacterIdentityDetails.tsx';
 
 export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
-  const fields: Array<{ label: string; value: string | number | null }> = [
-    { label: 'Height', value: data.height },
-    { label: 'Weight', value: data.weight },
-    { label: 'Age', value: data.age },
-    { label: 'Birthdate', value: data.birthdate },
-    { label: 'Tech level', value: data.techLevel === null ? null : `TL ${data.techLevel}` },
-  ];
-
   return (
     <section className="grid gap-7">
       <header>
@@ -48,33 +40,7 @@ export function CharacterMinimalView({ data }: { data: CharacterMinimalOut }) {
         </p>
       </header>
 
-      <section className="card border border-base-300/60 bg-base-100 rounded-2xl">
-        <div className="card-body p-5 grid gap-5">
-          <div>
-            <header className="label-eyebrow mb-3">At a glance</header>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
-              {fields.map((f) => (
-                <div key={f.label}>
-                  <dt className="label-eyebrow">{f.label}</dt>
-                  <dd className="text-base-content">
-                    {f.value === null || f.value === '' ? (
-                      <span className="text-base-content/40">—</span>
-                    ) : (
-                      f.value
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-          {data.appearance && (
-            <div>
-              <header className="label-eyebrow mb-2">Description</header>
-              <Markdown source={data.appearance} />
-            </div>
-          )}
-        </div>
-      </section>
+      <CharacterIdentityDetails data={data} />
     </section>
   );
 }

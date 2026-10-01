@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation.ts';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const itemRule = (unitCost: number) => ({
   version: 1,
@@ -126,6 +127,11 @@ test('resolves and reopens an item price without clipping the modal at supported
   await page.getByRole('button', { name: /\+ Add modifier/i }).click();
   const modifierName = 'Flexible grip across extended operating range';
   await page.getByLabel('Modifier name').fill(modifierName);
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Source and completeness/ })
+    .click();
+  await expect(page.getByLabel('Source key')).toBeVisible();
   await page.getByLabel('Source key').fill('pricing-rules');
   await page.getByLabel('Tags (comma-separated)').fill('grip, long-form');
   await page.getByLabel('Mutually exclusive group').fill('handling');
@@ -135,6 +141,12 @@ test('resolves and reopens an item price without clipping the modal at supported
     .fill(
       'A long descriptive note for this modifier explains its fictional handling tradeoff and reminds campaign authors to keep the rule connected to its source edition.',
     );
+  const calculationRule = page.getByRole('group', { name: 'Calculation rule' });
+  await calculationRule
+    .locator('summary')
+    .filter({ hasText: /^Advanced rule \(YAML\)$/ })
+    .click();
+  await expect(page.getByLabel('Advanced rule (YAML)')).toBeVisible();
   await page.getByLabel('Advanced rule (YAML)').fill(`version: 1
 inputs:
   - key: magnitude
@@ -166,7 +178,6 @@ outputs:
     rounding: nearest`);
   await expect(page.getByText(/1 inputs · 0 tables · Outputs: modifier/)).toBeVisible();
   await page.setViewportSize({ width: 320, height: 800 });
-  const calculationRule = page.getByRole('group', { name: 'Calculation rule' });
   const editorBox = await calculationRule.boundingBox();
   if (!editorBox) throw new Error('calculation editor is not visible at 320px');
   expect(editorBox.x).toBeGreaterThanOrEqual(0);
@@ -175,7 +186,7 @@ outputs:
   await page.getByLabel('Advanced rule (YAML)').evaluate((field) => {
     field.scrollTop = 0;
   });
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('calculation-editor-320.png'),
     fullPage: false,
   });
@@ -313,13 +324,21 @@ outputs:
   await expect(traitDialog.getByText(`${modifierName}: 30%`)).toBeVisible();
   await expect(traitDialog.getByText('Total: 13 points')).toBeVisible();
   await page.setViewportSize({ width: 320, height: 800 });
+  await expect
+    .poll(async () => {
+      const box = await traitDialog.locator('.modal-box').boundingBox();
+      return Boolean(
+        box && box.x >= 0 && box.x + box.width <= 320 && box.y >= 0 && box.y + box.height <= 800,
+      );
+    })
+    .toBe(true);
   const traitDialogBox = await traitDialog.locator('.modal-box').boundingBox();
   if (!traitDialogBox) throw new Error('trait resolver is not visible at 320px');
   expect(traitDialogBox.x).toBeGreaterThanOrEqual(0);
   expect(traitDialogBox.x + traitDialogBox.width).toBeLessThanOrEqual(320);
   expect(traitDialogBox.y).toBeGreaterThanOrEqual(0);
   expect(traitDialogBox.y + traitDialogBox.height).toBeLessThanOrEqual(800);
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('trait-resolver-selected-modifier-320.png'),
     fullPage: false,
   });
@@ -347,15 +366,17 @@ outputs:
   await expect(dialog).toBeVisible();
   for (const width of [320, 639, 640, 641, 1280]) {
     await page.setViewportSize({ width, height: 800 });
-    const box = await dialog.locator('.modal-box').boundingBox();
-    if (!box) throw new Error('pricing dialog box is not visible');
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.x + box.width).toBeLessThanOrEqual(width);
-    expect(box.y).toBeGreaterThanOrEqual(0);
-    expect(box.y + box.height).toBeLessThanOrEqual(800);
+    await expect(async () => {
+      const box = await dialog.locator('.modal-box').boundingBox();
+      if (!box) throw new Error('pricing dialog box is not visible');
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(800);
+    }).toPass({ timeout: 5_000 });
     await expect(dialog.getByRole('button', { name: 'Use these values' })).toBeVisible();
     if (width === 320 || width === 640) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`pricing-resolver-${width}.png`),
         fullPage: true,
       });
@@ -388,7 +409,15 @@ outputs:
   const weaponEditor = page.getByRole('region', { name: 'Priced spear: Weapon' });
   const rangedMode = weaponEditor.getByRole('group', { name: 'Attack mode 1' });
   await expect(rangedMode.getByLabel('Mode name')).toHaveValue('Bow shot');
-  await expect(rangedMode.getByLabel('Mode range')).toHaveValue('100/150');
+  await expect(rangedMode.getByRole('combobox', { name: 'Range', exact: true })).toHaveValue(
+    'fixed',
+  );
+  await expect(rangedMode.getByRole('spinbutton', { name: '1/2D (yd)', exact: true })).toHaveValue(
+    '100',
+  );
+  await expect(rangedMode.getByRole('spinbutton', { name: 'Max (yd)', exact: true })).toHaveValue(
+    '150',
+  );
   await page.getByRole('button', { name: 'Edit Priced spear' }).click();
   await api(page, 'PATCH', `/campaigns/${campaign.id}/library/items/${pricedItem.id}`, {
     calculation: itemRule(9),

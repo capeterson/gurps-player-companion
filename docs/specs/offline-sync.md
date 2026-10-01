@@ -11,11 +11,17 @@ README — this spec is the descriptive companion; read both.
 The service worker owns the app-shell precache, navigation fallback and bounded
 CacheFirst caches for public immutable image variants (see [media-uploads.md](media-uploads.md)); it
 does not cache authenticated API data or replay the outbox. Its navigation
-fallback excludes `/api/*`, `/admin/*`, `/media/*`, `/mcp`, `/.well-known/*`, and OAuth
-protocol endpoints so those requests always reach the Bun server. The mutable
+fallback excludes `/api/*`, `/admin/*` and `/admin.html`, `/media/*`, static
+asset/screenshot/package URLs, `/mcp`, `/.well-known/*`, and OAuth paths other
+than `/oauth/consent` so those requests always reach the Bun server (or the
+normal static precache where applicable). Root and query-string variants retain
+the same boundaries. Missing package assets return uncached 404s, not HTML. The mutable
 `sw.js`, registration bootstrap, manifest, HTML shells, and unversioned app-icon
 files are served with browser/CDN `no-store` headers, while content-hashed assets
 remain cacheable.
+Generated installation icons use content-hashed URLs, are included in the shell
+precache, and change URL when their artwork changes; the manifest itself remains
+uncached. See [architecture.md](architecture.md#pwa-installation-package).
 This prevents a deployed but edge-cached old worker from serving the player SPA
 for a newly introduced server route.
 

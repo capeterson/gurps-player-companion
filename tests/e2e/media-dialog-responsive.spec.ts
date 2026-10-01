@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import sharp from 'sharp';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -130,7 +131,7 @@ test('portrait and campaign cover editors keep controls reachable across viewpor
           viewport.width,
         );
         if ([320, 568].includes(viewport.width)) {
-          await portraitDialog.screenshot({
+          await captureReviewScreenshot(portraitDialog, {
             path: testInfo.outputPath(`portrait-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });
@@ -232,7 +233,7 @@ test('portrait and campaign cover editors keep controls reachable across viewpor
             );
           }
           if ([320, 499].includes(viewport.height)) {
-            await settings.screenshot({
+            await captureReviewScreenshot(settings, {
               path: testInfo.outputPath(`cover-568x${viewport.height}-input.png`),
               animations: 'disabled',
             });
@@ -259,7 +260,7 @@ test('portrait and campaign cover editors keep controls reachable across viewpor
           viewport.width,
         );
         if ([320, 568].includes(viewport.width)) {
-          await settings.screenshot({
+          await captureReviewScreenshot(settings, {
             path: testInfo.outputPath(`cover-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

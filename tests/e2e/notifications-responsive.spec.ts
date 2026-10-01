@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -114,7 +115,7 @@ test('notification settings and long inbox events fit responsive viewports', asy
           viewport.width,
         );
         if ([320, 568].includes(viewport.width)) {
-          await settings.screenshot({
+          await captureReviewScreenshot(settings, {
             path: testInfo.outputPath(
               `notification-settings-${viewport.width}x${viewport.height}.png`,
             ),
@@ -155,7 +156,7 @@ test('notification settings and long inbox events fit responsive viewports', asy
         );
 
         if ([320, 568].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(
               `notification-inbox-${viewport.width}x${viewport.height}.png`,
             ),
@@ -177,7 +178,7 @@ test('notification settings and long inbox events fit responsive viewports', asy
           expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(visualViewport.bottom + 1);
         }
         if ([320, 568].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(
               `notification-inbox-actions-${viewport.width}x${viewport.height}.png`,
             ),

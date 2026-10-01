@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import type { Tokens } from '../../src/client/lib/tokenStore.ts';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test('admin account controls confirm purge, expose nightly timing, cancel and unsuspend', async ({
   page,
@@ -130,7 +131,7 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
         });
         expect(hitTestable).toBe(true);
       }
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`admin-purge-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
       });

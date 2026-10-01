@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -75,14 +76,14 @@ test('technique form helper text wraps without widening the page', async ({ page
     expect(pageWidth).toBeLessThanOrEqual(viewport.width);
     if (viewport.width === 320) {
       expect(helpBox.height).toBeGreaterThan(20);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('technique-form-helper-320x568.png'),
         animations: 'disabled',
         fullPage: true,
       });
     }
     if (viewport.width === 568) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('technique-form-helper-568x320.png'),
         animations: 'disabled',
       });

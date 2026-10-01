@@ -11,6 +11,7 @@ import { campaignMemberships, campaigns, characterTraits } from '../db/schema.ts
 import { prepareLibraryReference } from '../services/libraryReferences.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+import { createTestActor } from '../testFixtures.ts';
 
 configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
@@ -24,16 +25,7 @@ function request(token: string, path: string, body?: unknown, method = 'POST') {
   );
 }
 async function register() {
-  const email = `references-${crypto.randomUUID()}@example.com`;
-  const response = await request('', '/auth/register', {
-    email,
-    password: 'TestPassword1!',
-    displayName: 'Reference tester',
-  });
-  expect(response.status).toBe(201);
-  const value = (await response.json()) as { accessToken: string };
-  const userId = JSON.parse(atob(value.accessToken.split('.')[1] ?? '')).sub as string;
-  return { token: value.accessToken, email, userId };
+  return createTestActor('library-reference');
 }
 async function create(token: string, path: string, body: unknown) {
   const response = await request(token, path, body);

@@ -1,7 +1,7 @@
-import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -144,15 +144,12 @@ test('character and campaign history wrap long summaries and keep expanded detai
         await expect(characterActor).toBeVisible();
         if (viewport.width === 320 || viewport.width === 568) {
           await characterSummary.scrollIntoViewIfNeeded();
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(
-            `character-history-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `character-history-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await writeFile(path, screenshot);
-          await testInfo.attach(`character-history-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
         }
         await expectWrappedText(characterSummaryContent);
         await expectUsefulSummaryWidth(characterSummaryContent, viewport.width);
@@ -168,15 +165,12 @@ test('character and campaign history wrap long summaries and keep expanded detai
           viewport.height + 1,
         );
         if (viewport.width === 320 || viewport.width === 568) {
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(
-            `character-history-actor-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `character-history-actor-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await writeFile(path, screenshot);
-          await testInfo.attach(`character-history-actor-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
         }
       });
     }
@@ -198,15 +192,12 @@ test('character and campaign history wrap long summaries and keep expanded detai
         await expect(campaignActor).toBeVisible();
         if (viewport.width === 320 || viewport.width === 568) {
           await campaignSummary.scrollIntoViewIfNeeded();
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(
-            `campaign-history-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `campaign-history-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await writeFile(path, screenshot);
-          await testInfo.attach(`campaign-history-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
         }
         await expectWrappedText(campaignSummaryContent);
         await expectUsefulSummaryWidth(campaignSummaryContent, viewport.width);
@@ -220,15 +211,12 @@ test('character and campaign history wrap long summaries and keep expanded detai
           viewport.height + 1,
         );
         if (viewport.width === 320 || viewport.width === 568) {
-          const screenshot = await page.screenshot({ animations: 'disabled' });
-          const path = testInfo.outputPath(
-            `campaign-history-actor-${viewport.width}x${viewport.height}.png`,
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `campaign-history-actor-${viewport.width}x${viewport.height}`,
+            { animations: 'disabled' },
           );
-          await writeFile(path, screenshot);
-          await testInfo.attach(`campaign-history-actor-${viewport.width}x${viewport.height}`, {
-            path,
-            contentType: 'image/png',
-          });
         }
         const rowBox = await campaignSummaryRow.boundingBox();
         expect(rowBox).not.toBeNull();

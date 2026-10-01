@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -129,7 +130,7 @@ test('Roll Sheet keeps long names, result and actions reachable across viewports
         await expect(rollButton).toBeVisible();
 
         if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`roll-sheet-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

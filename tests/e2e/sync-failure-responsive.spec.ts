@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
   { width: 320, height: 568 },
@@ -156,7 +157,7 @@ test('sync status and failure details wrap long entity names and errors', async 
         expect(visibleErrorHeight).toBeGreaterThan(0);
         if (viewport.height === 320) expect(scrollBox?.height).toBeGreaterThanOrEqual(80);
         if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: testInfo.outputPath(`sync-failure-${viewport.width}x${viewport.height}.png`),
             animations: 'disabled',
           });

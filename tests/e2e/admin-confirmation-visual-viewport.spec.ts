@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import type { Tokens } from '../../src/client/lib/tokenStore.ts';
+import { captureReviewScreenshot } from './review-artifacts';
 
 async function readVisualViewport(page: import('@playwright/test').Page) {
   return page.evaluate(() => {
@@ -197,7 +198,7 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
       await expect(title).toBeVisible();
       await expectTextInsideVisualViewport(page, title);
       await expectPhraseInsideVisualViewport(page, context, 'This immediately suspends');
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`admin-confirmation-${label}-top.png`),
         animations: 'disabled',
       });
@@ -226,7 +227,7 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
         expect(hitTestable, `${label}: action center should receive pointer input`).toBe(true);
       }
       await expectInsideVisualViewport(page, box);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`admin-confirmation-${label}-actions.png`),
         animations: 'disabled',
       });
@@ -371,7 +372,7 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
       await expect(action).toBeVisible();
       await expectTextInsideVisualViewport(page, action);
     }
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath('shared-player-confirmation-actions.png'),
       animations: 'disabled',
     });

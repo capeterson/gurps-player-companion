@@ -26,6 +26,84 @@ no durable MCP session ID. It supports initialization, version negotiation,
 Unsupported GET streams and DELETE sessions return protocol 405 responses. The
 server has no legacy HTTP+SSE endpoint or stdio sidecar.
 
+### Embedded details (MCP UI / MCP Apps)
+
+Settings → **Experimental Features** offers an **MCP UI** toggle, off by default
+for existing and new users. The account preference is persisted in
+`users.experimental_mcp_ui` and read during OAuth token resolution on every MCP
+request, rather than copied into tokens or a server-startup cache. No restart,
+new grant, or token refresh is needed. Clients must refresh tool discovery to
+see changed metadata; an already rendered snapshot is not remotely erased.
+
+`GET` / `PATCH /api/v1/auth/experimental-features` use the strict shared
+`experimentalFeatures` schema (`{ mcpUi: boolean }`) and require an active
+interactive JWT. These account controls have explicit MCP exclusions; API keys
+and delegated clients cannot change the user's opt-in. The settings toggle uses
+`useDraftToggle` to serialize rapid changes, retain queued intent, and toast plus
+flash on save failure. This account preference is online-only, like theme and
+notification preferences, and does not enter the character/library outbox.
+
+When disabled, `tools/list` omits `_meta.ui`, `resources/list` returns no UI
+resources, and `resources/read` rejects even a previously discovered UI URI.
+The canonical tools and structured responses remain available. The generic
+resources capability is stable across initialization so clients can discover
+resources after enabling the toggle. The checked-in tool snapshot documents the
+supported UI metadata for opted-in accounts; runtime discovery applies the gate.
+
+When enabled, `get_character`, `get_character_inventory_item`, and `get_campaign_library_skill`
+advertise `_meta.ui.resourceUri` pointing to
+`ui://gurps-player-companion/character.html`. MCP Apps hosts can render a
+read-only sheet or focused card alongside the tool result; other clients keep the same
+structured result. The authenticated transport supports `resources/list` and
+`resources/read`. UI discovery and reads require `gpc:read` and the account MCP UI opt-in; unknown URIs are
+rejected without interpreting them as paths or fetching external resources.
+
+The resource uses `text/html;profile=mcp-app` and contains a generic application
+shell, never a user-data snapshot or credentials. It is built separately into
+`dist/mcp-ui/character.html` with inline JavaScript, CSS, and fonts. Its resource
+CSP declares empty connection and external-resource allowlists. It does not load
+the PWA, register its service worker, bootstrap browser authentication, or seed a
+browser mirror. Tool results arrive through the MCP Apps SDK bridge. Refresh
+calls the same read tool with the original character/item or campaign/skill IDs, including its current scope,
+authorization, validation, and share-gate checks. Failed/cancelled requests and
+refreshes clear the previous snapshot; minimal results replace the full view
+with public identity only.
+
+The two focused read tools select a subject by ID and render a single card with
+no sheet tabs, attributes, or unrelated collections:
+
+- `get_character_inventory_item` maps to `GET /api/v1/characters/{id}/inventory/{itemId}`.
+  It returns the selected effective item and its descendants in depth-first order.
+  Leaves return no contents; empty containers show **Empty container.** Nested
+  contents start expanded and share the web app's read-only item disclosures.
+  The loader uses the authoritative character calculation, then projects the
+  subtree. It checks `resolveCharacterView` before loading private sheet data:
+  minimal viewers receive 403, and foreign/missing item IDs receive 404.
+- `get_campaign_library_skill` maps to `GET /api/v1/campaigns/{id}/library/skills/{skillId}`.
+  It returns one campaign definition with description, attribute/difficulty,
+  specialization, source, prerequisites, and effects. Membership and campaign
+  scoping apply; restricted definitions return 404 to non-owners. Search the
+  existing library read with `section: "skills"` first when the ID is unknown.
+
+Both are canonical REST reads executed by the same MCP handler graph, validated
+with `src/shared/schemas/details.ts`, and covered by the raw-API parity matrix.
+Their schemas and metadata are present in both generated catalogs. Selecting a
+new result or refreshing clears the previous card before rechecking access.
+
+The UI reuses the web app's Skills, Traits, Spells, Languages, and Techniques
+panels with `canWrite=false`, shared stat cards, the Inventory panel and item details,
+sanitized Markdown, `LibrarySkillDetails` shared with the campaign library, and theme styles. Readers can navigate sections, inspect
+notes and item stat blocks, filter tables, and use the existing local roller.
+It offers no sheet mutations. Roll results and table preferences stay local to
+the embedded UI. Portraits are not loaded by this self-contained view.
+
+`bun run build:mcp-ui` builds the resource; `dev`, `dev:server-only`, and `build`
+include this step. Restart development after changing embedded UI source.
+Ordinary PWA HMR remains unchanged. This follows the
+[MCP UI MCP Apps pattern](https://mcpui.dev/guide/server/typescript/usage-examples).
+Protocol/resource tests, shared read-only component tests, browser bridge and
+viewport checks, the generated catalog, and REST/MCP parity remain release gates.
+
 Production routing, development Vite routing, and proxy configuration all pass
 `/mcp`, `/oauth/*`, and `/.well-known/*` to Hono. Reject invalid
 Origin headers, configure browser-client CORS explicitly (including exposed auth
@@ -242,7 +320,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 49 player-domain tools covering 104 exact operations and gives each excluded
+method/path. It exposes 51 player-domain tools covering 106 exact operations and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -357,8 +435,13 @@ and no secret. Direct browser clients must also list their origin in
 `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
 CORS entry.
 
-Client-specific plugin packages and private registered-app mappings are local
-artifacts, excluded from source control and Docker build contexts. Configure
+Reusable workflow instructions are checked in under `skills/gpc-*/`; see
+[agent-skills.md](../agent-skills.md) for packaging and behavioral evals. They use
+the connected tool schemas and preserve explicit user authorization, server
+authority, private projections, idempotent retries, and acknowledgement read-back.
+They do not add tools or broaden OAuth scopes. Client-specific plugin registrations
+and private registered-app mappings remain local artifacts, excluded from source
+control and Docker build contexts. Configure
 clients with the target instance's `/mcp` URL: `https://gurps.abundant.zip/mcp`
 for the hosted production instance, or `https://gurps-dev.abundant.zip/mcp`
 for development testing. Each user signs in and consents with their own GPC account.
@@ -412,7 +495,7 @@ The implementation is released only with evidence for these gates:
    Publish a completed operation coverage report. Update overview, architecture,
    sync, sharing, history and JSON specs to describe the implemented state.
 
-The checked-in evidence includes the generated 49-tool catalog, per-operation
+The checked-in evidence includes the generated 51-tool catalog, per-operation
 successful REST/MCP differential and scope-denial fixtures, OAuth boundary and
 transport tests, transaction/idempotency regressions, client consent/Settings
 tests, and the Playwright browser authorization acceptance flow.
@@ -454,8 +537,8 @@ same route schemas; old free-text Range writes are rejected.
 ## Image upload task tool
 
 One `media` tool exposes four explicit actions: `capabilities` and `status`
-require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 49-tool catalog
-maps 104 player operations; each action retains an exact method/path mapping,
+require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 51-tool catalog
+maps 106 player operations; each action retains an exact method/path mapping,
 canonical request/response validators and REST parity coverage. An unknown
 action, a mixed-action payload or insufficient scope cannot dispatch a request.
 
@@ -486,7 +569,7 @@ standard REST seed and the connector bridge (`scripts/seed-lantern-mcp.ts`).
 mutation acknowledgements; encounter creation re-reads through MCP to obtain
 combatant IDs. Every domain write goes through an existing tool/handler.
 
-`lanternCoastMcp.integration.test.ts` initializes the real `/mcp` HTTP route with
+`tests/acceptance/lantern-coast-mcp.test.ts` initializes the real `/mcp` HTTP route with
 a persisted OAuth client, grant and access token, then creates the whole campaign:
 four fictional sources, all eleven library categories, six complete characters,
 owned pricing and mechanics, nested/enhanced inventory, pools and active effects,
@@ -494,7 +577,11 @@ shared/private logs with XP awards, and an encounter with hidden NPC and effect.
 The REST reference collects private notes through each author’s authorized feed,
 so GM privacy remains intact. It compares the complete graph with the standard REST seed, normalizing generated
 IDs/revisions/timestamps and the permitted ownership difference, and asserts
-OAuth audit provenance and no added users. The test respects the production MCP
+OAuth audit provenance and no added users. The dedicated `bun run test:acceptance:mcp-seed` check is outside ordinary
+server/shared discovery and CI. Agents run it before opening a PR or
+pushing code changes to that PR, recording the tested commit/result. Focused
+per-operation parity, authorization, OAuth and release browser gates remain
+mandatory in CI/the release workflow as described above. The test respects the production MCP
 rate budget. Normal commits are cleaned up only within the test's own graph.
 The standard script creates six demo player accounts; MCP uses one existing user
 because account creation is deliberately outside the delegated tool surface.
