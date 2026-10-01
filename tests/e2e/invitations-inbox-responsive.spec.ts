@@ -86,10 +86,9 @@ test('pending invitation inbox wraps long campaign names across supported widths
           viewport.width,
         );
         expect(box.y, `${label} top at ${viewport.height}px`).toBeGreaterThanOrEqual(0);
-        expect(
-          box.y + box.height,
-          `${label} bottom at ${viewport.height}px`,
-        ).toBeLessThanOrEqual(viewport.height);
+        expect(box.y + box.height, `${label} bottom at ${viewport.height}px`).toBeLessThanOrEqual(
+          viewport.height,
+        );
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         viewport.width,

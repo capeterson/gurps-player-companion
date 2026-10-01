@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import type { Tokens } from '../../src/client/lib/tokenStore.ts';
@@ -44,20 +45,27 @@ test('admin account controls confirm purge, expose nightly timing, cancel and un
     const admin = await register(adminEmail, 'Admin browser fixture');
     const member = await register(memberEmail, 'Purge browser fixture');
     await pool.query('update users set is_superuser=true where id=$1', [admin.user.id]);
-    await page.addInitScript((tokens) => {
-      if (!sessionStorage.getItem('admin-e2e-session-ready')) {
-        localStorage.setItem(
-          'gpc.tokenPair.v1',
-          JSON.stringify({
-            ...tokens,
-            sessionId: crypto.randomUUID(),
-            version: 0,
-            refreshRequestId: crypto.randomUUID(),
-          }),
-        );
-        sessionStorage.setItem('admin-e2e-session-ready', '1');
-      }
-    }, admin.tokens);
+    await page.addInitScript(
+      ({ tokens, sessionId, refreshRequestId }) => {
+        if (!sessionStorage.getItem('admin-e2e-session-ready')) {
+          localStorage.setItem(
+            'gpc.tokenPair.v1',
+            JSON.stringify({
+              ...tokens,
+              sessionId,
+              version: 0,
+              refreshRequestId,
+            }),
+          );
+          sessionStorage.setItem('admin-e2e-session-ready', '1');
+        }
+      },
+      {
+        tokens: admin.tokens,
+        sessionId: randomUUID(),
+        refreshRequestId: randomUUID(),
+      },
+    );
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
     await page.getByPlaceholder('Search by email or display name…').fill(memberEmail);
