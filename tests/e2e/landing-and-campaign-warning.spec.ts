@@ -95,6 +95,71 @@ test('README screenshots match the unauthenticated landing page assets', async (
   }
 });
 
+test('landing hero headline keeps its intended two lines across responsive breakpoints', async ({
+  page,
+}, testInfo) => {
+  const viewportCases = [
+    { width: 320, height: 568 },
+    { width: 375, height: 667 },
+    { width: 639, height: 700 },
+    { width: 640, height: 700 },
+    { width: 641, height: 700 },
+    { width: 767, height: 900 },
+    { width: 768, height: 900 },
+    { width: 769, height: 900 },
+    { width: 568, height: 320 },
+    { width: 844, height: 390 },
+    { width: 1023, height: 768 },
+    { width: 1024, height: 768 },
+    { width: 1025, height: 768 },
+    { width: 1279, height: 800 },
+    { width: 1280, height: 800 },
+    { width: 1281, height: 800 },
+  ];
+
+  await page.goto('/');
+  const heading = page.getByRole('heading', {
+    name: 'Your next adventure. All on one sheet.',
+    exact: true,
+  });
+  await expect(heading).toBeVisible();
+  await expect(heading).toHaveText(/Your next adventure\.\s*All on one sheet\./);
+
+  for (const viewport of viewportCases) {
+    await page.setViewportSize(viewport);
+    const geometry = await heading.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        lineHeight: Number.parseFloat(style.lineHeight),
+        scrollWidth: element.scrollWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.width);
+    expect(geometry.documentScrollWidth).toBeLessThanOrEqual(viewport.width);
+    if (viewport.width >= 639) {
+      expect(geometry.height).toBeLessThanOrEqual(geometry.lineHeight * 2 + 1);
+    }
+    if (viewport.height <= 390) {
+      expect(geometry.y).toBeGreaterThanOrEqual(0);
+      expect(geometry.y + geometry.height).toBeLessThanOrEqual(viewport.height);
+    }
+
+    if ([639, 640, 641].includes(viewport.width) || viewport.height <= 390) {
+      await page.screenshot({
+        path: testInfo.outputPath(`landing-hero-${viewport.width}x${viewport.height}.png`),
+        animations: 'disabled',
+      });
+    }
+  }
+});
+
 test('public landing, classic palette, Overview default, and campaign reassignment warning work', async ({
   page,
 }) => {

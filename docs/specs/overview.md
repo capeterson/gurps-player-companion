@@ -154,7 +154,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).

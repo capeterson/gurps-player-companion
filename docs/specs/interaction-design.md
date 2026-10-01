@@ -212,6 +212,11 @@ without changing the shared calculation rules.
 
 ## Responsive layout and accessibility
 
+The public landing hero scales its headline through the 640px breakpoint so
+the two advertised phrases remain on their intended lines at tablet and desktop
+widths. The desktop heading grows when its text column has enough room; short
+landscape layouts keep the heading inside the initial viewport.
+
 The editable identity name remains a single-line field, using 30px display type
 below 640px and 48px from 640px up. Compact Combat retains its 24px name size.
 Long editable names scroll within the input; read-only identity headings wrap
