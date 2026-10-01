@@ -477,6 +477,8 @@ the nightly run; overdue accounts run on the next night after startup.
   origin configured and no other server on that port. Generic
   `PLAYWRIGHT_START_SERVER`/`PLAYWRIGHT_BUILT_SERVER` and the legacy MCP flags
   control managed server startup; externally managed candidate runs remain supported.
+  Managed built runs set `ENVIRONMENT=test` so the compiled entry serves the built
+  client; externally managed servers must use test or production mode as appropriate.
   The MCP seed acceptance, integration suites and browser suites share one worktree
   database and run serially. Independent responsive scenarios reuse a worker-specific
   synthetic actor but retain fresh token sessions, browser contexts and entity rows.
