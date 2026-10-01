@@ -1110,7 +1110,14 @@ settings sections; switching sections retains drafts.
   locally while offline and pushed when back online, and a server rejection
   rolls the picker back with a toast and flash. The app icon is a fixed image
   that does not change with the theme.
-- Installable PWA; works offline for the character surface.
+- **Installable PWA.** Stable root identity, standalone launch, labeled mobile/
+  desktop installation screenshots, opaque general icons and a separate adaptive
+  Android icon that preserves the emblem under launcher masks. Content-hashed
+  installation-art URLs allow browsers to detect artwork updates. A 180px Apple
+  touch icon and 32px favicon share the existing brand mark. Character edits work
+  offline after the first online download; the built package has a mandatory
+  integrity check and real-service-worker browser acceptance. See
+  [architecture.md](architecture.md#pwa-installation-package).
 - **Settings** page: theme palettes (synced), account-scoped device-local
   Current Status display switches, notification controls, profile, password, passkeys, API keys. Long credential and
   connected-app names wrap inside their cards, with destructive actions stacked
@@ -1160,6 +1167,7 @@ player client.
 
 ```
 src/
+  build/pwaAssets.ts  Deterministic adaptive/Apple/favicon artwork and content-hashed installation URLs
   server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
     index.ts     Bun.serve entrypoint; SIGTERM/SIGINT graceful drain (`shutdownServer`)
     lifecycle.ts Draining flag (readiness 503, `Connection: close`) during shutdown
@@ -1347,6 +1355,7 @@ docs/
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
+  check-pwa-package.ts  Mandatory post-build manifest/icon/precache/admin-isolation verification
   capture-screenshots.mjs  Refresh canonical captures from a seeded local app
   release-image.sh  Pin and verify a candidate image, then promote its tested digest
   seed-lantern-mcp.ts  NDJSON connector bridge for the shared Lantern recipe (one existing owner)

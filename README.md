@@ -4,6 +4,14 @@
 
 Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with customizable light and dark palettes (including classic Arcane purple) and an installable app that keeps character edits available offline.
 
+To install on Android, open the app in Chrome and use **Install app** from the
+browser menu (the wording varies by browser). Open your characters online once
+before relying on offline access. After an artwork update is deployed, open the
+installed app online and accept **Review app update** if Chrome offers it.
+Only reinstall after all pending edits and images have synced; uninstalling can
+remove device-local data. [Chrome's app-update behavior](https://developer.chrome.com/blog/improvements-to-web-app-updates)
+explains why an existing installation can retain its previous icon.
+
 **[Play on the official hosted instance → gurps.abundant.zip](https://gurps.abundant.zip)**
 
 ![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](public/screenshots/armor-desktop.png)

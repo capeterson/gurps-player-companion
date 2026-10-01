@@ -12,9 +12,9 @@
  *     UI-visible flash + toast bus on rollback.
  *
  * The SW's role is narrower: precache the app shell so a first launch
- * with no network shows the UI, and runtime-cache a few read-only
- * GETs (library, /auth/me) so the local-first read path has a
- * fallback when Dexie is empty (e.g. brand-new device).  The SW never
+ * with no network shows the UI, and runtime-cache public immutable
+ * portrait/cover images. Authenticated API GETs are never cached;
+ * a brand-new device needs its first online data download. The SW never
  * caches mutations, never replays POSTs, and never replays sync ops —
  * that is page-orchestrator territory.
  *

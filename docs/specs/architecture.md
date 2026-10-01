@@ -51,9 +51,11 @@ The static handler marks `sw.js`, its registration bootstrap, the manifest, and
 both HTML entrypoints `no-store` for browsers and CDNs; content-hashed assets
 under `/assets/` use `Cache-Control: public, max-age=31536000, immutable`.
 Only existing files with Vite's content-hash naming pattern get this policy;
-missing assets and SPA fallbacks remain `no-store`. The service worker's
+missing package assets return uncached 404s instead of successful HTML, and SPA
+fallbacks remain `no-store`. The service worker's
 navigation fallback excludes `/api/*`,
-`/admin/*`, `/mcp`, `/.well-known/*`, and the OAuth protocol endpoints. This is
+`/admin/*` and `/admin.html`, static asset/screenshot/package URLs, `/mcp`,
+`/.well-known/*`, and every OAuth path except the player `/oauth/consent` page. This is
 a routing boundary as well as an offline policy: a stale app shell must never
 turn an OAuth authorization request or MCP discovery request into a React route.
 
@@ -99,6 +101,33 @@ The final image copies only the production dependency tree plus built output
 and migrations; development/test tools such as happy-dom, Vite and Playwright
 are absent. The image's health probe uses IPv4 loopback to match the default
 `0.0.0.0` server listener, avoiding IPv6 `localhost` resolution failures.
+
+### PWA installation package
+
+`vite.config.ts` emits one manifest link in the player HTML. The manifest fixes
+`id`, `scope` and `start_url` at `/`, preserving the previous inferred identity,
+and uses standalone display without locking orientation. Existing mobile combat
+and desktop campaign captures supply labeled narrow/wide installation screenshots.
+The default launch background/theme color is Gilded Tome; `lib/theme.ts` updates
+the page's browser-chrome color as the selected palette changes.
+
+`src/build/pwaAssets.ts` derives installation artwork from the opaque brand PNGs
+in `public/`: unchanged 192/512px general icons, a separate 512px adaptive icon,
+180px Apple touch icon, and 32px favicon. Adaptive artwork fits inside a centered
+circle of radius 38% of the canvas, leaving margin inside Android's 40% safe zone.
+Generated files use content-hashed `/assets/` URLs and immutable HTTP caching;
+changed artwork changes the manifest URLs so installed browsers can detect it.
+The same plugin serves these URLs under Vite development. Existing unversioned
+brand PNGs remain available to visible branding and desktop notifications.
+
+`build:client` runs `scripts/check-pwa-package.ts` after Vite: one manifest link,
+stable identity, real decoded icon/screenshot dimensions, opaque icons, icon
+precache coverage, and admin exclusion are build requirements. The opt-in
+`tests/e2e/pwa-package.spec.ts` runs with `PWA_E2E=1` against the built Bun server
+to exercise Chromium installability, real-worker offline launch and queued edits.
+Development Vite intentionally does not install a worker. Native Android launcher
+and iOS installation appearance still need device checks; browser emulation does
+not verify OS packaging. See [the package audit](../pwa-package-audit.md).
 
 ## MCP and delegated authorization
 

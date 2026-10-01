@@ -88,9 +88,10 @@ export function attachStaticHandler(
     const protocolPath =
       url.pathname === '/mcp' ||
       url.pathname.startsWith('/mcp/') ||
+      url.pathname === '/.well-known' ||
       url.pathname.startsWith('/.well-known/') ||
       (url.pathname.startsWith('/oauth/') && url.pathname !== '/oauth/consent');
-    if (url.pathname.startsWith('/api/') || protocolPath) {
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/') || protocolPath) {
       return c.json({ error: 'not_found' }, 404);
     }
     if (!existsSync(root)) {
@@ -113,6 +114,17 @@ export function attachStaticHandler(
       } catch {
         // fall through to index.html
       }
+    }
+    // A missing package asset is an actual 404, never a successful HTML shell.
+    // Otherwise broken manifest icons and stale JS URLs look like successful
+    // downloads until the browser tries to decode HTML as an image or module.
+    if (
+      /^\/(?:assets|screenshots)(?:\/|$)/.test(url.pathname) ||
+      shouldRevalidateStaticPath(url.pathname) ||
+      url.pathname === '/media' ||
+      url.pathname.startsWith('/media/')
+    ) {
+      return new Response('Not found', { status: 404, headers: REVALIDATION_HEADERS });
     }
     // Per AGENTS.md, /admin/* is served by a separate Vite entry
     // (admin.html) so the regular client bundle stays admin-free.
