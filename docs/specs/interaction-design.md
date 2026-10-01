@@ -288,6 +288,10 @@ Containers carry only a faint tint, not another typeface or palette. The tree
 is presentation over flat table rows, rather than an invalid nested table or a
 second editing surface.
 
+Character inventory alternate attack modes and the device-only solo tracker
+generate client IDs through the shared safe ID helper, so creating them also
+works on non-secure HTTP IP origins where `crypto.randomUUID()` is unavailable.
+
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide
 excluded rows without unmounting their editors. Category chips remain the

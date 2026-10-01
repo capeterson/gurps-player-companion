@@ -14,6 +14,7 @@ import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
 import { flashBus } from '../../../../sync/flashBus.ts';
 import { campaignTransferStores } from '../../../../sync/localCampaignTransfer.ts';
+import { newClientId } from '../../../../sync/outbox.ts';
 import { mutateActiveEffects } from '../activeEffectMutations.ts';
 
 export function SoloTrackerCard({
@@ -122,7 +123,7 @@ export function SoloTrackerCard({
         combatants: [
           ...row.combatants,
           {
-            id: crypto.randomUUID(),
+            id: newClientId(),
             name: submittedName,
             orderKey: (row.combatants.length + 1) * 10,
             active: true,
@@ -180,7 +181,7 @@ export function SoloTrackerCard({
         effects: [
           ...row.effects,
           {
-            id: crypto.randomUUID(),
+            id: newClientId(),
             name: submittedName,
             duration,
             startedAtRound: row.round,

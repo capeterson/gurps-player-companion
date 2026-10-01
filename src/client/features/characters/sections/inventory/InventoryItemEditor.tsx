@@ -10,6 +10,7 @@ import { LibraryAutocomplete } from '../../../../components/ui/LibraryAutocomple
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useToasts } from '../../../../lib/toast.tsx';
+import { newClientId } from '../../../../sync/outbox.ts';
 import { RepriceEntry } from '../../../library/RepriceEntry.tsx';
 import { ItemField, type ItemFieldSpec } from './ItemField.tsx';
 import {
@@ -459,7 +460,7 @@ function ItemListEditor({
                     ...current.weaponData,
                     modes: [
                       ...weaponModes(current.weaponData),
-                      { key: crypto.randomUUID(), name: name.trim() },
+                      { key: newClientId(), name: name.trim() },
                     ],
                   },
                 };
