@@ -450,6 +450,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
             <InfoTooltip
               ariaLabel="About log attachments"
               side="bottom"
+              scrollable
               contentClassName="w-64 max-h-[calc(100dvh-2rem)] overflow-y-auto"
               content="Campaign entries are shared with all campaign members. Select one of your characters to make a private entry visible only to you. Point recipients are chosen separately."
             >

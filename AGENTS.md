@@ -596,6 +596,9 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   on its configured port. Success screenshots are opt-in review artifacts: set
   `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for required visual inspection of UI changes.
   Failure screenshots and all assertions remain enabled in ordinary runs.
+  The broad built command seeds the standard Sample/Lantern Coast fixtures first;
+  externally managed broad runs must run `bun run db:seed` as well. Use the built
+  test-server harness for real background notification delivery.
 - **Visually inspect layout fixes.** For responsive or geometry changes,
   inspect screenshots or a headed-browser rendering at the affected sizes in
   addition to automated assertions before handoff.

@@ -47,6 +47,7 @@ test('roll history moves from Combat into the History tab and survives reload lo
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 10_000 });
 
+  await selectCharacterSection(page, 'Combat');
   await page.getByRole('button', { name: /^Dodge \d+$/ }).click();
   const rollDialog = page.getByRole('dialog', { name: 'Roll Dodge' });
   await rollDialog.getByRole('button', { name: /Roll vs \d+/ }).click();

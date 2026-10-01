@@ -1359,6 +1359,7 @@ public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
   run-bun-tests.ts, run-client-tests.mjs  Test execution with native case reports and command wall timings
+  start-built-test-server.ts  Compiled browser acceptance server with real notification processing
   check-pwa-package.ts  Mandatory post-build manifest/icon/precache/admin-isolation verification
   capture-screenshots.mjs  Refresh canonical captures from a seeded local app
   release-image.sh  Pin and verify a candidate image, then promote its tested digest

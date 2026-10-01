@@ -187,7 +187,9 @@ command. Agents run it before opening a PR or pushing code changes to it;
 focused MCP parity/security tests remain in CI. Test commands save timing reports
 in `.local/test-results/`. For broad browser checks, build first and use
 `bun run test:e2e:built` with the checkout's database and origin configured and no
-other server on that port. Set `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for success
+other server on that port. This command seeds the standard Sample/Lantern Coast
+fixtures without resetting existing Lantern play state, then starts the compiled
+server with its real notification worker. Set `PLAYWRIGHT_REVIEW_ARTIFACTS=1` for success
 screenshots when visually reviewing UI changes; failure screenshots remain on.
 
 The first command runs lint, type checking, server/shared tests, and API/MCP

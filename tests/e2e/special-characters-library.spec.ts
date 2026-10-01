@@ -243,6 +243,7 @@ test('library preserves special text and each Unicode group jump reaches its own
   const { id: characterId } = (await characterResponse.json()) as { id: string };
   await page.goto(`/characters/${characterId}`);
   await selectCharacterSection(page, 'Magic');
+  await page.getByRole('button', { name: '+ Add spell', exact: true }).click();
   const spellInput = page.getByRole('textbox', { name: 'Spell' });
   await spellInput.fill(visibleName);
   const option = page.getByRole('option').filter({ hasText: visibleName });
@@ -250,6 +251,7 @@ test('library preserves special text and each Unicode group jump reaches its own
   await option.click();
   await expect(spellInput).toHaveValue(visibleName);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: `Edit ${visibleName}`, exact: true }).click();
   const adoptedSpellName = page.getByRole('textbox', {
     name: `${visibleName} name`,
     exact: true,

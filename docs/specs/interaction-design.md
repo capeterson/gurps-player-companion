@@ -327,7 +327,7 @@ centers their grid within the visual viewport during zoom, panning, and resizing
 Dialog size preferences are capped by that visible area, with internal scrolling.
 
 The shared `InfoTooltip` supports scrollable recipient lists in adventure-log
-award summaries. These tooltips retain horizontal collision handling, constrain
+award summaries and the attachment visibility explanation. These tooltips retain horizontal collision handling, constrain
 height and vertical position to the visual viewport below the sticky app header,
 and allow pointer and keyboard scrolling. Hover, focus, or tap opens the list;
 Escape dismisses it.

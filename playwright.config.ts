@@ -73,10 +73,10 @@ export default defineConfig({
   ...(START_SERVER
     ? {
         webServer: {
-          command: BUILT_SERVER ? 'bun run dist/server/index.js' : 'bun run dev',
+          command: BUILT_SERVER ? 'bun run scripts/start-built-test-server.ts' : 'bun run dev',
           // The compiled entry has no Vite middleware. Development mode would
           // omit the static handler and return 404 for every browser route.
-          ...(BUILT_SERVER ? { env: { ENVIRONMENT: 'test' } } : {}),
+          ...(BUILT_SERVER ? { env: { ENVIRONMENT: 'test', NODE_ENV: 'development' } } : {}),
           url: new URL('/api/v1/healthz', BASE_URL).toString(),
           reuseExistingServer: !BUILT_SERVER && !process.env.CI,
           timeout: 60_000,
