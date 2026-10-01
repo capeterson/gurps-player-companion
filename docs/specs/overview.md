@@ -162,7 +162,7 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   and sign in with a passkey (`/auth/passkeys/*`). Ceremonies are verified by
   `@simplewebauthn/server` (origin/RP, challenge, type, flags, COSE algorithm,
   signature, and counter), not by an application-owned binary parser.
-- **Password reset** by emailed token (`/forgot-password` → `/reset-password`).
+- **Password reset** by emailed token (`/forgot-password` → `/reset-password`). An invalid or expired token offers a direct path to request another link.
 - **Public-auth rate limits**: durable Postgres counters bound registration by
   source IP and password login by source IP plus a normalized account budget
   consumed only by failed logins across source IPs. Recovery and passkey requests

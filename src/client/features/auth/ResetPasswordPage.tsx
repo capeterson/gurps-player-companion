@@ -6,6 +6,9 @@ import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 
+const INVALID_RESET_ERROR =
+  'This reset link is invalid or has expired. Please request a new one.';
+
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
@@ -33,7 +36,7 @@ export function ResetPasswordPage() {
     onError: (err) => {
       setError(
         err instanceof ApiError && err.status === 400
-          ? 'This reset link is invalid or has expired. Please request a new one.'
+          ? INVALID_RESET_ERROR
           : 'Something went wrong. Please try again.',
       );
     },
@@ -93,7 +96,18 @@ export function ResetPasswordPage() {
             required
           />
         </label>
-        {error && <p className="alert alert-error text-sm">{error}</p>}
+        {error && (
+          <div className="alert alert-error text-sm">
+            <div className="space-y-1">
+              <p>{error}</p>
+              {error === INVALID_RESET_ERROR && (
+                <Link to="/forgot-password" className="link">
+                  Request a new link
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
         <button type="submit" className="btn btn-primary" disabled={reset.isPending}>
           {reset.isPending ? 'Resetting…' : 'Reset password'}
         </button>
