@@ -311,14 +311,14 @@ export function EncounterPage() {
       )}
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">Initiative</h2>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {data.combatants.map((combatant, index) => (
             <article
               key={combatant.id}
-              className={`card border p-3 ${combatant.id === data.activeCombatantId ? 'border-primary bg-primary/10' : 'border-base-300'}`}
+              className={`card min-w-0 border p-3 ${combatant.id === data.activeCombatantId ? 'border-primary bg-primary/10' : 'border-base-300'}`}
             >
-              <div className="flex justify-between gap-2">
-                <strong>{combatant.name}</strong>
+              <div className="flex min-w-0 justify-between gap-2">
+                <strong className="min-w-0 [overflow-wrap:anywhere]">{combatant.name}</strong>
                 {combatant.id === data.activeCombatantId && (
                   <span className="badge badge-primary">Acting</span>
                 )}
@@ -774,7 +774,7 @@ function EffectRow({
   );
   return (
     <article className={`card border p-3 ${expired ? 'border-warning' : 'border-base-300'}`}>
-      <strong>{effect.name}</strong>
+      <strong className="block min-w-0 [overflow-wrap:anywhere]">{effect.name}</strong>
       <p className="text-sm text-base-content/70">
         {effectRemainingLabel(effect.duration, effect.startedAtRound, round)} · started round{' '}
         {effect.startedAtRound}

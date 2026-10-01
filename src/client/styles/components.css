@@ -700,6 +700,9 @@ dialog.modal[data-viewport-bounded="true"] {
   width: var(--dialog-viewport-width, 100dvw);
   height: var(--dialog-viewport-height, 100dvh);
 }
+dialog.modal:not([open]) {
+  display: none;
+}
 @layer components {
   dialog.modal[data-viewport-bounded="true"] > .modal-box {
     max-height: calc(var(--dialog-viewport-height, 100dvh) - 2rem);

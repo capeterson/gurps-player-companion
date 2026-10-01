@@ -254,6 +254,12 @@ heading wraps unbroken account names within its card.
 Detailed encounter NPC and effect forms open in the native dialog top layer, above the
 sticky app header. Their height stays within the dynamic viewport, with internal
 scrolling for long forms, and Escape closes the dialog and its controlled state.
+Closed native dialogs are removed from layout, so their previous viewport
+dimensions cannot widen the page.
+
+Encounter initiative cards keep long unspaced combatant names within their grid
+column at phone, tablet, and desktop widths; names wrap while the acting badge
+and combatant controls remain available without page-wide horizontal scrolling.
 
 Summary rows use a fluid name column and compact value/action columns. Long
 names and references wrap rather than shrinking to a few letters or forcing
