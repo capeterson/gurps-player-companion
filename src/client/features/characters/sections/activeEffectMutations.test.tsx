@@ -362,10 +362,10 @@ it('adds solo combatants and effects when randomUUID is unavailable', async () =
   fireEvent.change(await screen.findByLabelText('Solo combatant name'), {
     target: { value: 'Raider' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: /^Add$/ }));
   await screen.findByText('Raider');
   fireEvent.change(screen.getByLabelText('Effect name'), { target: { value: 'Quick ward' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Add effect', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: /^Add effect$/ }));
 
   await waitFor(async () => {
     const row = await getLocalDb().soloEncounters.get(id);

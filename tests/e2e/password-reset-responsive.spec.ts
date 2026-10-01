@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const invalidResetMessage =
-  'This reset link is invalid or has expired. Please request a new one.';
+const invalidResetMessage = 'This reset link is invalid or has expired. Please request a new one.';
 
 test('expired reset links offer a reachable request-new-link action on mobile and landscape', async ({
   page,
@@ -30,7 +29,9 @@ test('expired reset links offer a reachable request-new-link action on mobile an
         'data-theme',
         mode === 'dark' ? 'gilded-tome' : 'illuminated-manuscript',
       );
-      await expect(page.getByRole('heading', { name: 'Reset password', exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Reset password', exact: true }),
+      ).toBeVisible();
       await page.getByLabel('New password').fill('CorrectHorseBatteryStaple2');
       await page.getByLabel('Confirm password').fill('CorrectHorseBatteryStaple2');
       await page.getByRole('button', { name: 'Reset password', exact: true }).click();
@@ -53,14 +54,18 @@ test('expired reset links offer a reachable request-new-link action on mobile an
 
       if (viewport.height <= 390) {
         await page.screenshot({
-          path: testInfo.outputPath(`expired-reset-${mode}-${viewport.width}x${viewport.height}.png`),
+          path: testInfo.outputPath(
+            `expired-reset-${mode}-${viewport.width}x${viewport.height}.png`,
+          ),
           animations: 'disabled',
         });
       }
 
       await requestLink.click();
       await expect(page).toHaveURL(/\/forgot-password$/);
-      await expect(page.getByRole('heading', { name: 'Forgot password', exact: true })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Forgot password', exact: true }),
+      ).toBeVisible();
       await expect(page.getByLabel('Email')).toBeVisible();
     }
   }

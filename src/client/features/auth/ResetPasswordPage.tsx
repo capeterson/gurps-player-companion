@@ -6,8 +6,7 @@ import { useToasts } from '../../lib/toast.tsx';
 import { tokenStore } from '../../lib/tokenStore.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 
-const INVALID_RESET_ERROR =
-  'This reset link is invalid or has expired. Please request a new one.';
+const INVALID_RESET_ERROR = 'This reset link is invalid or has expired. Please request a new one.';
 
 export function ResetPasswordPage() {
   const [params] = useSearchParams();

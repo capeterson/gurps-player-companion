@@ -3,7 +3,9 @@ import { selectCharacterSection } from './character-navigation';
 
 const password = 'CorrectHorseBatteryStaple1';
 
-test('character inventory and solo tracker create IDs on an insecure HTTP origin', async ({ page }) => {
+test('character inventory and solo tracker create IDs on an insecure HTTP origin', async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 375, height: 812 });
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
