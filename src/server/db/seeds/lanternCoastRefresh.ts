@@ -184,6 +184,7 @@ export async function refreshLanternCoast(
             ? ['description']
             : [
                 'description',
+                'specializationPolicy',
                 'procedures',
                 'defaults',
                 'prerequisites',

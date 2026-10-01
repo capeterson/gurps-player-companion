@@ -1310,9 +1310,21 @@ library:
       kind: required_catalog
       options:
       - name: Cliff Gardens
-        description: Gather rainwater and edible cliff plants.
+        description: Survey one accessible cliff garden for familiar edible plants and usable rain traps during
+          an hour of careful searching. Reaching a ledge requires a separate climbing task; this specialization
+          does not make unstable ground safe. Use the shared Coastal Foraging task procedure, including its
+          -2 penalty when the player and GM confirm contamination in the gathering patch. Success offers a
+          plausible local find, not conjured rations or proof that every plant or water source is harmless.
+          The GM adjudicates seasonal growth, runoff, spoilage and collection limits, then records supplies,
+          travel time and any consequences manually; the action does not alter inventory or physical state.
       - name: Tide Flats
-        description: Harvest shellfish and mark safe channels.
+        description: Search one accessible tidal patch for familiar shellfish and a feasible gathering route
+          during an hour of careful work. Learn local tidal access separately from cliff gathering; success
+          does not certify a permanent safe channel or identify every hidden toxin. Use the shared Coastal
+          Foraging task procedure, including its -2 penalty when the player and GM confirm contamination in
+          the gathering patch. The GM decides the tide window, mud hazards, available quantity and spoilage,
+          and whether an unfamiliar specimen needs another expert. Record gathered supplies, consumed time
+          and exposure manually; the action does not create inventory or automatically change physical state.
     defaults:
     - kind: attribute
       attribute: Per

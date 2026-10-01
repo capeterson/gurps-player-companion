@@ -136,10 +136,12 @@ async function expectCollapsedCaretReachable(page: import('@playwright/test').Pa
 }
 
 async function expectFooterPointerReachable(button: import('@playwright/test').Locator) {
-  await button.scrollIntoViewIfNeeded();
   await expect
-    .poll(() =>
-      button.evaluate((element) => {
+    .poll(async () => {
+      // Zoom and caret reflow can move the footer after an earlier scroll.
+      // Reapply the scroll while checking the actual viewport and pointer hit.
+      await button.scrollIntoViewIfNeeded();
+      return button.evaluate((element) => {
         const bounds = element.getBoundingClientRect();
         const visual = window.visualViewport;
         const visualTop = visual?.offsetTop ?? 0;
@@ -157,8 +159,8 @@ async function expectFooterPointerReachable(button: import('@playwright/test').L
           !!hit &&
           (hit === element || element.contains(hit))
         );
-      }),
-    )
+      });
+    })
     .toBe(true);
 }
 

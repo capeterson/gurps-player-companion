@@ -95,7 +95,8 @@ async function oldDemo(ownerId: string) {
   const trait = catalog.traits.find((entry) => entry.name === 'Breakwater Poise');
   const skill = catalog.skills.find((entry) => entry.name === 'Shingle Ghosting');
   const barter = catalog.skills.find((entry) => entry.name === 'Quayside Barter');
-  if (!trait || !skill || !barter) throw new Error('Missing v1 catalog entries');
+  const foraging = catalog.skills.find((entry) => entry.name === 'Coastal Foraging');
+  if (!trait || !skill || !barter || !foraging) throw new Error('Missing v1 catalog entries');
   const { trait: ownedTrait } = z.object({ trait: identified }).parse(
     await request(player.id, `${characterPath}/traits`, 'POST', {
       kind: trait.kind,
@@ -133,6 +134,16 @@ async function oldDemo(ownerId: string) {
   await request(ownerId, `${path}/library/skills/${barter.id}`, 'PATCH', {
     description: 'GM house rule: rates follow the local guild ledger.',
   });
+  const { skill: ownedForaging } = z.object({ skill: identified }).parse(
+    await request(player.id, `${characterPath}/skills`, 'POST', {
+      name: foraging.name,
+      attribute: foraging.attribute,
+      difficulty: foraging.difficulty,
+      librarySkillId: foraging.id,
+      specialization: 'Cliff Gardens',
+      points: 4,
+    }),
+  );
   await request(player.id, `${characterPath}/combat`, 'PATCH', { currentHp: 1 });
   const log = identified.parse(
     await request(player.id, `${path}/log`, 'POST', {
@@ -152,6 +163,7 @@ async function oldDemo(ownerId: string) {
     ownedTraitId: ownedTrait.id,
     ownedSkillId: ownedSkill.id,
     ownedBarterId: ownedBarter.id,
+    ownedForagingId: ownedForaging.id,
     barterId: barter.id,
     logId: log.id,
     text,
@@ -204,7 +216,14 @@ describe('Lantern Coast explicit content refresh', () => {
           ?.procedures?.actions.length,
       ).toBeGreaterThan(0);
       expect(detail.skills.some((entry) => entry.name === 'Marsh Tracking')).toBe(true);
-      expect(detail.skills.some((entry) => entry.name === 'Coastal Foraging')).toBe(false);
+      expect(
+        detail.skills.some(
+          (entry) => entry.name === 'Coastal Foraging' && entry.specialization === 'Tide Flats',
+        ),
+      ).toBe(false);
+      const refreshedForaging = detail.skills.find((entry) => entry.id === old.ownedForagingId);
+      expect(refreshedForaging?.points).toBe(4);
+      expect(refreshedForaging?.notes).toContain('during an hour of careful searching');
       const logs = adventureLogOut.array().parse(await request(old.playerId, `${old.path}/log`));
       expect(logs.filter((entry) => entry.visibility === 'private')).toHaveLength(3);
       expect(logs.find((entry) => entry.id === old.logId)?.body).toBe(
