@@ -1,0 +1,573 @@
+{
+  "skill_name": "gpc-library-authoring",
+  "evals": [
+    {
+      "id": "library-create-approved",
+      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, create Navigation now: IQ/Hard, no specialization, no TL, explicitly no defaults, key navigation, source key frost-handbook, locator p. 12, citation FH p. 12. These rules are approved and complete.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "library",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": []
+            }
+          }
+        },
+        {
+          "id": "create-navigation",
+          "tool": "library_skill",
+          "match": {
+            "action": "create",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 201,
+            "body": {
+              "acknowledged": true,
+              "resourceId": "10000000-0000-4000-8000-000000000009",
+              "revision": 1
+            }
+          }
+        },
+        {
+          "id": "library-after",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": [
+                {
+                  "name": "Navigation",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "key": "navigation",
+                  "sourceKey": "frost-handbook",
+                  "sourceLocator": "p. 12",
+                  "source": "FH p. 12",
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "not_applicable"
+                  },
+                  "defaults": [],
+                  "status": "complete",
+                  "role": "definition",
+                  "id": "10000000-0000-4000-8000-000000000009"
+                }
+              ]
+            }
+          },
+          "requires": ["create-navigation"]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "applied"
+        },
+        {
+          "kind": "mutation_set",
+          "matches": [
+            {
+              "tool": "library_skill",
+              "arguments": {
+                "action": "create",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003"
+                },
+                "body": {
+                  "name": "Navigation",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "key": "navigation",
+                  "sourceKey": "frost-handbook",
+                  "sourceLocator": "p. 12",
+                  "source": "FH p. 12",
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "not_applicable"
+                  },
+                  "defaults": [],
+                  "status": "complete",
+                  "role": "definition"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "read_after_mutations",
+          "tool": "get_campaign_library"
+        }
+      ]
+    },
+    {
+      "id": "library-edition-paging",
+      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, update only the Navigation edition with source key frost-handbook-revised: set its description to \"Find a route through snow.\" Search results have one entry per page; preserve the original edition.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "library-page-0",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000009",
+                  "name": "Navigation",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "status": "complete",
+                  "role": "definition",
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "required"
+                  },
+                  "defaults": null,
+                  "key": "navigation",
+                  "sourceKey": "frost-handbook",
+                  "sourceLocator": "p. 12"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "library-page-1",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills",
+              "offset": 1
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000010",
+                  "name": "Navigation",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "status": "complete",
+                  "role": "definition",
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "required"
+                  },
+                  "defaults": null,
+                  "key": "navigation",
+                  "sourceKey": "frost-handbook-revised",
+                  "sourceLocator": "p. 18"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "update-edition",
+          "tool": "library_skill",
+          "match": {
+            "action": "update",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "skillId": "10000000-0000-4000-8000-000000000010"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "acknowledged": true,
+              "resourceId": "10000000-0000-4000-8000-000000000010",
+              "revision": 7
+            }
+          }
+        },
+        {
+          "id": "library-after",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills",
+              "offset": 1
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000010",
+                  "name": "Navigation",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "status": "complete",
+                  "role": "definition",
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "required"
+                  },
+                  "defaults": null,
+                  "key": "navigation",
+                  "sourceKey": "frost-handbook-revised",
+                  "sourceLocator": "p. 18",
+                  "description": "Find a route through snow."
+                }
+              ]
+            }
+          },
+          "requires": ["update-edition"]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "applied"
+        },
+        {
+          "kind": "mutation_set",
+          "matches": [
+            {
+              "tool": "library_skill",
+              "arguments": {
+                "action": "update",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003",
+                  "skillId": "10000000-0000-4000-8000-000000000010"
+                },
+                "body": {
+                  "description": "Find a route through snow."
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "calls",
+          "match": {
+            "tool": "get_campaign_library",
+            "arguments": {
+              "query": {
+                "offset": 1
+              }
+            }
+          },
+          "min": 1
+        },
+        {
+          "kind": "only_body_keys",
+          "match": {
+            "tool": "library_skill",
+            "arguments": {
+              "action": "update",
+              "path": {
+                "id": "10000000-0000-4000-8000-000000000003",
+                "skillId": "10000000-0000-4000-8000-000000000010"
+              },
+              "body": {
+                "description": "Find a route through snow."
+              }
+            }
+          },
+          "keys": ["description"]
+        },
+        {
+          "kind": "read_after_mutations",
+          "tool": "get_campaign_library"
+        }
+      ]
+    },
+    {
+      "id": "library-unknown-defaults",
+      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, save Ice Lore as a review entry now. It is IQ/Hard, no specialization or TL. Its defaults are unknown; do not invent them or mark it ready for adoption.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "library",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": []
+            }
+          }
+        },
+        {
+          "id": "create-review",
+          "tool": "library_skill",
+          "match": {
+            "action": "create",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 201,
+            "body": {
+              "acknowledged": true,
+              "resourceId": "10000000-0000-4000-8000-000000000011",
+              "revision": 7
+            }
+          }
+        },
+        {
+          "id": "library-after",
+          "tool": "get_campaign_library",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            },
+            "query": {
+              "section": "skills"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "skills": [
+                {
+                  "name": "Ice Lore",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "status": "needs_review",
+                  "role": "definition",
+                  "defaults": null,
+                  "specializationPolicy": {
+                    "kind": "none"
+                  },
+                  "techLevelPolicy": {
+                    "kind": "not_applicable"
+                  },
+                  "extraction": {
+                    "reviewNotes": "Default rules are unknown."
+                  },
+                  "id": "10000000-0000-4000-8000-000000000009"
+                }
+              ]
+            }
+          },
+          "requires": ["create-review"]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "applied"
+        },
+        {
+          "kind": "mutation_set",
+          "matches": [
+            {
+              "tool": "library_skill",
+              "arguments": {
+                "action": "create",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003"
+                },
+                "body": {
+                  "name": "Ice Lore",
+                  "attribute": "IQ",
+                  "difficulty": "H",
+                  "status": "needs_review"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "forbidden_call",
+          "match": {
+            "tool": "library_skill",
+            "arguments": {
+              "body": {
+                "defaults": []
+              }
+            }
+          }
+        },
+        {
+          "kind": "read_after_mutations",
+          "tool": "get_campaign_library"
+        },
+        {
+          "kind": "argument_values",
+          "match": {
+            "tool": "library_skill",
+            "arguments": {
+              "action": "create"
+            }
+          },
+          "path": "arguments.body.defaults",
+          "values": [null],
+          "allowMissing": true
+        }
+      ]
+    },
+    {
+      "id": "library-manager-denied",
+      "prompt": "I am a manager in campaign 10000000-0000-4000-8000-000000000003. Update Navigation to IQ/Easy now.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000020",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "manager"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "blocked"
+        },
+        {
+          "kind": "no_mutations"
+        }
+      ]
+    }
+  ]
+}

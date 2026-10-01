@@ -33,9 +33,11 @@
     "openapi:check": "bun run src/server/openapi/check.ts",
     "mcp:emit": "bun run src/server/mcp/emit.ts > docs/mcp-tools.json",
     "mcp:check": "bun run src/server/mcp/check.ts",
-    "check": "bun run lint && bun run typecheck && bun run test && bun run openapi:check && bun run mcp:check",
+    "check": "bun run lint && bun run typecheck && bun run skills:check && bun run test && bun run openapi:check && bun run mcp:check",
     "test:acceptance:mcp-seed": "bun run scripts/run-bun-tests.ts mcp-seed tests/acceptance/lantern-coast-mcp.test.ts",
-    "test:e2e:built": "bun run db:seed && PLAYWRIGHT_START_SERVER=1 PLAYWRIGHT_BUILT_SERVER=1 playwright test"
+    "test:e2e:built": "bun run db:seed && PLAYWRIGHT_START_SERVER=1 PLAYWRIGHT_BUILT_SERVER=1 playwright test",
+    "skills:check": "bun run scripts/gpc-skill-evals.mjs validate && bun test tests/skills",
+    "skills:eval": "bun run scripts/gpc-skill-evals.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1141.0",

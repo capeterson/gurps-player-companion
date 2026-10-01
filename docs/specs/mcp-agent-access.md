@@ -357,8 +357,13 @@ and no secret. Direct browser clients must also list their origin in
 `CORS_ORIGINS`; server-hosted ChatGPT and Claude OAuth requests do not require a
 CORS entry.
 
-Client-specific plugin packages and private registered-app mappings are local
-artifacts, excluded from source control and Docker build contexts. Configure
+Reusable workflow instructions are checked in under `skills/gpc-*/`; see
+[agent-skills.md](../agent-skills.md) for packaging and behavioral evals. They use
+the connected tool schemas and preserve explicit user authorization, server
+authority, private projections, idempotent retries, and acknowledgement read-back.
+They do not add tools or broaden OAuth scopes. Client-specific plugin registrations
+and private registered-app mappings remain local artifacts, excluded from source
+control and Docker build contexts. Configure
 clients with the target instance's `/mcp` URL: `https://gurps.abundant.zip/mcp`
 for the hosted production instance, or `https://gurps-dev.abundant.zip/mcp`
 for development testing. Each user signs in and consents with their own GPC account.
