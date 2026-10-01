@@ -1,5 +1,5 @@
-import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { attachReviewScreenshot } from './review-artifacts';
 
 const password = 'CorrectHorseBatteryStaple1';
 
@@ -168,12 +168,9 @@ test('pool popovers keep endpoint text above the mobile navigation flower', asyn
     await expect(footnote).toBeVisible();
 
     if (pool.label === 'HP') {
-      const screenshotPath = testInfo.outputPath('hp-popover-landscape-568x320.png');
-      const screenshot = await page.screenshot({ animations: 'disabled' });
-      await writeFile(screenshotPath, screenshot);
-      await testInfo.attach('hp-popover-landscape-568x320', {
-        path: screenshotPath,
-        contentType: 'image/png',
+      await attachReviewScreenshot(page, testInfo, 'hp-popover-landscape-568x320', {
+        animations: 'disabled',
+        path: testInfo.outputPath('hp-popover-landscape-568x320.png'),
       });
     }
 
@@ -272,12 +269,9 @@ test('pool popovers keep endpoint text above the mobile navigation flower', asyn
       await settleLayout(touchPage);
       await expectTextInsideVisualViewport(footnote);
       if (pool.label === 'HP') {
-        const screenshotPath = testInfo.outputPath('hp-pinch-150-percent-contained.png');
-        const screenshot = await touchPage.screenshot({ animations: 'disabled' });
-        await writeFile(screenshotPath, screenshot);
-        await testInfo.attach('hp-pinch-150-percent-contained', {
-          path: screenshotPath,
-          contentType: 'image/png',
+        await attachReviewScreenshot(touchPage, testInfo, 'hp-pinch-150-percent-contained', {
+          animations: 'disabled',
+          path: testInfo.outputPath('hp-pinch-150-percent-contained.png'),
         });
       }
 

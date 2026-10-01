@@ -74,8 +74,13 @@ describe('OpenAPI CLI lifecycle', () => {
       },
     ];
 
-    for (const command of commands) {
-      const result = await runOpenApiCommand(command.entrypoint);
+    // Both read-only commands retain their full maintenance observation window.
+    const results = await Promise.all(
+      commands.map((command) => runOpenApiCommand(command.entrypoint)),
+    );
+    for (const [index, command] of commands.entries()) {
+      const result = results[index];
+      if (!result) throw new Error(`Missing ${command.entrypoint} result`);
       expect(result.timedOut, `${command.entrypoint} exceeded its process deadline`).toBe(false);
       expect(result.exitCode, `${command.entrypoint} exit status`).toBe(0);
       expect(result.stdout, `${command.entrypoint} output`).toBe(command.expectedStdout);

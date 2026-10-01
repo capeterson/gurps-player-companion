@@ -33,6 +33,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
+  syncStateStore.reset('synced');
+  vi.useRealTimers();
   await resetLocalDb();
 });
 
@@ -864,6 +866,9 @@ describe('coalescing + orchestrator rollback', () => {
           return response({ changes, nextCursor: {}, hasMore: {} });
         }),
       );
+      // Advance display dwell timers while leaving IndexedDB's asynchronous
+      // tasks (setImmediate) and the clock real.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       await getSyncOrchestrator().triggerCursorPull();
       expect(await db.characterCombat.get(CHAR_ID)).toMatchObject({
         currentHp: 8,
@@ -872,7 +877,7 @@ describe('coalescing + orchestrator rollback', () => {
       });
       getSyncOrchestrator().start();
       try {
-        await waitFor(async () => expect(await db.outbox.count()).toBe(0));
+        await vi.waitFor(async () => expect(await db.outbox.count()).toBe(0));
         expect(await db.characterCombat.get(CHAR_ID)).toMatchObject(
           status === 'applied' ? { currentHp: 8, currentFp: -2 } : { currentHp: 10, currentFp: 0 },
         );
@@ -886,7 +891,8 @@ describe('coalescing + orchestrator rollback', () => {
             `character_combat:${CHAR_ID}:currentHp`,
           ]);
         }
-        await waitFor(() => expect(latest).toBe('synced'), { timeout: 3000 });
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(latest).toBe('synced');
       } finally {
         getSyncOrchestrator().stop();
         off();
@@ -1163,9 +1169,9 @@ describe('character_language / character_technique outbox lifecycle (S11)', () =
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    // The indicator store has no getter; subscribe and track the latest
-    // committed state (commit defers 'synced' by MIN_DWELL_MS).
-    let latest: string | null = null;
+    // Track the actual initial state too: a fast drain can remain synced
+    // throughout the minimum dwell window without emitting a transition.
+    let latest: string = syncStateStore.value;
     const off = syncStateStore.subscribe((s) => {
       latest = s;
     });

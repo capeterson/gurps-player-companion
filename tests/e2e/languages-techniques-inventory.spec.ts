@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const SHOTS = 'docs/screenshots/interaction-refresh';
 const WIDTHS = [320, 375, 390, 575, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025, 1280];
@@ -38,10 +39,12 @@ async function expectOptionHitTargets(page: Page, list: Locator) {
   expect(listId).toBeTruthy();
   expect(optionId).toBeTruthy();
   const points = [{ x: optionBox.x + optionBox.width / 2, y: optionBox.y + optionBox.height / 2 }];
-  const navigation = await page
-    .locator('.sheet-nav-toggle')
-    .boundingBox()
-    .catch(() => null);
+  // Desktop uses a dock instead of this mobile toggle. Do not pay the action
+  // timeout looking for an absent element on every autocomplete assertion.
+  const navigationToggle = page.locator('.sheet-nav-toggle');
+  const navigation = (await navigationToggle.isVisible())
+    ? await navigationToggle.boundingBox()
+    : null;
   if (navigation) {
     const left = Math.max(optionBox.x, navigation.x);
     const top = Math.max(optionBox.y, navigation.y);
@@ -90,7 +93,7 @@ async function expectSummary(table: Locator, name: string) {
 }
 async function captureOverlay(page: Page, name: string, width: number) {
   if ([320, 375, 575, 639, 640, 641, 1023, 1024, 1025].includes(width)) {
-    await page.screenshot({ path: `test-results/interaction-${name}-${width}.png` });
+    await captureReviewScreenshot(page, { path: `test-results/interaction-${name}-${width}.png` });
   }
 }
 
@@ -367,7 +370,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     await techniques.getByRole('button', { name: 'Close add form' }).click();
     if (width === 375) {
       await techniques.scrollIntoViewIfNeeded();
-      await page.screenshot({ path: 'test-results/languages-techniques-stress-mobile.png' });
+      await captureReviewScreenshot(page, {
+        path: 'test-results/languages-techniques-stress-mobile.png',
+      });
     }
   }
 
@@ -387,7 +392,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await expect(nested.getByText('Coastal charts', { exact: true })).toBeVisible();
   await expect(rations.getByText('Trail rations', { exact: true })).toBeVisible();
   await expect(nestedBlade.getByText('Signal blade', { exact: true })).toBeVisible();
-  await page.screenshot({ path: 'test-results/inventory-tree-before-checks-mobile.png' });
+  await captureReviewScreenshot(page, {
+    path: 'test-results/inventory-tree-before-checks-mobile.png',
+  });
 
   // Selection and an unblurred editor draft must survive collapsing the root
   // container. These are visible interactions, not a direct state assertion.
@@ -522,7 +529,7 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     }
     if (width === 375 || width === 1280) {
       await inventory.scrollIntoViewIfNeeded();
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: `test-results/inventory-stress-${width === 375 ? 'mobile' : 'desktop'}.png`,
       });
     }
@@ -544,17 +551,17 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await page.locator('.fold-section').getByRole('button', { name: 'Skills', exact: true }).click();
   await page.setViewportSize({ width: 375, height: 900 });
   await techniqueFold.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `${SHOTS}/languages-techniques-mobile.png` });
+  await captureReviewScreenshot(page, { path: `${SHOTS}/languages-techniques-mobile.png` });
   await selectCharacterSection(page, 'Inventory');
   await expect(page.locator(`#inventory-${fixture.longItem.id}`)).toHaveCount(0);
   await pack.scrollIntoViewIfNeeded();
   await pack.getByRole('button', { name: 'Collapse contents' }).click();
   await expect(pack.getByLabel(/^\d+ contained items?$/)).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/inventory-mobile-collapsed.png` });
+  await captureReviewScreenshot(page, { path: `${SHOTS}/inventory-mobile-collapsed.png` });
   await pack.getByRole('button', { name: 'Expand contents' }).click();
   await expect(nested).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/inventory-mobile.png` });
+  await captureReviewScreenshot(page, { path: `${SHOTS}/inventory-mobile.png` });
   await page.setViewportSize({ width: 1280, height: 900 });
   await pack.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: `${SHOTS}/inventory-desktop.png` });
+  await captureReviewScreenshot(page, { path: `${SHOTS}/inventory-desktop.png` });
 });

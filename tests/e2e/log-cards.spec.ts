@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test('log award details stay reachable and older entries edit in place', async ({
   page,
@@ -106,7 +107,9 @@ test('log award details stay reachable and older entries edit in place', async (
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
-    await page.screenshot({ path: testInfo.outputPath(`award-tooltip-${width}.png`) });
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath(`award-tooltip-${width}.png`),
+    });
     await page.keyboard.press('Escape');
     await expect(tooltip).toHaveCount(0);
     await page.mouse.move(0, 0);
@@ -127,7 +130,7 @@ test('log award details stay reachable and older entries edit in place', async (
   expect(Math.abs(((await form.boundingBox())?.y ?? 0) - (cardTop ?? 0))).toBeLessThan(60);
   expect(Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore)).toBeLessThan(60);
   await form.getByLabel('Title', { exact: true }).fill('Revised older award entry');
-  await page.screenshot({ path: testInfo.outputPath('older-entry-edit.png') });
+  await captureReviewScreenshot(page, { path: testInfo.outputPath('older-entry-edit.png') });
   await form.getByRole('button', { name: 'Save changes' }).click();
   await expect(
     page.getByRole('article').last().getByRole('heading', { name: 'Revised older award entry' }),

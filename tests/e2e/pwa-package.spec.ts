@@ -1,8 +1,11 @@
-/** Real built-worker acceptance. Run with PWA_E2E=1 against the built Bun server. */
+/** Real built-worker acceptance. Runs with PLAYWRIGHT_BUILT_SERVER=1 (or PWA_E2E=1 against an external built server). */
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test.skip(
-  process.env.PWA_E2E !== '1',
+  process.env.PWA_E2E !== '1' &&
+    process.env.PLAYWRIGHT_BUILT_SERVER !== '1' &&
+    process.env.MCP_E2E_BUILT_SERVER !== '1',
   'Requires the production client build and real service worker',
 );
 
@@ -47,7 +50,10 @@ test('installable package, mobile launch, screenshots and real offline cold navi
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('image/png');
   }
-  await page.screenshot({ path: 'test-results/pwa-launch-mobile.png', fullPage: false });
+  await captureReviewScreenshot(page, {
+    path: 'test-results/pwa-launch-mobile.png',
+    fullPage: false,
+  });
   for (const width of [320, 393, 639, 640, 641, 767, 768, 769]) {
     await page.setViewportSize({ width, height: 851 });
     await expect(page.getByRole('link', { name: 'Create your account' })).toBeVisible();

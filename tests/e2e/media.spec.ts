@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import sharp from 'sharp';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -125,7 +126,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     await expectInsideViewport(page, portraitEditor.locator('.modal-box'), width);
     await expectInsideViewport(page, portraitInput, width);
     await expect(portraitEditor.getByText(/JPEG, PNG or WebP/)).toBeVisible();
-    await page.screenshot({ path: `test-results/media-portrait-${width}.png`, fullPage: true });
+    await captureReviewScreenshot(page, {
+      path: `test-results/media-portrait-${width}.png`,
+      fullPage: true,
+    });
   }
 
   // The app shell and immutable image are now under service-worker control.
@@ -154,17 +158,22 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await expect
     .poll(() => portrait.evaluate((element: HTMLImageElement) => element.naturalWidth))
     .toBeGreaterThan(0);
-  await page.screenshot({ path: 'test-results/media-portrait-offline.png', fullPage: true });
+  await captureReviewScreenshot(page, {
+    path: 'test-results/media-portrait-offline.png',
+    fullPage: true,
+  });
 
   await page.setViewportSize({ width: 320, height: 900 });
   const mobileNavigation = page.getByRole('navigation', { name: 'Character and app navigation' });
   await mobileNavigation.locator('summary').click();
-  const logoutDialog = page.waitForEvent('dialog', { timeout: 15_000 });
-  const cancelSignOut = mobileNavigation.getByRole('button', { name: 'Logout' }).click();
-  const dialog = await logoutDialog;
-  expect(dialog.message()).toContain('discards unsaved image files');
-  await dialog.dismiss();
-  await cancelSignOut;
+  await mobileNavigation.getByRole('button', { name: 'Logout' }).click();
+  const logoutDialog = page.getByRole('dialog', { name: 'Discard unsaved changes and sign out?' });
+  await expect(logoutDialog).toBeVisible();
+  await expect(
+    logoutDialog.getByText(/discards all unsynced edits and image files on this device/),
+  ).toBeVisible();
+  await logoutDialog.getByRole('button', { name: 'Keep editing', exact: true }).click();
+  await expect(logoutDialog).toBeHidden();
   await expect(portraitTrigger).toBeVisible();
   await expect(portrait).toHaveAttribute('src', /^blob:/);
 
@@ -204,7 +213,10 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
     await expectInsideViewport(page, settings.locator('.modal-box'), width);
     await expectInsideViewport(page, coverInput, width);
     await expect(settings.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
-    await page.screenshot({ path: `test-results/media-cover-${width}.png`, fullPage: true });
+    await captureReviewScreenshot(page, {
+      path: `test-results/media-cover-${width}.png`,
+      fullPage: true,
+    });
   }
 
   await context.setOffline(true);
@@ -218,12 +230,13 @@ test('portrait and campaign images stay responsive, public, cached, and availabl
   await settings.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByLabel('Upload campaign cover')).toHaveCount(0);
   await page.getByLabel('Open user menu').click();
-  const confirmDialog = page.waitForEvent('dialog', { timeout: 15_000 });
-  const confirmSignOut = page.getByRole('button', { name: 'Logout' }).click();
-  const confirm = await confirmDialog;
-  expect(confirm.message()).toContain('discards unsaved image files');
-  await confirm.accept();
-  await confirmSignOut;
+  await page.getByRole('button', { name: 'Logout' }).click();
+  const confirmDialog = page.getByRole('dialog', { name: 'Discard unsaved changes and sign out?' });
+  await expect(confirmDialog).toBeVisible();
+  await expect(
+    confirmDialog.getByText(/discards all unsynced edits and image files on this device/),
+  ).toBeVisible();
+  await confirmDialog.getByRole('button', { name: 'Discard and sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login(?:\?.*)?$/, { timeout: 20_000 });
   const pendingCount = await page.evaluate(
     () =>

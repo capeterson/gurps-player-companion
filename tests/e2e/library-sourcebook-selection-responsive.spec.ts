@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -79,7 +80,7 @@ test('long sourcebook names wrap and remain selectable for export', async ({ pag
     expect(pageWidth).toBeLessThanOrEqual(viewport.width);
     if (viewport.width === 320) {
       expect(labelBox.height).toBeGreaterThan(20);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('sourcebook-selection-320x568.png'),
         animations: 'disabled',
         fullPage: true,

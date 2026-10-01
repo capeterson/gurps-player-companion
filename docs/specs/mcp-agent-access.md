@@ -486,7 +486,7 @@ standard REST seed and the connector bridge (`scripts/seed-lantern-mcp.ts`).
 mutation acknowledgements; encounter creation re-reads through MCP to obtain
 combatant IDs. Every domain write goes through an existing tool/handler.
 
-`lanternCoastMcp.integration.test.ts` initializes the real `/mcp` HTTP route with
+`tests/acceptance/lantern-coast-mcp.test.ts` initializes the real `/mcp` HTTP route with
 a persisted OAuth client, grant and access token, then creates the whole campaign:
 four fictional sources, all eleven library categories, six complete characters,
 owned pricing and mechanics, nested/enhanced inventory, pools and active effects,
@@ -494,7 +494,11 @@ shared/private logs with XP awards, and an encounter with hidden NPC and effect.
 The REST reference collects private notes through each author’s authorized feed,
 so GM privacy remains intact. It compares the complete graph with the standard REST seed, normalizing generated
 IDs/revisions/timestamps and the permitted ownership difference, and asserts
-OAuth audit provenance and no added users. The test respects the production MCP
+OAuth audit provenance and no added users. The dedicated `bun run test:acceptance:mcp-seed` check is outside ordinary
+server/shared discovery and CI. Agents run it before opening a PR or
+pushing code changes to that PR, recording the tested commit/result. Focused
+per-operation parity, authorization, OAuth and release browser gates remain
+mandatory in CI/the release workflow as described above. The test respects the production MCP
 rate budget. Normal commits are cleaned up only within the test's own graph.
 The standard script creates six demo player accounts; MCP uses one existing user
 because account creation is deliberately outside the delegated tool surface.

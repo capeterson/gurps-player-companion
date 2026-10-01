@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const password = 'CorrectHorseBatteryStaple1';
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -178,7 +179,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
         const chip = panel.getByRole('button', { name: new RegExp(`^${choice.action}$`, 'i') });
         await expect(chip).toBeVisible();
         await expectTextContained(page, chip);
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(`status-${choice.name}-${size.label}-open.png`),
           animations: 'disabled',
         });
@@ -236,7 +237,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
         await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: scale });
         await settle(page);
         await expectOverlayContained(page, maneuverPanel);
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(
             `status-maneuver-${viewportSize.name}-pinch-${Math.round(scale * 100)}-open.png`,
           ),
@@ -248,7 +249,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
         await settle(page);
         await expectTextContained(page, longestBlurb);
         await expectOverlayContained(page, maneuverPanel);
-        await page.screenshot({
+        await captureReviewScreenshot(page, {
           path: testInfo.outputPath(
             `status-maneuver-${viewportSize.name}-pinch-${Math.round(scale * 100)}-blurb.png`,
           ),
@@ -284,7 +285,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
       await expect(modifierTitle).toBeVisible();
       await expectTextContained(page, modifierTitle);
       await tapByHitTest(page, modifierTitle);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`status-modifier-pinch-${Math.round(scale * 100)}-open.png`),
         animations: 'disabled',
       });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const viewports = [
   { width: 320, height: 568 },
@@ -79,7 +80,7 @@ test('campaign history wraps long unbroken event summaries', async ({ page }, te
       const summaryBox = await summary.boundingBox();
       if (!summaryBox) throw new Error('History summary text has no visible bounding box');
       expect(summaryBox.height).toBeGreaterThan(20);
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('campaign-history-long-summary-320x568.png'),
         animations: 'disabled',
       });

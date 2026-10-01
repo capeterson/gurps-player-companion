@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 const password = 'CorrectHorseBatteryStaple1';
@@ -147,7 +148,7 @@ test('account and compact character menus remain touch reachable through resize 
       (viewport.width === 568 && viewport.height === 320) ||
       (viewport.width === 844 && viewport.height === 390)
     ) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`compact-menu-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
       });
@@ -169,7 +170,7 @@ test('account and compact character menus remain touch reachable through resize 
       compactMenu.getByRole('button', { name: 'Logout', exact: true }),
     );
     if (scale === 1.5) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('compact-menu-pinch-150.png'),
         animations: 'disabled',
       });
@@ -190,7 +191,7 @@ test('account and compact character menus remain touch reachable through resize 
       compactMenu.getByRole('button', { name: 'Logout', exact: true }),
     );
     await settleViewport(page);
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`compact-menu-portrait-scale-${scale}.png`),
       animations: 'disabled',
     });
@@ -272,7 +273,7 @@ test('account and compact character menus remain touch reachable through resize 
     await expectOverlayInsideVisualViewport(page, accountMenu);
     await expectReachableAfterScroll(page, accountMenu.getByRole('button', { name: 'Logout' }));
     if (scale === 1.5) {
-      await page.screenshot({
+      await captureReviewScreenshot(page, {
         path: testInfo.outputPath('account-menu-pinch-150.png'),
         animations: 'disabled',
       });
@@ -287,7 +288,7 @@ test('account and compact character menus remain touch reachable through resize 
     await expect(accountMenu).toContainText(email);
     await expectOverlayInsideVisualViewport(page, accountMenu);
     await expectReachableAfterScroll(page, accountMenu.getByRole('button', { name: 'Logout' }));
-    await page.screenshot({
+    await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`account-menu-portrait-scale-${scale}.png`),
       animations: 'disabled',
     });

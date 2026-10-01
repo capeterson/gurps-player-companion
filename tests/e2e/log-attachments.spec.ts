@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test('log attachments default to Campaign, save private character notes, and explain visibility within the viewport', async ({
   page,
@@ -60,7 +61,9 @@ test('log attachments default to Campaign, save private character notes, and exp
       expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
       expect(box.y + box.height).toBeLessThanOrEqual(801);
     }).toPass();
-    await page.screenshot({ path: testInfo.outputPath(`attachment-tooltip-${width}.png`) });
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath(`attachment-tooltip-${width}.png`),
+    });
     await page.mouse.move(0, 0);
   }
   await attachment.selectOption(fixtures.characterId);
@@ -78,7 +81,7 @@ test('log attachments default to Campaign, save private character notes, and exp
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
-    await page.screenshot({ path: testInfo.outputPath(`private-log-${width}.png`) });
+    await captureReviewScreenshot(page, { path: testInfo.outputPath(`private-log-${width}.png`) });
   }
   await page.reload();
   await entry.getByRole('button', { name: 'Edit A private chronicle' }).click();

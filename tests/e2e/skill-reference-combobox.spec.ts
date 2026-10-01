@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'change-me-please-this-is-a-seed-account';
 
@@ -15,6 +16,7 @@ test('skill reference suggestions stay inside the viewport at supported widths',
   await page.getByRole('link', { name: 'The Lantern Coast' }).first().click();
   await page.getByRole('link', { name: 'Library' }).click();
   await page.getByRole('button', { name: /^\+ Add trait$/ }).click();
+  await page.locator('summary').filter({ hasText: 'Mechanical effects' }).click();
   await page.getByRole('button', { name: '+ Add effect' }).click();
   await page.getByLabel('Effect 1 target').selectOption('skill');
 
@@ -29,8 +31,8 @@ test('skill reference suggestions stay inside the viewport at supported widths',
     await input.press('ArrowDown');
     const listbox = page.getByRole('listbox');
     await expect(listbox).toBeVisible();
-    await expect(listbox.getByText(/Stealth|Swimming/).first()).toBeVisible();
-    await expect(listbox.getByText('Armoury', { exact: true })).toHaveCount(0);
+    await expect(listbox.getByText('Saltwound Care', { exact: true })).toBeVisible();
+    await expect(listbox.getByText('Horizon Watch', { exact: true })).toHaveCount(0);
     const popup = listbox.locator('xpath=..');
     const box = await popup.boundingBox();
     expect(box).not.toBeNull();
@@ -46,7 +48,10 @@ test('skill reference suggestions stay inside the viewport at supported widths',
     expect(await popup.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
       await popup.evaluate((element) => element.clientHeight),
     );
-    await page.screenshot({ path: `test-results/skill-reference-${width}.png`, fullPage: false });
+    await captureReviewScreenshot(page, {
+      path: `test-results/skill-reference-${width}.png`,
+      fullPage: false,
+    });
     await page.keyboard.press('Escape');
   }
 
@@ -54,10 +59,7 @@ test('skill reference suggestions stay inside the viewport at supported widths',
   await input.fill('');
   await input.pressSequentially('s');
   await input.press('ArrowDown');
-  const selected = page
-    .getByRole('listbox')
-    .getByText(/Stealth|Swimming|Staff|Shield/)
-    .first();
+  const selected = page.getByRole('listbox').getByText('Saltwound Care', { exact: true }).first();
   await expect(selected).toBeVisible();
   const selectedLabel = await selected.textContent();
   await selected.click();

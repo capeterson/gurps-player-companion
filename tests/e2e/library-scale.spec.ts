@@ -103,7 +103,7 @@ test('navigates a large library at every breakpoint and edits it offline', async
 
       // Jumping lands the college heading just below the sticky toolbar.
       await strip.getByRole('button', { name: 'College 19 15' }).click();
-      const heading = page.locator('#library-group-spells-college-19');
+      const heading = table.getByRole('button', { name: 'College 19 15', exact: true });
       await expect(heading).toBeInViewport();
       const toolbar = page.locator('.library-toolbar');
       const [toolbarBox, headingBox] = await Promise.all([
@@ -132,7 +132,8 @@ test('navigates a large library at every breakpoint and edits it offline', async
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.evaluate(() => window.scrollTo(0, 0));
     const firstGroupRows = page
-      .locator('#library-group-spells-college-00')
+      .getByRole('table', { name: 'spells' })
+      .getByRole('button', { name: 'College 00 15', exact: true })
       .locator('xpath=ancestor::tbody/following-sibling::tbody[1]')
       .getByRole('button', { expanded: false })
       .first();
@@ -170,6 +171,7 @@ test('navigates a large library at every breakpoint and edits it offline', async
       .getByRole('textbox', { name: 'Description', exact: true })
       .fill('Edited **offline**');
     await page.getByRole('button', { name: 'Save changes' }).click();
+    await page.getByRole('button', { name: 'Skill 042', exact: true }).click();
     await expect(page.getByText('Edited offline', { exact: true })).toBeVisible();
 
     await page.context().setOffline(false);

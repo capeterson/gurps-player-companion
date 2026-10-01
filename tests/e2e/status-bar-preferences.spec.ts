@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 test('user preferences control the Current Status height and visible controls at responsive widths', async ({
   page,
@@ -59,7 +60,10 @@ test('user preferences control the Current Status height and visible controls at
         expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(900);
       }
     }
-    await page.screenshot({ path: `test-results/status-bar-${name}.png`, fullPage: false });
+    await captureReviewScreenshot(page, {
+      path: `test-results/status-bar-${name}.png`,
+      fullPage: false,
+    });
   }
   for (const width of widths) {
     const height = width < 1280 ? 568 : 900;
@@ -169,7 +173,7 @@ test('user preferences control the Current Status height and visible controls at
           await expect(
             bar.getByRole('button', { name: 'Adjust FP, current -1000 of 1000, Exhausted' }),
           ).toBeVisible();
-          await page.screenshot({
+          await captureReviewScreenshot(page, {
             path: 'test-results/status-bar-extreme-320.png',
             fullPage: false,
           });
@@ -271,7 +275,10 @@ test('user preferences control the Current Status height and visible controls at
         expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(900);
       }
     }
-    await page.screenshot({ path: `test-results/status-bar-${name}.png`, fullPage: false });
+    await captureReviewScreenshot(page, {
+      path: `test-results/status-bar-${name}.png`,
+      fullPage: false,
+    });
   }
   for (const width of widths) {
     const height = width < 1280 ? 568 : 900;

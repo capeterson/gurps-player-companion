@@ -1,6 +1,7 @@
 import { type Page, expect, test } from '@playwright/test';
 import type { SyncLogEntry } from '../../src/client/db/dexie';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 async function readJournal(page: Page): Promise<SyncLogEntry[]> {
   return page.evaluate(async () => {
@@ -140,7 +141,7 @@ test('a synced edit and its revision response share one item with Request and Re
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.y + box.height).toBeLessThanOrEqual(900);
     }
-    await page.screenshot({ path: testInfo.outputPath(`sync-log-${width}.png`) });
+    await captureReviewScreenshot(page, { path: testInfo.outputPath(`sync-log-${width}.png`) });
     await dialog.getByRole('button', { name: 'Close sync log' }).click();
   }
 
@@ -206,7 +207,7 @@ test('a synced edit and its revision response share one item with Request and Re
   await response.locator('summary').click();
   await expect(response.locator('pre')).toContainText('"status": "applied"');
   await response.locator('pre').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('sync-log-compressed.png') });
+  await captureReviewScreenshot(page, { path: testInfo.outputPath('sync-log-compressed.png') });
   const downloadPromise = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'Download sync debug log' }).click();
   const download = await downloadPromise;
@@ -244,7 +245,7 @@ test('a synced edit and its revision response share one item with Request and Re
   await expect(hpChange.getByText(String(hpBefore), { exact: true })).toBeVisible();
   await expect(hpChange.getByText('After', { exact: true })).toBeVisible();
   await expect(hpChange.getByText(String(hpBefore - 2), { exact: true })).toBeVisible();
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('sync-log-hp-burst.png'),
     animations: 'disabled',
   });
@@ -331,7 +332,9 @@ test('a synced edit and its revision response share one item with Request and Re
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.y + box.height).toBeLessThanOrEqual(900);
     }
-    await page.screenshot({ path: testInfo.outputPath(`sync-log-settings-${width}.png`) });
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath(`sync-log-settings-${width}.png`),
+    });
     await logDialog.getByRole('button', { name: 'Close sync log' }).click();
   }
   await saved().click();
@@ -375,7 +378,7 @@ test('a synced edit and its revision response share one item with Request and Re
       .locator('..')
       .getByText('just now', { exact: true }),
   ).toBeVisible();
-  await page.screenshot({
+  await captureReviewScreenshot(page, {
     path: testInfo.outputPath('sync-log-websocket-disconnected.png'),
     animations: 'disabled',
   });

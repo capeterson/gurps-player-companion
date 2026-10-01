@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'change-me-please-this-is-a-seed-account';
 
@@ -141,7 +142,10 @@ test('column filters stay in the viewport, persist, compose with search and sort
       await expectInsideViewport(page, dialog);
       await expectMarkerInsideHeaderAndClearOfNeighbors(header, 'Trait');
       if (width === 320 || width === 390) {
-        await page.screenshot({ path: `/tmp/table-filter-menu-${width}.png`, fullPage: false });
+        await captureReviewScreenshot(page, {
+          path: `/tmp/table-filter-menu-${width}.png`,
+          fullPage: false,
+        });
       }
       await dialog.getByRole('button', { name: 'Close filter' }).click();
       await expect(table.getByRole('rowgroup', { name: longName })).toBeVisible();
@@ -160,7 +164,10 @@ test('column filters stay in the viewport, persist, compose with search and sort
         await pointsDialog.locator('input[type="checkbox"]').first().check();
         await pointsDialog.getByRole('button', { name: 'Close filter' }).click();
         await expectMarkerInsideHeaderAndClearOfNeighbors(pointsHeader, 'Points');
-        await page.screenshot({ path: '/tmp/table-filter-points-320.png', fullPage: false });
+        await captureReviewScreenshot(page, {
+          path: '/tmp/table-filter-points-320.png',
+          fullPage: false,
+        });
         await page.getByRole('button', { name: 'Clear all filters' }).click();
       }
     }

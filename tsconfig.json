@@ -31,6 +31,12 @@
     "src/**/*.tsx",
     "drizzle.config.ts",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "tests/acceptance/**/*.ts",
+    "scripts/run-bun-tests.ts",
+    "scripts/start-built-test-server.ts",
+    "tests/e2e/authenticated-fixture.ts",
+    "tests/e2e/review-artifacts.ts",
+    "playwright.config.ts"
   ]
 }

@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { captureReviewScreenshot } from './review-artifacts';
 
 const password = 'CorrectHorseBatteryStaple1';
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -120,7 +121,7 @@ test('shared character cards work across home, characters, campaign, and GM page
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
         .toBeLessThanOrEqual(width);
       if ([320, 769, 1113].includes(width)) {
-        await surface.card.screenshot({
+        await captureReviewScreenshot(surface.card, {
           path: testInfo.outputPath(`character-card-${surface.name}-${width}.png`),
           animations: 'disabled',
         });
@@ -134,7 +135,7 @@ test('shared character cards work across home, characters, campaign, and GM page
   for (const surface of surfaces.filter(({ name }) => ['campaign', 'characters'].includes(name))) {
     await page.goto(surface.path);
     await expect(surface.card).toBeVisible({ timeout: 25_000 });
-    await surface.card.screenshot({
+    await captureReviewScreenshot(surface.card, {
       path: testInfo.outputPath(`character-card-${surface.name}-1113-dark.png`),
       animations: 'disabled',
     });
