@@ -227,7 +227,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           onClose();
         }}
       >
-        <div className="modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)*0.88)] max-w-[min(56rem,calc(var(--dialog-viewport-width,100dvw)-2rem))] flex-col border border-base-300 bg-base-100 p-0">
+        <div className="modal-box flex max-h-[calc(var(--dialog-viewport-height,100dvh)*0.96)] max-w-[min(56rem,calc(var(--dialog-viewport-width,100dvw)-2rem))] flex-col border border-base-300 bg-base-100 p-0">
           <header className="flex items-start justify-between border-b border-base-300 px-5 py-4">
             <div>
               <h2 className="font-display text-xl font-semibold">Sync log</h2>
@@ -460,11 +460,13 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
             </SyncSection>
           </div>
 
-          <footer className="border-t border-base-300 px-5 py-4">
+          <footer className="border-t border-base-300 px-5 py-4 [@media(max-height:480px)]:px-3 [@media(max-height:480px)]:py-2">
             {storageMessage && (
-              <p className="mb-3 text-xs text-base-content/60">{storageMessage}</p>
+              <p className="mb-3 text-xs text-base-content/60 [@media(max-height:480px)]:mb-1 [@media(max-height:480px)]:text-[10px]">
+                {storageMessage}
+              </p>
             )}
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap [@media(max-height:480px)]:flex-row [@media(max-height:480px)]:flex-wrap [@media(max-height:480px)]:gap-1">
               <button
                 type="button"
                 className="btn btn-primary btn-sm h-auto whitespace-normal py-2"
