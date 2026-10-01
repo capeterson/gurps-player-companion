@@ -278,7 +278,9 @@ can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
 Expanded trait and skill editors also wrap their complete **Edit** headings,
-including long unspaced names, within the editor's content width.
+including long unspaced names, within the editor's content width. Trait modifier
+names and descriptions wrap inside the expanded editor when they contain long
+unbroken text.
 
 Expanded editors use a responsive grid with full field labels such as
 **Difficulty**, **Default modifier**, and **Points**. Creation uses the same

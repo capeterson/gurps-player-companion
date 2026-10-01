@@ -681,7 +681,7 @@ function TraitConfiguredDetails({
           <h4 className="label-eyebrow mb-1">Modifiers</h4>
           <ul className="space-y-1">
             {trait.modifiers.map((modifier) => (
-              <li key={`${modifier.category}:${modifier.name}`}>
+              <li className="min-w-0 break-words" key={`${modifier.category}:${modifier.name}`}>
                 <span className="font-medium">{modifier.name}</span>{' '}
                 <span className="text-base-content/60">
                   ({formatSigned(modifier.costValue)}
