@@ -39,10 +39,12 @@ async function expectOptionHitTargets(page: Page, list: Locator) {
   expect(listId).toBeTruthy();
   expect(optionId).toBeTruthy();
   const points = [{ x: optionBox.x + optionBox.width / 2, y: optionBox.y + optionBox.height / 2 }];
-  const navigation = await page
-    .locator('.sheet-nav-toggle')
-    .boundingBox()
-    .catch(() => null);
+  // Desktop uses a dock instead of this mobile toggle. Do not pay the action
+  // timeout looking for an absent element on every autocomplete assertion.
+  const navigationToggle = page.locator('.sheet-nav-toggle');
+  const navigation = (await navigationToggle.isVisible())
+    ? await navigationToggle.boundingBox()
+    : null;
   if (navigation) {
     const left = Math.max(optionBox.x, navigation.x);
     const top = Math.max(optionBox.y, navigation.y);

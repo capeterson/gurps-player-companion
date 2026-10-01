@@ -57,7 +57,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  ...(process.env.CI ? { workers: 1 } : {}),
+  // Broad built acceptance includes legacy scenarios mutating seeded actors.
+  // Keep those serial; independent focused runs can select their worker count.
+  ...(process.env.CI || BUILT_SERVER ? { workers: 1 } : {}),
   reporter: [
     ...(process.env.CI ? [['github'] as const] : []),
     ['list'],

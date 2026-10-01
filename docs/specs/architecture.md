@@ -484,6 +484,8 @@ the nightly run; overdue accounts run on the next night after startup.
   play state. `scripts/start-built-test-server.ts` runs the compiled server and the
   real notification worker in one Bun process so background-delivery browser checks
   work despite ordinary test-mode servers intentionally disabling maintenance.
+  Built acceptance defaults to one browser worker because legacy scenarios mutate
+  shared seeded actors; independent focused scenarios can explicitly select more.
   The MCP seed acceptance, integration suites and browser suites share one worktree
   database and run serially. Independent responsive scenarios reuse a worker-specific
   synthetic actor but retain fresh token sessions, browser contexts and entity rows.
