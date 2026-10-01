@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { and, eq } from 'drizzle-orm';
 import { stringify } from 'yaml';
+import { benefitUnlocked } from '../../../shared/domain/skillProcedures.ts';
 import { adventureLogOut } from '../../../shared/schemas/adventureLog.ts';
+import { librarySkillOut, libraryTraitOut } from '../../../shared/schemas/campaignLibrary.ts';
 import { encounterOut } from '../../../shared/schemas/encounter.ts';
 import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
 import { createApp } from '../../app.ts';
@@ -22,6 +24,8 @@ import {
 } from '../schema.ts';
 import { ensureDemoUser } from './accounts.ts';
 import { LANTERN_CAMPAIGN_NAME, seedLanternCoast } from './lanternCoast.ts';
+import { lanternCharacters, lanternSharedLogs } from './lanternCoastData.ts';
+import { refreshLanternCoast } from './lanternCoastRefresh.ts';
 
 configureIntegrationTestEnvironment();
 afterAll(closeDb);
@@ -65,6 +69,64 @@ describe('Lantern Coast standard seed', () => {
       const roster = await rows(campaignId);
       expect(roster).toHaveLength(6);
       expect(new Set(roster.map((row) => row.ownerId)).size).toBe(6);
+      const library = await get(ownerId, `/campaigns/${campaignId}/library`);
+      const librarySkills = librarySkillOut.array().parse(library.skills);
+      const libraryTraits = libraryTraitOut.array().parse(library.traits);
+      expect(librarySkills).toHaveLength(48);
+      expect(libraryTraits).toHaveLength(30);
+      expect(new Set(librarySkills.map((skill) => skill.description)).size).toBe(48);
+      expect(new Set(libraryTraits.map((trait) => trait.description)).size).toBe(30);
+      for (const skill of librarySkills) {
+        expect(skill.description?.trim(), skill.name).toBeTruthy();
+        expect(skill.description, skill.name).not.toContain('adjudicate task scope at the table');
+        expect(skill.procedures?.modifiers.length, skill.name).toBeGreaterThan(0);
+        expect(skill.procedures?.actions.length, skill.name).toBeGreaterThan(0);
+        for (const action of skill.procedures?.actions ?? []) {
+          expect(action.label.trim(), skill.name).toBeTruthy();
+          expect(action.roll?.basis, skill.name).toBe('skill');
+          expect(action.outcomes.length, skill.name).toBeGreaterThan(0);
+          for (const outcome of action.outcomes)
+            expect(outcome.text.trim(), skill.name).toBeTruthy();
+        }
+      }
+      for (const trait of libraryTraits) expect(trait.description?.trim(), trait.name).toBeTruthy();
+      const ropework = librarySkills.find((skill) => skill.name === 'Ropework');
+      expect(ropework?.procedures?.actions[0]).toMatchObject({
+        id: 'ropework_task',
+        time: { amount: { kind: 'constant', value: 5 }, unit: 'minutes' },
+        outcomes: [
+          { kind: 'note', on: 'success' },
+          { kind: 'note', on: 'failure' },
+        ],
+      });
+      expect(ropework?.procedures?.modifiers[0]).toMatchObject({
+        when: [{ input: { domain: 'equipment', key: 'ropework_obstacle' }, value: true }],
+        value: { kind: 'fixed', value: -2 },
+        appliesTo: 'task_roll',
+      });
+      const ropeworkBenefit = ropework?.procedures?.benefits?.[0];
+      if (!ropeworkBenefit) throw new Error('Missing Ropework training benefit');
+      expect(ropeworkBenefit).toMatchObject({
+        when: { minimumRelativeLevel: 2 },
+        effects: [{ target: 'skill', skillName: 'Net Mending', value: 1 }],
+      });
+      expect(benefitUnlocked(ropeworkBenefit, 11, 10, 2, null)).toBe(false);
+      expect(benefitUnlocked(ropeworkBenefit, 12, 10, 4, null)).toBe(true);
+      for (const [name, prerequisite] of [
+        ['Beacon Lenscraft', 'Salvage Fitting'],
+        ['Tideglass Inscription', 'Beacon Resonance'],
+        ['Patient Triage', 'Saltwound Care'],
+      ] as const) {
+        expect(librarySkills.find((skill) => skill.name === name)?.prerequisiteRules).toEqual({
+          kind: 'skill',
+          name: prerequisite,
+          specialization: { kind: 'any' },
+          minimumPoints: 1,
+        });
+      }
+      const signing = librarySkills.find((skill) => skill.name === 'Silent Signing');
+      expect(signing?.prerequisiteRules).toBeNull();
+      expect(signing?.prerequisites).toContain('manually confirms Harbor Sign comprehension');
       const details = [];
       for (const row of roster) details.push(await loadCharacterDetail(row.id));
       const kestrel = details.find((row) => row.name === 'Kestrel Vale');
@@ -79,6 +141,15 @@ describe('Lantern Coast standard seed', () => {
           true,
         );
         expect(detail.skills.every((skill) => skill.effectiveLevel != null)).toBe(true);
+        expect(detail.skills.length, detail.name).toBeGreaterThanOrEqual(12);
+        expect(detail.skills.length, detail.name).toBeLessThanOrEqual(15);
+        expect(detail.traits.length, detail.name).toBeGreaterThanOrEqual(6);
+        expect(detail.traits.length, detail.name).toBeLessThanOrEqual(8);
+        expect(detail.earnedPoints, detail.name).toBe(6);
+        expect(detail.points.total, detail.name).toBeLessThanOrEqual(250 + 6);
+        expect(detail.points.unspent, detail.name).toBe(250 + 6 - detail.points.total);
+        expect(-detail.points.disadvantages, detail.name).toBeLessThanOrEqual(50);
+        expect(-detail.points.quirks, detail.name).toBeLessThanOrEqual(5);
         expect(detail.languages).toHaveLength(2);
       }
       expect(kestrel.skills.filter((skill) => skill.name === 'Coastal Foraging')).toHaveLength(2);
@@ -97,6 +168,12 @@ describe('Lantern Coast standard seed', () => {
       ).toBe('weapon_damage');
       expect(kestrel.techniques[0]?.level).toBeGreaterThan(10);
       expect(mira.spells).toHaveLength(6);
+      expect(
+        mira.skills.find((skill) => skill.name === 'Beacon Lenscraft')?.prerequisiteStatus,
+      ).toBe('met');
+      expect(
+        mira.skills.find((skill) => skill.name === 'Tideglass Inscription')?.prerequisiteStatus,
+      ).toBe('met');
       expect(details.map((row) => row.name).sort()).toEqual([
         'Bram Stonebridge',
         'Iona Reedwake',
@@ -120,6 +197,9 @@ describe('Lantern Coast standard seed', () => {
       expect(bow?.enchantments[0]?.mechanics?.effects[0]?.target).toBe('weapon_accuracy');
       const sable = details.find((row) => row.name === 'Sable Fenwick');
       expect(sable?.spells).toHaveLength(4);
+      expect(
+        sable?.skills.find((skill) => skill.name === 'Patient Triage')?.prerequisiteStatus,
+      ).toBe('met');
       const orin = details.find((row) => row.name === 'Orin Bellstrand');
       expect(orin?.inventory.find((item) => item.name === 'Salvage apron')?.armor?.frontOnly).toBe(
         true,
@@ -144,13 +224,55 @@ describe('Lantern Coast standard seed', () => {
       expect(events.length).toBeGreaterThan(100);
       expect(events.every((event) => event.actorUserId != null)).toBe(true);
       expect(new Set(events.map((event) => event.actorUserId)).size).toBe(7);
-      const logs = adventureLogOut
+      const allLogIds = new Set<string>();
+      const privateBodies = new Set<string>();
+      const gmLogs = adventureLogOut
         .array()
-        .parse(await get(kestrel.ownerId, `/campaigns/${campaignId}/log`));
-      expect(logs).toHaveLength(4);
-      expect(logs.filter((log) => log.visibility === 'private').map((log) => log.authorId)).toEqual(
-        [kestrel.ownerId],
-      );
+        .parse(await get(ownerId, `/campaigns/${campaignId}/log`));
+      expect(gmLogs).toHaveLength(5);
+      expect(gmLogs.every((log) => log.visibility === 'campaign')).toBe(true);
+      for (const expected of lanternSharedLogs) {
+        const saved = gmLogs.find((log) => log.title === expected.title);
+        expect(saved, expected.title).toBeDefined();
+        expect(saved).toMatchObject({
+          body: expected.body,
+          sessionDate: expected.sessionDate,
+          sessionNumber: expected.sessionNumber,
+          location: expected.location,
+          visibility: 'campaign',
+        });
+      }
+      for (const detail of details) {
+        const fixture = lanternCharacters.find((entry) => entry.character.name === detail.name);
+        if (!fixture) throw new Error(`Missing authored logs for ${detail.name}`);
+        const logs = adventureLogOut
+          .array()
+          .parse(await get(detail.ownerId, `/campaigns/${campaignId}/log`));
+        expect(logs, detail.name).toHaveLength(8);
+        for (const log of logs) allLogIds.add(log.id);
+        const privateLogs = logs.filter((log) => log.visibility === 'private');
+        expect(privateLogs, detail.name).toHaveLength(3);
+        expect(privateLogs.map((log) => log.sessionNumber).sort()).toEqual([0, 3, 4]);
+        expect(privateLogs.every((log) => log.authorId === detail.ownerId)).toBe(true);
+        expect(privateLogs.every((log) => log.characterId === detail.id)).toBe(true);
+        for (const expected of fixture.privateLogs) {
+          const saved = privateLogs.find((log) => log.title === expected.title);
+          expect(saved, expected.title).toBeDefined();
+          expect(saved).toMatchObject({
+            body: expected.body,
+            sessionDate: expected.sessionDate,
+            sessionNumber: expected.sessionNumber,
+            location: expected.location,
+          });
+          expect(saved?.body.trim(), expected.title).toBeTruthy();
+          expect(saved?.body, expected.title).not.toContain(
+            'I have not told the others what the beacon showed me.',
+          );
+          if (saved) privateBodies.add(saved.body);
+        }
+      }
+      expect(allLogIds.size).toBe(23);
+      expect(privateBodies.size).toBe(18);
       const [encounter] = await getDb()
         .select()
         .from(encounters)
@@ -199,6 +321,11 @@ describe('Lantern Coast standard seed', () => {
       expect(await seedLanternCoast(ownerId)).toEqual({
         campaignId: first.campaignId,
         created: false,
+      });
+      expect(await refreshLanternCoast(ownerId)).toMatchObject({
+        campaignId: first.campaignId,
+        created: false,
+        refreshed: false,
       });
       expect(await history(first.campaignId)).toHaveLength(before.length);
       const detail = await loadCharacterDetail(character.id);

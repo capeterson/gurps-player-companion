@@ -16,7 +16,12 @@ import { spellCreate } from '../../../shared/schemas/spell.ts';
 import { techniqueCreate } from '../../../shared/schemas/technique.ts';
 import { traitCreate } from '../../../shared/schemas/trait.ts';
 import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
-import { type SeedCharacter, type SeedItem, lanternCharacters } from './lanternCoastData.ts';
+import {
+  type SeedCharacter,
+  type SeedItem,
+  lanternCharacters,
+  lanternSharedLogs,
+} from './lanternCoastData.ts';
 
 export const LANTERN_CAMPAIGN_NAME = 'The Lantern Coast';
 const childSchemas = {
@@ -119,7 +124,10 @@ export async function populateLanternCoast({
             ...entry,
             [link]: source.id,
             ...(section === 'traits'
-              ? { pricingResolution: pricing('traits', entry.name, entry.level) }
+              ? {
+                  notes: entry.notes ?? source.description,
+                  pricingResolution: pricing('traits', entry.name, entry.level),
+                }
               : {}),
           }),
         );
@@ -173,46 +181,26 @@ export async function populateLanternCoast({
     await request(token, path, 'PATCH', { activeEffects: effects });
     await request(token, `${path}/combat`, 'PATCH', fixture.combat);
     // Real multi-actor, private content for permission and history testing.
-    await request(token, `${campaignPath}/log`, 'POST', {
-      sessionDate: '2026-09-18',
-      sessionNumber: 4,
-      title: `${fixture.character.name}: a promise unspoken`,
-      visibility: 'private',
-      characterId: character.id,
-      body: `A private note by **${fixture.displayName}**.\n\nI have not told the others what the beacon showed me.`,
-    });
+    for (const { key: _key, ...entry } of fixture.privateLogs) {
+      await request(token, `${campaignPath}/log`, 'POST', {
+        ...entry,
+        visibility: 'private',
+        characterId: character.id,
+      });
+    }
   }
-  for (const [sessionNumber, title, location, body] of [
-    [
-      0,
-      'A charter and a promise',
-      'Greyhaven inn',
-      'The party agreed to find Fen before the autumn storms.\n\n- Secure passage.\n- Collect supplies.\n- Visit the keeper’s workshop.',
-    ],
-    [
-      3,
-      'The bridge in the rain',
-      'Stonebridge crossing',
-      '**Bram held the bridge** while the villagers crossed. Kestrel found a safe path along the bank; Mira spent her reserves keeping the way lit.',
-    ],
-    [
-      4,
-      'The beacon at Greyhaven',
-      'Greyhaven lighthouse',
-      '## A light on the horizon\n\nWe reached **Greyhaven** at dusk. The lighthouse was silent, but a fresh trail led down to the sea caves.\n\n- Kestrel found the keeper’s brass compass.\n- Mira deciphered the inscription above the tide gate.\n- Bram held the bridge while the villagers crossed.\n\n**Next session:** follow the lanterns beneath the cliffs.',
-    ],
-  ] as const) {
+  for (const { key: _key, awardPerCharacter, ...entry } of lanternSharedLogs) {
     await request(ownerActor, `${campaignPath}/log`, 'POST', {
-      sessionDate: `2026-09-${sessionNumber === 0 ? '04' : sessionNumber === 3 ? '11' : '18'}`,
-      sessionNumber,
-      title,
-      location,
-      body,
+      ...entry,
       visibility: 'campaign',
-      xpAwards: characterIds.map((characterId) => ({
-        characterId,
-        amount: sessionNumber === 0 ? 0 : 3,
-      })),
+      ...(awardPerCharacter !== undefined
+        ? {
+            xpAwards: characterIds.map((characterId) => ({
+              characterId,
+              amount: awardPerCharacter,
+            })),
+          }
+        : {}),
     });
   }
   const encounter = encounterOut.parse(

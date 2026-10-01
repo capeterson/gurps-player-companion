@@ -196,10 +196,20 @@ the calculation editor directly and do not offer absent basic-price fields.
 The Lantern Coast bootstrap uses only original fixture definitions. Its four
 fictional sourcebooks have distinct non-default abbreviations (`LCGV`, `LCST`,
 `LCTR`, `LCQO`), and every entry carries an explicit source key, section locator,
-completeness status and definition role. Fixed and leveled trait pricing plus item
+completeness status and definition role. Its 30 traits and 48 skills describe
+practical coastal tasks, training and personal obligations in original prose.
+Structured defaults, prerequisites, conditional task modifiers, timed actions and
+selected level benefits use supported declarations. Social access and vows remain
+explicitly manual rather than receiving invented universal bonuses; action previews
+do not automatically change inventory, injury or recovery. Fixed and leveled trait pricing plus item
 cost/weight calculations produce character-owned purchase resolutions through
 the shared recipe. Equipment uses current independent weapon modes, structured
 Range, directional/typed armor facets, enchantment mechanics and snapshots.
 The mage trait retains `Magery` in its original campaign-specific name to use
 the existing spell/mana semantics; its price and training benefit are synthetic.
 No fictional source is represented as a published rules reference.
+Fresh fixtures have six characters with 12–15 skills and 6–8 traits each, five shared
+logs and three private journals apiece. The explicit `db:seed:lantern:refresh` command
+conservatively updates recognized unchanged older defaults once; edited fields,
+deleted older entries and play state are preserved. A completion marker preserves
+later deletions on subsequent runs. See the [seed guide](../../bootstrap/README.md).

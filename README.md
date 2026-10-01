@@ -121,7 +121,9 @@ docker compose -f docker-compose.dev.yml exec db psql -U gurps gurps
 docker compose -f docker-compose.dev.yml down
 ```
 
-The optional seed includes **Kestrel Vale, Mira Ashfall, and Bram Stonebridge** with linked libraries, equipment, magic, active effects, session logs, and an encounter. See the [seed guide](bootstrap/README.md) for demo account credentials, scenario coverage, and repeat-run behavior. Adding `-v` to `down` deletes the development database and dependency volumes.
+The optional seed includes **Kestrel Vale, Mira Ashfall, Bram Stonebridge, Iona Reedwake, Sable Fenwick, and Orin Bellstrand**, each with 12–15 skills and 6–8 traits. Its original coastal catalog has 30 traits and 48 skills, linked equipment and magic, five shared session logs, three private journal entries per character, and an encounter. See the [seed guide](bootstrap/README.md) for credentials, mechanics and repeat-run behavior. Adding `-v` to `down` deletes the development database and dependency volumes.
+
+After migrations, `bun run db:seed:lantern:refresh` conservatively enriches a recognized older demo once, preserving player edits and play state. In a worktree, run it through `./scripts/dev-worktree.sh run --rm migrate bun run db:seed:lantern:refresh`. Ordinary seed reruns continue to preserve existing Lantern campaigns.
 
 ### Production / self-hosting
 

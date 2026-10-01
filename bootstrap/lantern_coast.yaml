@@ -25,8 +25,11 @@ library:
       value: 1
     - target: will
       value: 1
-    description: Hold your line while spray and panic break around you. +1 Parry and Will; no other reflex or surprise
-      benefit.
+    description: A trained breakwater guard keeps a steady weapon line and resists panic. The sheet applies +1
+      Parry and +1 Will at all times; these are the entire numerical benefit, with no surprise immunity, extra
+      defense, or faster reaction. A guard may spend a minute showing the stance to a companion, but instruction
+      does not transfer the bonus. The GM still resolves loss of footing, fear circumstances, and whether a weapon
+      can parry.
     key: traits_1
     sourceKey: lantern_lives
     status: complete
@@ -52,7 +55,11 @@ library:
   - name: Longwatch Lungs
     kind: advantage
     basePoints: 7
-    description: 'A reserve built on night watches: +1 FP. Recovery follows the ordinary sheet rules.'
+    description: Breathing drills and paced exertion provide one additional FP, already included in the sheet
+      maximum. This reserve can pay ordinary exertion or magic costs; it is not free breathing underwater, immunity
+      to smoke, or faster recovery. A quiet watch is a good opportunity to rest, but recovery time and fatigue
+      expenditure remain the normal campaign rules. Record any extra exertion manually rather than treating this
+      as an inexhaustible watch.
     effects:
     - target: fp
       value: 1
@@ -83,8 +90,11 @@ library:
     basePoints: 0
     pointsPerLevel: 3
     maxLevel: 5
-    description: A practiced eye for beacon intervals; +1 Horizon Watch per level, rather than a universal vision
-      bonus.
+    description: Practice distinguishing beacon intervals from reflections grants +1 Horizon Watch per purchased
+      level, up to five levels. The bonus applies to that skill alone, including a mundane lookout task; it never
+      raises general Perception or defeats concealment automatically. Interpreting a suspicious interval takes
+      the time specified by Horizon Watch. A false identification still needs confirmation by signal or approach,
+      and the GM supplies only information the observer could see.
     effects:
     - target: skill
       skillName: Horizon Watch
@@ -106,8 +116,12 @@ library:
       skillName: Beacon Resonance
       value: 1
       scaling: per_level
-    description: Original beacon-magic aptitude, priced at 7 + 9 per level. The Magery keyword uses the app’s normal
-      spell-level and mana gate; +1 Beacon Resonance per level.
+    description: 'The fictional tideglass tradition costs 7 points plus 9 per level, to a maximum of three levels.
+      Its Magery name participates in the sheet''s existing spell-level and mana gate, and each level also grants
+      +1 Beacon Resonance. This is aptitude, not knowledge: learn spells separately, pay their stated energy,
+      and respect their range, duration, and prerequisites. Beacon Resonance can diagnose a ward during a ten-minute
+      examination; it cannot substitute for a spell, confer ownership of a beacon, or authorize a dangerous rite.
+      The GM adjudicates access to instruction and phenomena the spell system cannot represent.'
     tags:
     - beacon
     key: traits_4
@@ -119,7 +133,11 @@ library:
   - name: Stoneblood
     kind: advantage
     basePoints: 6
-    description: 'Greyhaven quarry heritage: innate DR 1 and a visible mineral sheen. No immunity to injury.'
+    description: A mineral sheen marks a Greyhaven quarry lineage. The sheet grants innate DR 1; no extra strength,
+      healing, immunity to crushing, or protection beyond that DR is implied. The visible sheen can identify
+      the character to quarry families or an investigator, which is a manually adjudicated social consequence
+      rather than a reaction modifier. Damage, armor layering, and any exposed weak point still follow ordinary
+      combat rules.
     effects:
     - target: dr
       value: 1
@@ -148,7 +166,11 @@ library:
   - name: Greyhaven Promise
     kind: disadvantage
     basePoints: -7
-    description: Return every rescued traveler to a safe harbor, even when a faster route would abandon them.
+    description: After accepting a rescue, see the traveler to a genuinely safe harbor before taking unrelated
+      paid work. This does not require a suicidal extraction, but a convenient delay or a richer offer is not
+      grounds for abandonment. When routes conflict, spend a scene arranging an escort, shelter, or an agreed
+      handover. The GM adjudicates whether safety and consent are real, and may introduce a broken promise as
+      a damaged relationship or lost commission; the app does not enforce vows or apply a flat social penalty.
     key: traits_6
     sourceKey: lantern_lives
     status: complete
@@ -179,7 +201,12 @@ library:
       category: limitation
       costType: percent
       costValue: -30
-    description: Stop to record unfamiliar beacon echoes when it costs time; the GM adjudicates the compulsion.
+    description: An unfamiliar beacon echo demands a pause to sketch its rhythm, normally ten minutes if recording
+      is safe. In a chase or rising tide, the player must explain restraint or accept the delay; the GM resolves
+      the compulsion and consequences rather than the app rolling self-control. A purchased Trusted companion
+      intervenes limitation lets the named companion interrupt this pause with a direct warning, not erase the
+      interest permanently. Recording an echo supplies a clue, never an automatic Beacon Resonance success or
+      a free spell.
     key: traits_7
     sourceKey: lantern_lives
     status: complete
@@ -205,7 +232,11 @@ library:
   - name: Bridgekeeper Oath
     kind: disadvantage
     basePoints: -8
-    description: Never charge a refugee for passage; repair damage you cause to a public crossing.
+    description: Permit refugees to cross without a toll and put right damage the character causes to a public
+      crossing. The oath covers a reasonable repair or arranged restitution, not an obligation to rebuild every
+      damaged bridge in the coast. Assess a damaged crossing before promising a schedule; work may consume hours,
+      materials, and help. The GM adjudicates who needs passage and what restitution is sufficient, and tracks
+      a refused obligation through people and access rather than an unconditional skill penalty.
     key: traits_8
     sourceKey: lantern_lives
     status: complete
@@ -231,7 +262,11 @@ library:
   - name: Lantern vigil
     kind: quirk
     basePoints: -1
-    description: Always light a candle for the lost.
+    description: At a safe evening halt, spend a minute lighting a small candle or explaining why no flame can
+      be spared. The ritual honors named people lost along the coast and can start a conversation with other
+      mourners. It offers no ward, divination, fear resistance, or numerical benefit. Forgetting it is a roleplaying
+      lapse for the player and GM to resolve; wind, stealth, fire danger, and candle consumption are manual scene
+      details.
     key: traits_9
     sourceKey: lantern_lives
     status: complete
@@ -257,7 +292,10 @@ library:
   - name: Tidewise Balance
     kind: advantage
     basePoints: 8
-    description: Deck-trained balance grants +1 Current Riding and Cliff Traverse.
+    description: Years on rolling decks and wet ladders grant +1 Current Riding and +1 Cliff Traverse, already
+      reflected in those effective skills. The trait does not increase Dodge, Move, or every DX roll. It does
+      not cancel a task penalty for a slick surface, an impossible handhold, a dangerous current, or excess load.
+      Use the relevant task procedure and let the GM determine route difficulty and physical consequences.
     effects:
     - target: skill
       skillName: Current Riding
@@ -290,7 +328,10 @@ library:
   - name: Signal Memory
     kind: advantage
     basePoints: 6
-    description: 'Recall routes encoded in bell patterns: +1 Signal Weaving and Archive Diving.'
+    description: Rehearsed bell phrases and catalog habits grant +1 Signal Weaving and +1 Archive Diving. This
+      is practice in two disciplines, not perfect recall of everything read or automatic understanding of an
+      unknown code. A message must still be composed and a source located in the stated task time. The GM adjudicates
+      missing records, language barriers, forged signals, and whether an old recollection is reliable.
     effects:
     - target: skill
       skillName: Signal Weaving
@@ -323,7 +364,11 @@ library:
   - name: Gentle Hands
     kind: advantage
     basePoints: 7
-    description: A calm bedside manner adds +1 Saltwound Care and Harbor Mediation.
+    description: A practiced, patient approach grants +1 Saltwound Care and +1 Harbor Mediation. The benefit
+      represents training that applies to those skills generally, not a guarantee that every patient or disputant
+      trusts the character. It creates no automatic healing, sedation, loyalty, or reaction bonus. Use normal
+      treatment and negotiation times; the GM resolves consent, supplies, infection, and the agreement that participants
+      actually accept.
     effects:
     - target: skill
       skillName: Saltwound Care
@@ -356,7 +401,11 @@ library:
   - name: Storm Debt
     kind: disadvantage
     basePoints: -9
-    description: Your berth is pledged to the storm guild; answer its salvage summons before accepting other work.
+    description: A storm-guild crew paid for the character's rescue and now holds first claim on reasonable salvage
+      service. When a summons arrives, seek terms or a named substitute before accepting competing work; a routine
+      duty normally occupies a watch rather than every adventure. A summons to certain death may be challenged
+      openly, with the debt still unresolved. The GM sets schedules and social consequences, and records repayment
+      in the story; the app neither creates a debt ledger nor subtracts money automatically.
     key: traits_13
     sourceKey: lantern_lives
     status: complete
@@ -382,7 +431,10 @@ library:
   - name: Counts the gulls
     kind: quirk
     basePoints: -1
-    description: Count the gulls before setting sail, and invent an omen for the result.
+    description: Before setting sail, count the visible gulls for about a minute and announce a personal omen.
+      The omen is a habit, not supernatural information, a weather roll, or a navigation modifier. If a hurried
+      departure prevents the count, the character remains unsettled until a safe pause permits a substitute ritual.
+      The player and GM adjudicate the interruption; the app applies no blanket anxiety penalty.
     key: traits_14
     sourceKey: lantern_lives
     status: complete
@@ -408,7 +460,11 @@ library:
   - name: Pocket gardener
     kind: perk
     basePoints: 1
-    description: Keep a miniature salt-tolerant garden; a narrative conversation starter, not a supply bonus.
+    description: A tiny salt-tolerant garden gives a concrete hobby and an excuse to trade cuttings with gardeners.
+      With an hour of care and local materials, the character may preserve one ordinary plant cutting during
+      travel, subject to the GM's assessment of weather and storage. It cannot feed a crew, create medicinal
+      effects, or replace Coastal Foraging. Plant condition, gifts, and contacts are manually adjudicated; no
+      supply or social bonus is automatic.
     key: traits_15
     sourceKey: lantern_lives
     status: complete
@@ -431,6 +487,453 @@ library:
         max: 1000
     sourceLocator: traits.15
     source: LCGV traits.15
+  - name: Beacon Courier's Seal
+    kind: perk
+    basePoints: 1
+    description: A current courier seal allows delivery of a sealed message to the Greyhaven beacon office during
+      its open watch, and a place in the next public dispatch. Checking the seal takes a few minutes; it offers
+      no priority over a declared emergency, immunity to searches, or access to restricted records. Staff may
+      refuse a broken or misused seal. The GM adjudicates the privilege and revocation; no reaction or skill
+      bonus is automatic.
+    key: traits_16
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.16
+    source: LCGV traits.16
+  - name: Missing-Keeper Obligation
+    kind: disadvantage
+    basePoints: -5
+    description: The character promised the keeper's household a real update whenever returning to Greyhaven.
+      Spend an evening following a credible lead or arranging help before departing on unrelated business; repeating
+      a rumor does not discharge the duty. Rescue remains subject to practical safety, and the household may
+      release the promise after an honest resolution. The GM adjudicates leads, deadlines, and broken trust manually;
+      this is an obligation, not an always-on penalty.
+    key: traits_17
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.17
+    source: LCGV traits.17
+  - name: Always Checks the Knot
+    kind: quirk
+    basePoints: -1
+    description: Before trusting a rope to carry a person, spend a few seconds checking its principal knot, even
+      if another expert tied it. In a hurry this can cost a moment or prompt a request for reassurance. The check
+      provides no automatic Ropework success and does not detect hidden damage. The player and GM adjudicate
+      timing; the habit never increases defense or climbing skill.
+    key: traits_18
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.18
+    source: LCGV traits.18
+  - name: Archive Custodian
+    kind: perk
+    basePoints: 1
+    description: A recognized custodian may consult the Greyhaven public chart drawers and request one supervised
+      copying desk during office hours. A request takes about ten minutes when the office is staffed; sealed
+      holdings and rival archives still require permission. Missing, false, or damaged records remain possible.
+      The GM adjudicates access and loss of standing manually; this privilege does not provide a research bonus
+      or perfect information.
+    key: traits_19
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.19
+    source: LCGV traits.19
+  - name: Must Credit the Discoverer
+    kind: disadvantage
+    basePoints: -5
+    description: When publishing a chart, selling a research result, or reporting a discovery to patrons, name
+      the person whose observation made it possible. Spend time checking attribution before a formal presentation,
+      even when anonymity would be politically convenient. The obligation does not force exposure of an endangered
+      informant; seek their consent or withhold the publication. The GM adjudicates disputes, opportunities lost
+      through delay, and restitution for false credit. No automatic social modifier applies.
+    key: traits_20
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.20
+    source: LCGV traits.20
+  - name: Keeps Every Rubbing
+    kind: quirk
+    basePoints: -1
+    description: Ask to retain a rubbing, sketch, or copied line from each significant inscription. Making the
+      record ordinarily takes ten minutes and uses paper or wax; when copying is unsafe, return later or voice
+      regret. These notes are evidence, not a universal memory bonus or automatic translation. The GM adjudicates
+      baggage, consent to copy, and any consequences of carrying restricted text.
+    key: traits_21
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.21
+    source: LCGV traits.21
+  - name: Dockwright's Union Token
+    kind: perk
+    basePoints: 1
+    description: A current union token permits use of the public repair bench and a request to borrow one ordinary
+      hand tool while the union workshop is staffed. Sign for the tool and return it by the end of the watch;
+      scarce materials and paid labor are excluded. Abuse can suspend access until restitution is made. The GM
+      adjudicates loans and local recognition manually; the token grants neither a craft bonus nor free equipment
+      ownership.
+    key: traits_22
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.22
+    source: LCGV traits.22
+  - name: Unsafe-Bridge Compulsion
+    kind: disadvantage
+    basePoints: -5
+    description: After noticing a credible defect in a public crossing, warn users and spend at least a short
+      scene marking the hazard or finding someone responsible. Simply walking away to save time violates the
+      compulsion, but emergency evacuation is a valid response when repair is impossible. The trait does not
+      reveal defects without a successful inspection. The GM adjudicates urgency, restraint, and consequences
+      manually; no unconditional Will or skill penalty is applied.
+    key: traits_23
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.23
+    source: LCGV traits.23
+  - name: Tidepilot's Charter
+    kind: perk
+    basePoints: 1
+    description: The harbor office recognizes the character as eligible to take paid pilotage assignments on
+      its marked local channels. A current chart and a briefing are still required, and the charter does not
+      license unfamiliar waters or guarantee a client. Presenting it takes a few minutes; an unsafe voyage can
+      suspend the privilege. The GM adjudicates commissions and licensing manually, with no automatic navigation
+      or social bonus.
+    key: traits_24
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.24
+    source: LCGV traits.24
+  - name: Crew Before Cargo
+    kind: disadvantage
+    basePoints: -5
+    description: When a voyage forces a choice between a person's safety and keeping cargo intact, choose the
+      person and explain that policy before loading a new client's goods. Seek salvage only after evacuation
+      is secure; the duty does not demand a hopeless rescue. The GM adjudicates genuine conflicts, compensation
+      demands, and trust earned or lost. The app does not automatically jettison inventory, transfer money, or
+      add a general reaction modifier.
+    key: traits_25
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.25
+    source: LCGV traits.25
+  - name: Refuge-House Key
+    kind: perk
+    basePoints: 1
+    description: A trusted volunteer holds the key to Greyhaven's public refuge kitchen and can request a sheltered
+      place for one person until the next watch. The caretaker may refuse access during quarantine, lack of space,
+      or abuse, and private stores remain restricted. Arranging admission takes a short conversation rather than
+      bypassing consent. The GM tracks capacity and privileges manually; the key grants neither free healing
+      nor a universal hospitality bonus.
+    key: traits_26
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.26
+    source: LCGV traits.26
+  - name: Patient Before Purse
+    kind: disadvantage
+    basePoints: -5
+    description: If a person presents an urgent, treatable wound, offer immediate assessment before bargaining
+      over payment. Commit a reasonable treatment scene or arrange a competent replacement before returning to
+      paid errands; there is no requirement to promise a cure or enter a hopeless hazard. The GM adjudicates
+      triage, consent, and forgone opportunities manually. The trait has no automatic healing output, economic
+      deduction, or numerical bedside bonus.
+    key: traits_27
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.27
+    source: LCGV traits.27
+  - name: Bellkeeper's Credentials
+    kind: perk
+    basePoints: 1
+    description: The beacon office permits the character to inspect the public bell schedule and request one
+      supervised test interval on an idle signal bell. Coordination normally takes ten minutes and may be refused
+      during an emergency or active watch. Private codes and control of the entire harbor network are excluded.
+      The GM adjudicates scheduling and credentials manually; no signal bonus or authority to issue false warnings
+      is implied.
+    key: traits_28
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: 1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.28
+    source: LCGV traits.28
+  - name: Stolen-Signal Suspicion
+    kind: disadvantage
+    basePoints: -5
+    description: A rival bellhouse believes the character copied its dispatch pattern. When dealing with that
+      bellhouse or its named allies, expect inspection of commissions and a demand for an explanation before
+      gaining routine cooperation. Allow a scene for resolving the challenge; strangers outside that network
+      are unaffected. The GM keeps the accusers and triggers explicit and resolves reputation, evidence, and
+      reconciliation manually, without a blanket reaction penalty.
+    key: traits_29
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -5
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.29
+    source: LCGV traits.29
+  - name: Rehearses in Whispers
+    kind: quirk
+    basePoints: -1
+    description: Before a formal signal performance, quietly rehearse its opening phrase for several seconds.
+      This habit can irritate a hurried partner or give a nearby listener advance warning, but supplies no automatic
+      success or bonus. The character may suppress it for an emergency while remaining visibly uncomfortable.
+      The player and GM adjudicate audible range and delay rather than applying an unconditional stealth penalty.
+    key: traits_30
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: points
+        op: constant
+        value: -1
+      outputs:
+      - key: points
+        node: points
+        unit: points
+        rounding: exact
+        increment: 1
+        min: -1000
+        max: 1000
+    sourceLocator: traits.30
+    source: LCGV traits.30
   skills:
   - name: Quayblade
     attribute: DX
@@ -439,13 +942,52 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Original Greyhaven training in quayblade; adjudicate task scope at the table.
+    description: Use a short coastal sword in close combat and practice safe passing drills on a narrow quay.
+      One attack uses the normal combat turn; an examination of a guard's stance takes a minute. The weapon row
+      supplies damage, reach, and parry, so this skill adds no separate damage or defense bonus. Fighting amid
+      tangled mooring lines uses the declared task penalty; the GM resolves footing, target defenses, and a dropped
+      weapon.
     key: skills_1
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.1
     source: LCST skills.1
+    procedures:
+      modifiers:
+      - id: quayblade_obstacle
+        label: Tangled mooring lines restrict the weapon
+        when:
+        - input:
+            domain: environment
+            key: quayblade_obstacle
+            label: Tangled mooring lines restrict the weapon
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: quayblade_task
+        label: Make a quayblade attack
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: Resolve the chosen weapon mode and target defense through normal combat; injury is recorded there.
+          'on': success
+        - kind: note
+          text: The strike misses or is defended against; the GM resolves any critical mishap.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Bulwark Handling
     attribute: DX
     difficulty: E
@@ -453,13 +995,52 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -4
-    description: Original Greyhaven training in bulwark handling; adjudicate task scope at the table.
+    description: Control the coast's small bucklers, redirect an incoming blow, and carry a shield through a
+      crowded gangway. Blocking uses the sheet defense calculated from this skill and the actual shield, not
+      a second flat defense bonus. An attack with the buckler takes the normal combat turn and uses its listed
+      mode. In cramped rigging, apply the selected handling penalty; the GM adjudicates loss of footing and which
+      attacks can be blocked.
     key: skills_2
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.2
     source: LCST skills.2
+    procedures:
+      modifiers:
+      - id: bulwark_handling_obstacle
+        label: Rigging obstructs the shield arm
+        when:
+        - input:
+            domain: environment
+            key: bulwark_handling_obstacle
+            label: Rigging obstructs the shield arm
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: bulwark_handling_task
+        label: Strike with the buckler
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: Resolve the buckler attack mode and the target's defense; this preview does not roll a Block.
+          'on': success
+        - kind: note
+          text: The strike fails; the GM resolves obstruction or any critical mishap.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Reedbow
     attribute: DX
     difficulty: H
@@ -467,13 +1048,52 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Original Greyhaven training in reedbow; adjudicate task scope at the table.
+    description: Shoot the flexible reedglass bow and maintain a safe firing lane across an open quay. Releasing
+      one shot uses a combat turn; reloading, Aim, range, ammunition, and damage come from the actual weapon
+      mode. Crosswind and a swaying platform can spoil a clean lane; the declared crosswind modifier applies
+      only when the GM confirms that circumstance. A hit does not ignore cover or defenses, and the app's combat
+      flow remains the place to resolve injury.
     key: skills_3
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.3
     source: LCST skills.3
+    procedures:
+      modifiers:
+      - id: reedbow_obstacle
+        label: Strong crosswind crosses the firing lane
+        when:
+        - input:
+            domain: environment
+            key: reedbow_obstacle
+            label: Strong crosswind crosses the firing lane
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: reedbow_task
+        label: Loose a reedbow shot
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: Resolve the selected ranged mode, target defense, and ammunition through the combat sheet.
+          'on': success
+        - kind: note
+          text: The arrow misses; the GM determines its landing point and any collateral danger.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Salvage Haft
     attribute: DX
     difficulty: A
@@ -481,13 +1101,52 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Original Greyhaven training in salvage haft; adjudicate task scope at the table.
+    description: Wield a hook-axe or heavy salvage haft in combat, or make a controlled strike against a marked
+      piece of wreckage. Each strike uses a combat turn; prolonged clearing is a separate salvage task. Damage,
+      strength requirements, and an unbalanced parry come from the weapon mode and are not improved by this description.
+      Unstable wreckage gives the stated task penalty. The GM determines whether the target can be cut and whether
+      the blow releases a dangerous load.
     key: skills_4
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.4
     source: LCST skills.4
+    procedures:
+      modifiers:
+      - id: salvage_haft_obstacle
+        label: Wreckage shifts underfoot
+        when:
+        - input:
+            domain: environment
+            key: salvage_haft_obstacle
+            label: Wreckage shifts underfoot
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: salvage_haft_task
+        label: Make a haft strike
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: Resolve the chosen haft mode; the GM adjudicates any released structural load.
+          'on': success
+        - kind: note
+          text: The strike fails; do not assume the footing or suspended load remains safe.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Beacon Rod
     attribute: DX
     difficulty: E
@@ -495,24 +1154,102 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Original Greyhaven training in beacon rod; adjudicate task scope at the table.
+    description: Handle a beacon keeper's long rod for a tap, sweeping strike, or controlled sparring demonstration.
+      A strike uses a combat turn and the rod's listed reach, damage, and defense. The skill neither channels
+      spells through an ordinary rod nor improves every staff-shaped object. Low overhead beams impede the chosen
+      action with the stated task penalty. The GM adjudicates leverage, obstructions, and any noncombat attempt
+      to move a heavy object.
     key: skills_5
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.5
     source: LCST skills.5
+    procedures:
+      modifiers:
+      - id: beacon_rod_obstacle
+        label: Low beams restrict the rod sweep
+        when:
+        - input:
+            domain: environment
+            key: beacon_rod_obstacle
+            label: Low beams restrict the rod sweep
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: beacon_rod_task
+        label: Use a beacon rod mode
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: Resolve the selected rod mode through normal attack and defense rules.
+          'on': success
+        - kind: note
+          text: The rod misses or catches an obstruction; the GM resolves a critical mishap.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Dockside Scrapping
     attribute: DX
     difficulty: E
     defaults: []
-    description: Original Greyhaven training in dockside scrapping; adjudicate task scope at the table.
+    description: Use the fictional quayworkers' grappling-and-striking drill at close reach. An attempt takes
+      a combat turn; damage and defense must come from the applicable unarmed combat mode or an explicit GM ruling.
+      Training has no declared default and does not grant a free attack, universal damage bonus, or immunity
+      to a weapon. A crowded workbench is a task obstacle. The GM resolves holds and escapes that the current
+      weapon modes do not represent.
     key: skills_6
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.6
     source: LCST skills.6
+    procedures:
+      modifiers:
+      - id: dockside_scrapping_obstacle
+        label: A crowded workbench obstructs movement
+        when:
+        - input:
+            domain: environment
+            key: dockside_scrapping_obstacle
+            label: A crowded workbench obstructs movement
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: dockside_scrapping_task
+        label: Attempt a dockside hold
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: The GM resolves the hold and records any restraint manually; this is not automatic injury.
+          'on': success
+        - kind: note
+          text: The hold is not established; the GM describes the opening or a critical mishap.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Shingle Ghosting
     attribute: DX
     difficulty: A
@@ -520,7 +1257,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: '**Move unseen.** The following task modifier is an explicit campaign example.'
+    description: Move quietly between nearby cover on a shingle beach, tidal stair, or cluttered quay. A short
+      crossing normally takes a minute; a lookout contest uses the existing Slip past the lookout action against
+      Horizon Watch. Loose shingle applies the declared -2 task modifier, and choosing speed does not erase that
+      penalty. Success gives a chance to reach cover, not invisibility or passage through a locked gate. The
+      GM adjudicates observers, available cover, travel distance, and any alarm manually; the practiced-scout
+      milestone adds no numerical bonus.
     procedures:
       modifiers:
       - id: noisy_ground
@@ -575,13 +1317,52 @@ library:
     - kind: attribute
       attribute: Per
       modifier: -5
-    description: Original Greyhaven training in coastal foraging; adjudicate task scope at the table.
+    description: 'Survey one accessible patch for food or water during an hour of careful searching. Learn Cliff
+      Gardens and Tide Flats separately: cliff practice covers edible plants and rain traps, while flats practice
+      covers shellfish and safe gathering channels. A contaminated patch imposes the declared task penalty. The
+      GM decides quantity, spoilage, tidal access, and whether unfamiliar material is safe; a success does not
+      conjure rations or diagnose every toxin. Record any supplies and travel time manually.'
     key: skills_8
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.8
     source: LCST skills.8
+    procedures:
+      modifiers:
+      - id: coastal_foraging_obstacle
+        label: The gathering patch shows contamination
+        when:
+        - input:
+            domain: environment
+            key: coastal_foraging_obstacle
+            label: The gathering patch shows contamination
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: coastal_foraging_task
+        label: Gather from the learned habitat
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM identifies a modest local find and records its quantity and condition manually.
+          'on': success
+        - kind: note
+          text: No dependable find is secured; the GM decides whether time, exposure, or a suspect sample matters.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Horizon Watch
     attribute: Per
     difficulty: A
@@ -589,13 +1370,52 @@ library:
     - kind: attribute
       attribute: Per
       modifier: -5
-    description: Original Greyhaven training in horizon watch; adjudicate task scope at the table.
+    description: Inspect a visible horizon or beacon approach for vessels, changing intervals, and suspicious
+      silhouettes. A focused sweep takes one minute; continuing a watch requires repeated attention as conditions
+      change. Dense mist gives the declared -2 task penalty. Success supplies a plausible sighting, not a name
+      at impossible distance or knowledge behind a wall. The GM adjudicates range, illumination, hidden observers,
+      and uncertainty before a report is treated as fact.
     key: skills_9
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.9
     source: LCST skills.9
+    procedures:
+      modifiers:
+      - id: horizon_watch_obstacle
+        label: Dense mist obscures the horizon
+        when:
+        - input:
+            domain: environment
+            key: horizon_watch_obstacle
+            label: Dense mist obscures the horizon
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: horizon_watch_task
+        label: Sweep the horizon
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM reports one visible change or confirms an unobstructed area within plausible range.
+          'on': success
+        - kind: note
+          text: An important detail may be missed or misidentified; the GM describes uncertainty manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Current Riding
     attribute: HT
     difficulty: E
@@ -603,13 +1423,52 @@ library:
     - kind: attribute
       attribute: HT
       modifier: -4
-    description: Original Greyhaven training in current riding; adjudicate task scope at the table.
+    description: Keep orientation and make a short controlled passage through coastal water or while riding a
+      small float. A difficult segment takes about a minute; longer travel needs repeated decisions, fatigue,
+      and an actual safe route. Opposing current gives the selected penalty, and the skill does not provide underwater
+      breathing or unlimited endurance. The GM adjudicates distance, carried load, exposure, and rescue opportunities;
+      record fatigue and displacement manually.
     key: skills_10
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.10
     source: LCST skills.10
+    procedures:
+      modifiers:
+      - id: current_riding_obstacle
+        label: A strong current opposes the route
+        when:
+        - input:
+            domain: environment
+            key: current_riding_obstacle
+            label: A strong current opposes the route
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: current_riding_task
+        label: Cross a short current
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM sets progress toward the chosen safe point and records any exertion manually.
+          'on': success
+        - kind: note
+          text: Progress is lost or the swimmer drifts; the GM decides the rescue and fatigue consequences.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Cliff Traverse
     attribute: DX
     difficulty: A
@@ -617,13 +1476,52 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Original Greyhaven training in cliff traverse; adjudicate task scope at the table.
+    description: Climb a marked coastal pitch or cross a narrow rock shelf with suitable holds. A short pitch
+      takes ten minutes of cautious movement; rope setup is a separate task. Wet, crumbling holds give the stated
+      penalty, and no roll creates an absent handhold or supports an impossible load. The GM sets attainable
+      distance, consequences of a fall, and the value of anchors before the attempt. Equipment use, movement,
+      and injury are recorded manually.
     key: skills_11
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.11
     source: LCST skills.11
+    procedures:
+      modifiers:
+      - id: cliff_traverse_obstacle
+        label: Holds are wet and crumbling
+        when:
+        - input:
+            domain: environment
+            key: cliff_traverse_obstacle
+            label: Holds are wet and crumbling
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: cliff_traverse_task
+        label: Traverse a marked pitch
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM moves the climber to the next feasible anchor or ledge and records travel time.
+          'on': success
+        - kind: note
+          text: The climber must halt or slips; the GM resolves anchors, rescue, and injury manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Beacon Resonance
     attribute: IQ
     difficulty: VH
@@ -640,13 +1538,52 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -7
-    description: Original Greyhaven training in beacon resonance; adjudicate task scope at the table.
+    description: Compare a fictional beacon's pulse against a known tideglass pattern during ten minutes of undisturbed
+      study. Instruction requires IQ 12 and Magery (Tideglass attunement), as the structured prerequisite declares.
+      A cracked or incomplete lens adds the task penalty. Success distinguishes a plausible active pattern from
+      noise; it does not cast a spell, open a sealed ward, or grant energy. The GM adjudicates magical interference,
+      missing reference patterns, dangerous exposure, and the meaning of the result.
     key: skills_12
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.12
     source: LCST skills.12
+    procedures:
+      modifiers:
+      - id: beacon_resonance_obstacle
+        label: The beacon lens is cracked
+        when:
+        - input:
+            domain: equipment
+            key: beacon_resonance_obstacle
+            label: The beacon lens is cracked
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: beacon_resonance_task
+        label: Examine a beacon pulse
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM identifies a plausible resonance pattern or a specific missing reference.
+          'on': success
+        - kind: note
+          text: The reading is inconclusive or misleading; the GM resolves any dangerous exposure manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Saltwound Care
     attribute: IQ
     difficulty: A
@@ -656,7 +1593,11 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -4
-    description: Record the learned TL and use the action as a campaign task preview.
+    description: 'At the learned TL, spend one minute assessing and dressing a fictional coastal wound with suitable
+      clean supplies. The existing Dress a wound action is a treatment preview: success does not automatically
+      restore HP or remove a condition. Without a suitable clean kit, apply the selected equipment penalty. The
+      GM adjudicates consent, treatable injury, infection risk, recovery, and consumed supplies under the campaign''s
+      treatment rules; record the result manually.'
     procedures:
       actions:
       - id: dress_wound
@@ -672,6 +1613,20 @@ library:
         - kind: note
           text: Consult the treatment rules and record the patient's recovery manually.
           'on': success
+      modifiers:
+      - id: inadequate_clean_kit
+        label: No suitable clean treatment kit
+        when:
+        - input:
+            domain: equipment
+            key: inadequate_clean_kit
+            label: No suitable clean treatment kit
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
     key: skills_13
     sourceKey: lantern_training
     status: complete
@@ -685,13 +1640,53 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Original Greyhaven training in archive diving; adjudicate task scope at the table.
+    description: Locate and compare a harbor record, chart entry, or dispatch in an accessible archive. One focused
+      search takes an hour; knowing the catalog does not guarantee that a missing document exists. Unsorted or
+      damaged records impose the declared penalty. A success identifies a relevant source and its uncertainty,
+      not automatic translation or proof that it is truthful. The GM adjudicates access, language, forgery, copying
+      time, and the concrete clue recovered.
     key: skills_14
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.14
     source: LCST skills.14
+    procedures:
+      modifiers:
+      - id: archive_diving_obstacle
+        label: Records are unsorted or water-damaged
+        when:
+        - input:
+            domain: equipment
+            key: archive_diving_obstacle
+            label: Records are unsorted or water-damaged
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: archive_diving_task
+        label: Search a harbor archive
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM supplies a relevant available record or a useful catalog lead, with provenance.
+          'on': success
+        - kind: note
+          text: The search yields no reliable lead; the GM decides whether further time or another collection
+            is needed.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Harbor Mediation
     attribute: IQ
     difficulty: A
@@ -699,13 +1694,55 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -6
-    description: Original Greyhaven training in harbor mediation; adjudicate task scope at the table.
+    description: Bring willing harbor disputants into a focused discussion of one concrete issue. A first exchange
+      takes ten minutes; entrenched disputes may take more scenes. An active feud gives the declared task penalty.
+      Use a quick contest against the opposing Harbor Mediation when a participant actively counters the proposal,
+      with the GM resolving the opponent. Success wins consideration, not consent, mind control, or a universal
+      reaction bonus; agreements and concessions are manual story outcomes.
     key: skills_15
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.15
     source: LCST skills.15
+    procedures:
+      modifiers:
+      - id: harbor_mediation_obstacle
+        label: The parties have an active feud
+        when:
+        - input:
+            domain: task
+            key: harbor_mediation_obstacle
+            label: The parties have an active feud
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: harbor_mediation_task
+        label: Propose a harbor compromise
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM presents a viable concession or willingness to continue; participants retain agency.
+          'on': success
+        - kind: note
+          text: The proposal is rejected or the meeting breaks down; the GM tracks the relationship consequence.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+        contest:
+          kind: quick
+          opponent: Harbor Mediation
   - name: Quayside Barter
     attribute: IQ
     difficulty: A
@@ -713,13 +1750,55 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Original Greyhaven training in quayside barter; adjudicate task scope at the table.
+    description: Assess a small quay trade and make one good-faith offer over roughly ten minutes. The stated
+      unfamiliar-market penalty applies when the seller's customs or goods are new. A quick contest against the
+      other trader's Quayside Barter determines which side argues its position better; it is not a fixed percentage
+      discount. The GM sets the goods' condition, available price range, and any accepted offer. Money, inventory,
+      debts, and failed negotiations are recorded manually.
     key: skills_16
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.16
     source: LCST skills.16
+    procedures:
+      modifiers:
+      - id: quayside_barter_obstacle
+        label: The market customs are unfamiliar
+        when:
+        - input:
+            domain: familiarity
+            key: quayside_barter_obstacle
+            label: The market customs are unfamiliar
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: quayside_barter_task
+        label: Negotiate a quay trade
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM offers a plausible concession within the available trade, if the other party agrees.
+          'on': success
+        - kind: note
+          text: No favorable agreement is reached; the GM adjudicates a refusal or loss of the offer.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+        contest:
+          kind: quick
+          opponent: Quayside Barter
   - name: Salvage Fitting
     attribute: IQ
     difficulty: A
@@ -731,13 +1810,52 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Original Greyhaven training in salvage fitting; adjudicate task scope at the table.
+    description: At the learned TL and chosen specialty, fit a salvaged component to armor or jetty hardware.
+      Spend an hour assessing and adjusting one feasible component; Body Armor and Jetty Hardware are distinct
+      training specialties. Improvised tools give the stated penalty, and the skill cannot upgrade an item's
+      technology or create material from nothing. The GM adjudicates part compatibility, consumables, final strength,
+      and failed work. Record item changes manually; the procedure grants no automatic DR or item-price change.
     key: skills_17
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.17
     source: LCST skills.17
+    procedures:
+      modifiers:
+      - id: salvage_fitting_obstacle
+        label: Only improvised fitting tools are available
+        when:
+        - input:
+            domain: equipment
+            key: salvage_fitting_obstacle
+            label: Only improvised fitting tools are available
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: salvage_fitting_task
+        label: Fit a salvaged component
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM confirms the feasible repair or fitting and records its material cost and limits.
+          'on': success
+        - kind: note
+          text: The fitting is unusable or needs rework; the GM resolves wasted material or hidden defects.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Tidepilot
     attribute: IQ
     difficulty: H
@@ -745,13 +1863,53 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -6
-    description: Plot routes between moving shoals; a route does not grant automatic safe passage.
+    description: Plot a route between moving shoals using a current chart, soundings, and an observed tide. Planning
+      one leg takes ten minutes and does not replace handling the actual boat. An obsolete chart gives the stated
+      task penalty. Success identifies a feasible route and a departure window, not guaranteed passage through
+      a storm. The GM adjudicates changing water, ship draft, travel time, and any encounter; navigation and
+      cargo consequences are manual.
     key: skills_18
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.18
     source: LCST skills.18
+    procedures:
+      modifiers:
+      - id: tidepilot_obstacle
+        label: The available chart is obsolete
+        when:
+        - input:
+            domain: equipment
+            key: tidepilot_obstacle
+            label: The available chart is obsolete
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: tidepilot_task
+        label: Plot a shoal passage
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM provides one plausible route and tide window, subject to actual handling and weather.
+          'on': success
+        - kind: note
+          text: The route is unreliable; the GM identifies uncertainty or adjudicates grounding risk if it is
+            followed.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Signal Weaving
     attribute: IQ
     difficulty: A
@@ -759,26 +1917,105 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Compose bell, pennant and lantern codes for a harbor crew.
+    description: Compose or interpret a short bell, pennant, or lantern message in a code shared by the crew.
+      Drafting takes one minute; transmission still requires equipment and a visible or audible path. An unfamiliar
+      codebook gives the stated penalty. Success conveys the agreed message, not translation of an unknown language,
+      a hidden command, or proof of the sender's identity. The GM adjudicates interception, reception, and any
+      ambiguity manually.
     key: skills_19
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.19
     source: LCST skills.19
+    procedures:
+      modifiers:
+      - id: signal_weaving_obstacle
+        label: The codebook format is unfamiliar
+        when:
+        - input:
+            domain: familiarity
+            key: signal_weaving_obstacle
+            label: The codebook format is unfamiliar
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: signal_weaving_task
+        label: Draft a harbor signal
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM confirms a short unambiguous message in a mutually known code.
+          'on': success
+        - kind: note
+          text: The message is ambiguous or malformed; the GM determines how recipients interpret it.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Marsh Distilling
     attribute: IQ
     difficulty: H
     techLevelPolicy:
       kind: required
     defaults: []
-    description: Prepare fictional salt-herb infusions at the learned TL; effects are adjudicated manually.
+    description: At the learned TL, prepare a fictional salt-herb infusion from identified samples and a distiller
+      roll. A small batch takes two hours; no default is declared because untrained processing is unsafe in the
+      fiction. Suspect samples give the declared penalty. The GM determines whether the batch is stable and any
+      agreed fictional effect; the skill does not automatically heal, poison, or supply spell energy. Record
+      ingredients, yield, and consequences manually.
     key: skills_20
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.20
     source: LCST skills.20
+    procedures:
+      modifiers:
+      - id: marsh_distilling_obstacle
+        label: The sample identity is uncertain
+        when:
+        - input:
+            domain: equipment
+            key: marsh_distilling_obstacle
+            label: The sample identity is uncertain
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: marsh_distilling_task
+        label: Prepare a marsh infusion
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 2
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records a stable fictional batch and any specifically agreed use; no automatic healing
+            occurs.
+          'on': success
+        - kind: note
+          text: The batch is unusable or suspect; the GM decides disposal, wasted ingredients, and exposure.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Harbor Winchcraft
     attribute: IQ
     difficulty: A
@@ -788,13 +2025,52 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Rig tide-powered winches and identify unsafe loads.
+    description: At the learned TL, inspect and rig a tide-powered winch for one known load. A setup takes ten
+      minutes before lifting; the plan requires an actual anchor, sound rope, and room for the load. A corroded
+      drum gives the stated penalty. Success establishes a plausible setup, not an automatic strength increase
+      or the ability to exceed the equipment's safe capacity. The GM sets capacity and adjudicates lift timing,
+      rope consumption, and failure consequences manually.
     key: skills_21
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.21
     source: LCST skills.21
+    procedures:
+      modifiers:
+      - id: harbor_winchcraft_obstacle
+        label: The winch drum is corroded
+        when:
+        - input:
+            domain: equipment
+            key: harbor_winchcraft_obstacle
+            label: The winch drum is corroded
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: harbor_winchcraft_task
+        label: Rig a harbor lift
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM approves a feasible rig and a safe load limit before an actual lift.
+          'on': success
+        - kind: note
+          text: The rig needs correction; if used regardless, the GM resolves shifting load or equipment failure.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Gullcall Performance
     attribute: HT
     difficulty: A
@@ -802,13 +2078,52 @@ library:
     - kind: attribute
       attribute: HT
       modifier: -5
-    description: Project patterned calls across windy quays.
+    description: Project a rehearsed call over a quay so a listening crew can recognize a simple agreed phrase.
+      A call takes ten seconds; an extended performance can require fatigue and pauses. Severe wind gives the
+      task penalty. Success helps willing listeners distinguish the phrase, not command real gulls, compel obedience,
+      or replace a shared language. The GM adjudicates distance, background noise, and whether hostile listeners
+      also hear it.
     key: skills_22
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.22
     source: LCST skills.22
+    procedures:
+      modifiers:
+      - id: gullcall_performance_obstacle
+        label: Severe wind disrupts the call
+        when:
+        - input:
+            domain: environment
+            key: gullcall_performance_obstacle
+            label: Severe wind disrupts the call
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: gullcall_performance_task
+        label: Project a crew call
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: The GM identifies which attentive listeners can recognize the agreed phrase.
+          'on': success
+        - kind: note
+          text: The phrase is lost or confused; the GM determines who misunderstands or overhears it.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
   - name: Tether Cast
     attribute: DX
     difficulty: H
@@ -816,13 +2131,1539 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -6
-    description: Place weighted rescue lines without entangling a swimmer.
+    description: Throw a weighted rescue line to a reachable person or anchor without entangling them. A prepared
+      cast uses one combat turn; preparing and retrieving the actual tether uses its weapon mode's reload time.
+      Crosswind gives the task penalty, while distance and other attack circumstances come from the ranged mode.
+      Success places the line, not a secure attachment or a guaranteed haul. The GM adjudicates grip, rope capacity,
+      rescue timing, and entanglement, and records those outcomes manually.
     key: skills_23
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: skills.23
     source: LCST skills.23
+    procedures:
+      modifiers:
+      - id: tether_cast_obstacle
+        label: Crosswind moves the weighted line
+        when:
+        - input:
+            domain: environment
+            key: tether_cast_obstacle
+            label: Crosswind moves the weighted line
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: tether_cast_task
+        label: Cast a rescue tether
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: The GM resolves placement using the tether mode; the recipient must still grip or secure the
+            line.
+          'on': success
+        - kind: note
+          text: The line misses or tangles; the GM resolves retrieval and any danger to nearby people.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+  - name: Ropework
+    attribute: DX
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -4
+    - kind: skill
+      name: Tether Cast
+      specialization:
+        kind: any
+      modifier: -4
+    description: Tie, inspect, and release the knots used for coastal work. A load-bearing line setup takes five
+      minutes and must have sound rope and a feasible anchor. Frayed rope gives the stated penalty; success does
+      not increase rope capacity or replace a climbing roll. The GM resolves attachment, load limits, consumed
+      rope, and a slipped knot manually. At relative level +2, sustained knot practice also grants the declared
+      +1 Net Mending benefit.
+    procedures:
+      modifiers:
+      - id: ropework_obstacle
+        label: The available rope is frayed
+        when:
+        - input:
+            domain: equipment
+            key: ropework_obstacle
+            label: The available rope is frayed
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: ropework_task
+        label: Prepare a load-bearing line
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 5
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM approves an appropriate knot and anchor for the stated feasible load.
+          'on': success
+        - kind: note
+          text: The setup needs retying or fails inspection; the GM resolves consequences if it is loaded anyway.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+      benefits:
+      - id: cross_training
+        label: Practiced net mending
+        when:
+          minimumRelativeLevel: 2
+        effects:
+        - target: skill
+          skillName: Net Mending
+          value: 1
+        sourceText: At relative level +2, sustained training grants +1 Net Mending; no other skill receives this
+          benefit.
+    key: skills_24
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.24
+    source: LCST skills.24
+  - name: Shoal Cartography
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Tidepilot
+      specialization:
+        kind: any
+      modifier: -3
+    description: Turn observed bearings and soundings into a small coastal chart. One harbor approach takes two
+      hours after gathering observations, not including the survey itself. Incomplete bearings give the task
+      penalty. The map records what was measured and dated; it cannot guarantee future tides or unfamiliar depths.
+      The GM judges scale, accuracy, missing areas, copying materials, and any error when the chart is used.
+    procedures:
+      modifiers:
+      - id: shoal_cartography_obstacle
+        label: Survey bearings are incomplete
+        when:
+        - input:
+            domain: equipment
+            key: shoal_cartography_obstacle
+            label: Survey bearings are incomplete
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: shoal_cartography_task
+        label: Draft an approach chart
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 2
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records a dated chart of the surveyed area and any known gaps.
+          'on': success
+        - kind: note
+          text: The chart contains unresolved gaps or distortions; the GM identifies the need for another observation.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_25
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.25
+    source: LCST skills.25
+  - name: Smallcraft Sailing
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Tidepilot
+      specialization:
+        kind: any
+      modifier: -4
+    description: Trim sail, plan a tack, and coordinate a small coastal boat through a short maneuver. Allow
+      one minute for the declared tack, with a suitable crew and vessel. A torn sail gives the task penalty.
+      Navigation, endurance, and harbor law are separate disciplines; success does not make a boat seaworthy
+      or cancel wind and current. The GM resolves attainable movement, crew coordination, damaged rigging, and
+      grounding manually.
+    procedures:
+      modifiers:
+      - id: smallcraft_sailing_obstacle
+        label: A sail is torn
+        when:
+        - input:
+            domain: equipment
+            key: smallcraft_sailing_obstacle
+            label: A sail is torn
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: smallcraft_sailing_task
+        label: Coordinate a smallcraft tack
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM advances the boat through a feasible tack and records its position.
+          'on': success
+        - kind: note
+          text: The tack loses progress or strains the rig; the GM resolves collision and damage risk.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_26
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.26
+    source: LCST skills.26
+  - name: Dockside Etiquette
+    attribute: IQ
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -4
+    - kind: skill
+      name: Harbor Mediation
+      specialization:
+        kind: any
+      modifier: -3
+    description: Make introductions, identify the right harbor official, and respect the local order of a quay
+      meeting. A first approach takes five minutes. Unfamiliar local custom gives the selected penalty, and a
+      credential is still needed for restricted business. Success opens an appropriate conversation rather than
+      changing everyone's reaction. The GM adjudicates who will speak, obligations accepted, and an accidental
+      slight manually.
+    procedures:
+      modifiers:
+      - id: dockside_etiquette_obstacle
+        label: Local quay customs are unfamiliar
+        when:
+        - input:
+            domain: familiarity
+            key: dockside_etiquette_obstacle
+            label: Local quay customs are unfamiliar
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: dockside_etiquette_task
+        label: Make a quay introduction
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 5
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM introduces a relevant willing participant or explains the proper next step.
+          'on': success
+        - kind: note
+          text: The approach is mistimed or awkward; the GM identifies an appropriate way to repair it.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_27
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.27
+    source: LCST skills.27
+  - name: Weather Reading
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Tidepilot
+      specialization:
+        kind: any
+      modifier: -4
+    description: 'Compare cloud, wind, pressure signs, and recent local reports for the next coastal watch. An
+      assessment takes ten minutes at an exposed observation point. Rapidly conflicting signs impose the task
+      penalty. Forecasts remain local and uncertain: this skill does not control weather or predict a distant
+      storm precisely. The GM supplies a plausible trend, the window of confidence, and consequences of relying
+      on a mistaken forecast.'
+    procedures:
+      modifiers:
+      - id: weather_reading_obstacle
+        label: Weather signs conflict rapidly
+        when:
+        - input:
+            domain: environment
+            key: weather_reading_obstacle
+            label: Weather signs conflict rapidly
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: weather_reading_task
+        label: Read the next watch's weather
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM gives a local trend with an explicit time window and uncertainty.
+          'on': success
+        - kind: note
+          text: The signs remain unclear or suggest the wrong trend; the GM adjudicates the forecast manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_28
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.28
+    source: LCST skills.28
+  - name: Marsh Tracking
+    attribute: Per
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: Per
+      modifier: -5
+    - kind: skill
+      name: Horizon Watch
+      specialization:
+        kind: any
+      modifier: -4
+    description: Follow physical traces across wet reed beds, mud banks, and raised marsh paths. Searching a
+      short stretch takes ten minutes; it requires an actual surviving trail. A rising tide gives the task penalty
+      and may erase a trail completely. Success suggests direction and recency, not the quarry's thoughts or
+      a route over impossible ground. The GM adjudicates tracks, search distance, broken trails, and the risk
+      of following a false sign.
+    procedures:
+      modifiers:
+      - id: marsh_tracking_obstacle
+        label: The rising tide is erasing tracks
+        when:
+        - input:
+            domain: environment
+            key: marsh_tracking_obstacle
+            label: The rising tide is erasing tracks
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: marsh_tracking_task
+        label: Follow a marsh trail
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM reveals a surviving trace and a plausible next section of trail.
+          'on': success
+        - kind: note
+          text: The trail is lost or ambiguous; the GM decides whether searching elsewhere can help.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_29
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.29
+    source: LCST skills.29
+  - name: Wreck Survey
+    attribute: Per
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: Per
+      modifier: -5
+    - kind: skill
+      name: Horizon Watch
+      specialization:
+        kind: any
+      modifier: -4
+    description: Inspect an accessible wreck section for obvious hazards, useful material, and a possible working
+      entrance. A small section takes ten minutes before anyone moves heavy pieces. Poor sight of load-bearing
+      members imposes the task penalty. Success is a cautious assessment, not proof that a sealed hold is safe
+      or free ownership of salvage. The GM adjudicates hidden defects, survey extent, tide timing, and how the
+      information changes a plan.
+    procedures:
+      modifiers:
+      - id: wreck_survey_obstacle
+        label: Load-bearing members are obscured
+        when:
+        - input:
+            domain: environment
+            key: wreck_survey_obstacle
+            label: Load-bearing members are obscured
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: wreck_survey_task
+        label: Survey a wreck section
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM identifies a visible hazard, useful fitting, or feasible next inspection point.
+          'on': success
+        - kind: note
+          text: A useful detail is missed or uncertain; the GM decides whether further inspection is possible.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_30
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.30
+    source: LCST skills.30
+  - name: Jetty Masonry
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Salvage Fitting
+      specialization:
+        kind: any
+      modifier: -4
+    description: At the learned TL, assess and repair the stonework of a small quay face or crossing. A minor
+      feasible repair takes four hours with suitable stone, mortar, and help; larger work needs a plan and repeated
+      tasks. A flooded work face imposes the task penalty. Success does not erect an entire bridge or change
+      armor DR. The GM resolves materials, curing time, load limits, and a failure or unsafe shortcut manually.
+    procedures:
+      modifiers:
+      - id: jetty_masonry_obstacle
+        label: The work face is flooded
+        when:
+        - input:
+            domain: environment
+            key: jetty_masonry_obstacle
+            label: The work face is flooded
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: jetty_masonry_task
+        label: Repair a minor quay defect
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 4
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records a feasible repair with its materials, curing time, and safe limit.
+          'on': success
+        - kind: note
+          text: The repair needs rework or inspection; the GM adjudicates wasted material and unsafe loading.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_31
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.31
+    source: LCST skills.31
+    techLevelPolicy:
+      kind: required
+  - name: Hull Patching
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Salvage Fitting
+      specialization:
+        kind: any
+      modifier: -4
+    description: At the learned TL, fit a temporary patch to one accessible hull leak. A small patch takes an
+      hour, given suitable boards, sealant, and time to work safely. Working while water actively enters imposes
+      the task penalty. Success is a limited repair with an agreed operating limit, not a new hull or immunity
+      to pressure. The GM records materials, leak rate, voyage restrictions, and a patch failure manually.
+    procedures:
+      modifiers:
+      - id: hull_patching_obstacle
+        label: Water enters while the patch is fitted
+        when:
+        - input:
+            domain: environment
+            key: hull_patching_obstacle
+            label: Water enters while the patch is fitted
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: hull_patching_task
+        label: Patch an accessible hull leak
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records a limited repair and the conditions under which it may hold.
+          'on': success
+        - kind: note
+          text: The patch leaks or needs refitting; the GM resolves water entry and material loss.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_32
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.32
+    source: LCST skills.32
+    techLevelPolicy:
+      kind: required
+  - name: Net Mending
+    attribute: DX
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -4
+    - kind: skill
+      name: Ropework
+      specialization:
+        kind: any
+      modifier: -3
+    description: Restore the pattern of an ordinary fishing net or netted cargo sling. One small tear takes thirty
+      minutes with enough cord and a suitable needle. Tangled wet mesh imposes the stated penalty. The repair
+      does not increase the original net's capacity or catch fish automatically. The GM judges whether the net
+      can be repaired and records cord consumed, time spent, and flaws in the result.
+    procedures:
+      modifiers:
+      - id: net_mending_obstacle
+        label: The mesh is wet and tangled
+        when:
+        - input:
+            domain: equipment
+            key: net_mending_obstacle
+            label: The mesh is wet and tangled
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: net_mending_task
+        label: Mend a small mesh tear
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 30
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM records a repaired ordinary mesh section with its original limits.
+          'on': success
+        - kind: note
+          text: The mesh remains uneven or weak; the GM determines rework and cord consumption.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_33
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.33
+    source: LCST skills.33
+  - name: Beacon Lenscraft
+    attribute: IQ
+    difficulty: H
+    defaults: []
+    description: At the learned TL, align and repair the mundane mounts of a fictional tideglass beacon lens.
+      Learn basic fitting first as the structured prerequisite requires. One alignment takes an hour with measuring
+      tools; a chipped lens gives the task penalty. The task does not restore a destroyed enchanted lens or cast
+      a light spell. The GM records alignment, spare parts, optical limits, and any risk of concentrating an
+      unsafe beam.
+    procedures:
+      modifiers:
+      - id: beacon_lenscraft_obstacle
+        label: The lens edge is chipped
+        when:
+        - input:
+            domain: equipment
+            key: beacon_lenscraft_obstacle
+            label: The lens edge is chipped
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: beacon_lenscraft_task
+        label: Align a beacon lens mount
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM approves a feasible mundane alignment and records its optical limits.
+          'on': success
+        - kind: note
+          text: Alignment is unreliable or needs replacement parts; the GM resolves any unsafe beam manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_34
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.34
+    source: LCST skills.34
+    techLevelPolicy:
+      kind: required
+    prerequisiteRules:
+      kind: skill
+      name: Salvage Fitting
+      specialization:
+        kind: any
+      minimumPoints: 1
+    prerequisites: At least 1 purchased point in Salvage Fitting; any learned specialization qualifies.
+  - name: Tideglass Inscription
+    attribute: IQ
+    difficulty: H
+    defaults: []
+    description: Copy or repair a fictional tideglass pattern already understood through Beacon Resonance. One
+      small inscription takes two hours and a stable working surface; unknown patterns cannot be invented by
+      this task. An incomplete reference gives the penalty. Success yields a readable prepared pattern, not a
+      spell, energized ward, or free magical effect. The GM decides compatible materials, the inscription's meaning,
+      and any danger from an error; those consequences are manual.
+    procedures:
+      modifiers:
+      - id: tideglass_inscription_obstacle
+        label: The reference pattern is incomplete
+        when:
+        - input:
+            domain: equipment
+            key: tideglass_inscription_obstacle
+            label: The reference pattern is incomplete
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: tideglass_inscription_task
+        label: Copy a known tideglass pattern
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 2
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records a readable prepared copy; activating any magic requires its separate rule.
+          'on': success
+        - kind: note
+          text: The pattern is flawed or incomplete; the GM decides rework and any later risk if it is used.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_35
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.35
+    source: LCST skills.35
+    prerequisiteRules:
+      kind: skill
+      name: Beacon Resonance
+      specialization:
+        kind: any
+      minimumPoints: 1
+    prerequisites: At least 1 purchased point in Beacon Resonance; any learned specialization qualifies.
+  - name: Channel Sounding
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Tidepilot
+      specialization:
+        kind: any
+      modifier: -3
+    description: Measure a shallow channel with marked line, pole, or another suitable mundane tool. One small
+      cross-section takes ten minutes from a stable boat or bank. A turbulent surface gives the task penalty.
+      The result describes measured depth at that tide, not unseen obstacles everywhere or permanent safe passage.
+      The GM adjudicates attainable accuracy, vessel access, shifting bottom, and manual chart updates.
+    procedures:
+      modifiers:
+      - id: channel_sounding_obstacle
+        label: Turbulence obscures the sounding
+        when:
+        - input:
+            domain: environment
+            key: channel_sounding_obstacle
+            label: Turbulence obscures the sounding
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: channel_sounding_task
+        label: Sound one channel section
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM records a plausible measured depth, location, and tide reference.
+          'on': success
+        - kind: note
+          text: The sounding is uncertain or misread; the GM determines whether repeating it can help.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_36
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.36
+    source: LCST skills.36
+  - name: Rescue Coordination
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Storm Drill
+      specialization:
+        kind: any
+      modifier: -3
+    description: Assign clear roles, routes, and signals for one feasible coastal rescue. A briefing takes five
+      minutes when the team can hear each other; an immediate emergency may leave too little time for it. Conflicting
+      instructions impose the task penalty. Success clarifies the plan without granting automatic success to
+      swimmers, climbers, or healers. The GM resolves consent, timing, available helpers, and the costs of a
+      confused plan.
+    procedures:
+      modifiers:
+      - id: rescue_coordination_obstacle
+        label: The team receives conflicting instructions
+        when:
+        - input:
+            domain: task
+            key: rescue_coordination_obstacle
+            label: The team receives conflicting instructions
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: rescue_coordination_task
+        label: Brief a rescue team
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 5
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM confirms clear responsibilities and a feasible next rescue step.
+          'on': success
+        - kind: note
+          text: Roles remain confused or a necessary step is missing; the GM resolves delay and coordination
+            manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_37
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.37
+    source: LCST skills.37
+  - name: Patient Triage
+    attribute: IQ
+    difficulty: H
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -6
+    - kind: skill
+      name: Saltwound Care
+      specialization:
+        kind: any
+      modifier: -4
+    description: At the learned TL, compare several fictional patients' visible needs and decide whom the crew
+      can assess first. Basic Saltwound Care training is required. A small group takes five minutes; incomplete
+      histories impose the task penalty. The result is an order of assessment, not a diagnosis of hidden illness
+      or automatic healing. The GM adjudicates severity, consent, available helpers, and an overlooked danger
+      manually; treatment uses its separate skill.
+    procedures:
+      modifiers:
+      - id: patient_triage_obstacle
+        label: Patient histories are incomplete
+        when:
+        - input:
+            domain: task
+            key: patient_triage_obstacle
+            label: Patient histories are incomplete
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: patient_triage_task
+        label: Order a small group's assessment
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 5
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM supplies a defensible assessment order and identifies any visible urgent need.
+          'on': success
+        - kind: note
+          text: An important need is missed or uncertain; the GM resolves the consequence and chance to reassess.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_38
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.38
+    source: LCST skills.38
+    techLevelPolicy:
+      kind: required
+    prerequisiteRules:
+      kind: skill
+      name: Saltwound Care
+      specialization:
+        kind: any
+      minimumPoints: 1
+    prerequisites: At least 1 purchased point in Saltwound Care; any learned specialization qualifies.
+  - name: Quarantine Stewardship
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Patient Triage
+      specialization:
+        kind: any
+      modifier: -4
+    description: At the learned TL, organize fictional harbor isolation, supply routes, and clear instructions
+      for a small refuge. A workable plan takes an hour with a caretaker and enough space. Conflicting official
+      instructions give the task penalty. Success is an agreed operational plan, not immunity to illness, a cure,
+      or authority to imprison unwilling people. The GM decides local law, consent, supplies, breaches, and the
+      duration of precautions manually.
+    procedures:
+      modifiers:
+      - id: quarantine_stewardship_obstacle
+        label: Officials issue conflicting precautions
+        when:
+        - input:
+            domain: task
+            key: quarantine_stewardship_obstacle
+            label: Officials issue conflicting precautions
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: quarantine_stewardship_task
+        label: Plan refuge precautions
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records an agreed separation and supply plan with explicit limits.
+          'on': success
+        - kind: note
+          text: The plan leaves a gap or is not accepted; the GM determines what must be renegotiated.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_39
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.39
+    source: LCST skills.39
+    techLevelPolicy:
+      kind: required
+  - name: Coastal Cooking
+    attribute: IQ
+    difficulty: E
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -4
+    - kind: skill
+      name: Coastal Foraging
+      specialization:
+        kind: any
+      modifier: -4
+    description: Prepare a simple meal from identified, edible coastal ingredients with working heat and utensils.
+      A crew pot takes an hour; unknown shellfish or marsh plants require their own identification. Spoiled stores
+      give the task penalty and may make cooking impossible. Success yields an ordinary meal, not extra FP recovery,
+      toxin removal, or limitless rations. The GM records portions, supplies, time, and any waste manually.
+    procedures:
+      modifiers:
+      - id: coastal_cooking_obstacle
+        label: Stored ingredients are spoiled
+        when:
+        - input:
+            domain: equipment
+            key: coastal_cooking_obstacle
+            label: Stored ingredients are spoiled
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: coastal_cooking_task
+        label: Prepare a crew pot
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM records an ordinary meal from the available safe ingredients.
+          'on': success
+        - kind: note
+          text: The meal is unpalatable or wasted; the GM decides whether any ingredients remain usable.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_40
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.40
+    source: LCST skills.40
+  - name: Cargo Appraisal
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Quayside Barter
+      specialization:
+        kind: any
+      modifier: -3
+    description: Inspect a small lot for condition, ordinary market value, and signs of concealed damage. A first
+      appraisal takes ten minutes with permission to examine the goods. Sealed or inaccessible packaging gives
+      the task penalty. Success offers a plausible range rather than the final selling price, magical identification,
+      or legal ownership. The GM adjudicates hidden defects, local scarcity, trust, and any later trade manually.
+    procedures:
+      modifiers:
+      - id: cargo_appraisal_obstacle
+        label: The packaging prevents a full inspection
+        when:
+        - input:
+            domain: equipment
+            key: cargo_appraisal_obstacle
+            label: The packaging prevents a full inspection
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: cargo_appraisal_task
+        label: Appraise a small cargo lot
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM gives an ordinary condition assessment and a plausible local value range.
+          'on': success
+        - kind: note
+          text: A defect or price signal remains unclear; the GM describes the uncertainty manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_41
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.41
+    source: LCST skills.41
+  - name: Smuggler Routes
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Tidepilot
+      specialization:
+        kind: any
+      modifier: -4
+    description: Recognize local patterns of concealed landings and consider a discreet route around a staffed
+      quay. Planning takes thirty minutes and needs current local information. Recently changed patrols give
+      the penalty. Success provides a plausible lead, not automatic stealth, an available criminal contact, or
+      certainty that a route is legal. The GM adjudicates patrols, permission, travel, rivals, and consequences
+      of discovery manually.
+    procedures:
+      modifiers:
+      - id: smuggler_routes_obstacle
+        label: Patrol schedules changed recently
+        when:
+        - input:
+            domain: familiarity
+            key: smuggler_routes_obstacle
+            label: Patrol schedules changed recently
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: smuggler_routes_task
+        label: Assess a concealed landing route
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 30
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM identifies a plausible local route or a useful gap in the available information.
+          'on': success
+        - kind: note
+          text: The route is stale or risky; the GM adjudicates patrol encounters if it is attempted.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_42
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.42
+    source: LCST skills.42
+  - name: Harbor Law
+    attribute: IQ
+    difficulty: H
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -6
+    - kind: skill
+      name: Archive Diving
+      specialization:
+        kind: any
+      modifier: -4
+    description: Find and interpret an ordinary Greyhaven rule about salvage, passage, labor, or cargo. Researching
+      a concrete dispute takes an hour with access to a current register. Conflicting jurisdictions give the
+      task penalty. Success identifies the likely rule and procedure, not automatic acquittal or authority over
+      officials. The GM adjudicates evidence, interpretation, representation, and the ruling; another harbor
+      may require separate local advice.
+    procedures:
+      modifiers:
+      - id: harbor_law_obstacle
+        label: More than one harbor claims jurisdiction
+        when:
+        - input:
+            domain: task
+            key: harbor_law_obstacle
+            label: More than one harbor claims jurisdiction
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: harbor_law_task
+        label: Research a harbor dispute
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 1
+          unit: hours
+        outcomes:
+        - kind: note
+          text: The GM identifies a relevant current rule and the proper hearing or filing route.
+          'on': success
+        - kind: note
+          text: The interpretation remains uncertain; the GM identifies missing facts or competing authority.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_43
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.43
+    source: LCST skills.43
+  - name: Storykeeping
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Gullcall Performance
+      specialization:
+        kind: any
+      modifier: -4
+    description: Collect and retell a coastal account while distinguishing named witnesses from remembered rumor.
+      A short retelling takes ten minutes; gathering reliable testimony is separate. Contradictory witnesses
+      give the selected penalty. Success makes the account clear and its sources traceable, not proof that every
+      event happened or a universal persuasion bonus. The GM adjudicates memory gaps, consent, audience response,
+      and any claim that needs independent confirmation.
+    procedures:
+      modifiers:
+      - id: storykeeping_obstacle
+        label: Witness accounts contradict each other
+        when:
+        - input:
+            domain: task
+            key: storykeeping_obstacle
+            label: Witness accounts contradict each other
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: storykeeping_task
+        label: Retell an attributed coast story
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM confirms a clear account with witness claims separated from rumor.
+          'on': success
+        - kind: note
+          text: The account confuses sources or omits a key point; the GM adjudicates correction and audience
+            response.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_44
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.44
+    source: LCST skills.44
+  - name: Tidepool Lore
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Coastal Foraging
+      specialization:
+        kind: any
+      modifier: -3
+    description: Identify ordinary tidepool creatures, their local habitats, and common signs of a disturbed
+      shore. An accessible pool takes ten minutes of careful observation. An unfamiliar seasonal species gives
+      the penalty. Success suggests a plausible identification, not animal control, safe eating, or the effect
+      of a magical specimen. The GM resolves uncertainty, ecological clues, and whether further samples or another
+      expert are needed.
+    procedures:
+      modifiers:
+      - id: tidepool_lore_obstacle
+        label: The seasonal species is unfamiliar
+        when:
+        - input:
+            domain: familiarity
+            key: tidepool_lore_obstacle
+            label: The seasonal species is unfamiliar
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: tidepool_lore_task
+        label: Inspect a tidepool community
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM provides a plausible local identification or an ecological clue.
+          'on': success
+        - kind: note
+          text: The specimen is misidentified or unresolved; the GM records uncertainty rather than a guaranteed
+            answer.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_45
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.45
+    source: LCST skills.45
+  - name: Storm Drill
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Harbor Winchcraft
+      specialization:
+        kind: any
+      modifier: -4
+    description: Organize a rehearsed crew response to a squall, including securing gear and identifying shelter.
+      A briefing and short rehearsal take ten minutes with the actual team. An unfamiliar crew gives the penalty.
+      Success establishes understood roles, not a bonus to every defense or immunity to storm damage. At relative
+      level +2, repeated training grants the declared +1 Rescue Coordination benefit. The GM resolves actual
+      performance, fatigue, lost equipment, and a missed instruction manually.
+    procedures:
+      modifiers:
+      - id: storm_drill_obstacle
+        label: The crew has not worked together before
+        when:
+        - input:
+            domain: familiarity
+            key: storm_drill_obstacle
+            label: The crew has not worked together before
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: storm_drill_task
+        label: Rehearse a storm response
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM records an understood plan and the next specific preparation step.
+          'on': success
+        - kind: note
+          text: A role or safety step is missed; the GM identifies the gap before an actual storm.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+      benefits:
+      - id: cross_training
+        label: Practiced rescue coordination
+        when:
+          minimumRelativeLevel: 2
+        effects:
+        - target: skill
+          skillName: Rescue Coordination
+          value: 1
+        sourceText: At relative level +2, sustained training grants +1 Rescue Coordination; no other skill receives
+          this benefit.
+    key: skills_46
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.46
+    source: LCST skills.46
+  - name: Silent Signing
+    attribute: DX
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: DX
+      modifier: -5
+    - kind: skill
+      name: Signal Weaving
+      specialization:
+        kind: any
+      modifier: -4
+    description: Keep a short Harbor Sign exchange visible while moving along a quay or peering from cover. One
+      short phrase takes ten seconds. Harbor Sign comprehension is required as a manually checked language condition;
+      this skill handles delivery and does not teach the language. An obstructed sightline gives the penalty.
+      The GM adjudicates who can see and understand, ambiguous gestures, and whether a lookout notices the exchange.
+    procedures:
+      modifiers:
+      - id: silent_signing_obstacle
+        label: The sightline is intermittently obstructed
+        when:
+        - input:
+            domain: environment
+            key: silent_signing_obstacle
+            label: The sightline is intermittently obstructed
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: silent_signing_task
+        label: Deliver a moving sign phrase
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 10
+          unit: seconds
+        outcomes:
+        - kind: note
+          text: The GM determines which sign-literate observers receive the short phrase clearly.
+          'on': success
+        - kind: note
+          text: The phrase is ambiguous or unseen; the GM resolves misunderstanding or observation manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_47
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.47
+    source: LCST skills.47
+    prerequisites: The GM manually confirms Harbor Sign comprehension before a task; language fluency is not
+      automatically checked by the application.
+  - name: Bell Tuning
+    attribute: IQ
+    difficulty: A
+    defaults:
+    - kind: attribute
+      attribute: IQ
+      modifier: -5
+    - kind: skill
+      name: Signal Weaving
+      specialization:
+        kind: any
+      modifier: -4
+    description: At the learned TL, compare and adjust an ordinary signal bell against a reference tone. One
+      small adjustment takes thirty minutes with a suitable tool and permission to work on the bell. Heavy background
+      noise gives the penalty. Success restores a plausible recognizable tone, not a magical resonance or greater
+      communication range. The GM records material limits, access, damage, and whether the bell needs a specialist
+      casting repair.
+    procedures:
+      modifiers:
+      - id: bell_tuning_obstacle
+        label: Heavy harbor noise obscures the reference
+        when:
+        - input:
+            domain: environment
+            key: bell_tuning_obstacle
+            label: Heavy harbor noise obscures the reference
+          operator: equals
+          value: true
+        value:
+          kind: fixed
+          value: -2
+        appliesTo: task_roll
+        sourceText: Apply only when the player and GM confirm this circumstance for the current task.
+      actions:
+      - id: bell_tuning_task
+        label: Tune a signal bell
+        roll:
+          basis: skill
+        time:
+          amount:
+            kind: constant
+            value: 30
+          unit: minutes
+        outcomes:
+        - kind: note
+          text: The GM records an ordinary bell tone that matches the available reference within practical limits.
+          'on': success
+        - kind: note
+          text: The tone remains wrong or the adjustment risks damage; the GM decides rework manually.
+          'on': failure
+        sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
+          changes manually.
+    key: skills_48
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: skills.48
+    source: LCST skills.48
+    techLevelPolicy:
+      kind: required
   spells:
   - name: Glimmer Shoal
     college: Beacon Light

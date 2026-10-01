@@ -21,7 +21,10 @@ import {
   type LanternRequest,
   populateLanternCoast,
 } from '../../src/server/db/seeds/lanternCoastContent.ts';
-import { lanternCharacters } from '../../src/server/db/seeds/lanternCoastData.ts';
+import {
+  lanternCharacters,
+  lanternSharedLogs,
+} from '../../src/server/db/seeds/lanternCoastData.ts';
 import { lanternMcpRequest } from '../../src/server/db/seeds/lanternCoastMcp.ts';
 import { mcpResource } from '../../src/server/oauth/service.ts';
 import { DEFAULT_CAMPAIGN_SOURCES } from '../../src/server/services/defaultCampaignSources.ts';
@@ -29,6 +32,9 @@ import {
   configureIntegrationTestEnvironment,
   integrationTestConfig,
 } from '../../src/server/testConfig.ts';
+import { adventureLogOut } from '../../src/shared/schemas/adventureLog.ts';
+import { librarySkillOut, libraryTraitOut } from '../../src/shared/schemas/campaignLibrary.ts';
+import { characterDetail } from '../../src/shared/schemas/character.ts';
 import { parseLibraryYaml } from '../../src/shared/yaml/library.ts';
 
 configureIntegrationTestEnvironment();
@@ -167,6 +173,8 @@ describe('Lantern Coast MCP seed acceptance', () => {
       'utf8',
     );
     const document = parseLibraryYaml(yaml);
+    expect(document.library.skills).toHaveLength(48);
+    expect(document.library.traits).toHaveLength(30);
     const sources = document.library.sources ?? [];
     expect(sources).toHaveLength(4);
     expect(new Set(sources.map((source) => source.abbreviation)).size).toBe(4);
@@ -307,7 +315,72 @@ describe('Lantern Coast MCP seed acceptance', () => {
       });
       const actual = await snapshot(request, result.campaignId);
       expect(actual.sheets).toHaveLength(6);
-      expect(actual.logs).toHaveLength(9);
+      const logs = adventureLogOut.array().parse(actual.logs);
+      expect(logs).toHaveLength(23);
+      expect(logs.filter((log) => log.visibility === 'private')).toHaveLength(18);
+      expect(logs.filter((log) => log.visibility === 'campaign')).toHaveLength(5);
+      const sheets = characterDetail.array().parse(actual.sheets);
+      for (const sheet of sheets) {
+        expect(sheet.skills.length, sheet.name).toBeGreaterThanOrEqual(12);
+        expect(sheet.skills.length, sheet.name).toBeLessThanOrEqual(15);
+        expect(sheet.traits.length, sheet.name).toBeGreaterThanOrEqual(6);
+        expect(sheet.traits.length, sheet.name).toBeLessThanOrEqual(8);
+        expect(sheet.earnedPoints, sheet.name).toBe(6);
+        expect(sheet.points.total, sheet.name).toBeLessThanOrEqual(250 + 6);
+        expect(sheet.points.unspent, sheet.name).toBe(250 + 6 - sheet.points.total);
+        expect(-sheet.points.disadvantages, sheet.name).toBeLessThanOrEqual(50);
+        expect(-sheet.points.quirks, sheet.name).toBeLessThanOrEqual(5);
+        const fixture = lanternCharacters.find((entry) => entry.character.name === sheet.name);
+        if (!fixture) throw new Error(`Missing authored logs for ${sheet.name}`);
+        const privateLogs = logs.filter(
+          (log) => log.visibility === 'private' && log.characterId === sheet.id,
+        );
+        expect(privateLogs, sheet.name).toHaveLength(3);
+        for (const expected of fixture.privateLogs) {
+          const saved = privateLogs.find((log) => log.title === expected.title);
+          expect(saved, expected.title).toBeDefined();
+          expect(saved).toMatchObject({
+            body: expected.body,
+            sessionDate: expected.sessionDate,
+            sessionNumber: expected.sessionNumber,
+            location: expected.location,
+            authorId: owner.id,
+          });
+          expect(saved?.body.trim(), expected.title).toBeTruthy();
+          expect(saved?.body, expected.title).not.toContain(
+            'I have not told the others what the beacon showed me.',
+          );
+        }
+      }
+      for (const expected of lanternSharedLogs) {
+        const saved = logs.find(
+          (log) => log.visibility === 'campaign' && log.title === expected.title,
+        );
+        expect(saved, expected.title).toBeDefined();
+        expect(saved).toMatchObject({
+          body: expected.body,
+          sessionDate: expected.sessionDate,
+          sessionNumber: expected.sessionNumber,
+          location: expected.location,
+        });
+      }
+      const library = actual.library as Record<string, unknown>;
+      const skills = librarySkillOut.array().parse(library.skills);
+      const traits = libraryTraitOut.array().parse(library.traits);
+      expect(skills).toHaveLength(48);
+      expect(traits).toHaveLength(30);
+      for (const skill of skills) {
+        expect(skill.description?.trim(), skill.name).toBeTruthy();
+        expect(skill.description, skill.name).not.toContain('adjudicate task scope at the table');
+        expect(skill.procedures?.actions.length, skill.name).toBeGreaterThan(0);
+        expect(skill.procedures?.modifiers.length, skill.name).toBeGreaterThan(0);
+        for (const action of skill.procedures?.actions ?? []) {
+          expect(action.outcomes.length, skill.name).toBeGreaterThan(0);
+          for (const outcome of action.outcomes)
+            expect(outcome.text.trim(), skill.name).toBeTruthy();
+        }
+      }
+      for (const trait of traits) expect(trait.description?.trim(), trait.name).toBeTruthy();
       const roster = await getDb()
         .select()
         .from(characters)

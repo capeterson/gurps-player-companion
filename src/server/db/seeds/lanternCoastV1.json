@@ -1,0 +1,1641 @@
+{
+  "description": "Original synthetic Lantern Coast defaults, retained for conservative one-time upgrades. Not a live seed or user-data snapshot.",
+  "traits": [
+    {
+      "key": "traits_1",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.1",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 12
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Breakwater Poise",
+      "kind": "advantage",
+      "basePoints": 12,
+      "description": "Hold your line while spray and panic break around you. +1 Parry and Will; no other reflex or surprise benefit.",
+      "source": "LCGV traits.1",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "parry",
+          "value": 1,
+          "scaling": "flat"
+        },
+        {
+          "target": "will",
+          "value": 1,
+          "scaling": "flat"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_2",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.2",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 7
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Longwatch Lungs",
+      "kind": "advantage",
+      "basePoints": 7,
+      "description": "A reserve built on night watches: +1 FP. Recovery follows the ordinary sheet rules.",
+      "source": "LCGV traits.2",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "fp",
+          "value": 1,
+          "scaling": "flat"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_3",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.3",
+      "status": "complete",
+      "role": "definition",
+      "name": "Horizon Reader",
+      "kind": "advantage",
+      "basePoints": 0,
+      "pointsPerLevel": 3,
+      "maxLevel": 5,
+      "description": "A practiced eye for beacon intervals; +1 Horizon Watch per level, rather than a universal vision bonus.",
+      "source": "LCGV traits.3",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "per_level",
+          "skillName": "Horizon Watch"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_4",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.4",
+      "status": "complete",
+      "role": "definition",
+      "name": "Magery (Tideglass attunement)",
+      "kind": "advantage",
+      "basePoints": 7,
+      "pointsPerLevel": 9,
+      "maxLevel": 3,
+      "description": "Original beacon-magic aptitude, priced at 7 + 9 per level. The Magery keyword uses the app’s normal spell-level and mana gate; +1 Beacon Resonance per level.",
+      "source": "LCGV traits.4",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "per_level",
+          "skillName": "Beacon Resonance"
+        }
+      ],
+      "tags": ["beacon"]
+    },
+    {
+      "key": "traits_5",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.5",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 6
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Stoneblood",
+      "kind": "advantage",
+      "basePoints": 6,
+      "description": "Greyhaven quarry heritage: innate DR 1 and a visible mineral sheen. No immunity to injury.",
+      "source": "LCGV traits.5",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "dr",
+          "value": 1,
+          "scaling": "flat"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_6",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.6",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -7
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Greyhaven Promise",
+      "kind": "disadvantage",
+      "basePoints": -7,
+      "description": "Return every rescued traveler to a safe harbor, even when a faster route would abandon them.",
+      "source": "LCGV traits.6",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_7",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.7",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -6
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Echo Collector",
+      "kind": "disadvantage",
+      "basePoints": -6,
+      "description": "Stop to record unfamiliar beacon echoes when it costs time; the GM adjudicates the compulsion.",
+      "source": "LCGV traits.7",
+      "availableModifiers": [
+        {
+          "name": "Trusted companion intervenes",
+          "category": "limitation",
+          "costType": "percent",
+          "costValue": -30
+        }
+      ],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_8",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.8",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -8
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Bridgekeeper Oath",
+      "kind": "disadvantage",
+      "basePoints": -8,
+      "description": "Never charge a refugee for passage; repair damage you cause to a public crossing.",
+      "source": "LCGV traits.8",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_9",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.9",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -1
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Lantern vigil",
+      "kind": "quirk",
+      "basePoints": -1,
+      "description": "Always light a candle for the lost.",
+      "source": "LCGV traits.9",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_10",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.10",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 8
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Tidewise Balance",
+      "kind": "advantage",
+      "basePoints": 8,
+      "description": "Deck-trained balance grants +1 Current Riding and Cliff Traverse.",
+      "source": "LCGV traits.10",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Current Riding"
+        },
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Cliff Traverse"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_11",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.11",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 6
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Signal Memory",
+      "kind": "advantage",
+      "basePoints": 6,
+      "description": "Recall routes encoded in bell patterns: +1 Signal Weaving and Archive Diving.",
+      "source": "LCGV traits.11",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Signal Weaving"
+        },
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Archive Diving"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_12",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.12",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 7
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Gentle Hands",
+      "kind": "advantage",
+      "basePoints": 7,
+      "description": "A calm bedside manner adds +1 Saltwound Care and Harbor Mediation.",
+      "source": "LCGV traits.12",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Saltwound Care"
+        },
+        {
+          "target": "skill",
+          "value": 1,
+          "scaling": "flat",
+          "skillName": "Harbor Mediation"
+        }
+      ],
+      "tags": []
+    },
+    {
+      "key": "traits_13",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.13",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -9
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Storm Debt",
+      "kind": "disadvantage",
+      "basePoints": -9,
+      "description": "Your berth is pledged to the storm guild; answer its salvage summons before accepting other work.",
+      "source": "LCGV traits.13",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_14",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.14",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": -1
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Counts the gulls",
+      "kind": "quirk",
+      "basePoints": -1,
+      "description": "Count the gulls before setting sail, and invent an omen for the result.",
+      "source": "LCGV traits.14",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    },
+    {
+      "key": "traits_15",
+      "sourceKey": "lantern_lives",
+      "sourceLocator": "traits.15",
+      "status": "complete",
+      "role": "definition",
+      "calculation": {
+        "version": 1,
+        "inputs": [],
+        "tables": [],
+        "nodes": [
+          {
+            "id": "points",
+            "op": "constant",
+            "value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "key": "points",
+            "unit": "points",
+            "node": "points",
+            "rounding": "exact",
+            "increment": 1,
+            "min": -1000,
+            "max": 1000
+          }
+        ]
+      },
+      "name": "Pocket gardener",
+      "kind": "perk",
+      "basePoints": 1,
+      "description": "Keep a miniature salt-tolerant garden; a narrative conversation starter, not a supply bonus.",
+      "source": "LCGV traits.15",
+      "availableModifiers": [],
+      "variants": [],
+      "effects": [],
+      "tags": []
+    }
+  ],
+  "skills": [
+    {
+      "key": "skills_1",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.1",
+      "status": "complete",
+      "role": "definition",
+      "name": "Quayblade",
+      "attribute": "DX",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in quayblade; adjudicate task scope at the table.",
+      "source": "LCST skills.1",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_2",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.2",
+      "status": "complete",
+      "role": "definition",
+      "name": "Bulwark Handling",
+      "attribute": "DX",
+      "difficulty": "E",
+      "description": "Original Greyhaven training in bulwark handling; adjudicate task scope at the table.",
+      "source": "LCST skills.2",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -4
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_3",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.3",
+      "status": "complete",
+      "role": "definition",
+      "name": "Reedbow",
+      "attribute": "DX",
+      "difficulty": "H",
+      "description": "Original Greyhaven training in reedbow; adjudicate task scope at the table.",
+      "source": "LCST skills.3",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_4",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.4",
+      "status": "complete",
+      "role": "definition",
+      "name": "Salvage Haft",
+      "attribute": "DX",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in salvage haft; adjudicate task scope at the table.",
+      "source": "LCST skills.4",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_5",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.5",
+      "status": "complete",
+      "role": "definition",
+      "name": "Beacon Rod",
+      "attribute": "DX",
+      "difficulty": "E",
+      "description": "Original Greyhaven training in beacon rod; adjudicate task scope at the table.",
+      "source": "LCST skills.5",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_6",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.6",
+      "status": "complete",
+      "role": "definition",
+      "name": "Dockside Scrapping",
+      "attribute": "DX",
+      "difficulty": "E",
+      "description": "Original Greyhaven training in dockside scrapping; adjudicate task scope at the table.",
+      "source": "LCST skills.6",
+      "defaults": [],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_7",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.7",
+      "status": "complete",
+      "role": "definition",
+      "name": "Shingle Ghosting",
+      "attribute": "DX",
+      "difficulty": "A",
+      "description": "**Move unseen.** The following task modifier is an explicit campaign example.",
+      "source": "LCST skills.7",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "procedures": {
+        "modifiers": [
+          {
+            "id": "noisy_ground",
+            "label": "Loose shingle underfoot",
+            "when": [
+              {
+                "input": {
+                  "domain": "environment",
+                  "key": "loose_shingle",
+                  "label": "Loose shingle underfoot"
+                },
+                "operator": "equals",
+                "value": true
+              }
+            ],
+            "value": {
+              "kind": "fixed",
+              "value": -2
+            },
+            "appliesTo": "task_roll",
+            "stacking": "stack"
+          }
+        ],
+        "actions": [
+          {
+            "id": "slip_past",
+            "label": "Slip past the lookout",
+            "roll": {
+              "basis": "skill",
+              "modifier": 0
+            },
+            "costs": [],
+            "contest": {
+              "kind": "quick",
+              "opponent": "Horizon Watch"
+            },
+            "outcomes": [
+              {
+                "on": "success",
+                "kind": "note",
+                "text": "Reach cover if the contest is won; the GM resolves the opponent."
+              }
+            ]
+          }
+        ],
+        "benefits": [
+          {
+            "id": "practiced_scout",
+            "label": "Practiced coastal scout",
+            "when": {
+              "minimumRelativeLevel": 2
+            },
+            "effects": [],
+            "sourceText": "Narrative campaign milestone; no automatic numerical bonus."
+          }
+        ]
+      },
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_8",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.8",
+      "status": "complete",
+      "role": "definition",
+      "name": "Coastal Foraging",
+      "attribute": "Per",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in coastal foraging; adjudicate task scope at the table.",
+      "source": "LCST skills.8",
+      "specializationPolicy": {
+        "kind": "required_catalog",
+        "options": [
+          {
+            "name": "Cliff Gardens",
+            "description": "Gather rainwater and edible cliff plants."
+          },
+          {
+            "name": "Tide Flats",
+            "description": "Harvest shellfish and mark safe channels."
+          }
+        ]
+      },
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "Per",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_9",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.9",
+      "status": "complete",
+      "role": "definition",
+      "name": "Horizon Watch",
+      "attribute": "Per",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in horizon watch; adjudicate task scope at the table.",
+      "source": "LCST skills.9",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "Per",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_10",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.10",
+      "status": "complete",
+      "role": "definition",
+      "name": "Current Riding",
+      "attribute": "HT",
+      "difficulty": "E",
+      "description": "Original Greyhaven training in current riding; adjudicate task scope at the table.",
+      "source": "LCST skills.10",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "HT",
+          "modifier": -4
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_11",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.11",
+      "status": "complete",
+      "role": "definition",
+      "name": "Cliff Traverse",
+      "attribute": "DX",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in cliff traverse; adjudicate task scope at the table.",
+      "source": "LCST skills.11",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_12",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.12",
+      "status": "complete",
+      "role": "definition",
+      "name": "Beacon Resonance",
+      "attribute": "IQ",
+      "difficulty": "VH",
+      "description": "Original Greyhaven training in beacon resonance; adjudicate task scope at the table.",
+      "source": "LCST skills.12",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -7
+        }
+      ],
+      "prerequisiteRules": {
+        "kind": "all",
+        "children": [
+          {
+            "kind": "attribute",
+            "attribute": "IQ",
+            "minimum": 12
+          },
+          {
+            "kind": "trait",
+            "name": "Magery (Tideglass attunement)",
+            "minimumLevel": 0
+          }
+        ]
+      },
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_13",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.13",
+      "status": "complete",
+      "role": "definition",
+      "name": "Saltwound Care",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "techLevelPolicy": {
+        "kind": "required",
+        "suggestedFrom": "campaign"
+      },
+      "description": "Record the learned TL and use the action as a campaign task preview.",
+      "source": "LCST skills.13",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -4
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "procedures": {
+        "modifiers": [],
+        "actions": [
+          {
+            "id": "dress_wound",
+            "label": "Dress a wound",
+            "roll": {
+              "basis": "skill",
+              "modifier": 0
+            },
+            "time": {
+              "amount": {
+                "kind": "constant",
+                "value": 1
+              },
+              "unit": "minutes"
+            },
+            "costs": [],
+            "outcomes": [
+              {
+                "on": "success",
+                "kind": "note",
+                "text": "Consult the treatment rules and record the patient's recovery manually."
+              }
+            ]
+          }
+        ],
+        "benefits": []
+      },
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_14",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.14",
+      "status": "complete",
+      "role": "definition",
+      "name": "Archive Diving",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in archive diving; adjudicate task scope at the table.",
+      "source": "LCST skills.14",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_15",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.15",
+      "status": "complete",
+      "role": "definition",
+      "name": "Harbor Mediation",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in harbor mediation; adjudicate task scope at the table.",
+      "source": "LCST skills.15",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -6
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_16",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.16",
+      "status": "complete",
+      "role": "definition",
+      "name": "Quayside Barter",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "description": "Original Greyhaven training in quayside barter; adjudicate task scope at the table.",
+      "source": "LCST skills.16",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_17",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.17",
+      "status": "complete",
+      "role": "definition",
+      "name": "Salvage Fitting",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "techLevelPolicy": {
+        "kind": "required",
+        "suggestedFrom": "campaign"
+      },
+      "description": "Original Greyhaven training in salvage fitting; adjudicate task scope at the table.",
+      "source": "LCST skills.17",
+      "specializationPolicy": {
+        "kind": "required_freeform"
+      },
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_18",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.18",
+      "status": "complete",
+      "role": "definition",
+      "name": "Tidepilot",
+      "attribute": "IQ",
+      "difficulty": "H",
+      "description": "Plot routes between moving shoals; a route does not grant automatic safe passage.",
+      "source": "LCST skills.18",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -6
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_19",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.19",
+      "status": "complete",
+      "role": "definition",
+      "name": "Signal Weaving",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "description": "Compose bell, pennant and lantern codes for a harbor crew.",
+      "source": "LCST skills.19",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_20",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.20",
+      "status": "complete",
+      "role": "definition",
+      "name": "Marsh Distilling",
+      "attribute": "IQ",
+      "difficulty": "H",
+      "techLevelPolicy": {
+        "kind": "required",
+        "suggestedFrom": "campaign"
+      },
+      "description": "Prepare fictional salt-herb infusions at the learned TL; effects are adjudicated manually.",
+      "source": "LCST skills.20",
+      "defaults": [],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_21",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.21",
+      "status": "complete",
+      "role": "definition",
+      "name": "Harbor Winchcraft",
+      "attribute": "IQ",
+      "difficulty": "A",
+      "techLevelPolicy": {
+        "kind": "required",
+        "suggestedFrom": "campaign"
+      },
+      "description": "Rig tide-powered winches and identify unsafe loads.",
+      "source": "LCST skills.21",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "IQ",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_22",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.22",
+      "status": "complete",
+      "role": "definition",
+      "name": "Gullcall Performance",
+      "attribute": "HT",
+      "difficulty": "A",
+      "description": "Project patterned calls across windy quays.",
+      "source": "LCST skills.22",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "HT",
+          "modifier": -5
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    },
+    {
+      "key": "skills_23",
+      "sourceKey": "lantern_training",
+      "sourceLocator": "skills.23",
+      "status": "complete",
+      "role": "definition",
+      "name": "Tether Cast",
+      "attribute": "DX",
+      "difficulty": "H",
+      "description": "Place weighted rescue lines without entangling a swimmer.",
+      "source": "LCST skills.23",
+      "defaults": [
+        {
+          "kind": "attribute",
+          "attribute": "DX",
+          "modifier": -6
+        }
+      ],
+      "groups": [],
+      "tags": [],
+      "situationalModifiers": [],
+      "effects": []
+    }
+  ],
+  "characters": [
+    {
+      "email": "rowan@example.invalid",
+      "displayName": "Rowan",
+      "name": "Kestrel Vale",
+      "traits": [
+        {
+          "name": "Breakwater Poise",
+          "points": 12
+        },
+        {
+          "name": "Longwatch Lungs",
+          "points": 7
+        },
+        {
+          "name": "Horizon Reader",
+          "points": 6,
+          "level": 2
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Quayblade",
+          "points": 8
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 4
+        },
+        {
+          "name": "Reedbow",
+          "points": 8
+        },
+        {
+          "name": "Shingle Ghosting",
+          "points": 8
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Cliff Gardens",
+          "points": 2
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Tide Flats",
+          "points": 4
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 4
+        },
+        {
+          "name": "Current Riding",
+          "points": 1
+        },
+        {
+          "name": "Cliff Traverse",
+          "points": 2
+        },
+        {
+          "name": "Saltwound Care",
+          "techLevel": 3,
+          "points": 1
+        },
+        {
+          "name": "Quayside Barter",
+          "points": 0
+        }
+      ]
+    },
+    {
+      "email": "mira@example.invalid",
+      "displayName": "Mira",
+      "name": "Mira Ashfall",
+      "traits": [
+        {
+          "name": "Magery (Tideglass attunement)",
+          "points": 25,
+          "level": 2
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Echo Collector",
+          "points": -6,
+          "modifiers": [
+            {
+              "name": "Trusted companion intervenes",
+              "category": "limitation",
+              "costType": "percent",
+              "costValue": -30
+            }
+          ]
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Beacon Resonance",
+          "points": 8
+        },
+        {
+          "name": "Archive Diving",
+          "points": 4
+        },
+        {
+          "name": "Saltwound Care",
+          "techLevel": 3,
+          "points": 2
+        },
+        {
+          "name": "Harbor Mediation",
+          "points": 4
+        },
+        {
+          "name": "Beacon Rod",
+          "points": 4
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 1
+        }
+      ]
+    },
+    {
+      "email": "bram@example.invalid",
+      "displayName": "Bram",
+      "name": "Bram Stonebridge",
+      "traits": [
+        {
+          "name": "Stoneblood",
+          "points": 6
+        },
+        {
+          "name": "Breakwater Poise",
+          "points": 12
+        },
+        {
+          "name": "Bridgekeeper Oath",
+          "points": -8
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        }
+      ],
+      "skills": [
+        {
+          "name": "Salvage Haft",
+          "points": 12
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 8
+        },
+        {
+          "name": "Dockside Scrapping",
+          "points": 4
+        },
+        {
+          "name": "Salvage Fitting",
+          "specialization": "Body Armor",
+          "techLevel": 3,
+          "points": 4
+        },
+        {
+          "name": "Cliff Traverse",
+          "points": 2
+        },
+        {
+          "name": "Saltwound Care",
+          "techLevel": 3,
+          "points": 1
+        },
+        {
+          "name": "Quayside Barter",
+          "points": 2
+        },
+        {
+          "name": "Current Riding",
+          "points": 0
+        }
+      ]
+    },
+    {
+      "email": "iona@example.invalid",
+      "displayName": "Iona",
+      "name": "Iona Reedwake",
+      "traits": [
+        {
+          "name": "Tidewise Balance",
+          "points": 8
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Counts the gulls",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Tidepilot",
+          "points": 12
+        },
+        {
+          "name": "Current Riding",
+          "points": 4
+        },
+        {
+          "name": "Tether Cast",
+          "points": 8
+        },
+        {
+          "name": "Quayblade",
+          "points": 4
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 2
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 4
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Tide Flats",
+          "points": 2
+        }
+      ]
+    },
+    {
+      "email": "sable@example.invalid",
+      "displayName": "Sable",
+      "name": "Sable Fenwick",
+      "traits": [
+        {
+          "name": "Gentle Hands",
+          "points": 7
+        },
+        {
+          "name": "Magery (Tideglass attunement)",
+          "points": 16,
+          "level": 1
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Pocket gardener",
+          "points": 1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Saltwound Care",
+          "techLevel": 3,
+          "points": 8
+        },
+        {
+          "name": "Marsh Distilling",
+          "techLevel": 3,
+          "points": 8
+        },
+        {
+          "name": "Beacon Resonance",
+          "points": 4
+        },
+        {
+          "name": "Harbor Mediation",
+          "points": 4
+        },
+        {
+          "name": "Beacon Rod",
+          "points": 2
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Cliff Gardens",
+          "points": 4
+        }
+      ]
+    },
+    {
+      "email": "orin@example.invalid",
+      "displayName": "Orin",
+      "name": "Orin Bellstrand",
+      "traits": [
+        {
+          "name": "Signal Memory",
+          "points": 6
+        },
+        {
+          "name": "Longwatch Lungs",
+          "points": 7
+        },
+        {
+          "name": "Storm Debt",
+          "points": -9
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Signal Weaving",
+          "points": 8
+        },
+        {
+          "name": "Harbor Winchcraft",
+          "techLevel": 3,
+          "points": 8
+        },
+        {
+          "name": "Gullcall Performance",
+          "points": 4
+        },
+        {
+          "name": "Salvage Fitting",
+          "specialization": "Jetty Hardware",
+          "techLevel": 3,
+          "points": 4
+        },
+        {
+          "name": "Salvage Haft",
+          "points": 4
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 2
+        },
+        {
+          "name": "Archive Diving",
+          "points": 2
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,7 @@
     "db:migrate": "bun run src/server/db/migrate.ts",
     "db:seed": "bun run src/server/db/seed.ts",
     "db:seed:lantern": "bun run src/server/db/seeds/lanternCoast.ts",
+    "db:seed:lantern:refresh": "bun run src/server/db/seeds/lanternCoastRefresh.ts",
     "db:seed:lantern:mcp": "bun run scripts/seed-lantern-mcp.ts",
     "db:up": "docker compose -f docker-compose.dev.yml up -d db",
     "db:down": "docker compose -f docker-compose.dev.yml down",

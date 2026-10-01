@@ -503,6 +503,20 @@ export const campaigns = pgTable(
   (t) => ({ ownerIdx: index('campaigns_owner_idx').on(t.ownerId) }),
 );
 
+/** Internal development-tool progress; never exposed through player APIs/sync. */
+export const demoSeedUpdates = pgTable(
+  'demo_seed_updates',
+  {
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    seed: text('seed').notNull(),
+    version: integer('version').notNull(),
+    appliedAt: timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ key: primaryKey({ columns: [t.campaignId, t.seed, t.version] }) }),
+);
+
 export const campaignMemberships = pgTable(
   'campaign_memberships',
   {
