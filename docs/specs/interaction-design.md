@@ -251,8 +251,9 @@ When the toolbar would occupy more than half the visible area below the app
 header, it scrolls with the document and field offsets reserve only the header.
 Pinning returns when the viewport has enough room.
 
-Audit-history summaries wrap long unspaced entity names within their rows,
-preserving the timestamp and actor columns.
+Audit-history summaries and actor names wrap without truncation. On phone
+widths, the actor uses an indented second line so the timestamp and summary keep
+their reading width; wider rows keep the actor beside the summary.
 
 Adventure-log titles, author names, and locations wrap within their cards even
 when the text contains no spaces.
