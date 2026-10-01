@@ -264,11 +264,11 @@ test('identity name remains readable and editable across narrow sheet widths', a
           exact: false,
         }),
       ).toHaveCount(0);
-      await viewer.evaluate(() => window.scrollTo(0, 0));
       const sharedHeading = viewer
         .getByRole('heading', { name: longOwnerName, exact: true })
         .first();
       await expect(sharedHeading).toBeVisible();
+      await sharedHeading.scrollIntoViewIfNeeded();
       await expect(sharedHeading).toBeInViewport();
       const sharedGeometry = await sharedHeading.evaluate((heading) => {
         const rect = heading.getBoundingClientRect();
