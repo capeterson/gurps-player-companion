@@ -419,8 +419,13 @@ export function DrSummaryCard({
                           : Math.max(0, baseDr + appliedEnchantmentDr);
                       return (
                         <li className="py-2" key={item.id}>
-                          <div className="flex justify-between gap-3">
-                            <InventoryAnchorLink itemId={item.id}>{item.name}</InventoryAnchorLink>
+                          <div className="flex min-w-0 justify-between gap-3">
+                            <InventoryAnchorLink
+                              itemId={item.id}
+                              className="link link-hover min-w-0 [overflow-wrap:anywhere]"
+                            >
+                              {item.name}
+                            </InventoryAnchorLink>
                             <span className="num shrink-0">{layerDr} DR</span>
                           </div>
                           {enchantments.length > 0 && (

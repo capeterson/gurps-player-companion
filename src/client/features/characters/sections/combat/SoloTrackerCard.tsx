@@ -265,9 +265,9 @@ export function SoloTrackerCard({
             {tracker.combatants.map((combatant) => (
               <li
                 key={combatant.id}
-                className={
+                className={`min-w-0 [overflow-wrap:anywhere] ${
                   combatant.id === tracker.activeCombatantId ? 'font-semibold text-primary' : ''
-                }
+                }`}
               >
                 {combatant.name}
                 {combatant.id === tracker.activeCombatantId ? ' · acting' : ''}

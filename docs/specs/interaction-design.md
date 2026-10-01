@@ -308,6 +308,8 @@ second editing surface.
 Character inventory alternate attack modes and the device-only solo tracker
 generate client IDs through the shared safe ID helper, so creating them also
 works on non-secure HTTP IP origins where `crypto.randomUUID()` is unavailable.
+Long unspaced solo-tracker combatant names wrap inside the tracker, and armor
+names in the protection-layer breakdown shrink and wrap beside their DR values.
 
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide
