@@ -244,6 +244,7 @@ Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
 Library group labels and mobile row metadata wrap long unspaced categories.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
+Help and About prose wraps long external links inside its content column.
 Focused library form fields retain their draft and stay below the sticky toolbar
 after rotation, visual-viewport resizing, and keyboard focus changes. Only an
 obscured active editing field is scrolled into the remaining working area.

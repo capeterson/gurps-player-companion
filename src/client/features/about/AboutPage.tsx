@@ -18,7 +18,7 @@ export function AboutPage() {
           permissions granted in the{' '}
           <a
             href="http://www.sjgames.com/general/online_policy.html"
-            className="link link-primary"
+            className="link link-primary [overflow-wrap:anywhere]"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -34,7 +34,7 @@ export function AboutPage() {
           This application is open-source, with the original source code on github at{' '}
           <a
             href="https://github.com/capeterson/gurps-player-companion/"
-            className="link link-primary"
+            className="link link-primary [overflow-wrap:anywhere]"
             target="_blank"
             rel="noopener noreferrer"
           >
