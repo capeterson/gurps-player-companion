@@ -293,7 +293,9 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
             </button>
           </div>
 
-          <h2 className="mb-3 font-display text-2xl font-semibold">{request.label}</h2>
+          <h2 className="mb-3 min-w-0 wrap-anywhere font-display text-2xl font-semibold">
+            {request.label}
+          </h2>
 
           {(request.rules?.length || request.action) && (
             <>

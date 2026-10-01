@@ -74,7 +74,10 @@ clicking it opens a portrait editor with upload/removal controls and image help.
 Campaign cover controls and help live in the Campaign section of the centered
 settings dialog, alongside separate Rules and Members sections. Workspace headers
 only display covers. Selections and replacements queue locally,
-including offline, and sync independently of text edits. Portraits also appear
+including offline, and sync independently of text edits. At heights up to 500px,
+the settings dialog keeps a compact label, Close button, section tabs and Save/Cancel
+visible while the full campaign name and reduced cover preview scroll with the
+upload controls. Portraits also appear
 in minimal campaign views. Images are sanitized into two WebP sizes and served
 through public, unguessable, immutable URLs; browser caches may retain them after
 logout or removal. See [media-uploads.md](media-uploads.md) for access, limits and
@@ -173,7 +176,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -181,7 +184,7 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   and sign in with a passkey (`/auth/passkeys/*`). Ceremonies are verified by
   `@simplewebauthn/server` (origin/RP, challenge, type, flags, COSE algorithm,
   signature, and counter), not by an application-owned binary parser.
-- **Password reset** by emailed token (`/forgot-password` → `/reset-password`).
+- **Password reset** by emailed token (`/forgot-password` → `/reset-password`). An invalid or expired token offers a direct path to request another link.
 - **Public-auth rate limits**: durable Postgres counters bound registration by
   source IP and password login by source IP plus a normalized account budget
   consumed only by failed logins across source IPs. Recovery and passkey requests
@@ -840,7 +843,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     variants sharing one shell. Check rolls show the effective target and a
     `Roll vs N` action. Attack rolls combine range, Aim, hit location, rule
     bonuses and an Other modifier; the controls remain independently adjustable.
-    The footer stays reachable while the content scrolls. Defense and skill
+    Long roll labels wrap inside the sheet, and the Roll action stays reachable
+    while controls and results scroll. Defense and skill
     rolls retain the generic modifier stepper and optional presets. Defense
     rows use the same success-roll evaluator as skills, an existing rules
     simplification.
@@ -909,7 +913,8 @@ settings sections; switching sections retains drafts.
 - **Membership management**: add/remove members, change roles, **transfer
   ownership**, delete campaign.
 - **Invitations**: invite by handle (email or display name), inbox to
-  accept/reject, notifications.
+  accept/reject, notifications. Pending invitation cards wrap long campaign
+  names on narrow screens. See [campaign-content-sharing.md](campaign-content-sharing.md).
 - **Character-sheet sharing gate** (`shareCharacterSheets`): when off, only the
   owner (GM) and a character's own player see full sheets; other members get a
   "minimal view" (identity columns only — no stats, temp effects, HP/FP,
@@ -979,7 +984,9 @@ settings sections; switching sections retains drafts.
   selector because the route already fixes its campaign.
   The body is **markdown** (CommonMark + GFM) rendered through a sanitized
   pipeline that never interprets raw HTML or scripts. The create/edit form
-  offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
+  offers a Tiptap **rich text editor** with a raw-markdown toggle. Entries with
+  GFM tables stay in Markdown mode so their table source remains intact; table
+  previews scroll locally on narrow screens. Entries
   can be **edited or deleted** by their author or the campaign owner. Editing
   replaces the selected card in place, with Save changes and Cancel beside the draft.
   Titles, author names, and locations wrap within their entry cards, including
@@ -996,8 +1003,9 @@ settings sections; switching sections retains drafts.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
-   Newly observed changes remain highlighted for 30 seconds. Cards open the full
-   sheet in a new tab. The REST
+   Newly observed changes remain highlighted for 30 seconds, and long unspaced
+   character names in activity summaries wrap inside the feed. Cards open the
+   full sheet in a new tab. The REST
    campaign mirror input stays stable across local subscription renders so
    the party query can settle instead of being invalidated by repeated mirror writes.
 - **Experimental turn tracking**: the owner enables **Campaign settings → Rules →

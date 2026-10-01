@@ -1,6 +1,19 @@
 import { type Page, expect, test } from '@playwright/test';
+import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot, captureReviewScreenshot } from './review-artifacts';
+
+const responsiveViewports = [
+  { width: 320, height: 568 },
+  { width: 375, height: 812 },
+  { width: 568, height: 320 },
+  { width: 639, height: 800 },
+  { width: 640, height: 800 },
+  { width: 641, height: 800 },
+  { width: 768, height: 1024 },
+  { width: 1024, height: 768 },
+  { width: 1440, height: 900 },
+];
 
 async function register(
   page: Page,
@@ -22,136 +35,228 @@ test('identity name remains readable and editable across narrow sheet widths', a
   page,
   browser,
 }, testInfo) => {
+  test.skip(
+    !process.env.ADMIN_E2E_DATABASE_URL,
+    'Set ADMIN_E2E_DATABASE_URL to this worktree test database so generated accounts can be removed',
+  );
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 800 });
-  const ownerToken = await register(page);
-  async function create(path: string, data: object, token = ownerToken) {
-    const response = await page.request.post(`/api/v1${path}`, {
-      data,
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    expect(response.ok(), await response.text()).toBeTruthy();
-    return response.json();
-  }
-
-  const campaign = await create('/campaigns', {
-    name: 'Long name layout campaign',
-    shareCharacterSheets: false,
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const ownerEmail = `overview-${runId}@example.com`;
+  const viewerEmail = `overview-viewer-${runId}@example.com`;
+  const campaignName = `Long name layout campaign ${runId}`;
+  const pool = new Pool({
+    connectionString: process.env.ADMIN_E2E_DATABASE_URL ?? '',
+    connectionTimeoutMillis: 5_000,
   });
-  const characterName = 'Responsive Surveyor';
-  const character = await create('/characters', {
-    name: characterName,
-    campaignId: campaign.id,
-  });
-  await page.goto(`/characters/${character.id}`);
-  await selectCharacterSection(page, 'Skills');
-
-  const ownerName = page.getByRole('textbox', { name: 'character name', exact: true }).first();
-  const ownerWidths = [320, 375, 390, 639, 640, 641, 768, 1024, 1280];
-  for (const width of ownerWidths) {
-    await page.setViewportSize({ width, height: 800 });
-    await expect(ownerName).toHaveValue(characterName);
-    const geometry = await ownerName.evaluate(async (element) => {
-      await document.fonts.ready;
-      const input = element as HTMLInputElement;
-      const style = getComputedStyle(input);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('Canvas text measurement is unavailable');
-      context.font = [
-        style.fontStyle,
-        style.fontVariant,
-        style.fontWeight,
-        style.fontSize,
-        style.fontFamily,
-      ]
-        .filter(Boolean)
-        .join(' ');
-      const textWidth = context.measureText(input.value).width;
-      const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
-      const rect = input.getBoundingClientRect();
-      return {
-        textWidth,
-        contentWidth: input.clientWidth - padding,
-        font: context.font,
-        x: rect.x,
-        right: rect.right,
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
-    expect(
-      geometry.textWidth,
-      `full character name fits at ${width}px (${geometry.font})`,
-    ).toBeLessThanOrEqual(geometry.contentWidth + 1);
-    expect(geometry.x).toBeGreaterThanOrEqual(0);
-    expect(geometry.right).toBeLessThanOrEqual(width + 1);
-    expect(geometry.scrollWidth).toBeLessThanOrEqual(width);
-    if (width === 320 || width === 640) {
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await expect(ownerName).toBeInViewport();
-      await attachReviewScreenshot(page, testInfo, `editable-name-${width}`);
-    }
-  }
-  const longOwnerName =
-    'PneumonoultramicroscopicsilicovolcanoconiosisResponsiveSurveyorWithAnUnusuallyLongTitle';
-  await page.setViewportSize({ width: 320, height: 568 });
-  await ownerName.fill(longOwnerName);
-  await ownerName.press('End');
-  await expect(ownerName).toHaveValue(longOwnerName);
-  await expect
-    .poll(() => ownerName.evaluate((input: HTMLInputElement) => input.scrollLeft))
-    .toBeGreaterThan(0);
-  await ownerName.blur();
-  await expect
-    .poll(async () => {
-      const response = await page.request.get(`/api/v1/characters/${character.id}`, {
-        headers: { Authorization: `Bearer ${ownerToken}` },
-      });
-      if (!response.ok()) return null;
-      return ((await response.json()) as { name?: string }).name ?? null;
-    })
-    .toBe(longOwnerName);
-
-  await page.reload();
-  await selectCharacterSection(page, 'Skills');
-  await expect(
-    page.getByRole('textbox', { name: 'character name', exact: true }).first(),
-  ).toHaveValue(longOwnerName);
-
-  const viewerEmail = `overview-viewer-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
-  const viewerContext = await browser.newContext({ viewport: { width: 320, height: 568 } });
-  const viewer = await viewerContext.newPage();
+  let campaignId: string | undefined;
+  let viewerContext: Awaited<ReturnType<typeof browser.newContext>> | undefined;
   try {
+    const ownerToken = await register(page, ownerEmail);
+    async function create(path: string, data: object, token = ownerToken) {
+      const response = await page.request.post(`/api/v1${path}`, {
+        data,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(response.ok(), await response.text()).toBeTruthy();
+      return response.json();
+    }
+
+    const campaign = await create('/campaigns', {
+      name: campaignName,
+      shareCharacterSheets: false,
+    });
+    campaignId = campaign.id;
+    const characterName = 'Responsive Surveyor';
+    const character = await create('/characters', {
+      name: characterName,
+      campaignId: campaign.id,
+      st: 11,
+      dx: 12,
+      iq: 13,
+      ht: 14,
+    });
+    await page.goto(`/characters/${character.id}`);
+    await selectCharacterSection(page, 'Skills');
+
+    const ownerName = page.getByRole('textbox', { name: 'character name', exact: true }).first();
+    const ownerWidths = [320, 375, 390, 639, 640, 641, 768, 1024, 1280];
+    for (const width of ownerWidths) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(ownerName).toHaveValue(characterName);
+      const geometry = await ownerName.evaluate(async (element) => {
+        await document.fonts.ready;
+        const input = element as HTMLInputElement;
+        const style = getComputedStyle(input);
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Canvas text measurement is unavailable');
+        context.font = [
+          style.fontStyle,
+          style.fontVariant,
+          style.fontWeight,
+          style.fontSize,
+          style.fontFamily,
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const textWidth = context.measureText(input.value).width;
+        const padding =
+          Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+        const rect = input.getBoundingClientRect();
+        return {
+          textWidth,
+          contentWidth: input.clientWidth - padding,
+          font: context.font,
+          x: rect.x,
+          right: rect.right,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(
+        geometry.textWidth,
+        `full character name fits at ${width}px (${geometry.font})`,
+      ).toBeLessThanOrEqual(geometry.contentWidth + 1);
+      expect(geometry.x).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(width + 1);
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(width);
+      if (width === 320 || width === 640) {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await expect(ownerName).toBeInViewport();
+        await attachReviewScreenshot(page, testInfo, `editable-name-${width}`);
+      }
+    }
+    const longOwnerName =
+      'PneumonoultramicroscopicsilicovolcanoconiosisResponsiveSurveyorWithAnUnusuallyLongTitle';
+    await page.setViewportSize({ width: 320, height: 568 });
+    await ownerName.fill(longOwnerName);
+    await ownerName.press('End');
+    await expect(ownerName).toHaveValue(longOwnerName);
+    await expect
+      .poll(() => ownerName.evaluate((input: HTMLInputElement) => input.scrollLeft))
+      .toBeGreaterThan(0);
+    await ownerName.blur();
+    await expect
+      .poll(async () => {
+        const response = await page.request.get(`/api/v1/characters/${character.id}`, {
+          headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        if (!response.ok()) return null;
+        return ((await response.json()) as { name?: string }).name ?? null;
+      })
+      .toBe(longOwnerName);
+
+    await page.reload();
+    await selectCharacterSection(page, 'Skills');
+    await expect(
+      page.getByRole('textbox', { name: 'character name', exact: true }).first(),
+    ).toHaveValue(longOwnerName);
+
+    viewerContext = await browser.newContext({ viewport: { width: 320, height: 568 } });
+    const viewer = await viewerContext.newPage();
     const viewerToken = await register(viewer, viewerEmail, 'Read-only title viewer');
     await create(`/campaigns/${campaign.id}/members`, { email: viewerEmail });
+
+    await viewer.goto(`/campaigns/${campaign.id}`);
+    const rosterCard = viewer.locator('article').filter({ hasText: longOwnerName });
+    const rosterHeading = rosterCard.getByRole('heading', {
+      level: 2,
+      name: longOwnerName,
+      exact: true,
+    });
+    const rosterNameLink = rosterCard.getByRole('link', { name: longOwnerName, exact: true });
+    await expect(rosterHeading).toBeVisible();
+    await expect(rosterNameLink).toHaveAttribute('href', `/characters/${character.id}`);
+    for (const attribute of ['ST 11', 'DX 12', 'IQ 13', 'HT 14']) {
+      await expect(rosterCard.getByText(attribute, { exact: true })).toHaveCount(0);
+    }
+    for (const viewport of responsiveViewports) {
+      await viewer.setViewportSize(viewport);
+      const geometry = await Promise.all(
+        [rosterCard, rosterHeading, rosterNameLink].map((node) =>
+          node.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              x: rect.x,
+              right: rect.right,
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+            };
+          }),
+        ),
+      );
+      for (const box of geometry) {
+        expect(
+          box.x,
+          `roster content starts in viewport at ${viewport.width}`,
+        ).toBeGreaterThanOrEqual(0);
+        expect(
+          box.right,
+          `roster content ends in viewport at ${viewport.width}`,
+        ).toBeLessThanOrEqual(viewport.width + 1);
+      }
+      for (const textMetrics of geometry.slice(1)) {
+        expect(
+          textMetrics.scrollWidth,
+          `roster name wraps at ${viewport.width}`,
+        ).toBeLessThanOrEqual(textMetrics.clientWidth + 1);
+      }
+      await expect(rosterNameLink).toBeVisible();
+      await expect
+        .poll(() => viewer.evaluate(() => document.documentElement.scrollWidth))
+        .toBeLessThanOrEqual(viewport.width);
+      if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
+        await viewer.evaluate(() => window.scrollTo(0, 0));
+        await attachReviewScreenshot(
+          viewer,
+          testInfo,
+          `minimal-roster-${viewport.width}x${viewport.height}`,
+          { fullPage: true, animations: 'disabled' },
+        );
+      }
+    }
+
     await viewer.goto(`/characters/${character.id}`);
     const minimalHeading = viewer.getByRole('heading', { name: longOwnerName, exact: true });
     await expect(minimalHeading).toBeVisible();
-    const geometry = await minimalHeading.evaluate((heading) => {
-      const rect = heading.getBoundingClientRect();
-      return {
-        x: rect.x,
-        right: rect.right,
-        height: rect.height,
-        fontSize: Number.parseFloat(getComputedStyle(heading).fontSize),
-        viewportWidth: document.documentElement.clientWidth,
-        scrollWidth: document.documentElement.scrollWidth,
-      };
-    });
-    expect(geometry.viewportWidth).toBe(320);
-    expect(geometry.x).toBeGreaterThanOrEqual(0);
-    expect(geometry.right).toBeLessThanOrEqual(321);
-    expect(geometry.height).toBeGreaterThan(geometry.fontSize * 1.2);
-    expect(geometry.scrollWidth).toBeLessThanOrEqual(320);
-    await attachReviewScreenshot(viewer, testInfo, 'minimal-view-long-name-320');
+    for (const viewport of responsiveViewports) {
+      await viewer.setViewportSize(viewport);
+      const geometry = await minimalHeading.evaluate((heading) => {
+        const rect = heading.getBoundingClientRect();
+        return {
+          x: rect.x,
+          right: rect.right,
+          height: rect.height,
+          fontSize: Number.parseFloat(getComputedStyle(heading).fontSize),
+          viewportWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+        };
+      });
+      expect(geometry.viewportWidth).toBe(viewport.width);
+      expect(geometry.x).toBeGreaterThanOrEqual(0);
+      expect(geometry.right).toBeLessThanOrEqual(viewport.width + 1);
+      expect(geometry.height).toBeGreaterThan(geometry.fontSize * 1.2);
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(viewport.width);
+      await expect(minimalHeading).toBeVisible();
+      if ([320, 568, 640, 768, 1024, 1440].includes(viewport.width)) {
+        await viewer.evaluate(() => window.scrollTo(0, 0));
+        await attachReviewScreenshot(
+          viewer,
+          testInfo,
+          `minimal-view-long-name-${viewport.width}x${viewport.height}`,
+          { fullPage: true, animations: 'disabled' },
+        );
+      }
+    }
 
     const enableSharing = await page.request.patch(`/api/v1/campaigns/${campaign.id}`, {
       data: { shareCharacterSheets: true },
       headers: { Authorization: `Bearer ${ownerToken}` },
     });
     expect(enableSharing.ok(), await enableSharing.text()).toBeTruthy();
-    for (const width of [320, 639, 640, 641]) {
-      await viewer.setViewportSize({ width, height: 800 });
+    for (const viewport of responsiveViewports) {
+      const { width } = viewport;
+      await viewer.setViewportSize(viewport);
       await viewer.reload();
       await selectCharacterSection(viewer, 'Skills');
       await expect(
@@ -159,11 +264,11 @@ test('identity name remains readable and editable across narrow sheet widths', a
           exact: false,
         }),
       ).toHaveCount(0);
-      await viewer.evaluate(() => window.scrollTo(0, 0));
       const sharedHeading = viewer
         .getByRole('heading', { name: longOwnerName, exact: true })
         .first();
       await expect(sharedHeading).toBeVisible();
+      await sharedHeading.scrollIntoViewIfNeeded();
       await expect(sharedHeading).toBeInViewport();
       const sharedGeometry = await sharedHeading.evaluate((heading) => {
         const rect = heading.getBoundingClientRect();
@@ -182,14 +287,36 @@ test('identity name remains readable and editable across narrow sheet widths', a
       expect(sharedGeometry.height).toBeGreaterThan(sharedGeometry.fontSize * 1.2);
       expect(sharedGeometry.scrollWidth).toBeLessThanOrEqual(width);
       if (width === 320 || width === 640) {
-        await attachReviewScreenshot(viewer, testInfo, `shared-view-long-name-${width}`, {
-          path: testInfo.outputPath(`shared-view-long-name-${width}.png`),
-        });
+        await attachReviewScreenshot(viewer, testInfo, `shared-view-long-name-${width}`);
       }
     }
     expect(viewerToken).toBeTruthy();
   } finally {
-    await viewerContext.close();
+    await viewerContext?.close();
+    try {
+      if (campaignId) {
+        const token = await page
+          .evaluate(
+            () =>
+              JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
+          )
+          .catch(() => undefined);
+        if (token) {
+          await page.request.delete(`/api/v1/campaigns/${campaignId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
+      await pool.query(
+        'delete from campaigns where name=$1 and owner_id=(select id from users where email=$2)',
+        [campaignName, ownerEmail],
+      );
+      await pool.query('delete from users where email = any($1::text[])', [
+        [ownerEmail, viewerEmail],
+      ]);
+    } finally {
+      await pool.end();
+    }
   }
 });
 

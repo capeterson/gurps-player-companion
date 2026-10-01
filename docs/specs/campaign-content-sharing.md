@@ -187,6 +187,13 @@ Joining is invite-based (`src/server/routes/invitations.ts`):
   **accepts** (`POST /invitations/{id}/accept`, which creates the membership)
   or **rejects** (`.../reject`). Owner/manager can cancel a pending invite.
 
+The campaigns page shows pending invite cards above the campaign list. Long
+campaign names wrap inside the card, including names without spaces, so the
+Accept and Reject actions remain inside narrow viewports. The workspace label
+and campaign Members settings also keep long unspaced display names and email
+addresses within their content areas while keeping invitation and membership
+actions reachable.
+
 Client surfaces: `CampaignInvitePanel`, `CampaignMembersPanel`,
 `InvitationsInbox`, `TransferOwnershipDialog`, `NotificationsBell`.
 
@@ -331,7 +338,8 @@ campaign character-history endpoint every five seconds and visually fades newly
 observed events over 30 seconds. GM summaries extend the shared `CharacterCard`
 shell with pools, secondary stats, conditions and lookup results. The common
 attribute line uses effective values, the campaign name links to its overview,
-and the character name opens the sheet in a new tab.
+and the character name opens the sheet in a new tab. Long unspaced character
+names in activity summaries wrap inside the feed instead of being clipped.
 
 Player sheets and GM cards share `joinCharacterMechanics`, reading the validated
 source/version declarations on synced trait/skill rows. The GM dashboard uses its
@@ -738,8 +746,11 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
 - **Editor:** the create/edit form uses a Tiptap + `tiptap-markdown` WYSIWYG
   (`src/client/components/markdown/RichTextEditor.tsx`) with a "Rich text" /
   "Markdown" tab toggle. The stored source of truth is always the markdown
-  string — the editor never produces or persists HTML. Strict CommonMark line
-  breaks (single newlines do not become `<br>`).
+  string — the editor never produces or persists HTML. GFM tables remain in
+  Markdown mode because the rich editor cannot round-trip table nodes; while a
+  table is present, users can edit its exact source and preview its rendered
+  form without switching to rich mode. Strict CommonMark line breaks (single
+  newlines do not become `<br>`).
 - Client surface: `LogPage` (single-column `max-w-3xl` layout), mounted at the
   campaign-scoped `/campaigns/:id/log` route. Scoped mode is fixed to the parent
   campaign and therefore does not render the legacy standalone page's campaign

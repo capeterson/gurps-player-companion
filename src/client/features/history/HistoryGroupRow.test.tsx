@@ -23,7 +23,7 @@ function makeEvent(actorDisplayName: string): HistoryEventOut {
 }
 
 describe('HistoryGroupRow', () => {
-  it('truncates a long common actor name in a folded header', () => {
+  it('wraps a long common actor name in a folded header', () => {
     const actorName = 'An unusually long actor display name that must not crowd out the summary';
     const event = makeEvent(actorName);
     const group: HistoryGroup = {
@@ -37,7 +37,8 @@ describe('HistoryGroupRow', () => {
 
     const actor = screen.getByRole('button').querySelector('span:nth-last-child(2)');
     expect(actor).toHaveTextContent(actorName);
-    expect(actor).toHaveClass('truncate', 'max-w-24');
+    expect(actor).not.toHaveClass('truncate');
+    expect(actor).toHaveClass('basis-full', '[overflow-wrap:anywhere]');
   });
 
   it('expands a campaign-library row into field changes and raw snapshots', () => {

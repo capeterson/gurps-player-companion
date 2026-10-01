@@ -15,6 +15,7 @@ import type { InventoryItemOut } from '../../../shared/schemas/inventory.ts';
 import type { SkillOut } from '../../../shared/schemas/skill.ts';
 import { SkillReferenceCombobox } from '../../components/ui/SkillReferenceCombobox.tsx';
 import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
+import { newEditorId } from './editorId.ts';
 
 const TARGET_LABELS: Record<EffectTarget, string> = {
   st: 'ST',
@@ -57,7 +58,7 @@ interface EffectDraft {
 
 function draftFromEffect(effect: TraitEffect): EffectDraft {
   return {
-    id: crypto.randomUUID(),
+    id: newEditorId(),
     target: effect.target,
     value: String(effect.value),
     scaling: effect.scaling,
@@ -72,7 +73,7 @@ function draftFromEffect(effect: TraitEffect): EffectDraft {
 
 function defaultDraft(): EffectDraft {
   return {
-    id: crypto.randomUUID(),
+    id: newEditorId(),
     target: 'skill',
     value: '1',
     scaling: 'flat',
@@ -407,7 +408,7 @@ export function EffectsEditor<T extends TraitEffect>({
                       ...drafts,
                       {
                         ...draft,
-                        id: crypto.randomUUID(),
+                        id: newEditorId(),
                         selector: selector ? { ...selector } : null,
                       },
                     ])

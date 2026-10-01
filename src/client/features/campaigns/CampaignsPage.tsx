@@ -69,8 +69,10 @@ export function CampaignsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <InvitationsInbox />
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="label-eyebrow">Workspace · {me.data?.displayName ?? '…'}</p>
+        <div className="min-w-0">
+          <p className="label-eyebrow [overflow-wrap:anywhere]">
+            Workspace · {me.data?.displayName ?? '…'}
+          </p>
           <h1 className="font-display text-4xl font-semibold leading-none">Campaigns</h1>
         </div>
         <button

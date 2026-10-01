@@ -75,6 +75,8 @@ test('long item categories wrap in the group heading and mobile row summary', as
         await page.setViewportSize(viewport);
         await expect(groupLabel).toHaveText(category);
         await expect(item).toBeVisible();
+        await groupHeading.scrollIntoViewIfNeeded();
+        await expect(groupLabel).toBeVisible();
         const [labelBox, labelWidth, pageWidth] = await Promise.all([
           groupLabel.boundingBox(),
           groupLabel.evaluate((element) => ({

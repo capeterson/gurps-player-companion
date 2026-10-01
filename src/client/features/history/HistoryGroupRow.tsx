@@ -78,7 +78,7 @@ function SingleRow({
         <span className="text-base-content [overflow-wrap:anywhere]">{event.summary}</span>
       </span>
       {actor && (
-        <span className="text-base-content/50 text-xs truncate max-w-24 shrink-0 pt-0.5">
+        <span className="min-w-0 max-w-full shrink-0 basis-full pl-16 pt-0.5 text-xs text-base-content/50 [overflow-wrap:anywhere] sm:basis-auto sm:pl-0 sm:max-w-24">
           {actor}
         </span>
       )}
@@ -93,7 +93,7 @@ function SingleRow({
           if (toggleEvent.currentTarget.open) void requestDetails();
         }}
       >
-        <summary className="flex cursor-pointer list-none items-start gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-200/40">
+        <summary className="flex flex-wrap cursor-pointer list-none items-start gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-200/40">
           {content}
         </summary>
         {detailEvent ? (
@@ -121,7 +121,7 @@ function SingleRow({
   }
 
   return (
-    <div className="flex items-start gap-2 py-2 px-3 border-b border-base-200 last:border-0 hover:bg-base-200/40 transition-colors text-sm">
+    <div className="flex flex-wrap items-start gap-2 py-2 px-3 border-b border-base-200 last:border-0 hover:bg-base-200/40 transition-colors text-sm">
       {content}
     </div>
   );
@@ -214,21 +214,23 @@ export function HistoryGroupRow({ group, showDetails, loadDetails }: GroupRowPro
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-start gap-2 py-2 px-3 hover:bg-base-200/40 transition-colors text-sm text-left"
+        className="w-full flex flex-wrap items-start gap-2 py-2 px-3 hover:bg-base-200/40 transition-colors text-sm text-left"
       >
         <span
-          className="text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5"
+          className="order-1 text-base-content/40 text-xs tabular-nums w-16 shrink-0 pt-0.5"
           title={first ? formatAbsolute(first.createdAt) : undefined}
         >
           {first ? formatRelative(first.createdAt) : ''}
         </span>
-        <span className="flex-1 min-w-0 text-base-content">{group.groupSummary}</span>
+        <span className="order-2 flex-1 min-w-0 text-base-content [overflow-wrap:anywhere]">
+          {group.groupSummary}
+        </span>
         {actor && (
-          <span className="text-base-content/40 text-xs truncate max-w-24 shrink-0 pt-0.5">
+          <span className="order-4 min-w-0 max-w-full shrink-0 basis-full pl-16 pt-0.5 text-xs text-base-content/40 [overflow-wrap:anywhere] sm:order-3 sm:basis-auto sm:pl-0 sm:max-w-24">
             {actor}
           </span>
         )}
-        <span className="text-base-content/40 text-xs shrink-0 pt-0.5 select-none">
+        <span className="order-3 text-base-content/40 text-xs shrink-0 pt-0.5 select-none sm:order-4">
           {open ? '▾' : '▸'} {group.events.length}
         </span>
       </button>

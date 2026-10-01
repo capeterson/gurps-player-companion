@@ -15,8 +15,9 @@
  *                   wrapped to match the rich surface's outer box.
  *
  * Switching surfaces carries state across: rich -> source serializes the
- * current doc; source -> rich re-parses the textarea text. Neither mode
- * ever interprets raw HTML — Tiptap's markdown parser only honours
+ * current doc; source -> rich re-parses the textarea text. GFM tables stay
+ * in source mode because tiptap-markdown cannot round-trip them. Neither
+ * mode ever interprets raw HTML — Tiptap's markdown parser only honours
  * CommonMark/GFM syntax, and the rendered body downstream is sanitized
  * by <Markdown>. The editor never produces or persists HTML.
  */
@@ -27,6 +28,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Markdown as TiptapMarkdown } from 'tiptap-markdown';
 import { Markdown } from './Markdown.tsx';
+import { containsGfmTableSyntax } from './markdownProcessor.ts';
 
 export type EditorMode = 'rich' | 'source';
 
@@ -64,11 +66,15 @@ export function RichTextEditor({
   'data-flash-parity': dataFlashParity,
   'aria-label': ariaLabel,
 }: RichTextEditorProps) {
-  const [mode, setMode] = useState<EditorMode>('rich');
+  const [initialHasTable] = useState(() => containsGfmTableSyntax(value));
+  const [mode, setMode] = useState<EditorMode>(() => (initialHasTable ? 'source' : 'rich'));
   // Raw-markdown buffer shown in source mode. Kept in state so the
   // <textarea> re-renders as the user types; mirrored into the editor
   // when switching back to rich mode.
   const [sourceText, setSourceText] = useState<string>(value);
+  const [sourceHasGfmTable, setSourceHasGfmTable] = useState(initialHasTable);
+  const sourceTextRef = useRef(sourceText);
+  sourceTextRef.current = sourceText;
 
   // Ref so the editor (created once by useEditor) always calls the
   // latest onBlur without needing to be recreated when the caller's
@@ -128,13 +134,20 @@ export function RichTextEditor({
   // empty), resync the doc without clobbering in-progress edits.
   useEffect(() => {
     if (!editor) return;
+    if (value === sourceTextRef.current) return;
     const md = (editor.storage as { markdown?: MarkdownStore }).markdown;
     const current = md ? md.getMarkdown() : '';
     if (value !== current) {
       setSourceText(value);
+      const hasTable = containsGfmTableSyntax(value);
+      setSourceHasGfmTable(hasTable);
+      if (hasTable) {
+        setMode('source');
+        return;
+      }
       editor.commands.setContent(value || '', false);
     }
-  }, [value]);
+  }, [editor, value]);
 
   // Both directions swap out the focused DOM surface (contenteditable
   // <-> textarea) via the toolbar button, whose onMouseDown prevents the
@@ -154,6 +167,7 @@ export function RichTextEditor({
 
   const switchToRich = () => {
     const md = sourceText;
+    if (sourceHasGfmTable) return;
     if (editor) {
       editor.commands.setContent(md || '', false);
       onChange(md);
@@ -243,14 +257,31 @@ export function RichTextEditor({
         </ToolbarButton>
         {/* Spacer pushes the mode toggle to the right edge. */}
         <span className="rich-text-toolbar-spacer" aria-hidden="true" />
-        <ToolbarButton
-          label={mode === 'rich' ? 'Edit raw markdown' : 'Back to rich text'}
-          active={mode === 'source'}
-          onClick={mode === 'rich' ? switchToSource : switchToRich}
-        >
-          {mode === 'rich' ? '</>' : '✎'}
-        </ToolbarButton>
+        {mode === 'source' && sourceHasGfmTable ? (
+          <ToolbarButton
+            label="Rich text unavailable for tables"
+            onClick={() => undefined}
+            disabled
+            active
+          >
+            ✎
+          </ToolbarButton>
+        ) : (
+          <ToolbarButton
+            label={mode === 'rich' ? 'Edit raw markdown' : 'Back to rich text'}
+            active={mode === 'source'}
+            onClick={mode === 'rich' ? switchToSource : switchToRich}
+          >
+            {mode === 'rich' ? '</>' : '✎'}
+          </ToolbarButton>
+        )}
       </div>
+
+      {mode === 'source' && sourceHasGfmTable && (
+        <output className="px-2 py-1 text-xs text-muted">
+          This entry has a table. Edit it in Markdown mode to keep the table.
+        </output>
+      )}
 
       {mode === 'rich' ? (
         <EditorContent editor={editor} className="rich-text-surface-wrap" />
@@ -263,6 +294,7 @@ export function RichTextEditor({
             value={sourceText}
             onChange={(e) => {
               setSourceText(e.target.value);
+              setSourceHasGfmTable(containsGfmTableSyntax(e.target.value));
               onChange(e.target.value);
             }}
             onBlur={() => onBlur?.()}

@@ -19,6 +19,7 @@ import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
 import { LibraryFormFooter } from './LibraryFormFooter.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
+import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 type FormProps<T, R> = {
@@ -292,7 +293,7 @@ export function StyleForm(props: FormProps<LibraryStyleCreate, LibraryStyleOut>)
   const [skills, setSkills] = useState((initial?.skills ?? []).join('\n'));
   const [perks, setPerks] = useState((initial?.perks ?? []).join('\n'));
   const [techniques, setTechniques] = useState<EditableTechnique[]>(() =>
-    (initial?.techniques ?? []).map((row) => ({ ...row, editorId: crypto.randomUUID() })),
+    (initial?.techniques ?? []).map((row) => ({ ...row, editorId: newEditorId() })),
   );
   const [formError, setFormError] = useState<string | null>(null);
   function patchTechnique(index: number, patch: Partial<EditableTechnique>) {
@@ -376,7 +377,7 @@ export function StyleForm(props: FormProps<LibraryStyleCreate, LibraryStyleOut>)
               setTechniques((rows) => [
                 ...rows,
                 {
-                  editorId: crypto.randomUUID(),
+                  editorId: newEditorId(),
                   name: '',
                   defaultSkillName: '',
                   difficulty: 'A',
