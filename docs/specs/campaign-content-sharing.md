@@ -743,8 +743,11 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
 - **Editor:** the create/edit form uses a Tiptap + `tiptap-markdown` WYSIWYG
   (`src/client/components/markdown/RichTextEditor.tsx`) with a "Rich text" /
   "Markdown" tab toggle. The stored source of truth is always the markdown
-  string — the editor never produces or persists HTML. Strict CommonMark line
-  breaks (single newlines do not become `<br>`).
+  string — the editor never produces or persists HTML. GFM tables remain in
+  Markdown mode because the rich editor cannot round-trip table nodes; while a
+  table is present, users can edit its exact source and preview its rendered
+  form without switching to rich mode. Strict CommonMark line breaks (single
+  newlines do not become `<br>`).
 - Client surface: `LogPage` (single-column `max-w-3xl` layout), mounted at the
   campaign-scoped `/campaigns/:id/log` route. Scoped mode is fixed to the parent
   campaign and therefore does not render the legacy standalone page's campaign

@@ -111,6 +111,11 @@ controls remain outbox-backed. An empty Magic items section is absent.
 Below 640px, adjustment controls move to their own row so long item names retain
 the available width beside energy or charges.
 
+Adventure-log Markdown tables keep a readable 36rem minimum width and scroll
+horizontally inside the log body or raw-Markdown preview. This local scroller
+keeps the final columns reachable on narrow screens without imposing wide
+tables on other Markdown surfaces.
+
 ## Named protection sources
 
 Incoming attack's **Protection before penetration** lists eligible innate DR by

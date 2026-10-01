@@ -961,7 +961,9 @@ settings sections; switching sections retains drafts.
   selector because the route already fixes its campaign.
   The body is **markdown** (CommonMark + GFM) rendered through a sanitized
   pipeline that never interprets raw HTML or scripts. The create/edit form
-  offers a Tiptap **rich text editor** with a raw-markdown toggle; entries
+  offers a Tiptap **rich text editor** with a raw-markdown toggle. Entries with
+  GFM tables stay in Markdown mode so their table source remains intact; table
+  previews scroll locally on narrow screens. Entries
   can be **edited or deleted** by their author or the campaign owner. Editing
   replaces the selected card in place, with Save changes and Cancel beside the draft.
   Titles, author names, and locations wrap within their entry cards, including
