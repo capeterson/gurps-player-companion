@@ -20,6 +20,8 @@ Masked rows awaiting rehydration also omit attribute placeholders. The GM
 wrapper supplies effective attributes and appends pools, secondary stats,
 conditions and lookup results inside the same shell. Its name link opens a new
 tab; missing mechanics show the existing unavailable notice and hide numbers.
+Long unspaced names in character change summaries wrap inside the GM activity
+feed, including when it appears below the cards on narrow viewports.
 
 ## Identity images and campaign settings
 

@@ -102,9 +102,11 @@ function ChangeRow({
           {new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </time>
       </div>
-      <p className="mt-1 text-sm leading-snug">{event.summary}</p>
+      <p className="mt-1 text-sm leading-snug [overflow-wrap:anywhere]">{event.summary}</p>
       {event.actorDisplayName && (
-        <p className="mt-1 text-xs text-base-content/40">by {event.actorDisplayName}</p>
+        <p className="mt-1 text-xs text-base-content/40 [overflow-wrap:anywhere]">
+          by {event.actorDisplayName}
+        </p>
       )}
     </div>
   );

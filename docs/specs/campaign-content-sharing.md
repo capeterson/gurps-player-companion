@@ -335,7 +335,8 @@ campaign character-history endpoint every five seconds and visually fades newly
 observed events over 30 seconds. GM summaries extend the shared `CharacterCard`
 shell with pools, secondary stats, conditions and lookup results. The common
 attribute line uses effective values, the campaign name links to its overview,
-and the character name opens the sheet in a new tab.
+and the character name opens the sheet in a new tab. Long unspaced character
+names in activity summaries wrap inside the feed instead of being clipped.
 
 Player sheets and GM cards share `joinCharacterMechanics`, reading the validated
 source/version declarations on synced trait/skill rows. The GM dashboard uses its

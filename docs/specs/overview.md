@@ -978,8 +978,9 @@ settings sections; switching sections retains drafts.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
-   Newly observed changes remain highlighted for 30 seconds. Cards open the full
-   sheet in a new tab. The REST
+   Newly observed changes remain highlighted for 30 seconds, and long unspaced
+   character names in activity summaries wrap inside the feed. Cards open the
+   full sheet in a new tab. The REST
    campaign mirror input stays stable across local subscription renders so
    the party query can settle instead of being invalidated by repeated mirror writes.
 - **Experimental turn tracking**: the owner enables **Campaign settings → Rules →
