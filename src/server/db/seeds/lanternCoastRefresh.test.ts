@@ -162,6 +162,14 @@ describe('Lantern Coast explicit content refresh', () => {
   it('enriches untouched defaults while preserving edits, costs, play state and private access', async () => {
     await isolated(async (ownerId) => {
       const old = await oldDemo(ownerId);
+      const restricted = parseLibraryYaml(old.text).library.traits.find(
+        (entry) => entry.name === "Beacon Courier's Seal",
+      );
+      if (!restricted) throw new Error('Missing new courier privilege');
+      await request(ownerId, `${old.path}/library/traits`, 'POST', {
+        ...restricted,
+        restricted: true,
+      });
       const oldCatalog = catalogSchema.parse(await request(ownerId, `${old.path}/library`));
       const deletedDefinition = oldCatalog.traits.find((entry) => entry.name === 'Longwatch Lungs');
       if (!deletedDefinition) throw new Error('Missing original definition');
@@ -178,6 +186,7 @@ describe('Lantern Coast explicit content refresh', () => {
       expect(detail.combat?.currentHp).toBe(1);
       expect(detail.earnedPoints).toBe(0);
       expect(detail.traits.find((entry) => entry.id === old.ownedTraitId)?.points).toBe(17);
+      expect(detail.traits.some((entry) => entry.name === "Beacon Courier's Seal")).toBe(false);
       expect(detail.traits.find((entry) => entry.id === old.ownedTraitId)?.notes).toBe(
         catalog.traits.find((entry) => entry.name === 'Breakwater Poise')?.description,
       );

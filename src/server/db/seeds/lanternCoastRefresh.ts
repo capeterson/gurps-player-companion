@@ -3,7 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
+import {
+  canPlayerSelectLibraryEntry,
+  libraryEntryKey,
+} from '../../../shared/domain/libraryIdentity.ts';
 import {
   definitionReference,
   resolveLibraryPricing,
@@ -334,7 +337,7 @@ export async function refreshLanternCoast(
         );
         if (matches.length !== 1) continue;
         const source = matches[0];
-        if (!source || source.name !== entry.name) continue;
+        if (!source || source.name !== entry.name || !canPlayerSelectLibraryEntry(source)) continue;
         const pricingResolution = resolveLibraryPricing(
           catalog,
           definitionReference('traits', source),
@@ -366,7 +369,7 @@ export async function refreshLanternCoast(
         );
         if (matches.length !== 1) continue;
         const source = matches[0];
-        if (!source || source.name !== entry.name) continue;
+        if (!source || source.name !== entry.name || !canPlayerSelectLibraryEntry(source)) continue;
         await request(
           token,
           `${path}/skills`,
