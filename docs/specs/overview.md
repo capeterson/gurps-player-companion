@@ -99,7 +99,7 @@ then resumes the complete consent request after login.
 Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
 Claude-compatible Dynamic Client Registration, so supported public clients need
 no per-client server configuration or shared secret.
-The 49 tools use server-local names such as `list_characters` and `character_skill`,
+The 51 tools use server-local names such as `list_characters` and `character_skill`,
 without an application prefix. Related writes share entity tools with explicit
 actions; reads remain separate. Clients refresh tool discovery after the rename.
 Every player-domain raw API operation has an exact tool/action mapping; typed
@@ -111,6 +111,19 @@ acknowledgement rather than echoing complete character/campaign resources; error
 retain their actionable body and agents re-read when refreshed state is needed.
 Successful result payloads are emitted only as structured content, with concise
 status text instead of a duplicate JSON copy.
+Settings → **Experimental Features** includes an account-wide **MCP UI** toggle,
+off by default. Its runtime gate hides UI metadata/resources when disabled;
+ordinary tools keep working, and clients refresh tool discovery after changes.
+Opted-in MCP Apps clients can render `get_character` as an embedded read-only character
+sheet with Overview, Traits, Skills, Magic, and Inventory sections. It shares the
+web app's presentation components and theme. Refresh rechecks access through the
+same tool; limited viewers receive public identity only. The generic UI resource
+ships separately from the PWA in `dist/mcp-ui/character.html`. Focused
+`get_character_inventory_item` and `get_campaign_library_skill` reads render one
+item/container subtree or campaign skill definition as a compact card, without
+sheet navigation or unrelated collections. They share authoritative calculations,
+item disclosures, and the library's skill presentation, while enforcing the same
+share gate and restricted-entry rules.
 Character, campaign, encounter, adventure-log, invitation, notification, and
 campaign-library reads offer bounded search/limit/offset controls, with library
 section selection, so agents can avoid loading unrelated context. History feeds
@@ -1188,7 +1201,7 @@ src/
     oauth/       client configuration sync, PKCE authorization/grants,
                  opaque token rotation/revocation, discovery + consent routes
     mcp/         exact operation manifest/catalog, SDK transport, checked
-                 snapshot, and same-process shared-handler executor
+                 snapshot, same-process shared-handler executor, and MCP Apps resource discovery
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
                  notificationEvents, notificationEmails, notificationMaintenance
                  (durable audit fan-out, invitation/security mail and lifecycle),
@@ -1213,6 +1226,8 @@ src/
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
   client/        React 19 PWA
+    mcp-ui/      MCP Apps bridge, shared character composition, and focused item/library skill cards;
+                 separate self-contained build via vite.mcp-ui.config.ts
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
       campaigns/ Campaign workspace identity/navigation, overview, scoped
@@ -1264,6 +1279,7 @@ src/
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
+    features/settings/ExperimentalFeaturesSection.tsx  Account-wide MCP UI opt-in
     lib/desktopNotifications.ts  Per-user browser opt-in, permission and delivery deduplication
     lib/editingFocusBounds.ts  Rich-text selection and textarea caret geometry for library focus scrolling
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,

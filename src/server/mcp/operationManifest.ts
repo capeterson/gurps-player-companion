@@ -132,6 +132,8 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   tool('GET', '/api/v1/auth/me', 'get_current_user', 'gpc:read'),
   excluded('GET', '/api/v1/auth/preferences', 'browser display-preference infrastructure'),
   excluded('PATCH', '/api/v1/auth/preferences', 'browser display-preference infrastructure'),
+  excluded('GET', '/api/v1/auth/experimental-features', 'interactive account feature opt-ins'),
+  excluded('PATCH', '/api/v1/auth/experimental-features', 'interactive account feature opt-ins'),
   excluded(
     'GET',
     '/api/v1/auth/notification-preferences',
@@ -249,6 +251,12 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
     'gpc:manage',
   ),
   tool('GET', '/api/v1/campaigns/{id}/library', 'get_campaign_library', 'gpc:read'),
+  tool(
+    'GET',
+    '/api/v1/campaigns/{id}/library/skills/{skillId}',
+    'get_campaign_library_skill',
+    'gpc:read',
+  ),
   task('POST', '/api/v1/campaigns/{id}/library/traits', 'library_trait', 'create', 'gpc:write'),
   task(
     'DELETE',
@@ -495,6 +503,12 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   task('POST', '/api/v1/characters', 'character', 'create', 'gpc:write'),
   task('DELETE', '/api/v1/characters/{id}', 'character', 'delete', 'gpc:manage'),
   tool('GET', '/api/v1/characters/{id}', 'get_character', 'gpc:read'),
+  tool(
+    'GET',
+    '/api/v1/characters/{id}/inventory/{itemId}',
+    'get_character_inventory_item',
+    'gpc:read',
+  ),
   task('PATCH', '/api/v1/characters/{id}', 'character', 'update', 'gpc:write'),
   tool(
     'POST',

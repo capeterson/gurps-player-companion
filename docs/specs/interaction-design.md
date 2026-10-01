@@ -334,6 +334,20 @@ Escape dismisses it.
 
 ## Verification and file map
 
+The MCP Apps character view (`src/client/mcp-ui/`) uses the same read-only
+collection panels, stat cards, Markdown, and inventory rows as the web app.
+`CharacterIdentityDetails` supplies identity fields to both the limited sheet
+and embedded view. Read-only inventory rows have one **Details** action opening
+`InventoryItemDetails`, with notes, effective armor/weapon blocks, container and
+magic-item information. Editable rows retain their existing editing interaction.
+The embedded shell receives authorized server snapshots through the MCP Apps
+bridge rather than reading the PWA mirror; its refresh repeats the same read tool.
+Focused item/container and campaign-library skill results use one compact card
+without sheet navigation. Container contents reuse nested read-only inventory
+rows, and `LibrarySkillDetails` is shared with the campaign library's disclosures.
+Its section controls wrap at narrow widths. It does not render a sheet dock or
+app header, and all inherited overlays remain bounded to the iframe viewport.
+
 Panel tests assert visible summaries, Add/Edit disclosures, preserved drafts,
 read-only behavior, create/delete payloads, validation, roll access, and the
 save-success/rejection/concurrent-edit guarantees. Browser tests exercise the
@@ -361,3 +375,14 @@ are inspected alongside bounding-box and overlap assertions.
 For a future collection, reuse these primitives before adding a new control
 or save path. Maintain this document when the shared interaction contract
 changes; collection-specific behavior also belongs in the overview catalog.
+
+## Account experimental features
+
+Settings has one **Experimental Features** section with an **MCP UI** toggle.
+The description explains the embedded character/item/container/skill cards;
+the footer says the preference follows the account and clients must refresh
+their tools after changing it. Features start off. Loading, read-error/retry,
+and rollback feedback use the standard settings patterns. `useDraftToggle`
+retains rapid same-field changes and flashes the visible checkbox with a toast
+on failure. This online account preference is outside the local-first sheet
+and library outbox.
