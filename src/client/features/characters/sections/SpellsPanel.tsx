@@ -544,13 +544,7 @@ function SpellReferenceDialog({
       onCancel={onClose}
     >
       <div className="modal-box w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] max-w-xl max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] overflow-y-auto border border-base-300 bg-base-100">
-        <header className="flex items-start justify-between gap-3">
-          <div className="min-w-0 [overflow-wrap:anywhere]">
-            <h3 className="break-words font-display text-xl">{spell.name}</h3>
-            <p className="mt-1 text-xs text-base-content/70">
-              {spell.college ?? 'No college'} · IQ/{spell.difficulty} · {spell.points} points
-            </p>
-          </div>
+        <header className="sticky -top-6 z-10 -mx-6 -mt-6 flex justify-end bg-base-100 px-6 pt-3 pb-2">
           <button
             type="button"
             className="btn btn-ghost btn-sm btn-square min-h-11 min-w-11"
@@ -560,6 +554,12 @@ function SpellReferenceDialog({
             <AppIcon name="close" size={18} />
           </button>
         </header>
+        <div className="mb-5 min-w-0 [overflow-wrap:anywhere]">
+          <h3 className="break-words font-display text-xl">{spell.name}</h3>
+          <p className="mt-1 text-xs text-base-content/70">
+            {spell.college ?? 'No college'} · IQ/{spell.difficulty} · {spell.points} points
+          </p>
+        </div>
         <dl className="my-5 grid grid-cols-2 gap-4 text-sm [overflow-wrap:anywhere]">
           <div>
             <dt className="text-xs text-base-content/60">Casting cost</dt>

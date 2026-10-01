@@ -87,7 +87,10 @@ Edit occupy one horizontal action row. Long names wrap; there is no page-wide
 horizontal scroller. A free upkeep is 0, while absent upkeep is an em dash.
 
 The name opens a bounded, read-only reference dialog with rendered Markdown,
-prerequisites, duration, base-to-effective costs, and level modifiers. The pencil
+prerequisites, duration, base-to-effective costs, and level modifiers. Its
+compact close control stays pinned on an opaque surface that reaches the
+dialog's inner top edge while the full spell heading and long reference content
+scroll inside the dialog. The pencil
 opens a labeled inline editor for name, difficulty, points, base cost, and
 Markdown description/notes. Deletion lives in that editor and requires the
 existing confirmation. Editors stay mounted when closed or filtered; Done
