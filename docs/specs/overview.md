@@ -119,6 +119,12 @@ Character, campaign, encounter and adventure-log text filters, plus admin user
 and campaign searches, treat `%`, `_` and backslash as literal characters rather
 than SQL pattern syntax. These searches remain case-insensitive.
 
+Reusable [GPC workflow skills](../agent-skills.md) cover character advancement,
+equipment and packing, campaign-library authoring, session wrap-up, and encounter
+preparation. Clients can package these with their connected GPC tools. Synthetic
+behavioral evals check the skills against the emitted tool schemas; they do not
+change server permissions or install a client plugin automatically.
+
 ## User-facing features
 
 ### Library selection
@@ -1345,7 +1351,9 @@ src/
                  navigation fallback. Mutable worker/bootstrap/HTML entrypoints
                  are served no-store; hashed assets remain cacheable. Outbox
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
+skills/          Portable GPC workflow skills, client metadata, and synthetic eval cases
 tests/
+  skills/        Eval-grader regression tests, run by skills:check and CI
   acceptance/    Explicit full Lantern MCP seed check, outside normal CI discovery
   e2e/           Real browser acceptance, geometry and local-first interaction regressions
 docs/
@@ -1354,10 +1362,12 @@ docs/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked; generation skips database maintenance)
+  agent-skills.md  Skill packaging and independent behavioral-eval instructions
   mcp-tools.json Emitted MCP catalog (CI-checked; generation skips database maintenance)
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
+  gpc-skill-evals.mjs  Validate cases, prepare blind inputs, and grade model traces
   run-bun-tests.ts, run-client-tests.mjs  Test execution with native case reports and command wall timings
   start-built-test-server.ts  Compiled browser acceptance server with real notification processing
   check-pwa-package.ts  Mandatory post-build manifest/icon/precache/admin-isolation verification
