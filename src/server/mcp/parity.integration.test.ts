@@ -253,6 +253,7 @@ async function registerActor(label: string, clientDbId: string): Promise<Actor> 
       scopes: ['gpc:read', 'gpc:write', 'gpc:manage'],
       expiresAt: new Date(Date.now() + 60_000),
       resource: 'http://localhost:3001/mcp',
+      experimentalMcpUi: false,
     },
   };
 }
@@ -588,6 +589,18 @@ describe('delegated operation behavioral parity', () => {
               ? { calculation: fixedCalculation({ modifier: { value: 15, unit: 'percentage' } }) }
               : { name: `${body.name} updated` },
       });
+      if (kind === 'skill') {
+        const detail = await call<{
+          kind: 'library_skill';
+          skill: { id: string; name: string };
+          experimentalActiveEffects: boolean;
+        }>(owner, 'get_campaign_library_skill', path(campaignId, { skillId: created.id }));
+        expect(detail.body).toMatchObject({
+          kind: 'library_skill',
+          skill: { id: created.id, name: `${body.name} updated` },
+          experimentalActiveEffects: true,
+        });
+      }
       if (kind === 'trait') {
         const narrowed = await call<{ traits: Array<{ id: string }>; skills: unknown[] }>(
           owner,
@@ -835,10 +848,45 @@ describe('delegated operation behavioral parity', () => {
       await call<{ item: { id: string } }>(owner, 'character_inventory', {
         action: 'create',
         ...path(characterId),
-        body: { name: `Pack ${suffix}` },
+        body: { name: `Pack ${suffix}`, isContainer: true },
       })
     ).body;
     const inventoryPath = path(characterId, { itemId: inventory.item.id });
+    const pouch = (
+      await call<{ item: { id: string } }>(owner, 'character_inventory', {
+        action: 'create',
+        ...path(characterId),
+        body: { name: `A Pouch ${suffix}`, isContainer: true, parentId: inventory.item.id },
+      })
+    ).body;
+    await call(owner, 'character_inventory', {
+      action: 'create',
+      ...path(characterId),
+      body: { name: `Token ${suffix}`, parentId: pouch.item.id },
+    });
+    await call(owner, 'character_inventory', {
+      action: 'create',
+      ...path(characterId),
+      body: { name: `B Compass ${suffix}`, parentId: inventory.item.id },
+    });
+    const itemDetail = await call<{
+      kind: string;
+      characterId: string;
+      characterName: string;
+      item: { id: string; name: string };
+      contents: Array<{ name: string }>;
+    }>(owner, 'get_character_inventory_item', inventoryPath);
+    expect(itemDetail.body).toMatchObject({
+      kind: 'inventory_item',
+      characterId,
+      characterName: `Character ${suffix}`,
+      item: { id: inventory.item.id, name: `Pack ${suffix}` },
+    });
+    expect(itemDetail.body.contents.map((item) => item.name)).toEqual([
+      `A Pouch ${suffix}`,
+      `Token ${suffix}`,
+      `B Compass ${suffix}`,
+    ]);
     await call(owner, 'character_inventory', {
       action: 'update',
       ...inventoryPath,
@@ -894,6 +942,7 @@ describe('delegated operation behavioral parity', () => {
         ),
         expiresAt: new Date(Date.now() + 60_000),
         resource: 'http://localhost:3001/mcp',
+        experimentalMcpUi: false,
       };
       const response = await handleMcp(
         new Request('http://localhost:3001/mcp', {
@@ -936,6 +985,7 @@ describe('delegated operation behavioral parity', () => {
     const gm = await registerActor('access-gm', client.id);
     const owner = await registerActor('access-owner', client.id);
     const viewer = await registerActor('access-viewer', client.id);
+    const outsider = await registerActor('access-outsider', client.id);
     const campaign = (
       await call<{ id: string }>(gm, 'campaign', {
         action: 'create',
@@ -976,6 +1026,121 @@ describe('delegated operation behavioral parity', () => {
       name: 'Private sheet',
     });
     expect(mcpRead.body.st).toBeUndefined();
+
+    const privateItem = (
+      await call<{ item: { id: string } }>(owner, 'character_inventory', {
+        action: 'create',
+        ...path(character.id),
+        body: { name: 'Private case', isContainer: true },
+      })
+    ).body.item;
+    const inventoryArgs = path(character.id, { itemId: privateItem.id });
+    const itemRead = await call<{ kind: string; item: { id: string } }>(
+      owner,
+      'get_character_inventory_item',
+      inventoryArgs,
+    );
+    expect(itemRead.body).toMatchObject({
+      kind: 'inventory_item',
+      item: { id: privateItem.id, name: 'Private case' },
+    });
+    const privateItemRest = await previewRest(
+      viewer,
+      'get_character_inventory_item',
+      inventoryArgs,
+    );
+    const privateItemMcp = await callAny(viewer, 'get_character_inventory_item', inventoryArgs);
+    expect(privateItemRest.status).toBe(403);
+    expect(privateItemMcp.isError).toBe(true);
+    expect(privateItemMcp.structured.status).toBe(privateItemRest.status);
+    expect(privateItemMcp.structured.body).toEqual(privateItemRest.body);
+
+    const otherCharacter = (
+      await call<{ id: string }>(owner, 'character', {
+        action: 'create',
+        body: { name: 'Other private sheet', campaignId: campaign.id },
+      })
+    ).body;
+    const crossCharacterArgs = path(otherCharacter.id, { itemId: privateItem.id });
+    const crossCharacterRest = await previewRest(
+      owner,
+      'get_character_inventory_item',
+      crossCharacterArgs,
+    );
+    const crossCharacterMcp = await callAny(
+      owner,
+      'get_character_inventory_item',
+      crossCharacterArgs,
+    );
+    expect(crossCharacterRest.status).toBe(404);
+    expect(crossCharacterMcp.isError).toBe(true);
+    expect(crossCharacterMcp.structured.status).toBe(crossCharacterRest.status);
+    expect(crossCharacterMcp.structured.body).toEqual(crossCharacterRest.body);
+
+    const publicSkill = (
+      await call<{ id: string }>(gm, 'library_skill', {
+        action: 'create',
+        ...path(campaign.id),
+        body: { name: 'Public campaign skill', attribute: 'DX', difficulty: 'A' },
+      })
+    ).body;
+    const publicSkillArgs = path(campaign.id, { skillId: publicSkill.id });
+    const memberSkill = await call<{
+      kind: string;
+      skill: { id: string; name: string };
+    }>(viewer, 'get_campaign_library_skill', publicSkillArgs);
+    expect(memberSkill.body).toMatchObject({
+      kind: 'library_skill',
+      skill: { id: publicSkill.id, name: 'Public campaign skill' },
+    });
+    const outsiderRest = await previewRest(outsider, 'get_campaign_library_skill', publicSkillArgs);
+    const outsiderMcp = await callAny(outsider, 'get_campaign_library_skill', publicSkillArgs);
+    expect(outsiderRest.status).toBe(403);
+    expect(outsiderMcp.isError).toBe(true);
+    expect(outsiderMcp.structured.status).toBe(outsiderRest.status);
+    expect(outsiderMcp.structured.body).toEqual(outsiderRest.body);
+
+    const restrictedSkill = (
+      await call<{ id: string }>(gm, 'library_skill', {
+        action: 'create',
+        ...path(campaign.id),
+        body: {
+          name: 'Restricted campaign skill',
+          attribute: 'IQ',
+          difficulty: 'H',
+          restricted: true,
+        },
+      })
+    ).body;
+    const restrictedArgs = path(campaign.id, { skillId: restrictedSkill.id });
+    expect((await call(gm, 'get_campaign_library_skill', restrictedArgs)).body).toMatchObject({
+      kind: 'library_skill',
+      skill: { id: restrictedSkill.id, restricted: true },
+    });
+    const restrictedRest = await previewRest(viewer, 'get_campaign_library_skill', restrictedArgs);
+    const restrictedMcp = await callAny(viewer, 'get_campaign_library_skill', restrictedArgs);
+    expect(restrictedRest.status).toBe(404);
+    expect(restrictedMcp.isError).toBe(true);
+    expect(restrictedMcp.structured.status).toBe(restrictedRest.status);
+    expect(restrictedMcp.structured.body).toEqual(restrictedRest.body);
+
+    const otherCampaign = (
+      await call<{ id: string }>(gm, 'campaign', {
+        action: 'create',
+        body: { name: `Cross-parent ${suffix}` },
+      })
+    ).body;
+    const crossCampaignArgs = path(otherCampaign.id, { skillId: publicSkill.id });
+    const crossCampaignRest = await previewRest(
+      gm,
+      'get_campaign_library_skill',
+      crossCampaignArgs,
+    );
+    const crossCampaignMcp = await callAny(gm, 'get_campaign_library_skill', crossCampaignArgs);
+    expect(crossCampaignRest.status).toBe(404);
+    expect(crossCampaignMcp.isError).toBe(true);
+    expect(crossCampaignMcp.structured.status).toBe(crossCampaignRest.status);
+    expect(crossCampaignMcp.structured.body).toEqual(crossCampaignRest.body);
 
     const updateBody = { name: 'Must remain private' };
     const restDenied = await app.request(`/api/v1/characters/${character.id}`, {

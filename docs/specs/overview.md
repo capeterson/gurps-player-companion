@@ -99,7 +99,7 @@ then resumes the complete consent request after login.
 Authorization discovery supports ChatGPT-style Client ID Metadata Documents and
 Claude-compatible Dynamic Client Registration, so supported public clients need
 no per-client server configuration or shared secret.
-The 49 tools use server-local names such as `list_characters` and `character_skill`,
+The 51 tools use server-local names such as `list_characters` and `character_skill`,
 without an application prefix. Related writes share entity tools with explicit
 actions; reads remain separate. Clients refresh tool discovery after the rename.
 Every player-domain raw API operation has an exact tool/action mapping; typed
@@ -111,6 +111,19 @@ acknowledgement rather than echoing complete character/campaign resources; error
 retain their actionable body and agents re-read when refreshed state is needed.
 Successful result payloads are emitted only as structured content, with concise
 status text instead of a duplicate JSON copy.
+Settings → **Experimental Features** includes an account-wide **MCP UI** toggle,
+off by default. Its runtime gate hides UI metadata/resources when disabled;
+ordinary tools keep working, and clients refresh tool discovery after changes.
+Opted-in MCP Apps clients can render `get_character` as an embedded read-only character
+sheet with Overview, Traits, Skills, Magic, and Inventory sections. It shares the
+web app's presentation components and theme. Refresh rechecks access through the
+same tool; limited viewers receive public identity only. The generic UI resource
+ships separately from the PWA in `dist/mcp-ui/character.html`. Focused
+`get_character_inventory_item` and `get_campaign_library_skill` reads render one
+item/container subtree or campaign skill definition as a compact card, without
+sheet navigation or unrelated collections. They share authoritative calculations,
+item disclosures, and the library's skill presentation, while enforcing the same
+share gate and restricted-entry rules.
 Character, campaign, encounter, adventure-log, invitation, notification, and
 campaign-library reads offer bounded search/limit/offset controls, with library
 section selection, so agents can avoid loading unrelated context. History feeds
@@ -118,6 +131,12 @@ remain cursor-paginated. Compatible clients also receive compressed MCP response
 Character, campaign, encounter and adventure-log text filters, plus admin user
 and campaign searches, treat `%`, `_` and backslash as literal characters rather
 than SQL pattern syntax. These searches remain case-insensitive.
+
+Reusable [GPC workflow skills](../agent-skills.md) cover character advancement,
+equipment and packing, campaign-library authoring, session wrap-up, and encounter
+preparation. Clients can package these with their connected GPC tools. Synthetic
+behavioral evals check the skills against the emitted tool schemas; they do not
+change server permissions or install a client plugin automatically.
 
 ## User-facing features
 
@@ -1188,7 +1207,7 @@ src/
     oauth/       client configuration sync, PKCE authorization/grants,
                  opaque token rotation/revocation, discovery + consent routes
     mcp/         exact operation manifest/catalog, SDK transport, checked
-                 snapshot, and same-process shared-handler executor
+                 snapshot, same-process shared-handler executor, and MCP Apps resource discovery
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
                  notificationEvents, notificationEmails, notificationMaintenance
                  (durable audit fan-out, invitation/security mail and lifecycle),
@@ -1213,6 +1232,8 @@ src/
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
   client/        React 19 PWA
+    mcp-ui/      MCP Apps bridge, shared character composition, and focused item/library skill cards;
+                 separate self-contained build via vite.mcp-ui.config.ts
     features/    Route-level screens grouped by domain (auth, characters,
                  campaigns, encounters, library, log, settings, history, home)
       campaigns/ Campaign workspace identity/navigation, overview, scoped
@@ -1264,6 +1285,7 @@ src/
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
+    features/settings/ExperimentalFeaturesSection.tsx  Account-wide MCP UI opt-in
     lib/desktopNotifications.ts  Per-user browser opt-in, permission and delivery deduplication
     lib/editingFocusBounds.ts  Rich-text selection and textarea caret geometry for library focus scrolling
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
@@ -1345,7 +1367,9 @@ src/
                  navigation fallback. Mutable worker/bootstrap/HTML entrypoints
                  are served no-store; hashed assets remain cacheable. Outbox
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
+skills/          Portable GPC workflow skills, client metadata, and synthetic eval cases
 tests/
+  skills/        Eval-grader regression tests, run by skills:check and CI
   acceptance/    Explicit full Lantern MCP seed check, outside normal CI discovery
   e2e/           Real browser acceptance, geometry and local-first interaction regressions
 docs/
@@ -1354,10 +1378,12 @@ docs/
   prototypes/    Standalone design studies, outside the app build:
                  armor-preview.html (interactive SVG armor-location proposal)
   openapi.json   Emitted OpenAPI contract (CI-checked; generation skips database maintenance)
+  agent-skills.md  Skill packaging and independent behavioral-eval instructions
   mcp-tools.json Emitted MCP catalog (CI-checked; generation skips database maintenance)
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
+  gpc-skill-evals.mjs  Validate cases, prepare blind inputs, and grade model traces
   run-bun-tests.ts, run-client-tests.mjs  Test execution with native case reports and command wall timings
   start-built-test-server.ts  Compiled browser acceptance server with real notification processing
   check-pwa-package.ts  Mandatory post-build manifest/icon/precache/admin-isolation verification

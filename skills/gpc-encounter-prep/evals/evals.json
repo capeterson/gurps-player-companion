@@ -1,0 +1,476 @@
+{
+  "skill_name": "gpc-encounter-prep",
+  "evals": [
+    {
+      "id": "encounter-hidden-and-duration",
+      "prompt": "Create a new Frost ambush encounter now in campaign 10000000-0000-4000-8000-000000000003 with PC Mira 10000000-0000-4000-8000-000000000002 and a hidden NPC Lookout, Basic Speed 6, DX 12, max HP 10. Give the Lookout a Fog cover tracker effect lasting 3 minutes. Do not advance turns or alter player sheets.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "encounters",
+          "tool": "list_encounters",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": []
+          }
+        },
+        {
+          "id": "encounter-created",
+          "tool": "encounter",
+          "match": {
+            "action": "create",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 201,
+            "body": {
+              "acknowledged": true,
+              "resourceId": "10000000-0000-4000-8000-000000000013"
+            }
+          }
+        },
+        {
+          "id": "encounter-created-read",
+          "tool": "get_encounter",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000013",
+              "campaignId": "10000000-0000-4000-8000-000000000003",
+              "version": 12,
+              "round": 1,
+              "activeCombatantId": "10000000-0000-4000-8000-000000000014",
+              "combatants": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000014",
+                  "kind": "pc",
+                  "characterId": "10000000-0000-4000-8000-000000000002",
+                  "name": "Mira"
+                },
+                {
+                  "id": "10000000-0000-4000-8000-000000000015",
+                  "kind": "npc",
+                  "name": "Lookout",
+                  "hiddenFromPlayers": true
+                }
+              ],
+              "effects": []
+            }
+          },
+          "requires": ["encounter-created"]
+        },
+        {
+          "id": "fog-created",
+          "tool": "encounter_effect",
+          "match": {
+            "action": "create",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 201,
+            "body": {
+              "acknowledged": true,
+              "resourceId": "10000000-0000-4000-8000-000000000011",
+              "revision": 7
+            }
+          },
+          "requires": ["encounter-created", "encounter-created-read"]
+        },
+        {
+          "id": "encounter-after",
+          "tool": "get_encounter",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000013",
+              "campaignId": "10000000-0000-4000-8000-000000000003",
+              "version": 12,
+              "round": 1,
+              "activeCombatantId": "10000000-0000-4000-8000-000000000014",
+              "combatants": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000014",
+                  "kind": "pc",
+                  "characterId": "10000000-0000-4000-8000-000000000002",
+                  "name": "Mira"
+                },
+                {
+                  "id": "10000000-0000-4000-8000-000000000015",
+                  "kind": "npc",
+                  "name": "Lookout",
+                  "hiddenFromPlayers": true
+                }
+              ],
+              "effects": [
+                {
+                  "targetCombatantId": "10000000-0000-4000-8000-000000000015",
+                  "name": "Fog cover",
+                  "duration": {
+                    "unit": "minutes",
+                    "amount": 3
+                  }
+                }
+              ]
+            }
+          },
+          "requires": ["encounter-created", "fog-created"]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "applied"
+        },
+        {
+          "kind": "mutation_set",
+          "matches": [
+            {
+              "tool": "encounter",
+              "arguments": {
+                "action": "create",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003"
+                },
+                "body": {
+                  "name": "Frost ambush",
+                  "combatants": [
+                    {
+                      "kind": "pc",
+                      "characterId": "10000000-0000-4000-8000-000000000002"
+                    },
+                    {
+                      "kind": "npc",
+                      "name": "Lookout",
+                      "basicSpeed": 6,
+                      "dx": 12,
+                      "maxHp": 10,
+                      "hiddenFromPlayers": true
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "tool": "encounter_effect",
+              "arguments": {
+                "action": "create",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003",
+                  "encounterId": "10000000-0000-4000-8000-000000000013"
+                },
+                "body": {
+                  "targetCombatantId": "10000000-0000-4000-8000-000000000015",
+                  "name": "Fog cover",
+                  "duration": {
+                    "unit": "minutes",
+                    "amount": 3
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "read_after_mutations",
+          "tool": "get_encounter"
+        }
+      ]
+    },
+    {
+      "id": "encounter-missing-speed",
+      "prompt": "Create an encounter in campaign 10000000-0000-4000-8000-000000000003 with PC Mira 10000000-0000-4000-8000-000000000002 and an NPC Lookout with DX 12 and max HP 10. I have not decided Basic Speed.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "encounters",
+          "tool": "list_encounters",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": []
+          }
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "needs_info"
+        },
+        {
+          "kind": "no_mutations"
+        }
+      ]
+    },
+    {
+      "id": "encounter-member-denied",
+      "prompt": "I am a member, not a manager, in campaign 10000000-0000-4000-8000-000000000003. Create a Frost ambush with PC Mira 10000000-0000-4000-8000-000000000002 now.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000020",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "member"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": "blocked"
+        },
+        {
+          "kind": "no_mutations"
+        }
+      ]
+    },
+    {
+      "id": "encounter-conflict",
+      "prompt": "Advance the current turn once in encounter 10000000-0000-4000-8000-000000000013 of campaign 10000000-0000-4000-8000-000000000003. If another GM has changed it, report that instead of advancing their new turn.",
+      "replies": [
+        {
+          "id": "campaign",
+          "tool": "get_campaign",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "name": "Frost Road",
+              "ownerId": "10000000-0000-4000-8000-000000000001",
+              "pointTarget": 150,
+              "techLevel": 6,
+              "members": [
+                {
+                  "userId": "10000000-0000-4000-8000-000000000001",
+                  "role": "owner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "encounter-before",
+          "tool": "get_encounter",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000013",
+              "campaignId": "10000000-0000-4000-8000-000000000003",
+              "version": 12,
+              "round": 1,
+              "activeCombatantId": "10000000-0000-4000-8000-000000000014",
+              "combatants": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000014",
+                  "kind": "pc",
+                  "characterId": "10000000-0000-4000-8000-000000000002",
+                  "name": "Mira"
+                },
+                {
+                  "id": "10000000-0000-4000-8000-000000000015",
+                  "kind": "npc",
+                  "name": "Lookout",
+                  "hiddenFromPlayers": true
+                }
+              ],
+              "effects": []
+            }
+          }
+        },
+        {
+          "id": "advance-conflict",
+          "tool": "encounter",
+          "match": {
+            "action": "advance_turn",
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 409,
+            "body": {
+              "error": "turn_conflict"
+            }
+          }
+        },
+        {
+          "id": "encounter-changed",
+          "tool": "get_encounter",
+          "match": {
+            "path": {
+              "id": "10000000-0000-4000-8000-000000000003",
+              "encounterId": "10000000-0000-4000-8000-000000000013"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body": {
+              "id": "10000000-0000-4000-8000-000000000013",
+              "campaignId": "10000000-0000-4000-8000-000000000003",
+              "version": 13,
+              "round": 1,
+              "activeCombatantId": "10000000-0000-4000-8000-000000000015",
+              "combatants": [
+                {
+                  "id": "10000000-0000-4000-8000-000000000014",
+                  "kind": "pc",
+                  "characterId": "10000000-0000-4000-8000-000000000002",
+                  "name": "Mira"
+                },
+                {
+                  "id": "10000000-0000-4000-8000-000000000015",
+                  "kind": "npc",
+                  "name": "Lookout",
+                  "hiddenFromPlayers": true
+                }
+              ],
+              "effects": []
+            }
+          },
+          "requires": ["advance-conflict"]
+        }
+      ],
+      "checks": [
+        {
+          "kind": "outcome",
+          "value": ["blocked", "partial"]
+        },
+        {
+          "kind": "mutation_set",
+          "matches": [
+            {
+              "tool": "encounter",
+              "arguments": {
+                "action": "advance_turn",
+                "path": {
+                  "id": "10000000-0000-4000-8000-000000000003",
+                  "encounterId": "10000000-0000-4000-8000-000000000013"
+                },
+                "body": {
+                  "direction": "next",
+                  "expectedRound": 1,
+                  "expectedActiveCombatantId": "10000000-0000-4000-8000-000000000014",
+                  "expectedVersion": 12
+                }
+              }
+            }
+          ]
+        },
+        {
+          "kind": "calls",
+          "match": {
+            "tool": "get_encounter"
+          },
+          "min": 2
+        },
+        {
+          "kind": "read_after_mutations",
+          "tool": "get_encounter"
+        }
+      ]
+    }
+  ]
+}

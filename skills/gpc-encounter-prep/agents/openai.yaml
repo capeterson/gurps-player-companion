@@ -1,0 +1,3 @@
+interface:
+  display_name: "GPC Encounter Preparation"
+  short_description: "Prepare rosters, hidden NPCs, and timed effects"

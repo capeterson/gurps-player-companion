@@ -167,6 +167,7 @@ export const users = pgTable(
       .$type<NotificationPreferences>()
       .notNull()
       .default(DEFAULT_NOTIFICATION_PREFERENCES),
+    experimentalMcpUi: boolean('experimental_mcp_ui').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

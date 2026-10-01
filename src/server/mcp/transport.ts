@@ -1,7 +1,14 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListResourcesRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import type { AppConfig } from '../config.ts';
 import {
   OAuthError,
@@ -18,6 +25,12 @@ import {
 } from './catalog.ts';
 import { type OperationInput, executeOperation } from './executor.ts';
 import type { IncludedOperation } from './operationManifest.ts';
+import {
+  CHARACTER_UI_URI,
+  characterUiMetadata,
+  characterUiResource,
+  readCharacterUi,
+} from './ui.ts';
 
 export const MAX_MCP_BODY_BYTES = 14 * 1024 * 1024;
 // Larger image envelopes need a process-wide bound, not only per-user rates.
@@ -102,7 +115,7 @@ function consumeRate(key: string): boolean {
 }
 
 /** Shared by discovery and the checked-in snapshot so hints cannot drift. */
-export function describeMcpTool(entry: RuntimeTool) {
+export function describeMcpTool(entry: RuntimeTool, uiEnabled = true) {
   const policies = entry.operations.map((operation) => operation.policy);
   const grouped = policies.some((policy) => policy.action);
   return {
@@ -117,6 +130,7 @@ export function describeMcpTool(entry: RuntimeTool) {
       openWorldHint: policies.some((policy) => policy.openWorld),
     },
     _meta: {
+      ...(uiEnabled ? characterUiMetadata(entry.policy.tool) : {}),
       ...(grouped
         ? {
             actions: policies.map((policy) => ({
@@ -138,6 +152,7 @@ export function describeMcpTool(entry: RuntimeTool) {
 type Dependencies = {
   resolvePrincipal: typeof resolveOAuthAccessToken;
   execute: typeof executeOperation;
+  readUi?: typeof readCharacterUi;
 };
 
 export interface MutationAcknowledgement {
@@ -317,17 +332,46 @@ export function createMcpHandler(
       }
     }
 
+    if (
+      ReadResourceRequestSchema.safeParse(parsedBody).success &&
+      !principal.scopes.includes('gpc:read')
+    ) {
+      return json({ error: 'insufficient_scope' }, 403, {
+        'www-authenticate': challenge(resource, 'insufficient_scope', 'gpc:read'),
+      });
+    }
+
     const server = new Server(
       { name: 'gurps-player-companion', version: '0.1.0' },
       {
-        capabilities: { tools: {} },
+        capabilities: { tools: {}, resources: {} },
         instructions:
           'Tools cover the GPC player API; task tools have explicit typed actions. Mutations return a compact acknowledgement; use a read action or tool for refreshed state. Image uploads combine metadata and bytes in one call: reuse clientUploadId and identical content after a lost response, then attach resourceId through a character/campaign update. Non-media mutations accept idempotencyKey; reuse it after a lost response.',
       },
     );
     server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: toolsForScopes(tools, principal.scopes).map(describeMcpTool),
+      tools: toolsForScopes(tools, principal.scopes).map((tool) =>
+        describeMcpTool(tool, principal.experimentalMcpUi),
+      ),
     }));
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources:
+        principal.experimentalMcpUi && principal.scopes.includes('gpc:read')
+          ? [characterUiResource]
+          : [],
+    }));
+    server.setRequestHandler(ReadResourceRequestSchema, async ({ params }) => {
+      if (!principal.experimentalMcpUi || params.uri !== CHARACTER_UI_URI)
+        throw new McpError(ErrorCode.InvalidParams, 'Unknown UI resource');
+      try {
+        return await (dependencies.readUi ?? readCharacterUi)();
+      } catch {
+        throw new McpError(
+          ErrorCode.InternalError,
+          'Character UI bundle unavailable; build the MCP UI assets',
+        );
+      }
+    });
     server.setRequestHandler(CallToolRequestSchema, async (toolCall) => {
       const tool = byName.get(toolCall.params.name);
       if (!tool) return toolError('unknown_tool', 'Unknown tool');

@@ -638,6 +638,8 @@ export async function rotateOAuthRefreshToken(
 
 export interface OAuthPrincipal {
   user: AuthenticatedUser;
+  /** Current account opt-in, loaded from the user row on every request. */
+  experimentalMcpUi: boolean;
   grantId: string;
   clientDbId: string;
   clientId: string;
@@ -701,6 +703,7 @@ export async function resolveOAuthAccessToken(
       authenticatedAt: null,
     },
     grantId: row.grant.id,
+    experimentalMcpUi: row.user.experimentalMcpUi,
     clientDbId: row.client.id,
     clientId: row.client.clientId,
     scopes,

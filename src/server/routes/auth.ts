@@ -21,6 +21,7 @@ import {
   tokenPair,
   userOut,
 } from '../../shared/schemas/auth.ts';
+import { experimentalFeatures } from '../../shared/schemas/experimentalFeatures.ts';
 import { themePreferences, themePreferencesPatch } from '../../shared/schemas/themePreferences.ts';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/jwt.ts';
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
@@ -653,6 +654,63 @@ router.openapi(
     const user = rows[0];
     if (!user) throw new HTTPException(401, { message: 'unknown_user' });
     return c.json(userToOut(user), 200);
+  },
+);
+
+// Experimental opt-ins require the account holder's interactive session.
+router.use('/auth/experimental-features', requireActiveJwt);
+router.openapi(
+  createRoute({
+    method: 'get',
+    path: '/auth/experimental-features',
+    tags: ['auth'],
+    summary: 'Read the authenticated user experimental feature opt-ins',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Experimental features',
+        content: { 'application/json': { schema: experimentalFeatures } },
+      },
+      401: errorResponse('Unauthorized'),
+    },
+  }),
+  async (c) => {
+    const [row] = await getDb()
+      .select({ mcpUi: users.experimentalMcpUi })
+      .from(users)
+      .where(eq(users.id, c.get('user').id));
+    if (!row) throw new HTTPException(401, { message: 'unknown_user' });
+    return c.json(row, 200);
+  },
+);
+router.openapi(
+  createRoute({
+    method: 'patch',
+    path: '/auth/experimental-features',
+    tags: ['auth'],
+    summary: 'Update the authenticated user experimental feature opt-ins',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: { required: true, content: { 'application/json': { schema: experimentalFeatures } } },
+    },
+    responses: {
+      200: {
+        description: 'Updated experimental features',
+        content: { 'application/json': { schema: experimentalFeatures } },
+      },
+      401: errorResponse('Unauthorized'),
+      422: errorResponse('Validation error'),
+    },
+  }),
+  async (c) => {
+    const { mcpUi } = c.req.valid('json');
+    const [row] = await getDb()
+      .update(users)
+      .set({ experimentalMcpUi: mcpUi, updatedAt: new Date() })
+      .where(eq(users.id, c.get('user').id))
+      .returning({ mcpUi: users.experimentalMcpUi });
+    if (!row) throw new HTTPException(401, { message: 'unknown_user' });
+    return c.json(row, 200);
   },
 );
 

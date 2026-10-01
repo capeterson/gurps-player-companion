@@ -180,7 +180,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |
 | Lint/format | Biome |
-| Build/bundler | Vite 6 (client + admin entries), `bun build` (server) |
+| Build/bundler | Vite 6 (client + admin entries and separate inline MCP Apps resource), `bun build` (server) |
 
 ## The three-layer source tree
 
@@ -318,7 +318,8 @@ see `0026_languages.sql` for the current template.
 Tables (grouped):
 
 - **Identity/auth**: `users` (including the CHECK-constrained `dark_theme` /
-  `light_theme` palette preferences and validated `notification_preferences`),
+  `light_theme` palette preferences, validated `notification_preferences`, and
+  the default-off `experimental_mcp_ui` account opt-in),
   `passkey_credentials`, `passkey_challenges`,
   `refresh_tokens`, `password_reset_tokens`, `api_keys`, and durable
   `auth_rate_limits` counters. Registration consumes a source-IP bucket only.

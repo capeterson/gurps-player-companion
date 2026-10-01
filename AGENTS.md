@@ -102,6 +102,12 @@ duplicate all-locations DR component. Keep content in its semantic category:
 Move is movement, not a defense. Do not add unsolicited character-sheet
 sections or replacement controls while simplifying an approved surface.
 
+Product copy explains useful choices and results. Do not append generic
+assurances about sync, account persistence, or internal plumbing. Optional
+explanations of these mechanisms require explicit user approval; default to
+omitting them. Include technical details only when they explain a meaningful
+decision or an actionable error/offline state.
+
 ### 1. Never silently discard user edits — queue them client-side
 
 This is a **fundamental rule** for every editable input in the app, not

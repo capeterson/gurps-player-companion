@@ -91,8 +91,8 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
-    expect(TOOLS.length).toBe(104);
-    expect(tools.length).toBe(49);
+    expect(TOOLS.length).toBe(106);
+    expect(tools.length).toBe(51);
     for (const tool of tools) {
       expect(tool.policy.tool).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
       expect(tool.policy.tool.startsWith('gpc_')).toBe(false);
@@ -502,8 +502,9 @@ describe('MCP canonical schema conversion', () => {
         total + JSON.stringify(tool.inputSchema).length + JSON.stringify(tool.outputSchema).length,
       0,
     );
-    // Media tools and portrait/cover asset IDs add required, compact output fields.
-    expect(outputBytes).toBeLessThan(260_000);
+    // Inventory subtree and campaign-skill detail reads add two canonical response
+    // schemas; the measured complete output catalog is 271.5 KB.
+    expect(outputBytes).toBeLessThan(290_000);
     // Calculator inputs plus source/modifier metadata are bounded, first-class
     // portable fields; reserve a measured 550 KB for the complete catalog while
     // still guarding against accidental schema duplication or unbounded growth.
