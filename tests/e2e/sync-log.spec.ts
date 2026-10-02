@@ -41,9 +41,11 @@ test('a synced edit and its revision response share one item with Request and Re
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/characters\/[a-f0-9-]+/, { timeout: 15_000 });
   const characterDestination = new URL(page.url()).pathname;
-  const saved = () =>
-    page.getByLabel('All changes saved', { exact: true }).filter({ visible: true });
+  const saved = () => page.getByLabel(/^All changes saved/).filter({ visible: true });
   await expect(saved()).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole('button', { name: 'All changes saved — live updates connected', exact: true }),
+  ).toBeVisible({ timeout: 15_000 });
   await selectCharacterSection(page, 'Overview');
   const strength = page.getByRole('textbox', { name: 'ST base', exact: true });
   await strength.fill('14');
@@ -74,13 +76,37 @@ test('a synced edit and its revision response share one item with Request and Re
   // One registration/page covers the narrow screen and the footer breakpoint.
   for (const width of [390, 639, 640, 641, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    await saved().hover();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toContainText('All changes synced · Live updates connected');
+    const tooltipBox = await tooltip.boundingBox();
+    if (!tooltipBox) throw new Error('Expected the connected sync tooltip');
+    expect(tooltipBox.x).toBeGreaterThanOrEqual(0);
+    expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(width);
+    expect(tooltipBox.y).toBeGreaterThanOrEqual(0);
+    expect(tooltipBox.y + tooltipBox.height).toBeLessThanOrEqual(900);
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath(`sync-connected-tooltip-${width}.png`),
+    });
     await saved().click();
     const dialog = page
       .getByRole('dialog')
       .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
     const syncButton = dialog.getByRole('button', { name: 'Sync now' });
     await expect(syncButton).toBeVisible();
+    const lastSyncTime = dialog
+      .getByText('Last sync', { exact: true })
+      .locator('..')
+      .locator('time');
+    const lastChangesTime = dialog
+      .getByText('Last changes', { exact: true })
+      .locator('..')
+      .locator('time');
+    await expect(lastSyncTime).toBeVisible();
+    await expect(lastChangesTime).toBeVisible();
     if (width === 390) {
+      const changeAt = await lastChangesTime.getAttribute('datetime');
+      const checkedAt = await lastSyncTime.getAttribute('datetime');
       const manualPull = page.waitForResponse(
         (response) =>
           response.url().includes('/api/v1/sync/cursor') && response.request().method() === 'POST',
@@ -90,10 +116,24 @@ test('a synced edit and its revision response share one item with Request and Re
       await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
       await expect(
         dialog
-          .getByText('Last successful sync', { exact: true })
+          .getByText('Last sync', { exact: true })
           .locator('..')
           .getByText('just now', { exact: true }),
       ).toBeVisible();
+      await expect(lastChangesTime).toHaveAttribute('datetime', changeAt ?? '');
+      await expect
+        .poll(async () => Date.parse((await lastSyncTime.getAttribute('datetime')) ?? ''))
+        .toBeGreaterThan(Date.parse(checkedAt ?? ''));
+
+      // A later automatic empty check also advances only Last sync.
+      const manualAt = await lastSyncTime.getAttribute('datetime');
+      await page.waitForResponse(
+        (response) => response.url().includes('/api/v1/sync/cursor') && response.ok(),
+      );
+      await expect
+        .poll(async () => Date.parse((await lastSyncTime.getAttribute('datetime')) ?? ''))
+        .toBeGreaterThan(Date.parse(manualAt ?? ''));
+      await expect(lastChangesTime).toHaveAttribute('datetime', changeAt ?? '');
     }
     const recent = dialog
       .locator('section')
@@ -129,6 +169,8 @@ test('a synced edit and its revision response share one item with Request and Re
     await expect(dialog.getByText('Raw', { exact: true })).toHaveCount(0);
     for (const locator of [
       dialog.locator('.modal-box'),
+      lastSyncTime,
+      lastChangesTime,
       syncButton,
       request.locator('pre'),
       response.locator('pre'),
@@ -284,7 +326,8 @@ test('a synced edit and its revision response share one item with Request and Re
       .filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
     await expect(logDialog.getByText('WebSocket', { exact: true })).toBeVisible();
     await expect(logDialog.getByText(/^(Connected|Connecting)$/)).toBeVisible();
-    await expect(logDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
+    await expect(logDialog.getByText('Last sync', { exact: true })).toBeVisible();
+    await expect(logDialog.getByText('Last changes', { exact: true })).toBeVisible();
     const settingsTitle = logDialog.getByRole('link', {
       name: `Campaign: ${campaignName} · campaign rules updated`,
       exact: true,
@@ -351,6 +394,10 @@ test('a synced edit and its revision response share one item with Request and Re
   await page.routeWebSocket('**/api/v1/sync/ws**', (socket) => socket.close());
   await page.reload();
   await expect(saved()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'All changes saved', exact: true })).toBeVisible();
+  await saved().hover();
+  await expect(page.getByRole('tooltip')).toContainText('All changes synced');
+  await expect(page.getByRole('tooltip')).not.toContainText('Live updates connected');
   await saved().click();
   const disconnectedDialog = page
     .getByRole('dialog')
@@ -364,7 +411,7 @@ test('a synced edit and its revision response share one item with Request and Re
       exact: true,
     }),
   ).toBeVisible();
-  await expect(disconnectedDialog.getByText('Last successful sync', { exact: true })).toBeVisible();
+  await expect(disconnectedDialog.getByText('Last sync', { exact: true })).toBeVisible();
   const manualPull = page.waitForResponse(
     (response) =>
       response.url().includes('/api/v1/sync/cursor') && response.request().method() === 'POST',
@@ -374,7 +421,7 @@ test('a synced edit and its revision response share one item with Request and Re
   await expect(page.getByText('Sync completed', { exact: true })).toBeVisible();
   await expect(
     disconnectedDialog
-      .getByText('Last successful sync', { exact: true })
+      .getByText('Last sync', { exact: true })
       .locator('..')
       .getByText('just now', { exact: true }),
   ).toBeVisible();

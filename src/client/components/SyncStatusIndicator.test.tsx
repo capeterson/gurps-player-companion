@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutboxEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { ToastProvider } from '../lib/toast.tsx';
@@ -12,6 +12,12 @@ import { SyncStatusIndicator } from './SyncStatusIndicator.tsx';
 
 const clearLocalAndFullResync = vi.fn<() => Promise<void>>();
 const revertFailedOperation = vi.fn<(id: string) => Promise<OutboxEntry>>();
+const websocket = vi.hoisted(() => ({ state: 'stopped' }));
+vi.mock('../sync/useSyncWsStatus.ts', () => ({ useSyncWsStatus: () => websocket }));
+
+beforeEach(() => {
+  websocket.state = 'stopped';
+});
 
 vi.mock('../sync/orchestrator.ts', () => ({
   getSyncOrchestrator: () => ({ clearLocalAndFullResync, revertFailedOperation }),
@@ -50,6 +56,43 @@ afterEach(() => {
 });
 
 describe('SyncStatusIndicator recovery action', () => {
+  it('shows a filled green gem only when synced and the WebSocket is connected', async () => {
+    websocket.state = 'connected';
+    const user = userEvent.setup();
+    const view = renderIndicator();
+    const connected = screen.getByRole('button', {
+      name: 'All changes saved — live updates connected',
+    });
+    expect(connected.querySelector('svg > path')).toHaveAttribute('fill', 'currentColor');
+    expect(connected.querySelector('svg > path')).toHaveClass('text-success');
+    await user.hover(connected);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Live updates connected');
+    await user.click(connected);
+    expect(screen.getByRole('heading', { name: 'Sync log' })).toBeVisible();
+
+    for (const state of ['connecting', 'reconnecting', 'stopped', 'offline']) {
+      websocket.state = state;
+      view.rerender(<SyncStatusIndicator />);
+      const idle = screen.getByRole('button', { name: 'All changes saved' });
+      expect(idle.querySelector('svg > path')).toHaveAttribute('fill', 'none');
+    }
+  });
+
+  it('prioritizes syncing, offline, and errors over a connected socket', async () => {
+    websocket.state = 'connected';
+    renderIndicator();
+    syncStateStore.reset('syncing');
+    expect(await screen.findByRole('button', { name: 'Syncing changes' })).toBeVisible();
+    window.dispatchEvent(new Event('offline'));
+    expect(
+      await screen.findByRole('button', { name: 'Offline — changes saved on this device' }),
+    ).toBeVisible();
+    syncStateStore.setError('Server unavailable');
+    expect(
+      await screen.findByRole('button', { name: 'Some changes failed to sync (offline)' }),
+    ).toBeVisible();
+  });
+
   it('opens the sync log from the normal synced state', async () => {
     syncStateStore.reset('synced');
     const user = userEvent.setup();

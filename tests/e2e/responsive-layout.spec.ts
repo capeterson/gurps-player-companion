@@ -58,7 +58,7 @@ unauthenticatedTest(
         darkTheme = true;
       }
 
-      const sync = page.getByRole('button', { name: 'All changes saved' });
+      const sync = page.getByRole('button', { name: /^All changes saved/ });
       await sync.hover();
       const tooltip = page.getByRole('tooltip');
       await expect(tooltip).toContainText('All changes synced');

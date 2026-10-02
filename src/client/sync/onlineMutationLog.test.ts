@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { journalCampaignMutation } from './onlineMutationLog.ts';
-import { lastSuccessfulSyncKey, redactSyncLogForCampaigns } from './syncLog.ts';
+import { lastChangesSyncKey, redactSyncLogForCampaigns } from './syncLog.ts';
 import { loadSyncLogEntry } from './syncLogPayload.ts';
 
 afterEach(async () => {
@@ -45,7 +45,7 @@ it('records a settings upload with the actual request and only the changed setti
     request: { method: 'PATCH', path: '/api/v1/campaigns/campaign', body },
     details: { newRevision: 42, response },
   });
-  expect((await getLocalDb().syncMeta.get(lastSuccessfulSyncKey()))?.value).toBe(entry.occurredAt);
+  expect((await getLocalDb().syncMeta.get(lastChangesSyncKey()))?.value).toBe(entry.occurredAt);
 });
 
 it('records failed saves without claiming a successful operation', async () => {
@@ -61,7 +61,7 @@ it('records failed saves without claiming a successful operation', async () => {
     reason: 'Network unavailable',
     request: { body },
   });
-  expect(await getLocalDb().syncMeta.get(lastSuccessfulSyncKey())).toBeUndefined();
+  expect(await getLocalDb().syncMeta.get(lastChangesSyncKey())).toBeUndefined();
 });
 
 it('does not journal a delayed response after the login session changes', async () => {

@@ -18,7 +18,7 @@ import {
 } from './orchestrator.ts';
 import { enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
-import { lastSuccessfulSyncKey } from './syncLog.ts';
+import { appendSyncLog, lastChangesSyncKey, lastSuccessfulSyncKey } from './syncLog.ts';
 
 function jwtForUser(userId: string): string {
   const enc = (value: unknown) =>
@@ -166,6 +166,7 @@ describe('manual HTTP sync', () => {
     expect((await getLocalDb().syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(
       expect.any(String),
     );
+    expect(await getLocalDb().syncMeta.get(lastChangesSyncKey())).toBeUndefined();
     expect(await getLocalDb().syncLog.count()).toBe(0);
   });
 
@@ -179,6 +180,73 @@ describe('manual HTTP sync', () => {
     await expect(getSyncOrchestrator().syncNow()).rejects.toThrow();
 
     expect((await getLocalDb().syncMeta.get(key))?.value).toBe('2026-09-28T12:00:00.000Z');
+  });
+
+  it('advances the last-sync time for an automatic empty check while retaining the last change', async () => {
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    const db = getLocalDb();
+    const checkAt = '2026-09-28T12:01:00.000Z';
+    const changedAt = '2026-09-28T12:00:00.000Z';
+    await appendSyncLog({ direction: 'push', result: 'synced', occurredAt: changedAt });
+    await db.syncLog.clear();
+    await db.syncMeta.put({ key: lastSuccessfulSyncKey(), value: checkAt });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(cursorResponse()));
+
+    await getSyncOrchestrator().triggerCursorPull();
+
+    const lastSync = (await db.syncMeta.get(lastSuccessfulSyncKey()))?.value;
+    expect(typeof lastSync).toBe('string');
+    expect(Date.parse(String(lastSync))).toBeGreaterThan(Date.parse(checkAt));
+    expect((await db.syncMeta.get(lastChangesSyncKey()))?.value).toBe(changedAt);
+    expect(await db.syncLog.count()).toBe(0);
+  });
+
+  it('does not record an interrupted or skipped cursor check', async () => {
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    const key = lastSuccessfulSyncKey();
+    const at = '2026-09-28T12:00:00.000Z';
+    await getLocalDb().syncMeta.put({ key, value: at });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        getSyncOrchestrator().setCurrentUser('another-user');
+        return cursorResponse();
+      }),
+    );
+    await getSyncOrchestrator().triggerCursorPull();
+    expect((await getLocalDb().syncMeta.get(key))?.value).toBe(at);
+
+    const offline = vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    await getSyncOrchestrator().triggerCursorPull();
+    expect((await getLocalDb().syncMeta.get(key))?.value).toBe(at);
+    offline.mockRestore();
+  });
+
+  it('does not record a check until all cursor pages have completed', async () => {
+    login();
+    getSyncOrchestrator().setCurrentUser(USER_ID);
+    const key = lastSuccessfulSyncKey();
+    const at = '2026-09-28T12:00:00.000Z';
+    await getLocalDb().syncMeta.put({ key, value: at });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({ changes: [], nextCursor: {}, hasMore: { character: true } }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            },
+          ),
+        )
+        .mockResolvedValueOnce(new Response('unavailable', { status: 503 })),
+    );
+    await expect(getSyncOrchestrator().triggerCursorPull()).rejects.toThrow();
+    expect((await getLocalDb().syncMeta.get(key))?.value).toBe(at);
   });
 });
 
