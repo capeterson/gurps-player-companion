@@ -1,7 +1,7 @@
 import { canonicalLibraryKey } from '../domain/libraryIdentity.ts';
+import { validateRaceDefinition } from '../domain/race.ts';
 import { upgradeLegacyWeaponRanges } from '../domain/rangedRange.ts';
 import type { Portable } from './sourceReferences.ts';
-
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -51,8 +51,9 @@ const libraryEntryKey = (entry: {
  * editions, standalone modifiers, calculation rules, and normalized weapon modes.
  * v13 replaces weapon Range text with structured fixed/ST-multiplier values.
  * v14 adds GM restrictions and sourcebook-scoped packages.
+ * v15 adds racial templates with complete variants/forms and additive lenses.
  */
-export const LIBRARY_YAML_VERSION = 14 as const;
+export const LIBRARY_YAML_VERSION = 15 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -133,6 +134,7 @@ export function sourceScopedLibrary(
     styles: library.styles?.filter(selected),
     enchantments: library.enchantments?.filter(selected),
     activeEffects: library.activeEffects?.filter(selected),
+    races: library.races?.filter(selected),
   };
 }
 
@@ -188,6 +190,13 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     const k = libraryEntryKey(st);
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
+  }
+  const raceKeys = new Set<string>();
+  for (const entry of doc.library.races ?? []) {
+    validateRaceDefinition(entry);
+    const key = libraryEntryKey(entry);
+    if (raceKeys.has(key)) throw new LibraryYamlError(`duplicate race (${entry.name})`);
+    raceKeys.add(key);
   }
   const effectKeys = new Set<string>();
   for (const entry of doc.library.activeEffects ?? []) {
@@ -295,6 +304,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
     styles,
     enchantments,
     activeEffects: sortedByName(input.activeEffects ?? []).map((entry) => compact(entry)),
+    races: sortedByName(input.races ?? []).map((entry) => compact(entry)),
   };
 
   const doc = new Document(payload);

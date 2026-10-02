@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 import tailwind from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { type Plugin, defineConfig } from 'vite';
+import { inlineMcpAssets } from './scripts/inline-mcp-assets';
 
 /** A resource must work in an opaque sandbox without loading our origin's
  * scripts, styles, fonts, service worker, or authenticated HTTP endpoints. */
@@ -12,26 +13,16 @@ function inlineApp(): Plugin {
     generateBundle(_options, bundle) {
       const html = bundle['character.html'];
       if (!html || html.type !== 'asset') throw new Error('Missing MCP App entry');
-      let source = String(html.source);
+      const assets: Parameters<typeof inlineMcpAssets>[1] = {};
       for (const [name, output] of Object.entries(bundle)) {
         if (output.type === 'chunk') {
-          source = source.replace(
-            /<script\b[^>]*src="[^"]+"[^>]*><\/script>/,
-            () =>
-              `<script type="module">${output.code.replace(/<\/script/gi, '<\\/script')}</script>`,
-          );
-          delete bundle[name];
+          assets[name] = { kind: 'script', source: output.code };
         } else if (name.endsWith('.css')) {
-          source = source.replace(
-            /<link\b[^>]*rel="stylesheet"[^>]*>/,
-            () => `<style>${String(output.source).replace(/<\/style/gi, '<\\/style')}</style>`,
-          );
-          delete bundle[name];
+          assets[name] = { kind: 'style', source: String(output.source) };
         }
       }
-      if (/<(?:script|link)\b[^>]*(?:src|href)=/.test(source))
-        throw new Error('MCP App has external assets');
-      html.source = source;
+      html.source = inlineMcpAssets(String(html.source), assets);
+      for (const name of Object.keys(assets)) delete bundle[name];
     },
   };
 }

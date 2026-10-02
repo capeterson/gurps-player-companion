@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import { type LibraryYamlDoc, libraryTraitCreate } from '../schemas/campaignLibrary.ts';
 import { characterCreate } from '../schemas/character.ts';
+import { libraryRaceOut } from '../schemas/race.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
 import { instantiateEffect } from './activeEffects.ts';
 import {
@@ -10,6 +11,8 @@ import {
   buildSpellOut,
 } from './characterDetail.ts';
 import { resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
+import { resolveRaceSelection } from './race.ts';
+import { characterCanCast, characterMagicTraits, hasMagery } from './spellCalc.ts';
 
 it('disables campaign active effects and conditional modifiers by default while keeping manual boosts', () => {
   const timestamp = '2026-09-10T00:00:00.000Z';
@@ -365,6 +368,128 @@ describe('earned adventure points and character caps', () => {
     combat: null,
     campaign: { pointTarget: 150, disadvantageCap: 50, quirkCap: 5 },
   };
+  it('adds racial attributes once, keeps temporary ST outside HP and point totals, and combines racial skill training', () => {
+    const timestamp = '2026-09-10T00:00:00.000Z';
+    const definition = libraryRaceOut.parse({
+      id: '0193b3c0-f1f0-7000-8000-00000000f001',
+      campaignId: '0193b3c0-f1f0-7000-8000-00000000f002',
+      revision: 4,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      key: 'forestkin',
+      name: 'Forestkin',
+      kind: 'race',
+      points: 25,
+      attributeModifiers: { st: 2, hp: 1 },
+      traits: [{ key: 'Magery', name: 'Magery', points: 5, level: 2 }],
+      skills: [
+        {
+          key: 'forest-lore',
+          name: 'Forest Lore',
+          attribute: 'IQ',
+          difficulty: 'A',
+          points: 2,
+        },
+      ],
+    });
+    const race = resolveRaceSelection(
+      { raceId: definition.id, variantKey: null, lensIds: [], formKey: null },
+      [definition],
+    );
+    const personalSkill: CharacterDetailInput['skills'][number] = {
+      id: 'personal-forest-lore',
+      characterId: 'character',
+      name: 'Forest Lore',
+      specialization: null,
+      attribute: 'IQ',
+      difficulty: 'A',
+      points: 1,
+      techLevel: null,
+      defaults: null,
+      notes: null,
+      librarySkillId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const spell = {
+      id: 'forest-spell',
+      characterId: 'character',
+      name: 'Forest Bolt',
+      college: null,
+      difficulty: 'H' as const,
+      points: 1,
+      baseEnergyCost: 1,
+      maintenanceCost: null,
+      castingTime: null,
+      duration: null,
+      prerequisites: null,
+      notes: null,
+      librarySpellId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const original = buildCharacterDetail(base);
+    const detail = buildCharacterDetail({
+      ...base,
+      character: {
+        ...base.character,
+        race,
+        hpMod: 2,
+        tempEffects: [{ id: 'boost', name: 'Boost', mods: { st: 3 } }],
+      },
+      campaign: { pointTarget: 150, disadvantageCap: 50, quirkCap: 5, manaLevel: 'low' },
+      skills: [personalSkill],
+      spells: [spell],
+      techniques: [
+        {
+          id: 'forest-lore-technique',
+          characterId: 'character',
+          name: 'Deep Lore',
+          defaultSkillName: 'Forest Lore',
+          difficulty: 'A',
+          points: 0,
+          defaultModifier: -1,
+          maxLevel: null,
+          notes: null,
+          libraryTechniqueId: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    });
+    expect(detail.derived.effectiveSt).toBe(16);
+    expect(detail.derived.hp).toBe(16);
+    expect(detail.points).toMatchObject({
+      race: 25,
+      skills: 1,
+      secondary: original.points.secondary + 4,
+      total: original.points.total + 31,
+    });
+    expect(detail.skills[0]).toMatchObject({ points: 1, racialTrainingPoints: 2 });
+    expect(detail.techniques[0]?.level).toBe((detail.skills[0]?.effectiveLevel ?? 0) - 1);
+    const magicTraits = characterMagicTraits(detail);
+    expect(hasMagery(magicTraits)).toBe(true);
+    const withoutRace = buildCharacterDetail({
+      ...base,
+      spells: [spell],
+      campaign: { pointTarget: 150, disadvantageCap: 50, quirkCap: 5, manaLevel: 'low' },
+    });
+    expect(detail.spells[0]?.level).toBe((withoutRace.spells[0]?.level ?? 0) + 2);
+    expect(
+      characterCanCast({
+        ...detail,
+        manaLevel: 'low',
+        manaLevelKnown: true,
+      }),
+    ).toBe(true);
+    expect(
+      characterCanCast({
+        traits: [],
+        manaLevel: 'low',
+        manaLevelKnown: true,
+      }),
+    ).toBe(false);
+  });
   it.each([0, 3, 1000, -5])(
     'adds earned points %s to the campaign cap without changing purchased points',
     (earnedPoints) => {

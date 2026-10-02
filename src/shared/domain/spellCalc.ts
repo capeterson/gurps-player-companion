@@ -130,9 +130,17 @@ export function spellFpRecovery(
  * expression inline.
  */
 export function characterCanCast(
-  c: Pick<CharacterDetail, 'traits' | 'manaLevel' | 'manaLevelKnown'>,
+  c: Pick<CharacterDetail, 'traits' | 'manaLevel' | 'manaLevelKnown'> &
+    Partial<Pick<CharacterDetail, 'race'>>,
 ): boolean {
-  return c.manaLevelKnown && canCastInMana(hasMagery(c.traits), c.manaLevel);
+  return c.manaLevelKnown && canCastInMana(hasMagery(characterMagicTraits(c)), c.manaLevel);
+}
+
+/** Personal and owned racial traits share the same casting and recovery gate. */
+export function characterMagicTraits(
+  c: Pick<CharacterDetail, 'traits'> & Partial<Pick<CharacterDetail, 'race'>>,
+): readonly MageryTraitInput[] {
+  return [...c.traits, ...(c.race?.snapshot?.traits ?? [])];
 }
 
 /**

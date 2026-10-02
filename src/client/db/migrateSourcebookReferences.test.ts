@@ -71,4 +71,59 @@ describe('legacy sourcebook reference migration', () => {
     );
     expect(migrated).toEqual({ definitionId: 'deleted-definition', sourceId: null });
   });
+
+  test('resolves each owned race snapshot source from its own campaign after character transfer', () => {
+    const migrated = migrateSourcebookValue(
+      {
+        selection: { raceId: 'race-from-campaign-a', lensIds: ['lens-from-campaign-b'] },
+        snapshot: {
+          points: 27,
+          sources: [
+            {
+              id: 'race-from-campaign-a',
+              campaignId: campaignA,
+              sourceKey: 'basic-set',
+            },
+            {
+              id: 'lens-from-campaign-b',
+              campaignId: campaignB,
+              sourceKey: 'basic-set',
+            },
+          ],
+          forms: [{ key: 'water', points: 27 }],
+        },
+      },
+      campaignB,
+      [
+        { id: sourceA, campaignId: campaignA, key: 'basic-set', name: 'Basic Set' },
+        {
+          id: '0193b3c0-f1f0-7000-8000-00000000b202',
+          campaignId: campaignB,
+          key: 'basic-set',
+          name: 'Basic Set',
+        },
+      ],
+      false,
+    );
+
+    expect(migrated).toEqual({
+      selection: { raceId: 'race-from-campaign-a', lensIds: ['lens-from-campaign-b'] },
+      snapshot: {
+        points: 27,
+        sources: [
+          {
+            id: 'race-from-campaign-a',
+            campaignId: campaignA,
+            sourceId: sourceA,
+          },
+          {
+            id: 'lens-from-campaign-b',
+            campaignId: campaignB,
+            sourceId: '0193b3c0-f1f0-7000-8000-00000000b202',
+          },
+        ],
+        forms: [{ key: 'water', points: 27 }],
+      },
+    });
+  });
 });

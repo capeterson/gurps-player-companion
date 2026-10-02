@@ -15,6 +15,7 @@ import type {
   LibraryTechniqueOut,
   LibraryTraitOut,
 } from '../../../../shared/schemas/campaignLibrary.ts';
+import type { LibraryRaceOut } from '../../../../shared/schemas/race.ts';
 import type { LibraryEntityClass } from '../../../../shared/schemas/sync.ts';
 import type { LocalLibraryItem } from '../../../db/dexie.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
@@ -36,6 +37,7 @@ import { normalizeLibraryItemRow } from '../../library/useLocalLibrary.ts';
  */
 
 type Kind =
+  | 'races'
   | 'traits'
   | 'skills'
   | 'spells'
@@ -46,6 +48,7 @@ type Kind =
   | 'activeEffects';
 
 type LibraryEntry =
+  | LibraryRaceOut
   | LibraryTraitOut
   | LibrarySkillOut
   | LibrarySpellOut
@@ -64,6 +67,7 @@ const ENTITY_CLASS: Record<Kind, LibraryEntityClass> = {
   techniques: 'campaign_library_technique',
   enchantments: 'campaign_library_enchantment',
   activeEffects: 'campaign_library_active_effect',
+  races: 'campaign_library_race',
 };
 
 export function useLibraryFetcher<T extends LibraryEntry>(

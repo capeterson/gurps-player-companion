@@ -23,6 +23,7 @@ import {
   libraryModifierCreate,
   librarySourceCreate,
 } from './libraryMetadata.ts';
+import { libraryRaceCreate } from './race.ts';
 import {
   situationalModifier,
   skillAttributeEnum,
@@ -459,6 +460,7 @@ export const importResult = z.object({
   styles: importSectionResult,
   enchantments: importSectionResult,
   activeEffects: importSectionResult,
+  races: importSectionResult.optional(),
   /** Whether the opt-in `applyCampaignSettings` flag actually updated the
    * campaigns row (false when the flag was off or the doc had no `campaign`
    * block). */
@@ -493,6 +495,7 @@ export const libraryYamlVersion = z.union([
   z.literal(12),
   z.literal(13),
   z.literal(14),
+  z.literal(15),
 ]);
 
 export const librarySourceScope = z
@@ -549,6 +552,7 @@ export const libraryYamlDoc = z
         /** Reusable typed enchantment definitions were added in v10. */
         enchantments: z.array(portableLibraryEntry(libraryEnchantmentCreate)).optional(),
         activeEffects: z.array(portableLibraryEntry(activeEffectDefinitionCreate)).optional(),
+        races: z.array(portableLibraryEntry(libraryRaceCreate)).optional(),
       })
       .strict(),
   })
@@ -588,6 +592,32 @@ export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
  * explicit; the YAML tests also compare these keys to the runtime Zod shapes.
  */
 export const libraryPortableFieldManifest = {
+  races: {
+    key: true,
+    sourceId: true,
+    sourceLocator: true,
+    status: true,
+    role: true,
+    preferredEdition: true,
+    restricted: true,
+    extraction: true,
+    name: true,
+    description: true,
+    source: true,
+    kind: true,
+    points: true,
+    attributeModifiers: true,
+    traits: true,
+    skills: true,
+    features: true,
+    effects: true,
+    variants: true,
+    forms: true,
+    compatibleRaceKeys: true,
+    removesTraits: true,
+    removesSkills: true,
+    tags: true,
+  } satisfies Record<keyof z.infer<typeof libraryRaceCreate>, true>,
   sources: {
     name: true,
     abbreviation: true,

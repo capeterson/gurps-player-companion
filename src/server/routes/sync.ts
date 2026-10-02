@@ -1,4 +1,6 @@
+import { raceName } from '../../shared/domain/race.ts';
 import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { campaignLibraryActiveEffects } from '../db/schema.ts';
 /**
  * /api/v1/sync/operations and /api/v1/sync/cursor.
@@ -672,6 +674,7 @@ async function fetchClassUpserts(args: {
     case 'campaign_library_technique':
     case 'campaign_library_style':
     case 'campaign_library_enchantment':
+    case 'campaign_library_race':
     case 'campaign_library_active_effect':
     case 'campaign_library_source':
     case 'campaign_library_modifier':
@@ -823,7 +826,7 @@ function upsertChange(
  * down to the same identity-only set after every cursor pull; both
  * must stay in lockstep per AGENTS.md's share-gate invariant.
  */
-function projectCharacterRow(row: DbCharacter): DbCharacter {
+function projectCharacterRow(row: DbCharacter): DbCharacter & { raceName: string } {
   // Drop every private column by replacing the row with a mask that
   // supplies the schema defaults for NOT NULL numeric / jsonb columns.
   return {
@@ -857,6 +860,8 @@ function projectCharacterRow(row: DbCharacter): DbCharacter {
     // player's named/manual temp effects or dismissed warnings, so
     // these collapse to empty rather than passing the real lists through.
     tempEffects: [],
+    race: structuredClone(HUMAN_RACE),
+    raceName: raceName(row.race),
     activeEffects: [],
     dismissedWarnings: [],
     activeConditionGroups: [],

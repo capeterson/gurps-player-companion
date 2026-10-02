@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MANA_LEVEL_LABELS } from '../../../../shared/constants/magic.ts';
 import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
-import { hasMagery, spellFpRecovery } from '../../../../shared/domain/spellCalc.ts';
+import {
+  characterMagicTraits,
+  hasMagery,
+  spellFpRecovery,
+} from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
@@ -135,7 +139,11 @@ export function CastSpellDialog({
   const allocated = totalAllocation(alloc);
   const recovery =
     mode === 'cast'
-      ? spellFpRecovery(character.manaLevel, hasMagery(character.traits), alloc.fromFp)
+      ? spellFpRecovery(
+          character.manaLevel,
+          hasMagery(characterMagicTraits(character)),
+          alloc.fromFp,
+        )
       : 0;
   const remaining = cost - allocated;
   const overspent = allocated > cost;
@@ -304,7 +312,7 @@ export function CastSpellDialog({
               ? 'FP spent maintaining a spell does not recover next turn.'
               : recovery > 0
                 ? `If spent on your turn, at the start of your next turn restore ${recovery} personal FP manually (up to your maximum). No automatic refund occurs.`
-                : hasMagery(character.traits)
+                : hasMagery(characterMagicTraits(character))
                   ? 'Only personal FP spent on your own turn can recover at the start of your next turn.'
                   : 'Without Magery, personal FP does not recover next turn.'}{' '}
             HP and powerstone energy are not refunded.

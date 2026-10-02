@@ -134,6 +134,16 @@ describe('summarizeEvent character', () => {
     expect(summary).toContain('ST');
   });
 
+  it('summarizes Human to an owned race snapshot by display name', () => {
+    const { summary } = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { race: null },
+      newRow: { race: { snapshot: { name: 'Centaur' } } },
+    });
+    expect(summary).toBe('Race: Human → Centaur');
+  });
+
   it.each([
     ['portrait_asset_id', null, 'asset-id', 'Portrait updated'],
     ['portrait_asset_id', 'asset-id', null, 'Portrait removed'],
@@ -150,6 +160,35 @@ describe('summarizeEvent character', () => {
       expect(summary).not.toContain('asset-id');
     },
   );
+});
+
+describe('summarizeEvent campaign_library_race', () => {
+  it('names race definitions on insert, update, and delete', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_race',
+        op: 'insert',
+        oldRow: null,
+        newRow: { name: 'Centaur' },
+      }).summary,
+    ).toBe('Added library race Centaur');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_race',
+        op: 'update',
+        oldRow: { name: 'Centaur', points: 80 },
+        newRow: { name: 'Centaur', points: 85 },
+      }).summary,
+    ).toBe('Library race: Points updated');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign_library_race',
+        op: 'delete',
+        oldRow: { name: 'Centaur' },
+        newRow: null,
+      }).summary,
+    ).toBe('Removed library race Centaur');
+  });
 });
 
 // ---------- summarizeEvent — character.tempEffects ----------

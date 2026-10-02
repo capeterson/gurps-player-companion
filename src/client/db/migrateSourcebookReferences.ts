@@ -20,6 +20,7 @@ const libraryStores = [
   'campaignLibraryEnchantments',
   'campaignLibraryActiveEffects',
   'campaignLibraryModifiers',
+  'campaignLibraryRaces',
 ];
 
 /** Only upgrade code interprets old source keys. Unresolved queued edits stay recoverable. */
@@ -43,7 +44,9 @@ export function migrateSourcebookValue(
   const resolvedCampaignId =
     typeof row.definitionId === 'string'
       ? (definitionCampaigns.get(row.definitionId) ?? origin?.campaignId)
-      : campaignId;
+      : typeof row.campaignId === 'string' && 'sourceKey' in row
+        ? row.campaignId
+        : campaignId;
   return Object.fromEntries(
     Object.entries(row).map(([key, entry]) => {
       if (key === 'sourceKey') {
@@ -100,14 +103,15 @@ export async function migrateSourcebookReferences(tx: Transaction): Promise<void
   }[];
   const campaignFor = (characterId: string | undefined) =>
     characters.find((row) => row.id === characterId)?.campaignId;
-  for (const store of [...libraryStores, 'characterTraits', 'characterInventory']) {
+  for (const store of [...libraryStores, 'characters', 'characterTraits', 'characterInventory']) {
     await tx
       .table(store)
       .toCollection()
       .modify(function (this: { value: Record<string, unknown> }, row: Record<string, unknown>) {
-        const campaignId = store.startsWith('campaignLibrary')
-          ? String(row.campaignId)
-          : campaignFor(String(row.characterId));
+        const campaignId =
+          store.startsWith('campaignLibrary') || store === 'characters'
+            ? String(row.campaignId)
+            : campaignFor(String(row.characterId));
         const migrated = migrateSourcebookValue(
           row,
           campaignId,

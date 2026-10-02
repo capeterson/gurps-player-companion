@@ -78,6 +78,7 @@ export const SYNCABLE_TABLES: Record<string, { table: string; family: 'character
     campaign_library_language: { table: 'campaign_library_languages', family: 'campaign' },
     campaign_library_technique: { table: 'campaign_library_techniques', family: 'campaign' },
     campaign_library_style: { table: 'campaign_library_styles', family: 'campaign' },
+    campaign_library_race: { table: 'campaign_library_races', family: 'campaign' },
     campaign_library_active_effect: {
       table: 'campaign_library_active_effects',
       family: 'campaign',

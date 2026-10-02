@@ -310,3 +310,7 @@ URL tokens are not stored in parent history. Media asset/counter rows are intern
 upload infrastructure rather than new syncable entity classes. Detached images
 have bounded retention, so old history references are not a permanent photo
 archive. See [media-uploads.md](media-uploads.md).
+
+## Racial templates
+
+`campaign_library_race` has revision, history and tombstone triggers; definition writes use existing audited library handlers. Character `race` changes use the existing root history trigger and summaries identify the before/after public race name. Restricted race definitions follow the library history visibility guard. See [races.md](races.md).

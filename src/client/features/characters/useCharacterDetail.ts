@@ -29,7 +29,7 @@ import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinChara
  * Dexie open.
  */
 /** Server-built details are authoritative; local details explicitly flag missing definitions. */
-export type EffectAwareCharacterDetail = CharacterDetail;
+export type EffectAwareCharacterDetail = CharacterDetail & { raceName?: string };
 export type CharacterDetailResult = EffectAwareCharacterDetail | null | undefined;
 
 /** Explicit overrides are for tests; production reads only synced declarations. */
@@ -79,7 +79,13 @@ export function useCharacterDetail(
           }
         : null,
     });
-    return { ...detail, libraryEffectsKnown: joined.libraryEffectsKnown };
+    return {
+      ...detail,
+      ...(character.minimalViewMasked && character.raceName !== undefined
+        ? { raceName: character.raceName }
+        : {}),
+      libraryEffectsKnown: joined.libraryEffectsKnown,
+    };
   }, [id, clock, options.libraryTraitEffects, options.librarySkillEffects]);
   const activeEffectsEnabled = useExperimentalActiveEffects(result?.campaignId);
   const nextExpiry = (activeEffectsEnabled ? result?.activeEffects : [])

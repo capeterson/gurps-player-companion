@@ -1,7 +1,7 @@
 # Library calculation rules and source editions
 
 This subsystem represents user-supplied material without supplying book content or
-extracting PDFs. YAML v14, REST, MCP and local-first authoring share the same
+extracting PDFs. YAML v15, REST, MCP and local-first authoring share the same
 schemas. Extraction, OCR and classification remain external responsibilities.
 
 ## Identity, sources and completeness
@@ -33,11 +33,11 @@ translated only during import/export, including nested calculation calls and
 modifier applicability. Import matches declared book metadata to target UUIDs;
 export derives distinct labels from the abbreviation/title/edition. Source-scoped
 export selects live UUIDs, while an incoming YAML scope selects its portable labels.
-Migration 0067 backfills existing links within each campaign before removing
+Migration 0068 backfills existing links within each campaign before removing
 `source_key` columns and the sourcebook's `key` column. Unresolved live links abort
 migration. Character pricing snapshots keep rules and paid values, resolving the
 original definition's campaign even after a character move. Historical audit rows
-remain untouched. Dexie v16 upgrades cached and queued references; unresolved
+remain untouched. Dexie v17 upgrades cached and queued references; unresolved
 older queued intent is retained and held for an explicit sourcebook choice.
 
 New campaigns begin with 17 common Fourth Edition source records (all priority
@@ -179,7 +179,7 @@ Migrations 0054–0056 add common metadata, sources/modifiers, typed JSON rules 
 snapshots, edition-qualified indexes, history/revision/tombstone triggers and
 compatibility backfills. Character paid values are not recalculated.
 
-YAML parsers accept v1–v14; exporters emit only canonical v14. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
+YAML parsers accept v1–v15; exporters emit only canonical v15. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
 modifiers are optional sections: omission preserves them even in replace mode;
 explicit empty arrays prune them. Merge/replace uses canonical edition identity.
 The final graph includes retained existing rows. It is validated under the
@@ -233,3 +233,7 @@ logs and three private journals apiece. The explicit `db:seed:lantern:refresh` c
 conservatively updates recognized unchanged older defaults once; edited fields,
 deleted older entries and play state are preserved. A completion marker preserves
 later deletions on subsequent runs. See the [seed guide](../../bootstrap/README.md).
+
+## Racial templates
+
+Races use printed package points rather than the pricing expression engine. Components retain their printed cost for inspection but are not billed independently. One owned resolved snapshot applies racial attribute deltas, traits/effects and training; complete variants/forms replace profiles and lenses add explicit deltas/replacements. Source changes do not reprice existing race purchases. See [races.md](races.md).

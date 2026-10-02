@@ -1,4 +1,4 @@
-/** Run migration 0067 against legacy-shaped tables in a rolled-back schema. */
+/** Run migration 0068 against legacy-shaped tables in a rolled-back schema. */
 import { expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { Pool, type PoolClient } from 'pg';
@@ -7,7 +7,7 @@ import { configureIntegrationTestEnvironment } from '../testConfig.ts';
 configureIntegrationTestEnvironment();
 
 const migration = readFileSync(
-  `${import.meta.dir}/migrations/0067_sourcebook_uuid_references.sql`,
+  `${import.meta.dir}/migrations/0068_sourcebook_uuid_references.sql`,
   'utf8',
 );
 const statements = migration
@@ -28,7 +28,7 @@ async function createLegacySchema(client: PoolClient, schema: string): Promise<v
       edition text,
       UNIQUE (campaign_id, key)
     );
-    CREATE TABLE characters (id uuid PRIMARY KEY, campaign_id uuid);
+    CREATE TABLE characters (id uuid PRIMARY KEY, campaign_id uuid, race jsonb);
     CREATE TABLE character_traits (
       id uuid PRIMARY KEY,
       character_id uuid NOT NULL,
@@ -39,6 +39,14 @@ async function createLegacySchema(client: PoolClient, schema: string): Promise<v
       id uuid PRIMARY KEY,
       character_id uuid NOT NULL,
       pricing_resolution jsonb
+    );
+    CREATE TABLE campaign_library_races (
+      id uuid PRIMARY KEY,
+      campaign_id uuid NOT NULL,
+      name text NOT NULL,
+      kind varchar(16) NOT NULL DEFAULT 'race',
+      key text NOT NULL DEFAULT '',
+      source_key text
     );
   `);
   for (const table of [
@@ -98,9 +106,11 @@ const sourceOne = '20000000-0000-4000-8000-000000000001';
 const sourceTwo = '20000000-0000-4000-8000-000000000002';
 const traitId = '30000000-0000-4000-8000-000000000001';
 const itemDefinitionId = '30000000-0000-4000-8000-000000000005';
+const raceDefinitionId = '30000000-0000-4000-8000-000000000008';
+const lensDefinitionId = '30000000-0000-4000-8000-000000000009';
 const characterId = '40000000-0000-4000-8000-000000000001';
 
-it('migration 0067 resolves campaign-scoped references and preserves detached purchase snapshots', async () => {
+it('migration 0068 resolves campaign-scoped references and preserves detached purchase snapshots', async () => {
   await withIsolatedSchema(async (client) => {
     await client.query(
       `INSERT INTO campaign_library_sources (id, campaign_id, name, key, abbreviation) VALUES
@@ -140,10 +150,61 @@ it('migration 0067 resolves campaign-scoped references and preserves detached pu
        VALUES ($1, $2, 'Legacy item', 'CORE')`,
       [itemDefinitionId, campaignOne],
     );
-    await client.query('INSERT INTO characters (id, campaign_id) VALUES ($1, $2)', [
-      characterId,
-      campaignTwo,
-    ]);
+    await client.query(
+      `INSERT INTO campaign_library_races (id, campaign_id, name, kind, key, source_key)
+       VALUES ($1, $2, 'Stonekin', 'race', 'stonekin', 'Core'),
+              ($3, $4, 'Stonekin lens', 'lens', 'stonekin-lens', 'Core')`,
+      [raceDefinitionId, campaignOne, lensDefinitionId, campaignTwo],
+    );
+    await client.query(
+      'INSERT INTO characters (id, campaign_id, race) VALUES ($1, $2, $3::jsonb)',
+      [
+        characterId,
+        campaignTwo,
+        JSON.stringify({
+          selection: {
+            raceId: raceDefinitionId,
+            variantKey: null,
+            lensIds: [lensDefinitionId],
+            formKey: 'water',
+          },
+          snapshot: {
+            name: 'Stonekin · Tidal',
+            description: 'Owned form',
+            points: 27,
+            attributeModifiers: { st: 2 },
+            traits: [{ key: 'stone-skin', name: 'Stone Skin', points: 5 }],
+            skills: [],
+            features: ['Stone bones'],
+            effects: [],
+            sources: [
+              {
+                id: raceDefinitionId,
+                campaignId: campaignOne,
+                revision: 3,
+                key: 'stonekin',
+                sourceKey: 'Core',
+                name: 'Stonekin',
+                source: 'Mariner',
+                sourceLocator: '42',
+              },
+              {
+                id: lensDefinitionId,
+                campaignId: campaignTwo,
+                revision: 2,
+                key: 'stonekin-lens',
+                sourceKey: 'Core',
+                name: 'Stonekin lens',
+                source: 'Mariner',
+                sourceLocator: '43',
+              },
+            ],
+            naturalForm: { key: 'natural', name: 'Stonekin', description: null, points: 27 },
+            forms: [{ key: 'water', name: 'Stonekin · Tidal', description: null, points: 27 }],
+          },
+        }),
+      ],
+    );
     await client.query(
       `INSERT INTO character_traits (id, character_id, pricing_resolution, modifiers)
        VALUES ('50000000-0000-4000-8000-000000000001', $1,
@@ -198,6 +259,60 @@ it('migration 0067 resolves campaign-scoped references and preserves detached pu
     );
     expect(otherCampaign.rows[0]?.source_id).toBe(sourceTwo);
 
+    const raceRows = await client.query<{ id: string; kind: string; source_id: string }>(
+      'SELECT id, kind, source_id FROM campaign_library_races ORDER BY kind',
+    );
+    expect(raceRows.rows).toEqual([
+      { id: lensDefinitionId, kind: 'lens', source_id: sourceTwo },
+      { id: raceDefinitionId, kind: 'race', source_id: sourceOne },
+    ]);
+    const raceCharacter = await client.query<{ race: unknown }>(
+      'SELECT race FROM characters WHERE id = $1',
+      [characterId],
+    );
+    expect(raceCharacter.rows[0]?.race).toEqual({
+      selection: {
+        raceId: raceDefinitionId,
+        variantKey: null,
+        lensIds: [lensDefinitionId],
+        formKey: 'water',
+      },
+      snapshot: {
+        name: 'Stonekin · Tidal',
+        description: 'Owned form',
+        points: 27,
+        attributeModifiers: { st: 2 },
+        traits: [{ key: 'stone-skin', name: 'Stone Skin', points: 5 }],
+        skills: [],
+        features: ['Stone bones'],
+        effects: [],
+        sources: [
+          {
+            id: raceDefinitionId,
+            campaignId: campaignOne,
+            revision: 3,
+            key: 'stonekin',
+            sourceId: sourceOne,
+            name: 'Stonekin',
+            source: 'Mariner',
+            sourceLocator: '42',
+          },
+          {
+            id: lensDefinitionId,
+            campaignId: campaignTwo,
+            revision: 2,
+            key: 'stonekin-lens',
+            sourceId: sourceTwo,
+            name: 'Stonekin lens',
+            source: 'Mariner',
+            sourceLocator: '43',
+          },
+        ],
+        naturalForm: { key: 'natural', name: 'Stonekin', description: null, points: 27 },
+        forms: [{ key: 'water', name: 'Stonekin · Tidal', description: null, points: 27 }],
+      },
+    });
+
     const character = await client.query<{ pricing_resolution: unknown; modifiers: unknown }>(
       'SELECT pricing_resolution, modifiers FROM character_traits WHERE character_id = $1',
       [characterId],
@@ -247,6 +362,15 @@ it('migration 0067 resolves campaign-scoped references and preserves detached pu
       ),
     ).rejects.toThrow(/foreign key constraint/i);
     await client.query('ROLLBACK TO SAVEPOINT before_composite_fk_check');
+    await client.query('SAVEPOINT before_race_composite_fk_check');
+    await expect(
+      client.query(
+        `INSERT INTO campaign_library_races (id, campaign_id, name, kind, source_id)
+         VALUES ('30000000-0000-4000-8000-000000000010', $1, 'Foreign race', 'race', $2)`,
+        [campaignOne, sourceTwo],
+      ),
+    ).rejects.toThrow(/foreign key constraint/i);
+    await client.query('ROLLBACK TO SAVEPOINT before_race_composite_fk_check');
     await client.query('SAVEPOINT before_source_delete_check');
     await expect(
       client.query('DELETE FROM campaign_library_sources WHERE id = $1', [sourceOne]),
@@ -255,7 +379,7 @@ it('migration 0067 resolves campaign-scoped references and preserves detached pu
   });
 });
 
-it('migration 0067 aborts when a live nested calculation references an unknown sourcebook', async () => {
+it('migration 0068 aborts when a live nested calculation references an unknown sourcebook', async () => {
   await withIsolatedSchema(async (client) => {
     await client.query(
       `INSERT INTO campaign_library_sources (id, campaign_id, name, key, abbreviation)

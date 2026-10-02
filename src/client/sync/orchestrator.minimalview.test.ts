@@ -21,6 +21,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
@@ -285,5 +286,88 @@ describe('enforceMinimalViewLocally — character row rewrite', () => {
       minimalViewMasked: false,
     });
     expect(await db.characterTraits.get('t-1')).toMatchObject({ name: 'Recovered' });
+  });
+
+  it('uses the latest race name when access is masked again after full hydration', async () => {
+    const db = getLocalDb();
+    await db.characters.put({
+      ...realCharacterRow(),
+      race: structuredClone(HUMAN_RACE),
+      raceName: 'Old private race',
+      st: 10,
+      minimalViewMasked: true,
+    } as never);
+    await db.campaigns.put({ ...shareOffCampaignRow(), shareCharacterSheets: true } as never);
+    await db.syncCursors.bulkPut([
+      { entityClass: 'character', revision: 99 },
+      { entityClass: 'character_trait', revision: 99 },
+    ]);
+    await db.syncMeta.put({
+      key: `accessible:${VIEWER_ID}`,
+      value: {
+        characterIds: [CHAR_ID],
+        campaignIds: [CAMPAIGN_ID],
+        observedAt: '2026-01-01T00:00:00.000Z',
+      },
+    });
+
+    const latestRace = {
+      selection: {
+        raceId: '0193b3c0-f1f0-7000-8000-00000000d777',
+        variantKey: null,
+        lensIds: [],
+        formKey: null,
+      },
+      snapshot: {
+        name: 'New public race',
+        description: null,
+        points: 10,
+        attributeModifiers: {},
+        traits: [],
+        skills: [],
+        features: [],
+        effects: [],
+        sources: [],
+        forms: [],
+      },
+    };
+    loginAs(VIEWER_ID);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        cursorResponse([], { characterIds: [CHAR_ID], campaignIds: [CAMPAIGN_ID] }),
+      )
+      .mockResolvedValueOnce(
+        cursorResponse(
+          [
+            {
+              entityClass: 'character',
+              entityId: CHAR_ID,
+              command: 'upsert',
+              revision: 6,
+              data: { ...realCharacterRow(), race: latestRace, revision: 6 },
+            },
+          ],
+          { characterIds: [CHAR_ID], campaignIds: [CAMPAIGN_ID] },
+        ),
+      )
+      .mockResolvedValueOnce(
+        cursorResponse([], { characterIds: [CHAR_ID], campaignIds: [CAMPAIGN_ID] }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await getSyncOrchestrator().bootstrap(VIEWER_ID);
+    const restored = await db.characters.get(CHAR_ID);
+    expect(restored?.race?.snapshot?.name).toBe('New public race');
+    expect(restored?.raceName).toBeUndefined();
+
+    await db.campaigns.put({ ...shareOffCampaignRow(), shareCharacterSheets: false } as never);
+    await getSyncOrchestrator().triggerCursorPull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const masked = await db.characters.get(CHAR_ID);
+    expect(masked?.raceName).toBe('New public race');
+    expect(masked?.race).toEqual(HUMAN_RACE);
+    expect(masked?.race?.snapshot).toBeNull();
+    expect(masked?.st).toBe(10);
   });
 });

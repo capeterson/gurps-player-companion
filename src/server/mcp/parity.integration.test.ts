@@ -612,6 +612,40 @@ describe('delegated operation behavioral parity', () => {
       }
       await call(owner, `library_${kind}`, { action: 'delete', ...itemPath });
     }
+    // This long parity matrix reaches the per-principal MCP request budget;
+    // isolate three additional CRUD operations on their own test actor.
+    const raceOwner = await registerActor('race-crud', client.id);
+    const raceCampaign = (
+      await call<{ id: string }>(raceOwner, 'campaign', {
+        action: 'create',
+        body: { name: `Race ${suffix}` },
+      })
+    ).body;
+    const race = (
+      await call<{ id: string }>(raceOwner, 'library_race', {
+        action: 'create',
+        ...path(raceCampaign.id),
+        body: {
+          key: `race-${suffix}`,
+          name: `Race ${suffix}`,
+          status: 'complete',
+          role: 'definition',
+          kind: 'race',
+          points: 10,
+          attributeModifiers: { st: 1 },
+          traits: [],
+          skills: [],
+        },
+      })
+    ).body;
+    const racePath = path(raceCampaign.id, { raceId: race.id });
+    await call(raceOwner, 'library_race', {
+      action: 'update',
+      ...racePath,
+      body: { points: 15 },
+    });
+    await call(raceOwner, 'library_race', { action: 'delete', ...racePath });
+    await call(raceOwner, 'campaign', { action: 'delete', ...path(raceCampaign.id) });
     const exported = await call<string>(owner, 'export_campaign_library', path(campaignId));
     expect(typeof exported.body).toBe('string');
     await call(owner, 'import_campaign_library', {
@@ -1377,7 +1411,7 @@ describe('delegated operation behavioral parity', () => {
     });
     const exported = await call<string>(owner, 'export_campaign_library', path(campaign.id));
     const yaml = parseLibraryYaml(exported.body);
-    expect(yaml.version).toBe(14);
+    expect(yaml.version).toBe(15);
     expect(exported.body).not.toContain('libraryItemId');
     expect(yaml.library.traits[0]?.effects).toEqual([
       portableEffects[1],

@@ -34,6 +34,8 @@ export const situationalModifier = z
   .strict();
 
 export const skillOut = z.object({
+  raceGranted: z.boolean().optional(),
+  racialTrainingPoints: z.number().int().nonnegative().optional(),
   procedures: skillProcedures.optional(),
   procedureContext: z.record(z.union([z.number(), z.string(), z.boolean()])).optional(),
   actionTargets: z.record(z.number().nullable()).optional(),

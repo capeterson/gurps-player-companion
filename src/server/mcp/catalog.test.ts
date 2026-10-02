@@ -91,8 +91,8 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
-    expect(TOOLS.length).toBe(106);
-    expect(tools.length).toBe(51);
+    expect(TOOLS.length).toBe(109);
+    expect(tools.length).toBe(52);
     for (const tool of tools) {
       expect(tool.policy.tool).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
       expect(tool.policy.tool.startsWith('gpc_')).toBe(false);
@@ -481,11 +481,117 @@ describe('MCP canonical schema conversion', () => {
     expect(await tool.validateResponse(500, 'text/html', '<html>')).not.toBeNull();
   });
 
+  test('accepts complete owned race forms and racial skill levels in character response contracts', async () => {
+    type JsonSchema = {
+      oneOf?: JsonSchema[];
+      properties?: Record<string, JsonSchema>;
+      enum?: unknown[];
+      [key: string]: unknown;
+    };
+    const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8')) as {
+      components: { schemas: Record<string, JsonSchema> };
+      paths: Record<
+        string,
+        {
+          get?: {
+            responses?: Record<string, { content?: Record<string, { schema?: JsonSchema }> }>;
+          };
+        }
+      >;
+    };
+    const detailSchema =
+      snapshot.paths['/api/v1/characters/{id}']?.get?.responses?.['200']?.content?.[
+        'application/json'
+      ]?.schema;
+    if (!detailSchema || !Array.isArray(detailSchema.oneOf))
+      throw new Error('character detail response schema missing full-view union');
+    const fullView = detailSchema.oneOf.find((branch) =>
+      branch.properties?.view?.enum?.includes('full'),
+    );
+    if (!fullView?.properties?.race || !fullView.properties.racialSkills)
+      throw new Error('full character response omitted race or racial skill schemas');
+    const responseSchema = {
+      type: 'object',
+      properties: {
+        race: fullView.properties.race,
+        racialSkills: fullView.properties.racialSkills,
+      },
+      required: ['race', 'racialSkills'],
+      additionalProperties: false,
+    };
+    const apiDoc = {
+      ...document(responseSchema),
+      components: snapshot.components,
+    };
+    const tool = buildToolCatalog(apiDoc, [], [policy])[0];
+    if (!tool) throw new Error('missing synthetic response contract');
+
+    const raceId = '0198aa77-1111-7111-8111-111111111111';
+    const campaignId = '0198aa77-2222-7222-8222-222222222222';
+    const sourceName = 'Source race';
+    const longName = `${'Composite race + lens '.repeat(12)}Night Vision 3`;
+    const longDescription = 'Published natural-form details. '.repeat(180);
+    const profile = {
+      points: 35,
+      attributeModifiers: { st: 2, hp: 1 },
+      traits: [],
+      skills: [],
+      features: [],
+      effects: [],
+    };
+    const option = {
+      key: 'natural',
+      name: longName,
+      description: longDescription,
+      ...profile,
+    };
+    const response = {
+      race: {
+        selection: { raceId, variantKey: null, lensIds: [], formKey: null },
+        snapshot: {
+          name: longName,
+          description: longDescription,
+          ...profile,
+          sources: [
+            {
+              id: raceId,
+              campaignId,
+              revision: 4,
+              key: 'source-race',
+              sourceKey: 'fantasy',
+              name: sourceName,
+              source: 'F 105',
+              sourceLocator: 'Chapter 6, p. 105',
+            },
+          ],
+          naturalForm: option,
+          forms: [option],
+        },
+      },
+      racialSkills: [
+        {
+          key: 'forest-lore',
+          name: 'Forest Lore',
+          attribute: 'IQ',
+          difficulty: 'A',
+          specialization: null,
+          techLevel: null,
+          points: 2,
+          description: 'Racially learned skill.',
+          effectiveLevel: 13,
+        },
+      ],
+    };
+    expect(longName.length).toBeGreaterThan(160);
+    expect(longDescription.length).toBeGreaterThan(4000);
+    expect(await tool.validateResponse(200, 'application/json', response)).toBeNull();
+  });
+
   test('does not advertise full REST success definitions on mutation tools', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     const mutations = tools.filter((tool) => tool.policy.method !== 'GET');
-    expect(mutations.length).toBe(33);
+    expect(mutations.length).toBe(34);
     for (const tool of mutations) {
       const output = JSON.stringify(tool.outputSchema);
       expect(tool.policy.resultMode, tool.policy.tool).toBe('compact-mutation-ack');
@@ -502,13 +608,12 @@ describe('MCP canonical schema conversion', () => {
         total + JSON.stringify(tool.inputSchema).length + JSON.stringify(tool.outputSchema).length,
       0,
     );
-    // Inventory subtree and campaign-skill detail reads add two canonical response
-    // schemas; the measured complete output catalog is 271.5 KB.
-    expect(outputBytes).toBeLessThan(290_000);
-    // Calculator inputs plus source/modifier metadata are bounded, first-class
-    // portable fields; reserve a measured 550 KB for the complete catalog while
-    // still guarding against accidental schema duplication or unbounded growth.
-    expect(completeSchemaBytes).toBeLessThan(550_000);
+    // Inventory, campaign-skill detail, and race detail schemas bring the complete
+    // output catalog to about 302.7 KB; this limit bounds accidental duplication.
+    expect(outputBytes).toBeLessThan(320_000);
+    // Calculator inputs, race profiles, and source/modifier metadata are bounded,
+    // first-class portable fields; reserve 620 KB while guarding duplication.
+    expect(completeSchemaBytes).toBeLessThan(620_000);
   });
 
   test('uses original Zod refinements that cannot be represented in OpenAPI', async () => {

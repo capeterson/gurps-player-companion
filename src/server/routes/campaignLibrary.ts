@@ -8,6 +8,7 @@ import { canAdoptLibraryEntry, libraryEntryKey } from '../../shared/domain/libra
 import { validatePricingCatalog } from '../../shared/domain/libraryPricing.ts';
 import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
 import { libraryModifierOut, librarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
+import { libraryRaceOut } from '../../shared/schemas/race.ts';
 import {
   exportSourceReferences,
   importSourceReferences,
@@ -85,6 +86,7 @@ import {
   enchantmentEntity,
   itemEntity,
   languageEntity,
+  raceEntity,
   skillEntity,
   spellEntity,
   styleEntity,
@@ -109,6 +111,7 @@ const libraryReadQuery = z.object({
       'styles',
       'enchantments',
       'activeEffects',
+      'races',
     ])
     .optional()
     .describe('Return only this library section; every other section is an empty array.'),
@@ -157,6 +160,7 @@ router.openapi(
               styles: z.array(libraryStyleOut),
               enchantments: z.array(libraryEnchantmentOut),
               activeEffects: z.array(activeEffectDefinitionOut),
+              races: z.array(libraryRaceOut),
             }),
           },
         },
@@ -192,6 +196,7 @@ router.openapi(
     const enchantments = includes('enchantments')
       ? await selectLibrarySection(db, enchantmentEntity, id)
       : [];
+    const races = includes('races') ? await selectLibrarySection(db, raceEntity, id) : [];
     const activeEffects = includes('activeEffects')
       ? await selectLibrarySection(db, activeEffectEntity, id)
       : [];
@@ -227,6 +232,7 @@ router.openapi(
           limit,
           offset,
         ),
+        races: narrowLibraryRows(visible(races).map(raceEntity.toOut), search, limit, offset),
         activeEffects: narrowLibraryRows(
           visible(activeEffects).map(activeEffectEntity.toOut),
           search,
@@ -290,6 +296,7 @@ registerLibraryCrud(router, techniqueEntity);
 registerLibraryCrud(router, styleEntity);
 registerLibraryCrud(router, enchantmentEntity);
 registerLibraryCrud(router, activeEffectEntity);
+registerLibraryCrud(router, raceEntity);
 
 // ===================== YAML EXPORT =====================
 
@@ -363,6 +370,7 @@ router.openapi(
         const styles = await selectLibrarySection(tx, styleEntity, id);
         const enchantments = await selectLibrarySection(tx, enchantmentEntity, id);
         const activeEffects = await selectLibrarySection(tx, activeEffectEntity, id);
+        const races = await selectLibrarySection(tx, raceEntity, id);
         return {
           campaign,
           sources,
@@ -376,6 +384,7 @@ router.openapi(
           styles,
           enchantments,
           activeEffects,
+          races,
         };
       },
       { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -393,6 +402,7 @@ router.openapi(
       styles,
       enchantments,
       activeEffects,
+      races,
     } = snapshot;
     const visible = <T extends { restricted?: boolean }>(rows: T[]): T[] =>
       campaign.ownerId === user.id ? rows : rows.filter((row) => !row.restricted);
@@ -418,6 +428,7 @@ router.openapi(
           styles: visible(styles).map(styleEntity.rowToCreate),
           enchantments: visible(enchantments).map(enchantmentEntity.rowToCreate),
           activeEffects: visible(activeEffects).map(activeEffectEntity.rowToCreate),
+          races: visible(races).map(raceEntity.rowToCreate),
         },
         sources,
       ),
@@ -440,6 +451,7 @@ router.openapi(
           styles: scoped.styles ?? [],
           enchantments: scoped.enchantments ?? [],
           activeEffects: scoped.activeEffects ?? [],
+          races: scoped.races ?? [],
         };
       } catch (error) {
         throw new HTTPException(400, { message: (error as Error).message });
@@ -729,6 +741,15 @@ router.openapi(
         scopedSet ? onlySelected : undefined,
       );
 
+      const races = await upsertByKey(
+        tx,
+        raceEntity,
+        id,
+        liveIncoming.races?.map((entry) => raceEntity.createSchema.parse(entry)),
+        mode,
+        scopedSet ? onlySelected : undefined,
+      );
+
       // Prune books only after their old contents have been pruned. The FK
       // must never force deletion of surviving links in a replace import.
       if (mode === 'replace' && !scopedKeys && incoming.sources !== undefined) {
@@ -772,6 +793,7 @@ router.openapi(
         styles,
         enchantments,
         activeEffects,
+        races,
         campaignSettingsApplied,
       };
     });

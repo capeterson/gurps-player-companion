@@ -49,6 +49,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [architecture.md](architecture.md) | Stack, process model, request lifecycle, data model, auth, testing, deploy. |
 | [interaction-design.md](interaction-design.md) | Character-sheet summary tables, disclosures, draft lifetime, responsive layout, and shared UI primitives. |
 | [offline-sync.md](offline-sync.md) | The local-first / outbox / cursor / WebSocket system in depth. |
+| [races.md](races.md) | Campaign races, variants/forms/lenses, one owned Overview choice and racial mechanics. |
 | [library-calculation-rules.md](library-calculation-rules.md) | Declarative pricing, source editions, completeness, snapshots, modifiers and item modes. |
 | [campaign-content-sharing.md](campaign-content-sharing.md) | Campaigns, roles, invitations, the share gate / minimal view, and the YAML library. |
 | [media-uploads.md](media-uploads.md) | Portraits, campaign covers, S3-compatible storage, public immutable caching and queued offline uploads. |
@@ -151,8 +152,8 @@ and abbreviation, with no source key input; entry pickers show
 `<abbreviation>: <publication title>`, with a compact **Page** field beside the
 picker at every width. Entry editors preserve their definition keys without
 showing a key input. Portable YAML labels translate to/from
-UUIDs at import/export, including nested pricing references. Migration 0067
-backfills existing links; Dexie v16 upgrades cached and queued edits.
+UUIDs at import/export, including nested pricing references. Migration 0068
+backfills existing links; Dexie v17 upgrades cached and queued edits.
 
 ### Library selection
 
@@ -218,6 +219,8 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registr
   account data from this device.
 
 ### Character sheet (the core surface)
+
+- **Race.** Overview Identity has one Race control, default Human. Campaign owners author racial templates, complete variants, alternate forms and additive lenses in Library → Races. Apply preserves personal purchases; owned attributes/effects/training and one printed Race cost survive library edits, deletion and campaign moves. Race-only skill projections are read-only. See [races.md](races.md).
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
 **Overview, Combat, Traits, Skills, Magic, Inventory, History**.
@@ -368,7 +371,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Active effects and conditional modifiers are behind the owner-only **Campaign settings → Rules → Experimental features → Enable active effects** (`experimentalActiveEffects`), off for new and existing campaigns. Disabled campaigns hide all related controls/library authoring and ignore their calculations while retaining stored data; manual temporary stat modifiers and skill procedures remain available. When enabled, campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v14. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Active effects and conditional modifiers are behind the owner-only **Campaign settings → Rules → Experimental features → Enable active effects** (`experimentalActiveEffects`), off for new and existing campaigns. Disabled campaigns hide all related controls/library authoring and ignore their calculations while retaining stored data; manual temporary stat modifiers and skill procedures remain available. When enabled, campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v15. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -981,7 +984,7 @@ settings sections; switching sections retains drafts.
   Import is the one online-only library action; the page pulls its result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
-  policies and per-catalog-option rule overrides; portable YAML v14 retains them.
+  policies and per-catalog-option rule overrides; portable YAML v15 retains them.
   Technique form explanations for default penalties and level caps wrap within
   their fields on narrow screens, keeping the examples readable without horizontal scrolling.
 - **Adventure log**: session log entries attached to Campaign (shared, default)
@@ -1403,6 +1406,7 @@ docs/
 public/
   screenshots/   Canonical app captures shared by the landing page and README
 scripts/
+  inline-mcp-assets.ts  Embed original MCP App script/style tags without reinterpreting bundled HTML strings
   gpc-skill-evals.mjs  Validate cases, prepare blind inputs, and grade model traces
   run-bun-tests.ts, run-client-tests.mjs  Test execution with native case reports and command wall timings
   start-built-test-server.ts  Compiled browser acceptance server with real notification processing
@@ -1491,7 +1495,7 @@ Things that repeatedly surprise people working in this repo:
 1. **Sync coverage is partial and deliberate.** The character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
    `character_language`, `character_technique`, `character_inventory`,
-   `character_combat`) and all eleven `campaign_library_*` classes flow through
+   `character_combat`) and all twelve `campaign_library_*` classes flow through
    the outbox; library edits are whole-entry patches (`AGENTS.md` S13) and the
    library YAML import is the one online-only library action. Campaigns
    are pulled into Dexie and only `coverAssetId` writes use the outbox; the adventure log, invitations, and

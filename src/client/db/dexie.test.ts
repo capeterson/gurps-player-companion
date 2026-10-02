@@ -20,7 +20,7 @@ import { getLocalDb, migrateLegacyTempScalarsRow, resetLocalDb } from './dexie.t
 
 const DB_NAME = 'gurps-pc-local';
 
-it('v16 migrates cached and queued source references while holding unknown intent', async () => {
+it('v17 migrates cached and queued source references while holding unknown intent', async () => {
   await resetLocalDb();
   const campaignId = '0193b3c0-f1f0-7000-8000-00000000b301';
   const destinationCampaignId = '0193b3c0-f1f0-7000-8000-00000000b306';
@@ -30,8 +30,47 @@ it('v16 migrates cached and queued source references while holding unknown inten
   const traitId = '0193b3c0-f1f0-7000-8000-00000000b304';
   const transferredDefinitionId = '0193b3c0-f1f0-7000-8000-00000000b308';
   const transferredCharacterId = '0193b3c0-f1f0-7000-8000-00000000b309';
+  const raceDefinitionId = '0193b3c0-f1f0-7000-8000-00000000b311';
+  const lensDefinitionId = '0193b3c0-f1f0-7000-8000-00000000b312';
+  const ownedRace = {
+    selection: {
+      raceId: raceDefinitionId,
+      variantKey: null,
+      lensIds: [lensDefinitionId],
+      formKey: 'water',
+    },
+    snapshot: {
+      name: 'Stonekin · Tidal',
+      description: 'Owned form',
+      points: 27,
+      sources: [
+        {
+          id: raceDefinitionId,
+          campaignId,
+          revision: 2,
+          key: 'stonekin',
+          sourceKey: 'core',
+          name: 'Stonekin',
+          source: 'Synthetic',
+          sourceLocator: '42',
+        },
+        {
+          id: lensDefinitionId,
+          campaignId: destinationCampaignId,
+          revision: 3,
+          key: 'tidal',
+          sourceKey: 'core',
+          name: 'Tidal',
+          source: 'Synthetic',
+          sourceLocator: '43',
+        },
+      ],
+      naturalForm: { key: 'natural', name: 'Stonekin', description: null, points: 27 },
+      forms: [{ key: 'water', name: 'Stonekin · Tidal', description: null, points: 27 }],
+    },
+  };
   const legacy = new Dexie(DB_NAME);
-  legacy.version(15).stores({
+  legacy.version(16).stores({
     mediaUploads: 'id, userId, targetId, state',
     mediaManifests: 'id',
     characters: 'id, ownerId, campaignId, updatedAt, revision',
@@ -45,6 +84,7 @@ it('v16 migrates cached and queued source references while holding unknown inten
     campaigns: 'id, ownerId, revision',
     campaignLibrarySources: 'id, campaignId, revision',
     campaignLibraryModifiers: 'id, campaignId, revision',
+    campaignLibraryRaces: 'id, campaignId, revision',
     campaignLibraryTraits: 'id, campaignId, revision',
     campaignLibrarySkills: 'id, campaignId, revision',
     campaignLibrarySpells: 'id, campaignId, revision',
@@ -66,7 +106,7 @@ it('v16 migrates cached and queued source references while holding unknown inten
   await legacy.table('characters').put({ id: characterId, campaignId });
   await legacy
     .table('characters')
-    .put({ id: transferredCharacterId, campaignId: destinationCampaignId });
+    .put({ id: transferredCharacterId, campaignId: destinationCampaignId, race: ownedRace });
   await legacy.table('campaignLibrarySources').put({
     id: sourceId,
     campaignId,
@@ -93,6 +133,26 @@ it('v16 migrates cached and queued source references while holding unknown inten
     sourceKey: null,
     revision: 3,
   });
+  await legacy.table('campaignLibraryRaces').bulkPut([
+    {
+      id: raceDefinitionId,
+      campaignId,
+      name: 'Stonekin',
+      kind: 'race',
+      key: 'stonekin',
+      sourceKey: 'core',
+      revision: 2,
+    },
+    {
+      id: lensDefinitionId,
+      campaignId: destinationCampaignId,
+      name: 'Tidal',
+      kind: 'lens',
+      key: 'tidal',
+      sourceKey: 'core',
+      revision: 3,
+    },
+  ]);
   await legacy.table('campaignLibraryTraits').put({
     id: traitId,
     campaignId,
@@ -188,6 +248,45 @@ it('v16 migrates cached and queued source references while holding unknown inten
       },
       prevValue: { name: 'Acute Vision', sourceKey: 'core' },
     }),
+    queued({
+      clientOpId: 'race-patch-known',
+      entityId: transferredCharacterId,
+      entityClass: 'character',
+      parentId: transferredCharacterId,
+      fieldPath: 'race',
+      coalesceKey: `${transferredCharacterId}|race`,
+      enqueuedAt: '2026-10-01T00:00:00.000Z',
+      attemptedValue: ownedRace,
+      prevValue: {
+        ...ownedRace,
+        snapshot: { ...ownedRace.snapshot, points: 20 },
+      },
+    }),
+    queued({
+      clientOpId: 'race-patch-unknown',
+      entityId: transferredCharacterId,
+      entityClass: 'character',
+      parentId: transferredCharacterId,
+      fieldPath: 'race',
+      coalesceKey: `${transferredCharacterId}|race`,
+      enqueuedAt: '2026-10-01T00:00:01.000Z',
+      attemptedValue: {
+        selection: { raceId: raceDefinitionId, variantKey: null, lensIds: [], formKey: null },
+        snapshot: {
+          points: 30,
+          sources: [
+            {
+              id: raceDefinitionId,
+              campaignId: destinationCampaignId,
+              sourceKey: 'unknown-book',
+              key: 'stonekin',
+            },
+          ],
+          forms: [{ key: 'giant', points: 30 }],
+        },
+      },
+      prevValue: ownedRace,
+    }),
   ]);
   legacy.close();
 
@@ -200,6 +299,13 @@ it('v16 migrates cached and queued source references while holding unknown inten
     sourceId,
     calculation: { nodes: [{ reference: { sourceId } }] },
   });
+  expect(await db.campaignLibraryRaces.get(raceDefinitionId)).toMatchObject({
+    id: raceDefinitionId,
+    campaignId,
+    kind: 'race',
+    sourceId,
+  });
+  expect(await db.campaignLibraryRaces.get(raceDefinitionId)).not.toHaveProperty('sourceKey');
   expect(
     (await db.characterTraits.get('0193b3c0-f1f0-7000-8000-00000000b305')) as unknown as Record<
       string,
@@ -215,6 +321,25 @@ it('v16 migrates cached and queued source references while holding unknown inten
       definitionId: transferredDefinitionId,
       sourceId: null,
       reference: { section: 'traits', key: 'Vision', sourceId },
+    },
+  });
+  expect(await db.characters.get(transferredCharacterId)).toMatchObject({
+    campaignId: destinationCampaignId,
+    race: {
+      selection: ownedRace.selection,
+      snapshot: {
+        points: 27,
+        sources: [
+          { id: raceDefinitionId, campaignId, sourceId },
+          {
+            id: lensDefinitionId,
+            campaignId: destinationCampaignId,
+            sourceId: destinationSourceId,
+          },
+        ],
+        naturalForm: { points: 27 },
+        forms: [{ key: 'water', points: 27 }],
+      },
     },
   });
   expect(await db.outbox.get('source-field')).toMatchObject({
@@ -254,6 +379,53 @@ it('v16 migrates cached and queued source references while holding unknown inten
       },
     },
   });
+  expect(await db.outbox.get('race-patch-known')).toMatchObject({
+    status: 'pending',
+    entityId: transferredCharacterId,
+    fieldPath: 'race',
+    attemptedValue: {
+      selection: ownedRace.selection,
+      snapshot: {
+        points: 27,
+        sources: [
+          { id: raceDefinitionId, campaignId, sourceId },
+          {
+            id: lensDefinitionId,
+            campaignId: destinationCampaignId,
+            sourceId: destinationSourceId,
+          },
+        ],
+        forms: [{ key: 'water', points: 27 }],
+      },
+    },
+    prevValue: { snapshot: { points: 20 } },
+  });
+  expect(await db.outbox.get('race-patch-unknown')).toMatchObject({
+    status: 'pending',
+    localSourceMigrationUnknown: true,
+    attemptedValue: {
+      snapshot: {
+        sources: [{ id: raceDefinitionId, campaignId: destinationCampaignId, sourceId: null }],
+      },
+    },
+    localSourceMigrationIntent: {
+      attemptedValue: {
+        snapshot: {
+          sources: [
+            { id: raceDefinitionId, campaignId: destinationCampaignId, sourceKey: 'unknown-book' },
+          ],
+        },
+      },
+    },
+  });
+  const queuedIds = (await db.outbox.orderBy('enqueuedAt').toArray()).map((op) => op.clientOpId);
+  expect(queuedIds.indexOf('race-patch-known')).toBeLessThan(
+    queuedIds.indexOf('race-patch-unknown'),
+  );
+  expect((await readDrainableOps(50)).map((op) => op.clientOpId)).toContain('race-patch-known');
+  expect((await readDrainableOps(50)).map((op) => op.clientOpId)).not.toContain(
+    'race-patch-unknown',
+  );
   expect((await readDrainableOps(50)).map((op) => op.clientOpId)).not.toContain(
     'unknown-whole-entry',
   );

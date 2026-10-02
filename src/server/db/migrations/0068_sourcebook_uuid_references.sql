@@ -12,6 +12,11 @@ BEGIN
     RETURN result;
   END IF;
   IF jsonb_typeof(value) <> 'object' THEN RETURN value; END IF;
+  -- Owned racial provenance records carry the definition's original campaign.
+  -- A later character transfer must not reconnect them to a same-key new book.
+  IF value ? 'campaignId' AND value ? 'sourceKey' THEN
+    campaign := (value ->> 'campaignId')::uuid;
+  END IF;
   -- Purchases retain their original definition when a character changes
   -- campaigns. Resolve that book in the definition's campaign, not the current
   -- character campaign (where the same portable label may mean another UUID).
@@ -52,16 +57,23 @@ BEGIN
     'campaign_library_traits', 'campaign_library_skills', 'campaign_library_spells',
     'campaign_library_items', 'campaign_library_languages', 'campaign_library_techniques',
     'campaign_library_styles', 'campaign_library_enchantments',
-    'campaign_library_active_effects', 'campaign_library_modifiers'
+    'campaign_library_active_effects', 'campaign_library_modifiers', 'campaign_library_races'
   ]) LOOP
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema = current_schema() AND c.table_name = tbl_name AND c.column_name = 'source_key') THEN CONTINUE; END IF;
     EXECUTE format('ALTER TABLE %I ADD COLUMN IF NOT EXISTS source_id uuid', tbl_name);
-    EXECUTE format('SELECT e.source_key, e.campaign_id FROM %I e LEFT JOIN campaign_library_sources s ON s.campaign_id = e.campaign_id AND lower(regexp_replace(trim(s.key), ''\s+'', '' '', ''g'')) = lower(regexp_replace(trim(e.source_key), ''\s+'', '' '', ''g'')) WHERE e.source_key IS NOT NULL AND s.id IS NULL LIMIT 1', tbl_name)
-      INTO missing_key, campaign;
+    IF EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.table_schema = current_schema() AND c.table_name = 'campaign_library_sources' AND c.column_name = 'key') THEN
+      EXECUTE format('SELECT e.source_key, e.campaign_id FROM %I e LEFT JOIN campaign_library_sources s ON s.campaign_id = e.campaign_id AND lower(regexp_replace(trim(s.key), ''\s+'', '' '', ''g'')) = lower(regexp_replace(trim(e.source_key), ''\s+'', '' '', ''g'')) WHERE e.source_key IS NOT NULL AND s.id IS NULL LIMIT 1', tbl_name)
+        INTO missing_key, campaign;
+      EXECUTE format('UPDATE %I e SET source_id = s.id FROM campaign_library_sources s WHERE s.campaign_id = e.campaign_id AND lower(regexp_replace(trim(s.key), ''\s+'', '' '', ''g'')) = lower(regexp_replace(trim(e.source_key), ''\s+'', '' '', ''g''))', tbl_name);
+    ELSE
+      -- Idempotent reapplication can meet a newly created, source-less table
+      -- after books were already upgraded. Never guess a missing old alias.
+      EXECUTE format('SELECT source_key, campaign_id FROM %I WHERE source_key IS NOT NULL LIMIT 1', tbl_name)
+        INTO missing_key, campaign;
+    END IF;
     IF missing_key IS NOT NULL THEN
       RAISE EXCEPTION 'Cannot migrate unresolved sourcebook % in % (campaign %)', missing_key, tbl_name, campaign;
     END IF;
-    EXECUTE format('UPDATE %I e SET source_id = s.id FROM campaign_library_sources s WHERE s.campaign_id = e.campaign_id AND lower(regexp_replace(trim(s.key), ''\s+'', '' '', ''g'')) = lower(regexp_replace(trim(e.source_key), ''\s+'', '' '', ''g''))', tbl_name);
     FOR column_name IN SELECT c.column_name FROM information_schema.columns c
       WHERE c.table_schema = current_schema() AND c.table_name = tbl_name
       AND c.column_name IN ('calculation', 'available_modifiers', 'applicability')
@@ -71,7 +83,7 @@ BEGIN
     END LOOP;
     EXECUTE format('DROP INDEX IF EXISTS %I', tbl_name || '_key');
     EXECUTE format('ALTER TABLE %I DROP COLUMN source_key', tbl_name);
-    EXECUTE format('CREATE UNIQUE INDEX %I ON %I (campaign_id, %s lower(coalesce(nullif(key, ''''), name)), coalesce(source_id::text, ''''))', tbl_name || '_key', tbl_name, CASE WHEN tbl_name = 'campaign_library_traits' THEN 'kind,' ELSE '' END);
+    EXECUTE format('CREATE UNIQUE INDEX %I ON %I (campaign_id, %s lower(coalesce(nullif(key, ''''), name)), coalesce(source_id::text, ''''))', tbl_name || '_key', tbl_name, CASE WHEN tbl_name IN ('campaign_library_traits', 'campaign_library_races') THEN 'kind,' ELSE '' END);
   END LOOP;
 END $$;
 --> statement-breakpoint
@@ -81,6 +93,7 @@ UPDATE character_traits e SET
 FROM characters c WHERE c.id = e.character_id;
 UPDATE inventory_items e SET pricing_resolution = migrate_sourcebook_refs(e.pricing_resolution, c.campaign_id, false)
 FROM characters c WHERE c.id = e.character_id;
+UPDATE characters SET race = migrate_sourcebook_refs(race, campaign_id, false);
 --> statement-breakpoint
 DROP INDEX IF EXISTS campaign_library_sources_key;
 ALTER TABLE campaign_library_sources DROP COLUMN IF EXISTS key;
@@ -92,7 +105,7 @@ BEGIN
     'campaign_library_traits', 'campaign_library_skills', 'campaign_library_spells',
     'campaign_library_items', 'campaign_library_languages', 'campaign_library_techniques',
     'campaign_library_styles', 'campaign_library_enchantments',
-    'campaign_library_active_effects', 'campaign_library_modifiers'
+    'campaign_library_active_effects', 'campaign_library_modifiers', 'campaign_library_races'
   ]) LOOP
     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass(tbl_name) AND conname = tbl_name || '_source_book_fk') THEN CONTINUE; END IF;
     EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I FOREIGN KEY (campaign_id, source_id) REFERENCES campaign_library_sources(campaign_id, id) ON DELETE NO ACTION', tbl_name, tbl_name || '_source_book_fk');

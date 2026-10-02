@@ -52,6 +52,7 @@ import type { LibrarySectionShellProps } from './sections/CrudLibrarySection.tsx
 import { EnchantmentsSection } from './sections/EnchantmentsSection.tsx';
 import { ItemsSection } from './sections/ItemsSection.tsx';
 import { LanguagesSection } from './sections/LanguagesSection.tsx';
+import { RacesSection } from './sections/RacesSection.tsx';
 import { SkillsSection } from './sections/SkillsSection.tsx';
 import { SpellsSection } from './sections/SpellsSection.tsx';
 import { StylesSection } from './sections/StylesSection.tsx';
@@ -62,6 +63,7 @@ import { type LocalLibrary, emptyLibrary, useLocalLibrary } from './useLocalLibr
 type SectionKey =
   | 'sources'
   | 'modifiers'
+  | 'races'
   | 'traits'
   | 'skills'
   | 'spells'
@@ -75,6 +77,7 @@ type SectionKey =
 const SECTIONS: readonly { key: SectionKey; label: string }[] = [
   { key: 'sources', label: 'Sources' },
   { key: 'modifiers', label: 'Modifiers' },
+  { key: 'races', label: 'Races' },
   { key: 'traits', label: 'Traits' },
   { key: 'skills', label: 'Skills' },
   { key: 'spells', label: 'Spells' },
@@ -453,6 +456,7 @@ export function LibraryPage({
         ['Items', 'items', libraryEntryKey],
         ['Enchantments', 'enchantments', libraryEntryKey],
         ['Active effects', 'activeEffects', libraryEntryKey],
+        ['Races', 'races', libraryEntryKey],
         ['Languages', 'languages', libraryEntryKey],
         ['Techniques', 'techniques', libraryEntryKey],
         ['Styles', 'styles', libraryEntryKey],
@@ -856,6 +860,7 @@ export function LibraryPage({
         <div className="library-content flex flex-col gap-3">
           <CatalogSection section="sources" {...shell('sources')} />
           <CatalogSection section="modifiers" {...shell('modifiers')} />
+          <RacesSection {...shell('races')} />
           <TraitsSection {...shell('traits')} />
           <SkillsSection {...shell('skills')} />
           <SpellsSection {...shell('spells')} />
@@ -942,7 +947,7 @@ function formatImportResult(r: ImportResult): string {
     ? `; ${r.incomplete} incomplete/reference entries blocked from adoption`
     : '';
   const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
-  return `Imported in ${r.mode} mode — ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('languages')}, ${totals('techniques')}, ${totals('styles')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;
+  return `Imported in ${r.mode} mode — ${totals('races')}, ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('languages')}, ${totals('techniques')}, ${totals('styles')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;
 }
 
 function slugify(name: string): string {

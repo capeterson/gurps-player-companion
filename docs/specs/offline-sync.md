@@ -39,6 +39,7 @@ campaign_library_trait  campaign_library_skill  campaign_library_spell
 campaign_library_item  campaign_library_language  campaign_library_technique
 campaign_library_style  campaign_library_enchantment
 campaign_library_active_effect  campaign_library_source  campaign_library_modifier
+campaign_library_race
 ```
 
 Everything else is either read-only in the local store or fully online:
@@ -535,7 +536,7 @@ are reads. No time-only grouping or new write path is introduced.
 Each current subject title includes its captured name and links to the actual local
 entity when it still exists and access permits. Character traits, skills, spells,
 and inventory use their supported sheet anchors; languages, techniques, and combat
-link to the parent sheet. All eleven library categories use the library's
+link to the parent sheet. All twelve library categories use the library's
 `?section=&open=` routes. Deleted subjects remain readable without dead links.
 Names are captured before truncation/compression, and are scrubbed with the values
 when character/campaign access is revoked. Reserved protocol classes are explicitly
@@ -955,7 +956,7 @@ orchestrator test files are the working references.
 
 ## Campaign library
 
-All eleven library classes are sync-backed (Dexie v12 stores
+All twelve library classes are sync-backed (races use Dexie v16; other categories use v11/v12 stores
 `campaignLibrary*`, indexed by `campaignId`). Reads are local-first for every
 campaign member: `/sync/cursor` emits each row's REST projection plus `revision`
 for campaigns in the viewer's accessible set, and migration 0051 adds
@@ -1077,7 +1078,7 @@ lifecycle, access and cache semantics are in [media-uploads.md](media-uploads.md
 
 ### Sourcebook identity upgrade
 
-Dexie v16 converts legacy `sourceKey` references in cached entries, nested pricing
+Dexie v17 converts legacy `sourceKey` references in cached entries, nested pricing
 rules/snapshots and queued attempted/previous values to campaign-scoped sourcebook
 UUIDs. Queued source creates/renames supply both previous and new alias evidence.
 Sourcebook rows no longer carry keys. An unresolved queued legacy reference keeps
@@ -1087,3 +1088,7 @@ Unresolved speculative additions can be explicitly reverted in the sync log and
 recreated with a selected book; this never discards them automatically.
 Sync protocol 2 rejects older clients before processing operations; upgraded
 clients retain outbox IDs, ordering and delivery-uncertainty state.
+
+## Racial templates
+
+`campaign_library_race` and Dexie v16 `campaignLibraryRaces` use the same cursor/outbox/whole-entry path as other library definitions. Character race is one root `race` patch. Race/campaign patches preserve enqueue order across one another, and race selections depend on speculative race/lens writes. Cursor and minimal-view sweeps validate/scrub the owned snapshot while retaining public raceName. See [races.md](races.md).

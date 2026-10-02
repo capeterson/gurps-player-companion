@@ -76,6 +76,7 @@ export function characterInsertValues(
     speedQuarterMod: body.speedQuarterMod,
     moveMod: body.moveMod,
     tempEffects: body.tempEffects ?? [],
+    ...(body.race ? { race: body.race } : {}),
     activeEffects: body.activeEffects ?? [],
     activeConditionGroups: body.activeConditionGroups ?? [],
   };

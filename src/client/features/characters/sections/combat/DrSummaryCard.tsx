@@ -499,7 +499,7 @@ export function DrSummaryCard({
                         className="flex justify-between gap-3 py-2"
                         key={`${effect.sourceKind}:${effect.sourceId}`}
                       >
-                        {effect.sourceKind === 'active_effect' ? (
+                        {effect.sourceKind === 'active_effect' || effect.sourceKind === 'race' ? (
                           <span className="min-w-0 break-words">{effect.sourceName}</span>
                         ) : (
                           <SheetAnchorLink

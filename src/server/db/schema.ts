@@ -67,6 +67,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationPreferences,
 } from '../../shared/schemas/notificationPreferences.ts';
+import type { CharacterRace, LibraryRaceCreate } from '../../shared/schemas/race.ts';
 import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schemas/skill.ts';
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
@@ -637,6 +638,12 @@ export const characters = pgTable(
      * Replaces the ten `temp_*` scalar columns (see migration 0017). */
     tempEffects: jsonb('temp_effects').$type<TempEffect[]>().notNull().default([]),
     /** Validated by activeEffectsField. */
+    race: jsonb('race')
+      .$type<CharacterRace>()
+      .notNull()
+      .default(
+        sql`'{"selection":{"raceId":null,"variantKey":null,"lensIds":[],"formKey":null},"snapshot":null}'::jsonb`,
+      ),
     activeEffects: jsonb('active_effects')
       .$type<ActiveEffectInstance[]>()
       .notNull()
@@ -1768,4 +1775,78 @@ export const notificationEmailQueue = pgTable(
     createdAt: createdAt(),
   },
   (t) => ({ eventKey: uniqueIndex('notification_email_event_key').on(t.eventKey) }),
+);
+
+export const campaignLibraryRaces = pgTable(
+  'campaign_library_races',
+  {
+    ...libraryMetadataColumns(),
+    id: id(),
+    campaignId: uuid('campaign_id')
+      .notNull()
+      .references(() => campaigns.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 160 }).notNull(),
+    description: text('description'),
+    source: varchar('source', { length: 160 }),
+    kind: varchar('kind', { length: 16 }).$type<'race' | 'lens'>().notNull().default('race'),
+    points: integer('points').notNull().default(0),
+    attributeModifiers: jsonb('attribute_modifiers')
+      .$type<LibraryRaceCreate['attributeModifiers']>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    traits: jsonb('traits')
+      .$type<LibraryRaceCreate['traits']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    skills: jsonb('skills')
+      .$type<LibraryRaceCreate['skills']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    features: jsonb('features')
+      .$type<LibraryRaceCreate['features']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    effects: jsonb('effects')
+      .$type<LibraryRaceCreate['effects']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    variants: jsonb('variants')
+      .$type<LibraryRaceCreate['variants']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    forms: jsonb('forms').$type<LibraryRaceCreate['forms']>().notNull().default(sql`'[]'::jsonb`),
+    compatibleRaceKeys: jsonb('compatible_race_keys')
+      .$type<LibraryRaceCreate['compatibleRaceKeys']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    removesTraits: jsonb('removes_traits')
+      .$type<LibraryRaceCreate['removesTraits']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    removesSkills: jsonb('removes_skills')
+      .$type<LibraryRaceCreate['removesSkills']>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    tags: jsonb('tags').$type<LibraryRaceCreate['tags']>().notNull().default(sql`'[]'::jsonb`),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    sourceBookFk: foreignKey({
+      name: 'campaign_library_races_source_book_fk',
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }),
+    naturalKey: uniqueIndex('campaign_library_races_key').on(
+      t.campaignId,
+      t.kind,
+      sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
+      sql`coalesce(${t.sourceId}::text, '')`,
+    ),
+    campaignRevisionIdx: index('campaign_library_races_campaign_revision_idx').on(
+      t.campaignId,
+      t.revision,
+    ),
+  }),
 );
