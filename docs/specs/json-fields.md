@@ -28,7 +28,7 @@ The two deliberate exceptions (`notifications.payload`,
 
 | Table.column | Shape schema (`src/shared/schemas/`) | Validated at |
 |---|---|---|
-| `campaign_library_{traits,skills,spells,items,languages,techniques,styles,enchantments,active_effects,modifiers}.extraction` | Nullable `extractionRecord` (libraryMetadata.ts): preserved rawText/reviewNotes/locator | Shared library create/update schemas at REST, sync, YAML and client validation; typed Drizzle columns |
+| `campaign_library_{traits,skills,spells,items,languages,techniques,styles,enchantments,active_effects,modifiers,races}.extraction` | Nullable `extractionRecord` (libraryMetadata.ts): preserved rawText/reviewNotes/locator | Shared library create/update schemas at REST, sync, YAML and client validation; typed Drizzle columns |
 | `campaign_library_traits.calculation`, `campaign_library_items.calculation`, `campaign_library_modifiers.calculation` | Nullable `calculationDefinition` (calculation.ts), bounded CalculationDefinitionV1 graph | Create/update/YAML schema plus final reference-graph validation; typed Drizzle columns |
 | `campaign_library_modifiers.applicability` | `modifierApplicability` (libraryMetadata.ts): universal/kinds/tags/exact references/advisory | All shared definition write boundaries and final graph validation |
 | `campaign_library_modifiers.tags` | `libraryModifierCreate.shape.tags`: max 100 strings, 1–40 characters | Shared schemas at all write boundaries |
@@ -150,3 +150,15 @@ name fallback, which still requires non-null `inventory_items.library_item_id`.
 | `campaign_library_skills.procedures` | `skillProcedures` (`skillProcedures.ts`), typed `SkillProcedures`; library CRUD/YAML and owned-snapshot parsing. |
 | `character_skills.library_mechanics.skillRules.procedures` | Optional `skillProcedures` within `ownedSkillRules`; captured, refreshed and retained with existing owned mechanics. |
 | Dexie `campaigns.activeEffectDefinitions` | Read-only `activeEffectDefinitionOut[]` cursor projection; validated at emission/application, retained by campaign mirrors, purged with campaigns. No additional server JSON column. |
+
+## Race ownership and definitions
+
+| JSONB field | Schema and boundaries |
+| --- | --- |
+| `characters.race` | `characterRace` in `race.ts`, typed `CharacterRace`; create/update/sync and client cursor/outbox validate shape. Shared `prepareRace` authoritatively resolves selection or retained forms at REST/sync writes. |
+| `campaign_library_races.attribute_modifiers` | `raceAttributeModifiers`; `libraryRaceCreate`/update, whole-row validation, YAML, and client outbox. Drizzle `LibraryRaceCreate['attributeModifiers']`. |
+| `campaign_library_races.traits`, `.skills` | Arrays of `racialTrait` / `racialSkill`; same library boundaries, unique component-key domain checks; Drizzle indexed `LibraryRaceCreate` types. |
+| `campaign_library_races.features`, `.effects` | Bounded descriptive strings / portable `libraryTraitEffect` array; same library boundaries and typed columns. |
+| `campaign_library_races.variants`, `.forms` | `raceOption` arrays (complete profiles); same library boundaries plus unique-key/domain validation; typed indexed fields. |
+| `campaign_library_races.compatible_race_keys`, `.removes_traits`, `.removes_skills`, `.tags` | Bounded string-key/tag arrays from `libraryRaceCreate`; same boundaries and indexed Drizzle types. |
+| `campaign_library_races.extraction` | Nullable `extractionRecord` via library metadata; same REST/sync/YAML/client boundaries and `$type<LibraryMetadata['extraction']>`. |

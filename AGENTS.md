@@ -48,6 +48,7 @@ requirement — not optional documentation.**
   - `history-tracking.md` — the append-only audit log.
   - `media-uploads.md` — portraits, campaign covers, object storage, public caching and offline uploads.
   - `active-effects-skill-procedures.md` — active effect instances and declarative skill procedures.
+  - `races.md` — campaign racial templates, owned character race purchases, variants, forms, and lenses.
   - `library-calculation-rules.md` — source editions, bounded declarative pricing, completeness, purchase snapshots and weapon modes.
   - `notifications.md` — event recipients, inbox/email preferences, desktop opt-in and durable delivery.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
@@ -253,7 +254,7 @@ The outbox + cursor system covers the character classes (`character`,
 `character_language`, `character_technique`, `character_inventory`,
 `character_combat`) **and every campaign-library class**
 (`campaign_library_trait`, `_skill`, `_spell`, `_item`, `_language`,
-`_technique`, `_style`, `_enchantment`, `_active_effect`, `_source`, `_modifier`). The library is
+`_technique`, `_style`, `_enchantment`, `_active_effect`, `_source`, `_modifier`, `_race`). The library is
 local-first like the character sheet: every library read comes from Dexie,
 and every library create/edit/delete goes through the outbox. Do not add a
 React Query/HTTP read or a direct REST write for library entries in the PWA.

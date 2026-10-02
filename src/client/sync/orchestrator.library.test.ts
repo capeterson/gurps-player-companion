@@ -4,6 +4,7 @@
  * cursor, with the same guarantees as the character classes.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import type { OperationEnvelope } from '../../shared/schemas/sync.ts';
 import { type LocalLibrarySkill, getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -13,13 +14,58 @@ import {
   resetSyncOrchestratorForTests,
   setRejectionNotifier,
 } from './orchestrator.ts';
-import { enqueueCreate, enqueueDelete, enqueueEntityPatch } from './outbox.ts';
+import {
+  enqueueCreate,
+  enqueueDelete,
+  enqueueEntityPatch,
+  enqueueFieldPatch,
+  readDrainableOps,
+} from './outbox.ts';
 import { syncStateStore } from './state.ts';
 
 const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000ca01';
 const SKILL_A = '0193b3c0-f1f0-7000-8000-00000000a001';
 const SKILL_B = '0193b3c0-f1f0-7000-8000-00000000b001';
 const NEW_LIBRARY_ROWS = [
+  {
+    label: 'race',
+    entityClass: 'campaign_library_race',
+    store: 'campaignLibraryRaces',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000c004',
+    attemptedValue: {
+      name: 'Stonekin',
+      kind: 'race',
+      points: 25,
+      attributeModifiers: { st: 2 },
+      traits: [],
+      skills: [],
+      features: [],
+      effects: [],
+      variants: [],
+      forms: [],
+      compatibleRaceKeys: [],
+      removesTraits: [],
+      removesSkills: [],
+      tags: [],
+    },
+    baseValue: {
+      name: 'Stonekin',
+      description: 'Server text',
+      kind: 'race',
+      points: 25,
+      attributeModifiers: { st: 2 },
+      traits: [],
+      skills: [],
+      features: [],
+      effects: [],
+      variants: [],
+      forms: [],
+      compatibleRaceKeys: [],
+      removesTraits: [],
+      removesSkills: [],
+      tags: [],
+    },
+  },
   {
     label: 'language',
     entityClass: 'campaign_library_language',
@@ -266,7 +312,7 @@ describe('campaign library outbox path', () => {
     async ({ entityClass, entityId, label, store, baseValue }) => {
       login();
       const table = libraryTable(store);
-      const otherId = `${entityId.slice(0, -1)}4`;
+      const otherId = `${entityId.slice(0, -1)}f`;
       await table?.put(categoryRow(entityId, baseValue));
       await table?.put(
         categoryRow(otherId, baseValue, { name: `Other ${String(baseValue.name)}` }),
@@ -714,5 +760,84 @@ describe('whole-entry patch coalescing (S3/S13)', () => {
         attemptedValue: { name: 'Stealth' },
       }),
     ).rejects.toThrow(/campaign id/);
+  });
+});
+
+describe('race and campaign rebase ordering', () => {
+  it('retries an unchanged stale race before the campaign move and later race choice', async () => {
+    login();
+    const characterId = '0193b3c0-f1f0-7000-8000-00000000c010';
+    const campaignA = CAMPAIGN;
+    const campaignB = '0193b3c0-f1f0-7000-8000-00000000ca02';
+    const raceA = '0193b3c0-f1f0-7000-8000-00000000c011';
+    const raceB = '0193b3c0-f1f0-7000-8000-00000000c012';
+    const db = getLocalDb();
+    await db.characters.put({
+      id: characterId,
+      ownerId: 'owner',
+      campaignId: campaignA,
+      name: 'Race rebase',
+      st: 10,
+      dx: 10,
+      iq: 10,
+      ht: 10,
+      race: HUMAN_RACE,
+      revision: 5,
+    } as never);
+    const selectedRace = (raceId: string) => ({
+      ...HUMAN_RACE,
+      selection: { ...HUMAN_RACE.selection, raceId },
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: characterId,
+      fieldPath: 'race',
+      attemptedValue: selectedRace(raceA),
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: characterId,
+      fieldPath: 'campaignId',
+      attemptedValue: campaignB,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: characterId,
+      fieldPath: 'race',
+      attemptedValue: selectedRace(raceB),
+    });
+    const initial = (await db.outbox.orderBy('enqueuedAt').toArray()).find(
+      (op) => op.fieldPath === 'race',
+    );
+    if (!initial) throw new Error('first race patch was not queued');
+    const sent = stubServer((ops) =>
+      ops.map((op) =>
+        sent.length === 1
+          ? {
+              clientOpId: op.clientOpId,
+              status: 'stale_base',
+              reason: 'newer character revision',
+              latestEntity: {
+                id: characterId,
+                campaignId: campaignA,
+                race: HUMAN_RACE,
+                revision: 8,
+              },
+            }
+          : { clientOpId: op.clientOpId, status: 'applied', newRevision: 9 + sent.length },
+      ),
+    );
+
+    await drain();
+    expect(sent[0]?.map((op) => op.fieldPath)).toEqual(['race']);
+    const [rebased] = await db.outbox.orderBy('enqueuedAt').toArray();
+    expect(rebased).toMatchObject({ clientOpId: initial.clientOpId, baseRevision: 8 });
+    await drain();
+    expect(sent[1]?.[0]).toMatchObject({ clientOpId: initial.clientOpId, fieldPath: 'race' });
+    await drain();
+    expect(sent[2]?.[0]?.fieldPath).toBe('campaignId');
+    await drain();
+    expect(sent[3]?.[0]).toMatchObject({ fieldPath: 'race', attemptedValue: selectedRace(raceB) });
+    expect(await db.outbox.count()).toBe(0);
   });
 });

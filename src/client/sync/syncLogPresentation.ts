@@ -47,6 +47,7 @@ const ENTITIES: Record<EntityClass, EntityPresentation> = {
     destination: 'library',
     section: 'enchantments',
   },
+  campaign_library_race: { label: 'Library race', destination: 'library', section: 'races' },
   campaign_library_active_effect: {
     label: 'Library active effect',
     destination: 'library',

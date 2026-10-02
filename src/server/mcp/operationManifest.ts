@@ -317,6 +317,21 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
     'update',
     'gpc:write',
   ),
+  task('POST', '/api/v1/campaigns/{id}/library/races', 'library_race', 'create', 'gpc:write'),
+  task(
+    'PATCH',
+    '/api/v1/campaigns/{id}/library/races/{raceId}',
+    'library_race',
+    'update',
+    'gpc:write',
+  ),
+  task(
+    'DELETE',
+    '/api/v1/campaigns/{id}/library/races/{raceId}',
+    'library_race',
+    'delete',
+    'gpc:manage',
+  ),
   task(
     'POST',
     '/api/v1/campaigns/{id}/library/active-effects',

@@ -13,7 +13,8 @@ import {
   attrSpent,
   secondarySpent,
 } from '../../../shared/domain/attributeTooltips.ts';
-import { hasMagery } from '../../../shared/domain/spellCalc.ts';
+import { raceName } from '../../../shared/domain/race.ts';
+import { characterMagicTraits, hasMagery } from '../../../shared/domain/spellCalc.ts';
 import { getWarningLabel } from '../../../shared/domain/warnings.ts';
 import { formatScaled, formatSigned } from '../../../shared/format/number.ts';
 import type { CampaignOut } from '../../../shared/schemas/campaign.ts';
@@ -43,6 +44,7 @@ import {
   nullableTextParser,
   scaledIntParser,
 } from '../../lib/parsers.ts';
+import { CharacterRaceControl } from './CharacterRaceControl.tsx';
 import { SHEET_ICONS, SHEET_TABS, SheetNavigation, type SheetTab } from './SheetNavigation.tsx';
 import { parseSheetAnchor, sheetAnchor } from './sheetAnchors.ts';
 
@@ -331,10 +333,10 @@ function fmtSignedDelta(value: number, scale = 1): string {
 }
 
 /**
- * Single primary-attribute cell. When `tempValue` is non-zero, the
+ * Single primary-attribute cell. When the effective value differs from the base, the
  * effective value reads as the big number and the input shrinks to a
- * small "base ±temp" line beneath it (mirroring the legacy gurps-player-web
- * pattern). Tooltip on the label shows points spent / next +1 cost / what
+ * small "base ±adjustment" line alongside it, including racial and trait effects.
+ * Tooltip on the label shows points spent / next +1 cost / what
  * the attribute influences.
  */
 function PrimaryAttrCell({
@@ -361,6 +363,7 @@ function PrimaryAttrCell({
   canWrite: boolean;
 }) {
   const tempTotal = tempEffects.totals[axis];
+  const totalAdjustment = effective - baseValue;
   const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
   const tempManual = manualEffect?.mods[axis] ?? 0;
   return (
@@ -378,11 +381,11 @@ function PrimaryAttrCell({
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
       <span className="flex items-baseline gap-2">
-        {tempTotal !== 0 ? (
+        {totalAdjustment !== 0 ? (
           <>
             <span
-              className="num text-2xl font-semibold text-warning"
-              title={`Effective ${effective} (base ${baseValue} ${fmtSignedDelta(tempTotal)})`}
+              className={`num text-2xl font-semibold ${tempTotal !== 0 ? 'text-warning' : ''}`}
+              title={`Effective ${effective} (base ${baseValue} ${fmtSignedDelta(totalAdjustment)})`}
             >
               {effective}
             </span>
@@ -398,7 +401,9 @@ function PrimaryAttrCell({
                 width="w-12 sm:w-9"
                 size="sm"
               />
-              <span className="text-warning">{fmtSignedDelta(tempTotal)}</span>
+              <span className={tempTotal !== 0 ? 'text-warning' : ''}>
+                {fmtSignedDelta(totalAdjustment)}
+              </span>
             </span>
           </>
         ) : (
@@ -635,6 +640,7 @@ function IdentityPanel({
         </div>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <CharacterRaceControl key={character.id} character={character} canWrite={canWrite} />
         <div className="form-control">
           <span className="label-text-alt label-eyebrow">Tech level</span>
           <span>TL {character.techLevel ?? '—'}</span>
@@ -1142,6 +1148,10 @@ function PointsPanel({
           </li>
         )}
         <li className="flex justify-between">
+          <span>Race</span>
+          <span className="num">{character.race?.snapshot?.points ?? 0}</span>
+        </li>
+        <li className="flex justify-between">
           <span>Attributes</span>
           <span className="num">{p.attributes}</span>
         </li>
@@ -1631,6 +1641,7 @@ export function CharacterSheetPage() {
       <CharacterMinimalView
         data={{
           view: 'minimal',
+          raceName: character.raceName ?? raceName(character.race),
           id: character.id,
           ownerId: character.ownerId,
           // The schema marks `campaignId` optional+nullable, so coerce
@@ -1663,7 +1674,7 @@ export function CharacterSheetPage() {
   // Show the Magic section by default for any caster (Magery present, or
   // already has at least one spell / powerstone / magic item).  Owners
   // without any magic can still tab to it to add their first.
-  const showMagicTab = hasMagery(character.traits) || magicTabCount > 0 || canWrite;
+  const showMagicTab = hasMagery(characterMagicTraits(character)) || magicTabCount > 0 || canWrite;
   const visibleTabs: readonly SheetTab[] = showMagicTab
     ? SHEET_TABS
     : SHEET_TABS.filter((t) => t !== 'Magic');

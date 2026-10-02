@@ -1,6 +1,8 @@
 import type { ActiveEffectInstance } from '../schemas/activeEffects.ts';
 import type { PricingResolution } from '../schemas/calculation.ts';
+import { type CharacterRace, HUMAN_RACE } from '../schemas/race.ts';
 import { resolveActiveEffects } from './activeEffects.ts';
+import { racialProfile } from './race.ts';
 import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
 import type { ResolvedEffect } from './traitEffects.ts';
 /**
@@ -100,6 +102,7 @@ export interface CharacterDetailInputCharacter {
   /** Optional: stale local Dexie rows and pre-migration server rows
    * may lack this column; adapters default it to `[]`. */
   tempEffects?: TempEffect[];
+  race?: CharacterRace | undefined;
   activeEffects?: ActiveEffectInstance[];
   dismissedWarnings: string[];
   /** Optional — defaults to []. Pre-Phase-2 rows may not have this field. */
@@ -549,7 +552,51 @@ export function buildCharacterDetail(
     activeGroups,
     input.now ?? Date.now(),
   );
+  const racial = racialProfile(character.race);
+  const racialAttrs = { ...baseAttrs };
+  const racialAttributeFields = {
+    st: 'st',
+    dx: 'dx',
+    iq: 'iq',
+    ht: 'ht',
+    hp: 'hpMod',
+    will: 'willMod',
+    per: 'perMod',
+    fp: 'fpMod',
+    speedQuarter: 'speedQuarterMod',
+    move: 'moveMod',
+  } as const;
+  for (const [axis, field] of Object.entries(racialAttributeFields)) {
+    const key = axis as keyof typeof racialAttributeFields;
+    racialAttrs[field as (typeof racialAttributeFields)[typeof key]] +=
+      racial.attributeModifiers[key] ?? 0;
+  }
+  const racialId = (key: string): string => {
+    let hash = 14695981039346656037n;
+    for (const char of key)
+      hash = ((hash ^ BigInt(char.codePointAt(0) ?? 0)) * 1099511628211n) & ((1n << 48n) - 1n);
+    return `${character.id.slice(0, 24)}${hash.toString(16).padStart(12, '0')}`;
+  };
+  const raceEffects = resolveEffects(
+    [
+      {
+        id: racialId('profile'),
+        name: character.race?.snapshot?.name ?? 'Human',
+        level: null,
+        libraryEffects: racial.effects,
+      },
+      ...racial.traits.map((trait) => ({
+        id: racialId(`trait:${trait.key}`),
+        name: trait.name,
+        level: trait.level,
+        libraryEffects: trait.effects,
+      })),
+    ],
+    [],
+    activeGroups,
+  ).map((effect) => ({ ...effect, sourceKind: 'race' as const }));
   const resolved = [
+    ...raceEffects,
     ...(procedureEffects ?? []),
     ...activeResolution.effects,
     ...resolveEffects(
@@ -572,7 +619,7 @@ export function buildCharacterDetail(
   // Apply effects to attrs, THEN compute derived stats — so dodge / parry
   // / block / dr already include the trait contributions when the UI
   // reads them.
-  const attrs = applyEffectsToAttrs(baseAttrs, resolved);
+  const attrs = applyEffectsToAttrs(racialAttrs, resolved);
   const derived = computeDerived(attrs);
 
   const traitInputs: CharacterTraitInput[] = traits.map((t) => ({
@@ -598,6 +645,7 @@ export function buildCharacterDetail(
     techniqueInputs,
     spellInputs,
     pointTarget,
+    racial.points,
   );
 
   const weights = computeWeights(
@@ -608,7 +656,42 @@ export function buildCharacterDetail(
     buildInventoryItemOut(item, weights.perItem, itemEnchantments.get(item.id)),
   );
   const traitsOut = traits.map(buildTraitOut);
-  const defaultableSkills = skills.map((skill) => {
+  const raceSkillMatches = (a: CharacterDetailInputSkill, b: (typeof racial.skills)[number]) =>
+    a.name.trim().toLowerCase() === b.name.trim().toLowerCase() &&
+    a.attribute === b.attribute &&
+    a.difficulty === b.difficulty &&
+    a.techLevel === b.techLevel &&
+    (a.specialization ?? '').trim().toLowerCase() === (b.specialization ?? '').trim().toLowerCase();
+  const combinedSkills = skills.map((skill) => ({
+    ...skill,
+    points:
+      skill.points +
+      racial.skills
+        .filter((row) => raceSkillMatches(skill, row))
+        .reduce((sum, row) => sum + row.points, 0),
+  }));
+  // Racial training participates in defaults without creating editable child purchases.
+  const virtualRacialSkills: CharacterDetailInputSkill[] = racial.skills.flatMap((skill) =>
+    skill.attribute && skill.difficulty && !skills.some((row) => raceSkillMatches(row, skill))
+      ? [
+          {
+            id: racialId(`skill:${skill.key}`),
+            characterId: character.id,
+            name: skill.name,
+            attribute: skill.attribute,
+            difficulty: skill.difficulty,
+            points: skill.points,
+            techLevel: skill.techLevel,
+            specialization: skill.specialization,
+            notes: skill.description,
+            librarySkillId: null,
+            createdAt: character.createdAt,
+            updatedAt: character.updatedAt,
+          },
+        ]
+      : [],
+  );
+  const defaultableSkills = [...combinedSkills, ...virtualRacialSkills].map((skill) => {
     const snapshot = libraryMechanics.safeParse(skill.libraryMechanics);
     return {
       ...skill,
@@ -621,14 +704,22 @@ export function buildCharacterDetail(
     ? { campaignRules: campaign.houseRules }
     : undefined;
   const skillLevels = resolveSkillLevels(defaultableSkills, derived, defaultConditionContext);
-  let skillsOut = skills.map((s) =>
-    buildSkillOut(
-      s,
-      derived,
-      skillBonusFor(s.name, resolved, s.specialization).total,
-      skillLevels.get(s.id) ?? null,
-    ),
-  );
+  let skillsOut = [...skills, ...virtualRacialSkills].map((s) => {
+    const virtual = virtualRacialSkills.some((row) => row.id === s.id);
+    const training = racial.skills
+      .filter((row) => raceSkillMatches(s, row))
+      .reduce((sum, row) => sum + row.points, 0);
+    return {
+      ...buildSkillOut(
+        { ...s, points: virtual ? 0 : s.points },
+        derived,
+        skillBonusFor(s.name, resolved, s.specialization).total,
+        skillLevels.get(s.id) ?? null,
+      ),
+      ...(training ? { racialTrainingPoints: training } : {}),
+      ...(virtual ? { raceGranted: true } : {}),
+    };
+  });
   skillsOut = skillsOut.map((skill) => {
     const source = defaultableSkills.find((row) => row.id === skill.id);
     const messages = unresolvedDefaultConditionMessages(
@@ -671,9 +762,12 @@ export function buildCharacterDetail(
             candidate.effectiveLevel == null
               ? null
               : candidate.effectiveLevel - attributeLevelFor(candidate.attribute, derived),
-          points: candidate.points,
+          points: candidate.points + (candidate.racialTrainingPoints ?? 0),
         })),
-      traits: traitsOut.map((trait) => ({ name: trait.name, level: trait.level })),
+      traits: [...traitsOut, ...racial.traits].map((trait) => ({
+        name: trait.name,
+        level: trait.level,
+      })),
       attributes: {
         ST: derived.effectiveSt,
         DX: derived.effectiveDx,
@@ -695,7 +789,9 @@ export function buildCharacterDetail(
       prerequisiteMessages: failedPrerequisiteMessages(evaluation),
     };
   });
-  const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
+  const magery = mageryLevel(
+    [...traits, ...racial.traits].map((t) => ({ name: t.name, level: t.level })),
+  );
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
   const techLevel: number | null = campaign?.techLevel ?? null;
   // A character in a campaign whose row we don't have yet (client-side,
@@ -737,7 +833,8 @@ export function buildCharacterDetail(
     for (const [key, value] of Object.entries(campaign?.houseRules ?? {}))
       if (['string', 'boolean', 'number'].includes(typeof value))
         context[`campaign:${key}`] = value as string | number | boolean;
-    for (const trait of traits) context[`trait:${trait.name}`] = trait.level ?? 1;
+    for (const trait of [...traits, ...racial.traits])
+      context[`trait:${trait.name}`] = trait.level ?? 1;
     for (const skill of skillsOut)
       if (skill.effectiveLevel !== null)
         context[`skill:${skill.name}${skill.specialization ? `/${skill.specialization}` : ''}`] =
@@ -747,7 +844,7 @@ export function buildCharacterDetail(
       if (!rules) continue;
       const ownContext = {
         ...context,
-        'character:points': skill.points,
+        'character:points': skill.points + (skill.racialTrainingPoints ?? 0),
         ...(skill.techLevel == null ? {} : { 'tech_level:learned': skill.techLevel }),
       };
       const base = evaluateModifiers(
@@ -835,10 +932,12 @@ export function buildCharacterDetail(
         Object.entries(procedureAttributes).map(([k, v]) => [`character:${k}`, v]),
       ),
       ...Object.fromEntries(Object.entries(procedureSkills).map(([k, v]) => [`skill:${k}`, v])),
-      ...Object.fromEntries(traits.map((t) => [`trait:${t.name}`, t.level ?? 1])),
+      ...Object.fromEntries(
+        [...traits, ...racial.traits].map((t) => [`trait:${t.name}`, t.level ?? 1]),
+      ),
       ...(campaign?.techLevel == null ? {} : { 'tech_level:campaign': campaign.techLevel }),
       ...(s.techLevel == null ? {} : { 'tech_level:learned': s.techLevel }),
-      'character:points': s.points,
+      'character:points': s.points + (s.racialTrainingPoints ?? 0),
     },
     actionTargets: Object.fromEntries(
       (s.procedures?.actions ?? []).map((action) => [
@@ -918,6 +1017,18 @@ export function buildCharacterDetail(
     speedQuarterMod: character.speedQuarterMod,
     moveMod: character.moveMod,
     tempEffects: character.tempEffects ?? [],
+    race: character.race ?? structuredClone(HUMAN_RACE),
+    racialSkills: racial.skills.map((skill) => {
+      const held = defaultableSkills.find((row) => raceSkillMatches(row, skill));
+      const level = held ? (skillLevels.get(held.id) ?? null) : null;
+      return {
+        ...skill,
+        effectiveLevel:
+          level == null
+            ? null
+            : level + skillBonusFor(skill.name, resolved, skill.specialization).total,
+      };
+    }),
     activeEffects: character.activeEffects ?? [],
     capabilities: activeResolution.capabilities,
     dismissedWarnings: character.dismissedWarnings,

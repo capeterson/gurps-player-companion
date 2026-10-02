@@ -1,7 +1,11 @@
 import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SPELL_DIFFICULTIES, type SpellDifficulty } from '../../../../shared/constants/skills.ts';
-import { characterCanCast, hasMagery } from '../../../../shared/domain/spellCalc.ts';
+import {
+  characterCanCast,
+  characterMagicTraits,
+  hasMagery,
+} from '../../../../shared/domain/spellCalc.ts';
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { type SpellOut, spellCreate } from '../../../../shared/schemas/spell.ts';
@@ -749,7 +753,7 @@ function SpellsTable({
   useEffect(() => {
     setPendingRoll((pending) => (pending?.context === rollContext ? pending : null));
   }, [rollContext]);
-  const characterHasMagery = hasMagery(character.traits);
+  const characterHasMagery = hasMagery(characterMagicTraits(character));
   const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
   const castable = characterCanCast(character);
   const reference = character.spells.find((spell) => spell.id === referenceId);

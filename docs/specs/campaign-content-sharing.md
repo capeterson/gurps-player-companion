@@ -372,12 +372,12 @@ campaign's past-encounter list with an on-page final-round summary.
 
 ## The campaign library
 
-A per-campaign catalog of reusable content, backed by eleven tables:
+A per-campaign catalog of reusable content, backed by twelve tables:
 `campaign_library_traits`, `campaign_library_skills`,
 `campaign_library_spells`, `campaign_library_items`,
 `campaign_library_languages`, `campaign_library_techniques`,
 `campaign_library_styles`, `campaign_library_enchantments`,
-`campaign_library_active_effects`, `campaign_library_sources`, and
+`campaign_library_active_effects`, `campaign_library_races`, `campaign_library_sources`, and
 `campaign_library_modifiers`. It's what lets a GM define campaign-specific
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
@@ -418,7 +418,7 @@ seeds the character row's written fluency to `n/a`.
   doors share one service layer (`createLibraryEntry` / `updateLibraryEntry` /
   `deleteLibraryEntry`). The PWA editor always uses the outbox, with whole-entry
   patches, so the owner can edit offline; see offline-sync.md "Campaign
-  library". All eleven categories have dedicated editor forms. Languages and
+  library". All twelve categories have dedicated editor forms. Languages and
   techniques are consumed on the character sheet; styles describe their component
   skills, perks and techniques without creating a separate character style row.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor),
@@ -529,7 +529,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   or unknown keys at the document, library, entity, and nested JSON-object
   levels; `emitLibraryYaml` produces **byte-stable** output via canonical
   sorting, key ordering, and field compaction, so import → export → diff yields
-  the same bytes. `LIBRARY_YAML_VERSION = 14`; max payload 20 MB. v1
+  the same bytes. `LIBRARY_YAML_VERSION = 15`; max payload 20 MB. v1
   (pre-effects), v2 (effects on traits/skills), v3 (container/powerstone/
   magic-item item fields + `campaign.manaLevel`), and v4 (languages +
   techniques/styles sections) documents still parse — the
@@ -544,7 +544,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   per-catalog-option rule overrides. The
   parser unions on the literal `version` field and newer fields default/absent
   on older docs. v14 adds per-entry `restricted` and optional explicit
-  `scope: { kind: sources, sourceKeys: [...] }` for sourcebook packages.
+  `scope: { kind: sources, sourceKeys: [...] }` for sourcebook packages. v15 adds optional racial templates, variants/forms, and lenses.
 - **Item fields (v3):** library items carry the same container/powerstone/
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
@@ -595,7 +595,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   therefore leave the target campaign's current setting unchanged on import.
 - **Export** (`GET /campaigns/{id}/library/export`): any member; streams a YAML
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
-  campaign settings, and all eleven library sections are read on one read-only
+  campaign settings, and all twelve library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
   document assembled from different database moments. `?sourceKeys=` accepts a
   URL-encoded JSON array of source keys and selects
@@ -652,7 +652,7 @@ Names are display labels and duplicate names can coexist under distinct canonica
 keys or editions. Sources use their own canonical key. The final source/reference
 graph is validated before import writes, including entries retained by omitted
 sections. Source and modifier sections follow the omission-versus-empty replace
-rule. Export is canonical YAML v14; v1–v13 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 and later require structured Range objects.
+rule. Export is canonical YAML v15; v1–v14 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 and later require structured Range objects.
 
 See [library-calculation-rules.md](library-calculation-rules.md) for standalone
 modifiers, completeness/adoption gates, calculation rules, explicit character
@@ -830,3 +830,7 @@ Minimal viewers receive 403. The focused campaign-skill read
 requires campaign membership and a matching campaign ID; restricted definitions
 are owner-only and otherwise return 404. Both use the canonical read handlers,
 with no browser-side mirror or direct HTTP calls in the embedded MCP card.
+
+## Racial templates
+
+YAML v15 adds optional `library.races`, including templates, variants, forms and lenses. Omission in an older replace import preserves the race catalog. Source-scoped packages and owner restrictions apply to races. Minimal character views expose raceName only, never owned racial mechanics. See [races.md](races.md).

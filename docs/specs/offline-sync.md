@@ -39,6 +39,7 @@ campaign_library_trait  campaign_library_skill  campaign_library_spell
 campaign_library_item  campaign_library_language  campaign_library_technique
 campaign_library_style  campaign_library_enchantment
 campaign_library_active_effect  campaign_library_source  campaign_library_modifier
+campaign_library_race
 ```
 
 Everything else is either read-only in the local store or fully online:
@@ -535,7 +536,7 @@ are reads. No time-only grouping or new write path is introduced.
 Each current subject title includes its captured name and links to the actual local
 entity when it still exists and access permits. Character traits, skills, spells,
 and inventory use their supported sheet anchors; languages, techniques, and combat
-link to the parent sheet. All eleven library categories use the library's
+link to the parent sheet. All twelve library categories use the library's
 `?section=&open=` routes. Deleted subjects remain readable without dead links.
 Names are captured before truncation/compression, and are scrubbed with the values
 when character/campaign access is revoked. Reserved protocol classes are explicitly
@@ -955,7 +956,7 @@ orchestrator test files are the working references.
 
 ## Campaign library
 
-All eleven library classes are sync-backed (Dexie v12 stores
+All twelve library classes are sync-backed (races use Dexie v16; other categories use v11/v12 stores
 `campaignLibrary*`, indexed by `campaignId`). Reads are local-first for every
 campaign member: `/sync/cursor` emits each row's REST projection plus `revision`
 for campaigns in the viewer's accessible set, and migration 0051 adds
@@ -1074,3 +1075,7 @@ only after attachment acknowledgement. Logout/resync abort media work before
 purging both account stores; public image caches deliberately survive. The sync
 log provides an explicit source export separate from shareable debug data. Full
 lifecycle, access and cache semantics are in [media-uploads.md](media-uploads.md).
+
+## Racial templates
+
+`campaign_library_race` and Dexie v16 `campaignLibraryRaces` use the same cursor/outbox/whole-entry path as other library definitions. Character race is one root `race` patch. Race/campaign patches preserve enqueue order across one another, and race selections depend on speculative race/lens writes. Cursor and minimal-view sweeps validate/scrub the owned snapshot while retaining public raceName. See [races.md](races.md).

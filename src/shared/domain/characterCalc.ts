@@ -200,6 +200,7 @@ export function computeDerived(attrs: CharacterAttrs): DerivedStats {
 }
 
 export interface PointBreakdown {
+  readonly race?: number;
   readonly attributes: number;
   readonly secondary: number;
   readonly advantages: number;
@@ -254,6 +255,7 @@ export function computePointBreakdown(
   techniques: readonly CharacterTechniqueInput[] = [],
   spells: readonly CharacterSpellInput[] = [],
   campaignPointTarget: number | null = null,
+  racePoints = 0,
 ): PointBreakdown {
   const attributes = computeAttributePoints(attrs);
   const secondary = computeSecondaryPoints(attrs);
@@ -285,9 +287,11 @@ export function computePointBreakdown(
     languagePoints +
     skillPoints +
     spellPoints +
-    techniquePoints;
+    techniquePoints +
+    racePoints;
 
   return {
+    ...(racePoints ? { race: racePoints } : {}),
     attributes,
     secondary,
     advantages,

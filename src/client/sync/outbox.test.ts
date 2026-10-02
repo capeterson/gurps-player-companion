@@ -1,3 +1,4 @@
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 /**
  * Outbox semantics: the "latest patch wins per (entityId, fieldPath)"
  * rule from AGENTS.md, plus the parallel-different-fields case.
@@ -1901,5 +1902,58 @@ describe('backoffMs', () => {
     const ms = backoffMs(MAX_ATTEMPTS + 5);
     expect(ms).toBeGreaterThanOrEqual(300_000);
     expect(ms).toBeLessThanOrEqual(301_000);
+  });
+});
+
+describe('race adoption campaign ordering', () => {
+  it('waits for a race choice before moving away and preserves intervening choices during coalescing', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    const patch = (fieldPath: string, attemptedValue: unknown) =>
+      enqueueFieldPatch({ entityClass: 'character', entityId: CHAR_ID, fieldPath, attemptedValue });
+    const campaignA = '0193b3c0-f1f0-7000-8000-00000000ca01';
+    const campaignB = '0193b3c0-f1f0-7000-8000-00000000ca02';
+    await patch('campaignId', campaignA);
+    await patch('race', HUMAN_RACE);
+    await patch('campaignId', campaignB);
+    const queued = await db.outbox.toArray();
+    expect(queued).toHaveLength(3);
+    let ready = await readDrainableOps(20);
+    expect(ready).toHaveLength(1);
+    const firstReady = ready[0];
+    if (!firstReady) throw new Error('expected campaign A patch');
+    expect(firstReady.attemptedValue).toBe(campaignA);
+    await db.outbox.delete(firstReady.clientOpId);
+    ready = await readDrainableOps(20);
+    expect(ready.map((op) => op.fieldPath)).toEqual(['race']);
+    const secondReady = ready[0];
+    if (!secondReady) throw new Error('expected race patch');
+    await db.outbox.delete(secondReady.clientOpId);
+    ready = await readDrainableOps(20);
+    expect(ready).toHaveLength(1);
+    expect(ready[0]?.attemptedValue).toBe(campaignB);
+  });
+
+  it('holds a root race patch until its speculative library race is acknowledged', async () => {
+    await seedCharacter();
+    const raceId = '0193b3c0-f1f0-7000-8000-00000000ca03';
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000ca01';
+    await enqueueCreate({
+      entityClass: 'campaign_library_race',
+      entityId: raceId,
+      campaignId,
+      attemptedValue: { name: 'Stonekin' },
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'race',
+      attemptedValue: { ...HUMAN_RACE, selection: { ...HUMAN_RACE.selection, raceId } },
+    });
+    const racePatch = (await getLocalDb().outbox.toArray()).find((op) => op.fieldPath === 'race');
+    expect(racePatch?.prevValue).toEqual(HUMAN_RACE);
+    expect((await readDrainableOps(20)).map((op) => op.entityClass)).toEqual([
+      'campaign_library_race',
+    ]);
   });
 });

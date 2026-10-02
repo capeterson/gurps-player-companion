@@ -578,7 +578,8 @@ function SkillRow({
     techLevelField.isSaving;
   const hasConfiguredRules = Boolean(skill.libraryMechanics || skill.procedures);
   const hasAdvancedDetails = hasConfiguredRules || skill.techLevel != null;
-  const canExpand = canWrite || Boolean(skill.notes) || hasConfiguredRules;
+  const canExpand =
+    canWrite || Boolean(skill.notes) || hasConfiguredRules || skill.raceGranted === true;
 
   const deletion = useConfirmedEntityDelete({
     entityClass: 'character_skill',
@@ -645,13 +646,18 @@ function SkillRow({
             {skill.attribute}/{skill.difficulty}
           </span>
         </td>
-        <td className="num w-11 text-right text-xs text-base-content/70 sm:w-14">{skill.points}</td>
+        <td className="num w-11 text-right text-xs text-base-content/70 sm:w-14">
+          {!skill.raceGranted && skill.points}
+          {((skill.racialTrainingPoints ?? 0) > 0 || skill.raceGranted) && (
+            <span className="block text-[10px]">{skill.racialTrainingPoints ?? 0} race</span>
+          )}
+        </td>
         <td className="w-12 text-right sm:w-16">
           <RollLevelChip
             level={skill.effectiveLevel ?? skill.level}
             name={displayName}
             title={
-              skill.points <= 0
+              skill.points + (skill.racialTrainingPoints ?? 0) <= 0
                 ? skill.defaults == null
                   ? 'Defaults unknown — add the skill definition'
                   : skill.defaults.length === 0
@@ -750,7 +756,9 @@ function SkillRow({
                     </select>
                   </fieldset>
                   <fieldset className="fieldset min-w-0 p-0">
-                    <legend className="fieldset-legend text-xs">Points</legend>
+                    <legend className="fieldset-legend text-xs">
+                      {skill.racialTrainingPoints ? 'Personal points' : 'Points'}
+                    </legend>
                     <input
                       aria-label={`${displayName} points`}
                       className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
@@ -812,6 +820,9 @@ function SkillRow({
               </div>
             ) : (
               <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
+                {skill.raceGranted && (
+                  <p>Included in your race. Change this purchase through Race in Overview.</p>
+                )}
                 {skill.notes && <Markdown source={skill.notes} />}
                 {hasConfiguredRules && (
                   <SkillConfiguredDetails skill={skill} displayName={displayName} onRoll={onRoll} />
@@ -1015,7 +1026,7 @@ function SkillsTable({
                     key={skill.id}
                     characterId={character.id}
                     skill={skill}
-                    canWrite={canWrite}
+                    canWrite={canWrite && !skill.raceGranted}
                     expanded={expandedId === skill.id}
                     position={position}
                     dragging={draggingId === skill.id}
