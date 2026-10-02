@@ -1,4 +1,6 @@
+import { raceName } from '../../../shared/domain/race.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
+import type { CharacterRace } from '../../../shared/schemas/race.ts';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 
 /** Identity-only presentation shared by the limited sheet and MCP Apps. */
@@ -8,9 +10,10 @@ export function CharacterIdentityDetails({
   data: Pick<
     CharacterDetail,
     'height' | 'weight' | 'age' | 'birthdate' | 'techLevel' | 'appearance'
-  >;
+  > & { race?: CharacterRace | undefined; raceName?: string | undefined };
 }) {
   const fields = [
+    { label: 'Race', value: data.raceName ?? raceName(data.race) },
     { label: 'Height', value: data.height },
     { label: 'Weight', value: data.weight },
     { label: 'Age', value: data.age },

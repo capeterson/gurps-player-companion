@@ -1,7 +1,10 @@
+import { raceName } from '../../shared/domain/race.ts';
 import {
   activeEffectDefinitionOut,
   activeEffectsField,
 } from '../../shared/schemas/activeEffects.ts';
+import { characterRace } from '../../shared/schemas/race.ts';
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { drainOneImage, warmMediaManifests } from './mediaUploads.ts';
 import { patchKeys, patchesOverlap, unsettledPatch } from './patchKeys.ts';
 /**
@@ -1176,6 +1179,45 @@ class SyncOrchestrator {
                 );
 
                 await this.stampRevision(op.entityClass, op.entityId, newRevision);
+                const laterRace =
+                  fieldPath === 'campaignId' &&
+                  (await db.outbox
+                    .where('entityId')
+                    .equals(op.entityId)
+                    .filter(
+                      (candidate) =>
+                        candidate.entityClass === 'character' &&
+                        candidate.fieldPath === 'race' &&
+                        candidate.enqueuedAt > op.enqueuedAt &&
+                        ['pending', 'in_flight', 'transient_retry'].includes(candidate.status),
+                    )
+                    .first());
+                if (op.entityClass === 'character' && (fieldPath === 'race' || laterRace)) {
+                  // These fields form a causal sequence: adoption resolves against the
+                  // campaign at that moment. Moving a retry to the tail (or replacing it
+                  // with a later same-field edit) would cross an intervening context edit.
+                  await db.outbox.update(op.clientOpId, {
+                    baseRevision: newRevision,
+                    prevValue: entity[fieldPath],
+                    status: 'pending',
+                    deliveryUncertain: false,
+                    nextEarliestAttemptAt: undefined,
+                    localCampaignTransferUndo: transferUndo,
+                  });
+                  await appendSyncLog({
+                    direction: 'push',
+                    result: 'requeued',
+                    entityClass: op.entityClass,
+                    entityId: op.entityId,
+                    command: op.command,
+                    fieldPath,
+                    humanName: op.humanName,
+                    batchId: op.batchId,
+                    request: operationRequest(op),
+                    details: { serverReason: outcome.reason, newRevision },
+                  });
+                  return;
+                }
                 await db.outbox.delete(op.clientOpId);
                 await appendSyncLog({
                   direction: 'push',
@@ -2165,6 +2207,10 @@ class SyncOrchestrator {
     }
     switch (entityClass) {
       case 'character': {
+        if (merged.race !== undefined) merged.race = characterRace.parse(merged.race);
+        // Full rows carry the owned race, while minimal rows carry its public
+        // name. Do not retain an older masked name across full hydration.
+        if (row.race !== undefined && row.raceName === undefined) merged.raceName = undefined;
         const existing = existingRow as LocalCharacter | undefined;
         if (merged.activeEffects !== undefined)
           merged.activeEffects = activeEffectsField
@@ -2339,6 +2385,8 @@ class SyncOrchestrator {
             speedQuarterMod: 0,
             moveMod: 0,
             tempEffects: [],
+            raceName: existing.raceName ?? raceName(existing.race),
+            race: structuredClone(HUMAN_RACE),
             activeEffects: [],
             dismissedWarnings: [],
             activeConditionGroups: [],

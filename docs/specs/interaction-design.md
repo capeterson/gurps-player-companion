@@ -424,3 +424,7 @@ and rollback feedback use the standard settings patterns. `useDraftToggle`
 retains rapid same-field changes and flashes the visible checkbox with a toast
 on failure. This online account preference is outside the local-first sheet
 and library outbox.
+
+## Racial templates
+
+Race uses one control in Overview Identity and a centered bounded preview/Apply dialog. Variants, compatible lenses and alternate forms compose a single purchase; Human is the baseline. Race-only skill projections are read-only. The library authoring form uses visual component rows and shared metadata controls. See [races.md](races.md).

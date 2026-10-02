@@ -62,6 +62,7 @@ const destinations: Record<EntityClass, [string, string]> = {
     'Library source',
     '/campaigns/parent/library?section=sources&open=entity',
   ],
+  campaign_library_race: ['Library race', '/campaigns/parent/library?section=races&open=entity'],
   campaign_library_modifier: [
     'Library modifier',
     '/campaigns/parent/library?section=modifiers&open=entity',

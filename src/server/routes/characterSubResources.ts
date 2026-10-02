@@ -10,9 +10,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import type { ManaLevel } from '../../shared/constants/magic.ts';
-import { computeDerived } from '../../shared/domain/characterCalc.ts';
-import { mageryLevel } from '../../shared/domain/spellCalc.ts';
 import { characterDetail } from '../../shared/schemas/character.ts';
 import { combatStateOut, combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { uuid } from '../../shared/schemas/common.ts';
@@ -29,7 +26,7 @@ import { traitCreate, traitOut, traitUpdate } from '../../shared/schemas/trait.t
 import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
-import { getDb } from '../db/client.ts';
+import type { getDb } from '../db/client.ts';
 import {
   characterLanguages,
   characterSkills,
@@ -40,7 +37,6 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
-import { campaigns as campaignsTable } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
   LIBRARY_LINKED_CHILDREN,
@@ -52,10 +48,8 @@ import {
   buildCombatStateOut,
   buildLanguageOut,
   buildSkillOut,
-  buildSpellOut,
   buildTechniqueOut,
   buildTraitOut,
-  characterAttrsFromRow,
   loadCharacterDetail,
 } from '../services/characterSummary.ts';
 import { combatUpsertValues, inventoryInsertValues } from '../services/entityWrites.ts';
@@ -67,26 +61,6 @@ import { buildPatchSet } from '../services/patchSet.ts';
 
 const router = createOpenApiApp();
 router.use('/characters/*', requireActiveUser);
-
-/**
- * Ambient mana for a character's campaign; campaignless = normal.
- *
- * This is a lighter-weight, standalone query rather than reading
- * `manaLevel` off a `loadCharacterDetail` result: both spell handlers
- * that call it need the mana level *before* the post-write detail
- * refresh happens (they build the `spellOut` response from it, then
- * separately call `loadCharacterDetail` afterward to pick up the
- * just-created/updated spell). Reusing the detail load here would mean
- * loading it twice anyway, so there's nothing to consolidate.
- */
-async function manaLevelFor(campaignId: string | null): Promise<ManaLevel> {
-  if (!campaignId) return 'normal';
-  const [row] = await getDb()
-    .select({ manaLevel: campaignsTable.manaLevel })
-    .from(campaignsTable)
-    .where(eq(campaignsTable.id, campaignId));
-  return row?.manaLevel ?? 'normal';
-}
 
 /** Shared write gate for REST character subresources. */
 async function loadWritableCharacter(id: string, userId: string) {
@@ -367,25 +341,14 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadWritableCharacter(id, user.id);
-    const db = getDb();
+    await loadWritableCharacter(id, user.id);
     const created = await withAudit(user.id, undefined, (tx) =>
       insertCharacterChild(tx, user.id, LIBRARY_LINKED_CHILDREN.character_spell, id, body),
     );
-    const derived = computeDerived(characterAttrsFromRow(access.character));
-    const traits = await db
-      .select()
-      .from(characterTraits)
-      .where(eq(characterTraits.characterId, id));
-    const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
-    const mana = await manaLevelFor(access.character.campaignId);
-    return c.json(
-      {
-        spell: buildSpellOut(created, derived.effectiveIq, magery, mana),
-        character: await loadCharacterDetail(id),
-      },
-      201,
-    );
+    const character = await loadCharacterDetail(id);
+    const spell = character.spells.find((spell) => spell.id === created.id);
+    if (!spell) throw new HTTPException(500, { message: 'created spell missing from detail' });
+    return c.json({ spell, character }, 201);
   },
 );
 
@@ -418,8 +381,7 @@ router.openapi(
     const user = c.get('user');
     const { id, spellId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadWritableCharacter(id, user.id);
-    const db = getDb();
+    await loadWritableCharacter(id, user.id);
     const updates = buildPatchSet(body);
     const updated = await withAudit(user.id, undefined, (tx) =>
       updateCharacterChild(
@@ -432,20 +394,10 @@ router.openapi(
       ),
     );
     if (!updated) throw new HTTPException(404, { message: 'spell not found' });
-    const derived = computeDerived(characterAttrsFromRow(access.character));
-    const traits = await db
-      .select()
-      .from(characterTraits)
-      .where(eq(characterTraits.characterId, id));
-    const magery = mageryLevel(traits.map((t) => ({ name: t.name, level: t.level })));
-    const mana = await manaLevelFor(access.character.campaignId);
-    return c.json(
-      {
-        spell: buildSpellOut(updated, derived.effectiveIq, magery, mana),
-        character: await loadCharacterDetail(id),
-      },
-      200,
-    );
+    const character = await loadCharacterDetail(id);
+    const spell = character.spells.find((spell) => spell.id === updated.id);
+    if (!spell) throw new HTTPException(500, { message: 'updated spell missing from detail' });
+    return c.json({ spell, character }, 200);
   },
 );
 
@@ -1010,13 +962,13 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const access = await loadWritableCharacter(id, user.id);
+    await loadWritableCharacter(id, user.id);
 
     // Atomic upsert keyed on the unique (character_id) index. Doing this
     // as a single statement is essential: the previous select-then-insert
     // sequence let two parallel first-time edits both observe `!existing`
     // and then collide on the unique constraint, rolling one save back.
-    const derived = computeDerived(characterAttrsFromRow(access.character));
+    const { derived } = await loadCharacterDetail(id);
     const setOnUpdate = buildPatchSet(body);
     const [row] = await withAudit(user.id, undefined, async (tx) =>
       tx

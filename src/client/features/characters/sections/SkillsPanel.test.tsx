@@ -592,3 +592,18 @@ describe('SkillsPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Roll Stealth' })).toBeInTheDocument();
   });
 });
+
+it('shows racial skills as rollable race purchases without personal editing controls', () => {
+  renderPanel(
+    makeCharacter([makeSkill({ raceGranted: true, racialTrainingPoints: 2, points: 0 })]),
+    true,
+  );
+  expect(screen.getByText('2 race')).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Edit Broadsword' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View Broadsword' }));
+  expect(
+    screen.getByText('Included in your race. Change this purchase through Race in Overview.'),
+  ).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Delete skill' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Broadsword points' })).not.toBeInTheDocument();
+});

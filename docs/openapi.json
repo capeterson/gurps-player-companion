@@ -3323,6 +3323,1118 @@
           "updatedAt"
         ]
       },
+      "RaceAttributeModifiers": {
+        "type": "object",
+        "properties": {
+          "st": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "dx": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "iq": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "ht": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "hp": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "will": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "per": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "fp": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "speedQuarter": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "move": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          },
+          "sizeModifier": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        },
+        "default": {},
+        "additionalProperties": false
+      },
+      "RacialTrait": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "advantage",
+              "disadvantage",
+              "perk",
+              "quirk",
+              "language",
+              "cultural_familiarity"
+            ],
+            "default": "advantage"
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000
+          },
+          "level": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 1000,
+            "default": null
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "default": null
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "RacialSkill": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "attribute": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "ST",
+              "DX",
+              "IQ",
+              "HT",
+              "Will",
+              "Per",
+              "Other"
+            ],
+            "default": null
+          },
+          "difficulty": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "E",
+              "A",
+              "H",
+              "VH"
+            ],
+            "default": null
+          },
+          "specialization": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160,
+            "default": null
+          },
+          "techLevel": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 12,
+            "default": null
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "default": null
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "RaceOption": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "default": null
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "LibraryRaceOut": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceLocator": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 240
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "needs_review",
+              "reference_only"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "definition",
+              "template",
+              "example",
+              "reference"
+            ]
+          },
+          "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
+            "type": "boolean"
+          },
+          "extraction": {
+            "$ref": "#/components/schemas/LibraryExtractionRecord"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20000
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 160
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "race",
+              "lens"
+            ],
+            "default": "race"
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "compatibleRaceKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesTraits": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesSkills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "name",
+          "id",
+          "campaignId",
+          "revision",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "LibrarySkillDetail": {
         "type": "object",
         "properties": {
@@ -4785,6 +5897,1552 @@
             "$ref": "#/components/schemas/ActiveEffectStacking"
           }
         }
+      },
+      "LibraryRaceCreate": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceLocator": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 240
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "needs_review",
+              "reference_only"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "definition",
+              "template",
+              "example",
+              "reference"
+            ]
+          },
+          "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
+            "type": "boolean"
+          },
+          "extraction": {
+            "$ref": "#/components/schemas/LibraryExtractionRecord"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20000
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 160
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "race",
+              "lens"
+            ],
+            "default": "race"
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "compatibleRaceKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesTraits": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesSkills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 100,
+            "default": []
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "LibraryRaceUpdate": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceLocator": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 240
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "needs_review",
+              "reference_only"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "definition",
+              "template",
+              "example",
+              "reference"
+            ]
+          },
+          "preferredEdition": {
+            "type": "boolean"
+          },
+          "restricted": {
+            "type": "boolean"
+          },
+          "extraction": {
+            "$ref": "#/components/schemas/LibraryExtractionRecord"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20000
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 160
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "race",
+              "lens"
+            ],
+            "default": "race"
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceOption"
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "compatibleRaceKeys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesTraits": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "removesSkills": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 100,
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "OwnedRacialSkill": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "attribute": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "ST",
+              "DX",
+              "IQ",
+              "HT",
+              "Will",
+              "Per",
+              "Other"
+            ],
+            "default": null
+          },
+          "difficulty": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "E",
+              "A",
+              "H",
+              "VH"
+            ],
+            "default": null
+          },
+          "specialization": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160,
+            "default": null
+          },
+          "techLevel": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 12,
+            "default": null
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 4000,
+            "default": null
+          },
+          "effectiveLevel": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "points",
+          "effectiveLevel"
+        ],
+        "additionalProperties": false
+      },
+      "RaceSelection": {
+        "type": "object",
+        "properties": {
+          "raceId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "default": null
+          },
+          "variantKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160,
+            "default": null
+          },
+          "lensIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "maxItems": 10,
+            "default": []
+          },
+          "formKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160,
+            "default": null
+          }
+        },
+        "default": {},
+        "additionalProperties": false
+      },
+      "RaceSourceSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "sourceKey": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 160
+          },
+          "sourceLocator": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "revision",
+          "key",
+          "sourceKey",
+          "name",
+          "source",
+          "sourceLocator"
+        ],
+        "additionalProperties": false
+      },
+      "OwnedRaceForm": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20000,
+            "default": null
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "OwnedRaceSnapshot": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 20000
+          },
+          "points": {
+            "type": "integer",
+            "minimum": -5000,
+            "maximum": 10000,
+            "default": 0
+          },
+          "attributeModifiers": {
+            "$ref": "#/components/schemas/RaceAttributeModifiers"
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialTrait"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RacialSkill"
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "maxItems": 100,
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "enum": [
+                    "st",
+                    "dx",
+                    "iq",
+                    "ht",
+                    "hp",
+                    "fp",
+                    "will",
+                    "per",
+                    "basic_speed",
+                    "basic_move",
+                    "dodge",
+                    "parry",
+                    "block",
+                    "dr",
+                    "fright_check",
+                    "skill",
+                    "damage_thrust",
+                    "damage_swing",
+                    "weapon_attack",
+                    "weapon_parry",
+                    "weapon_block",
+                    "weapon_damage",
+                    "weapon_accuracy"
+                  ],
+                  "description": "Mechanical destination. weapon_* targets require weaponSelector; skill requires skillName."
+                },
+                "value": {
+                  "type": "integer",
+                  "minimum": -100,
+                  "maximum": 100,
+                  "description": "Signed integer modifier."
+                },
+                "scaling": {
+                  "type": "string",
+                  "enum": [
+                    "flat",
+                    "per_level"
+                  ],
+                  "default": "flat",
+                  "description": "flat applies once; per_level multiplies by the owning character trait level."
+                },
+                "skillName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized skill name, or '*' wildcard, for a skill target."
+                },
+                "skillSpecialty": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "description": "Exact normalized specialty, or '*' wildcard; only valid with a skill target."
+                },
+                "hitLocation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "description": "Optional exact DR hit-location scope; only valid for a DR target."
+                },
+                "weaponSelector": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "inventory_item"
+                          ]
+                        },
+                        "inventoryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "inventoryItemId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "library_item"
+                          ]
+                        },
+                        "libraryItemId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "libraryItemName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "libraryItemName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_skill"
+                          ]
+                        },
+                        "skillName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "skillSpecialty": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "skillName"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "weapon_name"
+                          ]
+                        },
+                        "weaponName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "modeName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        },
+                        "modeKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "weaponName"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Exact deterministic weapon match. inventory_item is character-owned only; portable library effects use library_item, weapon_skill, or weapon_name. modeName may be Primary or an exact alternate attack mode and is invalid for Parry/Block."
+                },
+                "conditionGroup": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40,
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "conditionLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "target",
+                "value"
+              ],
+              "additionalProperties": false,
+              "description": "Portable trait/skill library mechanic; exact character inventory IDs are forbidden."
+            },
+            "maxItems": 30,
+            "default": []
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RaceSourceSnapshot"
+            },
+            "maxItems": 11
+          },
+          "naturalForm": {
+            "$ref": "#/components/schemas/OwnedRaceForm"
+          },
+          "forms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnedRaceForm"
+            },
+            "maxItems": 30,
+            "default": []
+          }
+        },
+        "default": null,
+        "required": [
+          "name",
+          "description",
+          "sources"
+        ],
+        "additionalProperties": false
+      },
+      "CharacterRace": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "$ref": "#/components/schemas/RaceSelection"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/OwnedRaceSnapshot"
+          }
+        },
+        "additionalProperties": false
       },
       "ActiveEffectInstance": {
         "type": "object",
@@ -16183,7 +18841,8 @@
                 "techniques",
                 "styles",
                 "enchantments",
-                "activeEffects"
+                "activeEffects",
+                "races"
               ],
               "description": "Return only this library section; every other section is an empty array."
             },
@@ -18555,6 +21214,12 @@
                       "items": {
                         "$ref": "#/components/schemas/ActiveEffectDefinitionOut"
                       }
+                    },
+                    "races": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LibraryRaceOut"
+                      }
                     }
                   },
                   "required": [
@@ -18568,7 +21233,8 @@
                     "techniques",
                     "styles",
                     "enchantments",
-                    "activeEffects"
+                    "activeEffects",
+                    "races"
                   ]
                 }
               }
@@ -30423,6 +33089,243 @@
         }
       }
     },
+    "/api/v1/campaigns/{id}/library/races": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Add a library race (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryRaceCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryRaceOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/library/races/{raceId}": {
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a library race (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "raceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryRaceUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryRaceOut"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Duplicate name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "campaigns"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a library race (owner only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "raceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "400": {
+            "description": "Referenced definition cannot be deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/campaigns/{id}/library/export": {
       "get": {
         "tags": [
@@ -30830,6 +33733,28 @@
                       ]
                     },
                     "activeEffects": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    },
+                    "races": {
                       "type": "object",
                       "properties": {
                         "created": {
@@ -35357,6 +38282,9 @@
                     "maxItems": 40,
                     "default": []
                   },
+                  "race": {
+                    "$ref": "#/components/schemas/CharacterRace"
+                  },
                   "activeEffects": {
                     "$ref": "#/components/schemas/ActiveEffectsField"
                   },
@@ -35386,6 +38314,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -35610,6 +38544,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -35728,6 +38665,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -36607,6 +39547,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -38711,7 +41658,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -38960,6 +41908,16 @@
               }
             }
           },
+          "400": {
+            "description": "Selected race or form unavailable or changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -39024,6 +41982,12 @@
                     {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -39248,6 +42212,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -39366,6 +42333,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -40245,6 +43215,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -42349,7 +45326,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -42598,6 +45576,9 @@
                     {
                       "type": "object",
                       "properties": {
+                        "raceName": {
+                          "type": "string"
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -42902,6 +45883,9 @@
                     "maxItems": 40,
                     "default": []
                   },
+                  "race": {
+                    "$ref": "#/components/schemas/CharacterRace"
+                  },
                   "activeEffects": {
                     "$ref": "#/components/schemas/ActiveEffectsField"
                   },
@@ -42933,6 +45917,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -43157,6 +46147,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -43275,6 +46268,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -44154,6 +47150,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -46258,7 +49261,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -46503,6 +49507,16 @@
                     "inventory",
                     "combat"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Selected race or form unavailable or changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -48749,6 +51763,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -48973,6 +51993,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -49091,6 +52114,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -49970,6 +52996,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -52074,7 +55107,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -52399,6 +55433,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -52623,6 +55663,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -52741,6 +55784,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -53620,6 +56666,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -55724,7 +58777,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -56050,6 +59104,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -56274,6 +59334,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -56392,6 +59455,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -57271,6 +60337,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -59375,7 +62448,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -60603,6 +63677,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -60827,6 +63907,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -60945,6 +64028,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -61824,6 +64910,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -63928,7 +67021,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -65177,6 +68271,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -65401,6 +68501,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -65519,6 +68622,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -66398,6 +69504,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -68502,7 +71615,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -68827,6 +71941,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -69051,6 +72171,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -69169,6 +72292,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -70048,6 +73174,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -72152,7 +75285,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -72530,6 +75664,13 @@
                     "skill": {
                       "type": "object",
                       "properties": {
+                        "raceGranted": {
+                          "type": "boolean"
+                        },
+                        "racialTrainingPoints": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
                         "procedures": {
                           "$ref": "#/components/schemas/SkillProcedures"
                         },
@@ -73007,6 +76148,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -73231,6 +76378,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -73349,6 +76499,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -74228,6 +77381,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -76332,7 +79492,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -76730,6 +79891,13 @@
                     "skill": {
                       "type": "object",
                       "properties": {
+                        "raceGranted": {
+                          "type": "boolean"
+                        },
+                        "racialTrainingPoints": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
                         "procedures": {
                           "$ref": "#/components/schemas/SkillProcedures"
                         },
@@ -77207,6 +80375,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -77431,6 +80605,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -77549,6 +80726,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -78428,6 +81608,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -80532,7 +83719,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -80857,6 +84045,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -81081,6 +84275,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -81199,6 +84396,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -82078,6 +85278,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -84182,7 +87389,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -84673,6 +87881,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -84897,6 +88111,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -85015,6 +88232,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -85894,6 +89114,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -87998,7 +91225,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -88511,6 +91739,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -88735,6 +91969,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -88853,6 +92090,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -89732,6 +92972,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -91836,7 +95083,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -92161,6 +95409,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -92385,6 +95639,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -92503,6 +95760,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -93382,6 +96642,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -95486,7 +98753,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -95922,6 +99190,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -96146,6 +99420,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -96264,6 +99541,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -97143,6 +100423,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -99247,7 +102534,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -99705,6 +102993,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -99929,6 +103223,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -100047,6 +103344,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -100926,6 +104226,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -103030,7 +106337,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -103355,6 +106663,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -103579,6 +106893,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -103697,6 +107014,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -104576,6 +107896,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -106680,7 +110007,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -107135,6 +110463,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -107359,6 +110693,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -107477,6 +110814,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -108356,6 +111696,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -110460,7 +113807,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -110936,6 +114284,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -111160,6 +114514,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -111278,6 +114635,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -112157,6 +115517,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -114261,7 +117628,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -114586,6 +117954,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "racialSkills": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/OwnedRacialSkill"
+                      }
+                    },
                     "portraitAssetId": {
                       "type": "string",
                       "nullable": true,
@@ -114810,6 +118184,9 @@
                       "maxItems": 40,
                       "default": []
                     },
+                    "race": {
+                      "$ref": "#/components/schemas/CharacterRace"
+                    },
                     "activeEffects": {
                       "$ref": "#/components/schemas/ActiveEffectsField"
                     },
@@ -114928,6 +118305,9 @@
                     "points": {
                       "type": "object",
                       "properties": {
+                        "race": {
+                          "type": "integer"
+                        },
                         "attributes": {
                           "type": "integer"
                         },
@@ -115807,6 +119187,13 @@
                       "items": {
                         "type": "object",
                         "properties": {
+                          "raceGranted": {
+                            "type": "boolean"
+                          },
+                          "racialTrainingPoints": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "procedures": {
                             "$ref": "#/components/schemas/SkillProcedures"
                           },
@@ -117911,7 +121298,8 @@
                               "trait",
                               "skill",
                               "item",
-                              "active_effect"
+                              "active_effect",
+                              "race"
                             ]
                           },
                           "sourceName": {
@@ -120277,6 +123665,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -120501,6 +123895,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -120619,6 +124016,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -121498,6 +124898,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -123602,7 +127009,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -124034,6 +127442,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -124258,6 +127672,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -124376,6 +127793,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -125255,6 +128675,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -127359,7 +130786,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -127687,6 +131115,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -127911,6 +131345,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -128029,6 +131466,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -128908,6 +132348,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -131012,7 +134459,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -131338,6 +134786,12 @@
                     "character": {
                       "type": "object",
                       "properties": {
+                        "racialSkills": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OwnedRacialSkill"
+                          }
+                        },
                         "portraitAssetId": {
                           "type": "string",
                           "nullable": true,
@@ -131562,6 +135016,9 @@
                           "maxItems": 40,
                           "default": []
                         },
+                        "race": {
+                          "$ref": "#/components/schemas/CharacterRace"
+                        },
                         "activeEffects": {
                           "$ref": "#/components/schemas/ActiveEffectsField"
                         },
@@ -131680,6 +135137,9 @@
                         "points": {
                           "type": "object",
                           "properties": {
+                            "race": {
+                              "type": "integer"
+                            },
                             "attributes": {
                               "type": "integer"
                             },
@@ -132559,6 +136019,13 @@
                           "items": {
                             "type": "object",
                             "properties": {
+                              "raceGranted": {
+                                "type": "boolean"
+                              },
+                              "racialTrainingPoints": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
                               "procedures": {
                                 "$ref": "#/components/schemas/SkillProcedures"
                               },
@@ -134663,7 +138130,8 @@
                                   "trait",
                                   "skill",
                                   "item",
-                                  "active_effect"
+                                  "active_effect",
+                                  "race"
                                 ]
                               },
                               "sourceName": {
@@ -135050,6 +138518,7 @@
                           "campaign_library_style",
                           "campaign_library_enchantment",
                           "campaign_library_active_effect",
+                          "campaign_library_race",
                           "campaign_library_source",
                           "campaign_library_modifier",
                           "adventure_log"
@@ -135293,6 +138762,7 @@
                           "campaign_library_style",
                           "campaign_library_enchantment",
                           "campaign_library_active_effect",
+                          "campaign_library_race",
                           "campaign_library_source",
                           "campaign_library_modifier",
                           "adventure_log"
@@ -135893,6 +139363,7 @@
                             "campaign_library_style",
                             "campaign_library_enchantment",
                             "campaign_library_active_effect",
+                            "campaign_library_race",
                             "campaign_library_source",
                             "campaign_library_modifier",
                             "adventure_log"
@@ -136103,6 +139574,7 @@
                             "campaign_library_style",
                             "campaign_library_enchantment",
                             "campaign_library_active_effect",
+                            "campaign_library_race",
                             "campaign_library_source",
                             "campaign_library_modifier",
                             "adventure_log"
@@ -136167,6 +139639,7 @@
                               "campaign_library_style",
                               "campaign_library_enchantment",
                               "campaign_library_active_effect",
+                              "campaign_library_race",
                               "campaign_library_source",
                               "campaign_library_modifier",
                               "adventure_log"
@@ -136264,6 +139737,9 @@
                         "campaign_library_active_effect": {
                           "type": "boolean"
                         },
+                        "campaign_library_race": {
+                          "type": "boolean"
+                        },
                         "campaign_library_source": {
                           "type": "boolean"
                         },
@@ -136351,6 +139827,10 @@
                           "minimum": 0
                         },
                         "campaign_library_active_effect": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "campaign_library_race": {
                           "type": "integer",
                           "minimum": 0
                         },

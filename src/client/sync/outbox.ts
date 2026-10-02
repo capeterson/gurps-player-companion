@@ -1,3 +1,4 @@
+import { HUMAN_RACE, characterRace } from '../../shared/schemas/race.ts';
 import { libraryDependencyHeld } from './libraryDependencies.ts';
 import { patchesOverlap, unsettledPatch } from './patchKeys.ts';
 /**
@@ -129,6 +130,9 @@ export async function enqueueFieldPatches(
 
 async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Promise<void> {
   let args = input;
+  if (args.entityClass === 'character' && args.fieldPath === 'race') {
+    args = { ...args, attemptedValue: characterRace.parse(args.attemptedValue) };
+  }
   if (args.entityClass === 'character' && args.fieldPath === 'campaignId') {
     args = {
       ...args,
@@ -209,6 +213,8 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
       : carriedPrev
         ? carriedPrev.value
         : await readFieldValue(args);
+  if (args.entityClass === 'character' && args.fieldPath === 'race' && prev === undefined)
+    prev = structuredClone(HUMAN_RACE);
   if (
     args.entityClass === 'character' &&
     args.fieldPath === 'campaignId' &&
@@ -289,6 +295,19 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
  * applied, so it stays queued as the successor's ordered predecessor.
  * Callers must run inside the enqueue transaction.
  */
+/** Race adoption resolves against the campaign at this point in the user's edit order. */
+function raceCampaignOrder(a: OutboxEntry, b: OutboxEntry): boolean {
+  return (
+    a.entityClass === 'character' &&
+    b.entityClass === 'character' &&
+    a.entityId === b.entityId &&
+    a.command === 'patch' &&
+    b.command === 'patch' &&
+    ((a.fieldPath === 'race' && b.fieldPath === 'campaignId') ||
+      (a.fieldPath === 'campaignId' && b.fieldPath === 'race'))
+  );
+}
+
 async function coalesceSameKeyOps(dupes: readonly OutboxEntry[]): Promise<{
   coalescable: OutboxEntry[];
   carriedPrev: { value: unknown } | undefined;
@@ -302,7 +321,7 @@ async function coalesceSameKeyOps(dupes: readonly OutboxEntry[]): Promise<{
           (other) =>
             other.fieldPath !== d.fieldPath &&
             other.enqueuedAt > d.enqueuedAt &&
-            patchesOverlap(d, other),
+            (patchesOverlap(d, other) || raceCampaignOrder(d, other)),
         ),
       )
       .map((d) => d.clientOpId),
@@ -856,15 +875,21 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
           patchesOverlap(previous, op),
       );
     let libraryCampaignId = isLibraryEntityClass(op.entityClass) ? op.parentId : undefined;
-    if (libraryWrites.length && !isLibraryEntityClass(op.entityClass) && op.parentId) {
-      if (!campaignsByCharacter.has(op.parentId))
+    const libraryCharacterId = op.entityClass === 'character' ? op.entityId : op.parentId;
+    if (libraryWrites.length && !isLibraryEntityClass(op.entityClass) && libraryCharacterId) {
+      if (!campaignsByCharacter.has(libraryCharacterId))
         campaignsByCharacter.set(
-          op.parentId,
-          (await db.characters.get(op.parentId))?.campaignId ?? undefined,
+          libraryCharacterId,
+          (await db.characters.get(libraryCharacterId))?.campaignId ?? undefined,
         );
-      libraryCampaignId = op.localRequiredCampaignId ?? campaignsByCharacter.get(op.parentId);
+      libraryCampaignId =
+        op.localRequiredCampaignId ?? campaignsByCharacter.get(libraryCharacterId);
     }
+    const earlierRaceCampaignPatch = unsettled.some(
+      (previous) => previous.enqueuedAt < op.enqueuedAt && raceCampaignOrder(previous, op),
+    );
     const dependencyHeld =
+      earlierRaceCampaignPatch ||
       Boolean(op.localMediaUploadId && !op.localMediaReady) ||
       (libraryWrites.length > 0 && libraryDependencyHeld(op, libraryWrites, libraryCampaignId)) ||
       mixedPatchHeld ||

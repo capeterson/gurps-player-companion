@@ -250,6 +250,11 @@ function summarizeCharacter(
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
   const c = changes[0] as FieldChange;
+  if (c.field === 'race') {
+    const display = (value: unknown) =>
+      (value as { snapshot?: { name?: string } } | null)?.snapshot?.name ?? 'Human';
+    return `Race: ${display(c.oldValue)} → ${display(c.newValue)}`;
+  }
   if (c.field === 'portraitAssetId') return c.newValue ? 'Portrait updated' : 'Portrait removed';
   if (c.field === 'activeEffects') {
     const before = (c.oldValue ?? []) as Array<{ id: string; name: string; state: string }>;
@@ -676,6 +681,12 @@ const EVENT_SUMMARIZERS = {
   campaign_library_language: summarizeLibraryLanguage,
   campaign_library_technique: summarizeLibraryTechnique,
   campaign_library_style: summarizeLibraryStyle,
+  campaign_library_race: (op, oldRow, newRow) =>
+    op === 'insert'
+      ? `Added library race ${newRow?.name}`
+      : op === 'delete'
+        ? `Removed library race ${oldRow?.name}`
+        : describeFieldChanges('Library race', diffRows(oldRow, newRow)),
   campaign_library_active_effect: (op, oldRow, newRow) =>
     op === 'insert'
       ? `Added active effect definition ${newRow?.name}`

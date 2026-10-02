@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { and, desc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { selectInventoryItemDetail } from '../../shared/domain/inventoryDetails.ts';
+import { raceName } from '../../shared/domain/race.ts';
 import {
   type CharacterMinimalOut,
   characterCreate,
@@ -29,6 +30,7 @@ import { characterInsertValues } from '../services/entityWrites.ts';
 import { prepareMediaAttachment } from '../services/media/service.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
+import { prepareRace } from '../services/races.ts';
 import { decideCharacterAccess } from './sync.ts';
 
 const router = createOpenApiApp();
@@ -54,6 +56,7 @@ async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
   }
   return {
     view: 'minimal',
+    raceName: raceName(c.race),
     id: c.id,
     ownerId: c.ownerId,
     campaignId: c.campaignId,
@@ -187,6 +190,7 @@ router.openapi(
         content: { 'application/json': { schema: characterDetail } },
       },
       401: errorResponse('Unauthorized'),
+      400: errorResponse('Selected race or form unavailable or changed'),
       403: errorResponse('Campaign access forbidden or active effects disabled'),
       422: errorResponse('Validation error'),
     },
@@ -202,6 +206,7 @@ router.openapi(
     }
     assertAttributeCaps(enforceAttributeCaps, body);
     const [created] = await withAudit(user.id, undefined, async (tx) => {
+      await prepareRace(tx, user.id, null, body.campaignId ?? null, body);
       await prepareActiveEffects(tx, user.id, null, body.campaignId ?? null, body);
       return tx
         .insert(characters)
@@ -288,6 +293,7 @@ router.openapi(
       200: { description: 'Updated', content: { 'application/json': { schema: characterDetail } } },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
+      400: errorResponse('Selected race or form unavailable or changed'),
       422: errorResponse('Attribute cap violation'),
     },
   }),
@@ -316,6 +322,13 @@ router.openapi(
         .from(characters)
         .where(eq(characters.id, id))
         .for('update');
+      await prepareRace(
+        tx,
+        user.id,
+        id,
+        body.campaignId === undefined ? access.character.campaignId : body.campaignId,
+        updates,
+      );
       await prepareActiveEffects(
         tx,
         user.id,

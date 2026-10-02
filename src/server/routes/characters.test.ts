@@ -19,6 +19,7 @@ import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import type { TraitEffect } from '../../shared/schemas/effects.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
+import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { LIBRARY_ENTITY_CLASSES } from '../../shared/schemas/sync.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
 import { createApp } from '../app.ts';
@@ -1379,6 +1380,86 @@ describe('GET /api/v1/characters/{id} — access matrix', () => {
     expect(body).not.toHaveProperty('traits');
     expect(body).not.toHaveProperty('warnings');
     expect(body).not.toHaveProperty('dismissedWarnings');
+  });
+
+  it('masks an owned race snapshot from minimal detail and cursor surfaces', async () => {
+    const gm = await registerUser('race-mask-gm');
+    const owner = await registerUser('race-mask-owner');
+    const viewer = await registerUser('race-mask-viewer');
+    const campaign = await createCampaign(gm.accessToken, { shareCharacterSheets: false });
+    await addMember(gm.accessToken, campaign.id as string, owner.email);
+    await addMember(gm.accessToken, campaign.id as string, viewer.email);
+    const character = await createCharacter(owner.accessToken, {
+      name: 'Centaur Profile',
+      campaignId: campaign.id,
+      st: 17,
+    });
+    const raceResponse = await app.request(`/api/v1/campaigns/${campaign.id}/library/races`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({
+        key: `private-centaur-${crypto.randomUUID()}`,
+        sourceLocator: 'synthetic share-gate fixture',
+        status: 'complete',
+        role: 'definition',
+        name: 'Private Centaur',
+        kind: 'race',
+        points: 80,
+        attributeModifiers: { st: 3 },
+        traits: [{ key: 'private-trait', name: 'Private Advantage', points: 20 }],
+      }),
+    });
+    expect(raceResponse.status, await raceResponse.clone().text()).toBe(201);
+    const race = (await raceResponse.json()) as { id: string };
+    const applied = await app.request(`/api/v1/characters/${character.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        race: {
+          selection: { raceId: race.id, variantKey: null, lensIds: [], formKey: null },
+          snapshot: null,
+        },
+      }),
+    });
+    expect(applied.status, await applied.clone().text()).toBe(200);
+
+    const detailResponse = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: bearer(viewer.accessToken),
+    });
+    expect(detailResponse.status).toBe(200);
+    const detail = (await detailResponse.json()) as Record<string, unknown>;
+    expect(detail.view).toBe('minimal');
+    expect(detail.raceName).toBe('Private Centaur');
+    expect(detail).not.toHaveProperty('race');
+    expect(detail).not.toHaveProperty('racialSkills');
+
+    const listResponse = await app.request('/api/v1/characters', {
+      headers: bearer(viewer.accessToken),
+    });
+    expect(listResponse.status).toBe(200);
+    expect((await listResponse.json()) as { id: string }[]).not.toContainEqual(
+      expect.objectContaining({ id: character.id }),
+    );
+
+    const cursorResponse = await app.request('/api/v1/sync/cursor', {
+      method: 'POST',
+      headers: jsonHeaders(viewer.accessToken),
+      body: JSON.stringify({ cursors: [{ entityClass: 'character', sinceRevision: 0 }] }),
+    });
+    expect(cursorResponse.status).toBe(200);
+    const cursor = (await cursorResponse.json()) as {
+      changes: Array<{ entityId: string; data?: Record<string, unknown> }>;
+    };
+    const row = cursor.changes.find((change) => change.entityId === character.id)?.data;
+    expect(row?.race).toEqual(HUMAN_RACE);
+    expect(row?.raceName).toBe('Private Centaur');
+    expect(row?.st).toBe(10);
+    expect(row).not.toHaveProperty('racialSkills');
+
+    const historyResponse = await app.request(`/api/v1/characters/${character.id}/history`, {
+      headers: bearer(viewer.accessToken),
+    });
+    expect(historyResponse.status).toBe(403);
   });
 
   it('non-member is forbidden (403)', async () => {
