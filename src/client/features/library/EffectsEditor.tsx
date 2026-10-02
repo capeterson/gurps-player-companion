@@ -99,9 +99,9 @@ function candidateFromDraft(draft: EffectDraft): unknown {
     ...(draft.target === 'skill'
       ? {
           skillName: draft.skillName.trim(),
-          ...(draft.skillSpecialty.trim() ? { skillSpecialty: draft.skillSpecialty.trim() } : {}),
         }
       : {}),
+    ...(draft.skillSpecialty.trim() ? { skillSpecialty: draft.skillSpecialty.trim() } : {}),
     ...(draft.target === 'dr' && draft.hitLocation.trim()
       ? { hitLocation: draft.hitLocation.trim() }
       : {}),
@@ -125,8 +125,8 @@ export function effectPreview(effect: TraitEffect): string {
     } else if (selector.kind === 'weapon_name') target += ` for “${selector.weaponName}”`;
     else if (selector.kind === 'library_item') target += ` for “${selector.libraryItemName}”`;
     else target += ' for selected inventory item';
-    if (selector.modeKey || selector.modeName)
-      target += ` · ${selector.modeKey ?? selector.modeName} mode`;
+    if (selector.modeKey) target += ` · ${selector.modeKey} mode key`;
+    if (selector.modeName) target += ` · “${selector.modeName}” mode name`;
   }
   const condition = effect.conditionLabel ?? effect.conditionGroup;
   return `${signed}${scale} to ${target}${condition ? ` while ${condition}` : ''}`;
@@ -140,6 +140,8 @@ interface Props<T extends TraitEffect> {
   inventoryItems?: readonly InventoryItemOut[];
   /** Portable editors reject exact character inventory bindings. */
   portable?: boolean;
+  /** Library authors may maintain archived conditions while activation is disabled. */
+  authoring?: boolean;
   onChange: (effects: T[]) => void;
   onValidityChange?: (valid: boolean) => void;
 }
@@ -152,10 +154,12 @@ export function EffectsEditor<T extends TraitEffect>({
   characterSkills,
   inventoryItems = [],
   portable = true,
+  authoring = portable,
   onChange,
   onValidityChange,
 }: Props<T>) {
   const activeEffectsEnabled = useExperimentalActiveEffects(campaignId);
+  const conditionsEditable = authoring || activeEffectsEnabled;
   const [drafts, setDrafts] = useState<EffectDraft[]>(() => effects.map(draftFromEffect));
   const [errors, setErrors] = useState<string[][]>(() => effects.map(() => []));
   const externalKey = JSON.stringify(effects);
@@ -251,41 +255,29 @@ export function EffectsEditor<T extends TraitEffect>({
           ? {
               kind,
               skillName: '',
-              ...(draft.selector?.modeKey
-                ? { modeKey: draft.selector.modeKey }
-                : draft.selector?.modeName
-                  ? { modeName: draft.selector.modeName }
-                  : {}),
+              ...(draft.selector?.modeKey ? { modeKey: draft.selector.modeKey } : {}),
+              ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
             }
           : kind === 'weapon_name'
             ? {
                 kind,
                 weaponName: '',
-                ...(draft.selector?.modeKey
-                  ? { modeKey: draft.selector.modeKey }
-                  : draft.selector?.modeName
-                    ? { modeName: draft.selector.modeName }
-                    : {}),
+                ...(draft.selector?.modeKey ? { modeKey: draft.selector.modeKey } : {}),
+                ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
               }
             : kind === 'inventory_item'
               ? {
                   kind,
                   inventoryItemId: '',
-                  ...(draft.selector?.modeKey
-                    ? { modeKey: draft.selector.modeKey }
-                    : draft.selector?.modeName
-                      ? { modeName: draft.selector.modeName }
-                      : {}),
+                  ...(draft.selector?.modeKey ? { modeKey: draft.selector.modeKey } : {}),
+                  ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
                 }
               : {
                   kind,
                   libraryItemId: weaponItems[0]?.id,
                   libraryItemName: weaponItems[0]?.name ?? '',
-                  ...(draft.selector?.modeKey
-                    ? { modeKey: draft.selector.modeKey }
-                    : draft.selector?.modeName
-                      ? { modeName: draft.selector.modeName }
-                      : {}),
+                  ...(draft.selector?.modeKey ? { modeKey: draft.selector.modeKey } : {}),
+                  ...(draft.selector?.modeName ? { modeName: draft.selector.modeName } : {}),
                 },
     }));
   }
@@ -317,7 +309,7 @@ export function EffectsEditor<T extends TraitEffect>({
       )}
 
       {drafts.map((draft, index) => {
-        if (!activeEffectsEnabled && draft.conditionGroup) return null;
+        if (!conditionsEditable && draft.conditionGroup) return null;
         const selector = draft.selector;
         return (
           <div key={draft.id} className="space-y-2 rounded-lg bg-base-200/60 p-3">
@@ -557,33 +549,58 @@ export function EffectsEditor<T extends TraitEffect>({
                   </label>
                 )}
                 {selector.kind === 'library_item' && (
-                  <label className="form-control sm:col-span-2">
-                    <span className="label-text text-xs">Weapon definition *</span>
-                    <select
-                      className="select select-bordered select-sm"
-                      value={selector.libraryItemId ?? ''}
-                      onChange={(event) => {
-                        const item = weaponItems.find(
-                          (candidate) => candidate.id === event.target.value,
-                        );
-                        update(index, (row) => ({
-                          ...row,
-                          selector: {
-                            ...selector,
-                            libraryItemId: item?.id,
-                            libraryItemName: item?.name ?? '',
-                          },
-                        }));
-                      }}
-                    >
-                      <option value="">Select a library weapon…</option>
-                      {weaponItems.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="form-control">
+                      <span className="label-text text-xs">Library item definition *</span>
+                      <select
+                        className="select select-bordered select-sm"
+                        value={selector.libraryItemId ?? ''}
+                        onChange={(event) => {
+                          const item = libraryItems.find(
+                            (candidate) => candidate.id === event.target.value,
+                          );
+                          update(index, (row) => ({
+                            ...row,
+                            selector: {
+                              ...selector,
+                              libraryItemId: item?.id,
+                              libraryItemName: item?.name ?? selector.libraryItemName,
+                            },
+                          }));
+                        }}
+                      >
+                        <option value="">Match a definition by name</option>
+                        {selector.libraryItemId &&
+                          !libraryItems.some((item) => item.id === selector.libraryItemId) && (
+                            <option value={selector.libraryItemId}>
+                              {selector.libraryItemName} (unavailable definition)
+                            </option>
+                          )}
+                        {libraryItems.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {!selector.libraryItemId && (
+                      <label className="form-control">
+                        <span className="label-text text-xs">Library item name *</span>
+                        <input
+                          className="input input-bordered input-sm"
+                          value={selector.libraryItemName}
+                          maxLength={160}
+                          placeholder="Exact library item name"
+                          onChange={(event) =>
+                            update(index, (row) => ({
+                              ...row,
+                              selector: { ...selector, libraryItemName: event.target.value },
+                            }))
+                          }
+                        />
+                      </label>
+                    )}
+                  </div>
                 )}
                 {selector.kind === 'inventory_item' && (
                   <label className="form-control sm:col-span-2">
@@ -609,29 +626,46 @@ export function EffectsEditor<T extends TraitEffect>({
                   </label>
                 )}
                 {draft.target !== 'weapon_parry' && draft.target !== 'weapon_block' && (
-                  <label className="form-control sm:col-span-3">
-                    <span className="label-text text-xs">Stable attack mode key (optional)</span>
-                    <input
-                      className="input input-bordered input-sm"
-                      value={selector.modeKey ?? selector.modeName ?? ''}
-                      placeholder="Mode key; blank applies to every mode"
-                      onChange={(event) =>
-                        update(index, (row) => ({
-                          ...row,
-                          selector: {
-                            ...selector,
-                            modeName: undefined,
-                            modeKey: event.target.value || undefined,
-                          },
-                        }))
-                      }
-                    />
-                  </label>
+                  <fieldset className="grid gap-2 sm:col-span-3 sm:grid-cols-2">
+                    <label className="form-control">
+                      <span className="label-text text-xs">Stable attack mode key (optional)</span>
+                      <input
+                        className="input input-bordered input-sm"
+                        value={selector.modeKey ?? ''}
+                        maxLength={40}
+                        placeholder="Mode key; blank applies to every mode"
+                        onChange={(event) =>
+                          update(index, (row) => ({
+                            ...row,
+                            selector: {
+                              ...selector,
+                              modeKey: event.target.value || undefined,
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-control">
+                      <span className="label-text text-xs">Exact attack mode name (optional)</span>
+                      <input
+                        className="input input-bordered input-sm"
+                        value={selector.modeName ?? ''}
+                        maxLength={40}
+                        placeholder="Primary or an alternate mode name"
+                        onChange={(event) =>
+                          update(index, (row) => ({
+                            ...row,
+                            selector: { ...selector, modeName: event.target.value || undefined },
+                          }))
+                        }
+                      />
+                    </label>
+                  </fieldset>
                 )}
               </div>
             )}
 
-            {activeEffectsEnabled && (
+            {conditionsEditable && (
               <details>
                 <summary className="cursor-pointer text-xs text-base-content/70">Condition</summary>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">

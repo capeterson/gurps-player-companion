@@ -14,7 +14,7 @@ const viewports = [
   { width: 1280, height: 800 },
 ];
 
-test('technique form helper text wraps without widening the page', async ({ page }, testInfo) => {
+test('typed technique fields stay usable without widening the page', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/register');
@@ -39,52 +39,44 @@ test('technique form helper text wraps without widening the page', async ({ page
     timeout: 30_000,
   });
   await page.getByRole('button', { name: '+ Add technique', exact: true }).click();
-  const name = page.getByRole('textbox', { name: 'Technique name *' });
+  const name = page.locator('[data-field-path="name"]');
+  const defaultSkill = page.locator('[data-field-path="defaultSkillName"]');
+  const longTechniqueName =
+    'A long technique name entered to confirm the form stays usable after resizing.';
+  const longDefaultSkill =
+    'A representative long default skill name retained at every viewport width.';
   await expect(name).toBeVisible();
-  await name.fill('A long technique name entered to confirm the form stays usable after resizing.');
+  await name.fill(longTechniqueName);
+  await defaultSkill.fill(longDefaultSkill);
   await name.evaluate((input) => input.blur());
-
-  const help = page.getByText(
-    'A cap of +1 lets a Karate-1 technique reach full Karate. Leave blank for no cap.',
-    { exact: true },
-  );
-  const penaltyHelp = page.getByText('For example, Karate-1 starts one level below Karate.', {
-    exact: true,
-  });
+  await defaultSkill.evaluate((input) => input.blur());
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
-    await expect(name).toHaveValue(
-      'A long technique name entered to confirm the form stays usable after resizing.',
-    );
-    await expect(help).toBeVisible();
-    await expect(penaltyHelp).toBeVisible();
-    const [helpBox, pageWidth, helpWidths] = await Promise.all([
-      help.boundingBox(),
+    await expect(name).toHaveValue(longTechniqueName);
+    await expect(defaultSkill).toHaveValue(longDefaultSkill);
+    const [nameBox, skillBox, pageWidth] = await Promise.all([
+      name.boundingBox(),
+      defaultSkill.boundingBox(),
       page.evaluate(() => document.documentElement.scrollWidth),
-      Promise.all([
-        help.evaluate((element) => ({ scroll: element.scrollWidth, client: element.clientWidth })),
-        penaltyHelp.evaluate((element) => ({
-          scroll: element.scrollWidth,
-          client: element.clientWidth,
-        })),
-      ]),
     ]);
-    if (!helpBox) throw new Error('Technique helper text has no visible bounding box');
-    expect(helpBox.x).toBeGreaterThanOrEqual(0);
-    expect(helpBox.x + helpBox.width).toBeLessThanOrEqual(viewport.width);
-    for (const width of helpWidths) expect(width.scroll).toBeLessThanOrEqual(width.client);
+    if (!nameBox || !skillBox)
+      throw new Error('Technique fields should have visible bounding boxes');
+    for (const box of [nameBox, skillBox]) {
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    }
     expect(pageWidth).toBeLessThanOrEqual(viewport.width);
     if (viewport.width === 320) {
-      expect(helpBox.height).toBeGreaterThan(20);
+      expect(nameBox.height).toBeGreaterThan(20);
       await captureReviewScreenshot(page, {
-        path: testInfo.outputPath('technique-form-helper-320x568.png'),
+        path: testInfo.outputPath('technique-form-fields-320x568.png'),
         animations: 'disabled',
         fullPage: true,
       });
     }
     if (viewport.width === 568) {
       await captureReviewScreenshot(page, {
-        path: testInfo.outputPath('technique-form-helper-568x320.png'),
+        path: testInfo.outputPath('technique-form-fields-568x320.png'),
         animations: 'disabled',
       });
     }

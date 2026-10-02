@@ -132,14 +132,17 @@ Even incomplete records must have valid references when a structured rule is sup
 unfinished formulas belong in extraction evidence until their graph is valid.
 
 The visual editor creates fixed, per-unit, bounded-range, choice and lookup-table
-presets. The validated YAML fragment editor preserves arbitrary supported ASTs;
-it never attempts to reverse-engineer an advanced rule into an inaccurate preset.
+presets. The typed definition builder edits all inputs, typed choice/table values, named
+operations, source-qualified calls, and output units/rounding/bounds. It preserves
+arbitrary supported ASTs without reverse-engineering them into a preset. The
+entry’s subtle **Raw YAML** disclosure provides synchronized whole-entry source editing.
 Using a preset explicitly replaces the current rule. No preset contains inferred
 book prices.
 
-Trait-local modifiers also have a validated YAML source editor, preserving their
-calculation rules and descriptive fields when the simple fixed-value form cannot
-represent them.
+Trait-local modifiers use editable typed rows, including fixed or calculated
+costs and descriptions. Variants, per-level costs, caps, tags, and modifier
+applicability are authorable without YAML. Applicability combines universal,
+kind, tag and source-qualified trait matches using the existing OR semantics.
 
 ## Purchase snapshots and explicit re-resolution
 
@@ -182,7 +185,11 @@ accepted. Item-level Parry/Block effects do not accept an attack-mode restrictio
 
 Weapon, armor, shield, container, powerstone, magic-item and enchantment facets
 coexist on one physical item. The library editor offers visual attack modes and a
-lossless weapon YAML mode, armor YAML, container fields and existing magical data.
+complete typed weapon/armor detail views, container fields, powerstone capacity
+and energy, every magic-item mode, and editable enchantment attachments.
+Linked enchantment mechanics remain authoritative until **Make independent**
+retains the snapshot and removes the link. Unrelated edits preserve dormant
+facets and container values; mode key and mode name restrictions are independent.
 Ambiguous extraction belongs in evidence with incomplete status, not fabricated
 damage/skill/reach fields.
 
@@ -209,7 +216,8 @@ logout purge and human-readable campaign history.
 Implementation: `shared/schemas/{calculation,libraryMetadata}.ts`,
 `shared/domain/{calculation,libraryPricing,libraryGraph,libraryIdentity,weaponModes}.ts`,
 `server/services/{libraryPricing,libraryReferences}.ts`, and
-`client/features/library/{CalculationEditor,PricingResolver,RepriceEntry,WeaponModesEditor}.tsx`.
+`client/features/library/{LibraryEntryEditor,LibraryEntryFields,StructuredFields,CalculationEditor,
+PricingResolver,RepriceEntry,WeaponModesEditor,ItemEnchantmentEditor}.tsx`.
 
 Item cost and weight use unconstrained PostgreSQL `numeric` storage (API bounds still apply), so a rule's declared rounding is not silently replaced by a two-decimal database scale. Existing paid values are unchanged.
 
@@ -222,7 +230,10 @@ Blank/nonfinite amounts, invalid bounds and nonpositive steps are explained befo
 replacement. Item presets retain the current basic or constant calculated weight
 unless the author edits it. Returning to **Use basic price fields** clears the
 calculation and restores the basic-value controls. Modifier catalog entries use
-the calculation editor directly and do not offer absent basic-price fields.
+the calculation editor directly and can remove the rule without offering absent
+basic-price fields. Named definition pickers preserve source edition and trait
+kind. **Match another edition** adopts an existing semantic identity without
+exposing a normal key input.
 
 ## Synthetic development catalog
 

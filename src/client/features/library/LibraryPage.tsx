@@ -45,6 +45,7 @@ import { editingFocusBounds } from '../../lib/editingFocusBounds.ts';
 import { readActiveUser } from '../../sync/activeUser.ts';
 import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
+import { LibraryPackageEditor, type PackageReview } from './LibraryPackageEditor.tsx';
 import { librarySearchWords } from './librarySearch.ts';
 import { ActiveEffectsSection } from './sections/ActiveEffectsSection.tsx';
 import { CatalogSection } from './sections/CatalogSection.tsx';
@@ -132,11 +133,12 @@ export function LibraryPage({
   const library: LocalLibrary = localLibrary ?? emptyLibrary();
 
   const activeEffectsEnabled = currentCampaign?.experimentalActiveEffects === true;
+  const activeEffectsVisible = activeEffectsEnabled || isOwner;
   const requestedSection = parseSection(params.get('section'));
   const section =
-    requestedSection === 'activeEffects' && !activeEffectsEnabled ? 'traits' : requestedSection;
+    requestedSection === 'activeEffects' && !activeEffectsVisible ? 'traits' : requestedSection;
   const visibleSections = SECTIONS.filter(
-    ({ key }) => key !== 'activeEffects' || activeEffectsEnabled,
+    ({ key }) => key !== 'activeEffects' || activeEffectsVisible,
   );
   const [sourceFilter, setSourceFilter] = useState('');
   const [search, setSearch] = useState(() => params.get('q') ?? '');
@@ -318,6 +320,7 @@ export function LibraryPage({
   const [jumpSlot, setJumpSlot] = useState<HTMLElement | null>(null);
 
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [packageOpen, setPackageOpen] = useState(false);
   const [applyCampaignSettings, setApplyCampaignSettings] = useState(false);
   const [fileCandidate, setFileCandidate] = useState<{
     yaml: string;
@@ -384,6 +387,7 @@ export function LibraryPage({
       setPendingImport(null);
       setImportError(null);
       setImportMessage(formatImportResult(result));
+      setPackageOpen(false);
       // The import is a server-side bulk write; pull its rows (and any
       // applied campaign settings) into Dexie right away.
       void getSyncOrchestrator().triggerCursorPull();
@@ -424,12 +428,19 @@ export function LibraryPage({
     }
   }
 
-  async function prepareImport() {
-    if (!fileCandidate || !campaignId) return;
+  async function prepareImport(review?: PackageReview) {
+    if ((!fileCandidate && !review) || !campaignId) return;
     try {
-      const { sourceScopedLibrary } = await import('../../../shared/yaml/library.ts');
-      const { yaml, fileName, doc: parsed } = fileCandidate;
-      const sourceKeys = parsed.scope?.sourceKeys ?? selectedImportKeys;
+      const { parseLibraryYaml, sourceScopedLibrary } = await import(
+        '../../../shared/yaml/library.ts'
+      );
+      const candidate = review
+        ? { yaml: review.yaml, fileName: 'Library package', doc: parseLibraryYaml(review.yaml) }
+        : fileCandidate;
+      if (!candidate) return;
+      const { yaml, fileName, doc: parsed } = candidate;
+      const sourceKeys =
+        parsed.scope?.sourceKeys ?? (review ? review.sourceKeys : selectedImportKeys);
       const portableIncoming = sourceKeys
         ? sourceScopedLibrary(parsed.library, sourceKeys)
         : parsed.library;
@@ -442,8 +453,8 @@ export function LibraryPage({
       const scopedIds = sourceKeys
         ? (incoming.sources ?? []).map((source) => source.id as string)
         : undefined;
-      const mode = importMode;
-      const applySettings = !sourceKeys && applyCampaignSettings;
+      const mode = review?.mode ?? importMode;
+      const applySettings = !sourceKeys && (review?.applyCampaignSettings ?? applyCampaignSettings);
       if (mode === 'replace' && !localLibrary) {
         throw new Error('Reload the current library before replacing it');
       }
@@ -470,32 +481,30 @@ export function LibraryPage({
         .flat()
         .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length;
       const selectedSourceIds = scopedIds && new Set(scopedIds);
-      const preview = sections
-        .filter(([, key]) => key !== 'activeEffects' || activeEffectsEnabled)
-        .flatMap(([label, key, naturalKey]) => {
-          const incomingRows = incoming[key];
-          // Omitted optional sections are intentionally untouched by Replace.
-          if (!incomingRows) return [];
-          const current = localLibrary?.[key];
-          const incomingKeys = new Set(incomingRows.map((entry) => naturalKey(entry as never)));
-          return [
-            {
-              label,
-              incoming: incomingRows.length,
-              removed:
-                mode === 'replace' && current
-                  ? current.filter(
-                      (entry) =>
-                        (!selectedSourceIds ||
-                          (key !== 'sources' &&
-                            'sourceId' in entry &&
-                            selectedSourceIds.has(String(entry.sourceId)))) &&
-                        !incomingKeys.has(naturalKey(entry as never)),
-                    ).length
-                  : null,
-            },
-          ];
-        });
+      const preview = sections.flatMap(([label, key, naturalKey]) => {
+        const incomingRows = incoming[key];
+        // Omitted optional sections are intentionally untouched by Replace.
+        if (!incomingRows) return [];
+        const current = localLibrary?.[key];
+        const incomingKeys = new Set(incomingRows.map((entry) => naturalKey(entry as never)));
+        return [
+          {
+            label,
+            incoming: incomingRows.length,
+            removed:
+              mode === 'replace' && current
+                ? current.filter(
+                    (entry) =>
+                      (!selectedSourceIds ||
+                        (key !== 'sources' &&
+                          'sourceId' in entry &&
+                          selectedSourceIds.has(String(entry.sourceId)))) &&
+                      !incomingKeys.has(naturalKey(entry as never)),
+                  ).length
+                : null,
+          },
+        ];
+      });
       setImportError(null);
       setImportMessage(null);
       setPendingImport({
@@ -609,6 +618,34 @@ export function LibraryPage({
             </div>
           </div>
         </section>
+        {isOwner &&
+          currentCampaign &&
+          localLibrary &&
+          (packageOpen ? (
+            <LibraryPackageEditor
+              key={campaignId}
+              campaign={currentCampaign}
+              library={localLibrary}
+              pending={importMutation.isPending}
+              onCancel={() => setPackageOpen(false)}
+              onReview={(review) => void prepareImport(review)}
+            />
+          ) : (
+            <section className="card card-border bg-base-100">
+              <div className="card-body gap-3">
+                <h3 className="card-title">Edit a library package</h3>
+                <p>
+                  Stage related entries and campaign settings together, then review a merge or
+                  replacement.
+                </p>
+                <div className="card-actions justify-end">
+                  <button type="button" className="btn btn-sm" onClick={() => setPackageOpen(true)}>
+                    Edit package
+                  </button>
+                </div>
+              </div>
+            </section>
+          ))}
         {isOwner && (
           <section className="card card-border bg-base-100">
             <div className="card-body gap-4">
@@ -869,7 +906,7 @@ export function LibraryPage({
           <TechniquesSection {...shell('techniques')} />
           <StylesSection {...shell('styles')} />
           <EnchantmentsSection {...shell('enchantments')} />
-          {activeEffectsEnabled && <ActiveEffectsSection {...shell('activeEffects')} />}
+          {activeEffectsVisible && <ActiveEffectsSection {...shell('activeEffects')} />}
         </div>
       )}
     </div>

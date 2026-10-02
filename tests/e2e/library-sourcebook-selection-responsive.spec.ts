@@ -112,7 +112,7 @@ test('long sourcebook names wrap and remain selectable for export', async ({ pag
   });
   await page.getByLabel('Publication title').fill('Mariner Techniques');
   await page.getByLabel('Abbreviation').fill('MT');
-  await page.getByRole('button', { name: 'Save source' }).click();
+  await page.getByRole('button', { name: 'Add source' }).click();
   await expect(page.getByRole('button', { name: 'Edit Mariner Techniques' })).toBeVisible();
 
   let initialLibrary: {
@@ -196,7 +196,7 @@ test('long sourcebook names wrap and remain selectable for export', async ({ pag
   });
   await page.getByLabel('Publication title').fill('GURPS Martial Arts Revised');
   await page.getByLabel('Abbreviation').fill('MA2');
-  await page.getByRole('button', { name: 'Save source' }).click();
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Edit GURPS Martial Arts Revised' })).toBeVisible();
 
   let renamedLibrary: {

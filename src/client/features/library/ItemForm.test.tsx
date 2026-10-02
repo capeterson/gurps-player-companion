@@ -1,69 +1,49 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ArmorFacetEditor } from './ArmorFacetEditor.tsx';
 import { ItemForm } from './ItemForm.tsx';
 
-function renderForm() {
+function renderForm(isPending = false) {
   const onSubmit = vi.fn();
-  render(<ItemForm definitions={[]} isPending={false} onCancel={vi.fn()} onSubmit={onSubmit} />);
+  render(
+    <ItemForm definitions={[]} isPending={isPending} onCancel={vi.fn()} onSubmit={onSubmit} />,
+  );
   return { onSubmit };
 }
 
 describe('ItemForm advanced facets', () => {
-  it('keeps optional facets closed for an ordinary item', () => {
+  it('keeps optional equipment facets folded for an ordinary item', () => {
     renderForm();
-
-    for (const title of [
-      'Weapon and shield facets',
-      'Armor facets',
-      'Enchantments',
-      'Powerstone and magic-item facets (YAML)',
-    ]) {
-      expect(
-        screen.getByText(title, { selector: 'summary' }).closest('details'),
-      ).not.toHaveAttribute('open');
-    }
-    expect(screen.queryByLabelText('Armor data (YAML)')).not.toBeInTheDocument();
+    const facets = screen.getByText('Equipment facets', { selector: 'summary' }).closest('details');
+    expect(facets).not.toHaveAttribute('open');
+    expect(screen.queryByLabelText('Damage resistance (DR)')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Weapon or shield')).not.toBeVisible();
   });
 
-  it('opens invalid YAML, guides common armor fields, and preserves advanced data on save', async () => {
+  it('edits armor and weapon facets visually while retaining imported fields on save', () => {
     const { onSubmit } = renderForm();
-    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Layered cuirass' } });
-
-    const armorSection = screen
-      .getByText('Armor facets', { selector: 'summary' })
-      .closest('details');
-    expect(armorSection).not.toBeNull();
-    fireEvent.click(screen.getByText('Armor facets', { selector: 'summary' }));
-    fireEvent.click(screen.getByLabelText('Armor item'));
-    fireEvent.click(screen.getByRole('button', { name: 'Edit armor YAML' }));
-    fireEvent.change(screen.getByLabelText('Armor data (YAML)'), {
-      target: { value: 'dr: nope\nlocations: [torso]' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Armor YAML');
-    await waitFor(() => expect(armorSection).toHaveAttribute('open'));
-    expect(onSubmit).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText('Armor data (YAML)'), {
-      target: {
-        value:
-          'dr: 2\nlocations: [torso]\ntypedDr:\n  cut: 4\nfrontOnly: true\ndrCrushing: 5\ndb: 2',
-      },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Visual armor fields' }));
+    const imported = `name: Layered cuirass
+isArmor: true
+armor:
+  dr: 2
+  locations: [torso]
+  typedDr: { cut: 4 }
+  frontOnly: true
+  drCrushing: 5
+  db: 2
+weaponData:
+  modes:
+    - key: cut
+      name: Cut
+      damage: sw+1 cut
+`;
+    fireEvent.change(screen.getByLabelText('Raw YAML'), { target: { value: imported } });
+    fireEvent.click(screen.getByText('Equipment facets', { selector: 'summary' }));
     fireEvent.change(screen.getByLabelText('Damage resistance (DR)'), {
-      target: { value: '1001' },
+      target: { value: '3' },
     });
-    expect(screen.getByLabelText('Damage resistance (DR)')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByText('DR must be between 0 and 1000.')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Damage resistance (DR)'), { target: { value: '3' } });
-    fireEvent.click(screen.getByText('Weapon and shield facets', { selector: 'summary' }));
-    fireEvent.click(screen.getByLabelText('Weapon or shield'));
-    fireEvent.change(screen.getByLabelText('damage'), { target: { value: 'sw+1 cut' } });
-    fireEvent.change(screen.getByLabelText('Stable mode key'), { target: { value: 'cut' } });
+    fireEvent.change(screen.getByLabelText('damage'), { target: { value: 'sw+2 cut' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -79,31 +59,62 @@ describe('ItemForm advanced facets', () => {
           db: 2,
         }),
         weaponData: expect.objectContaining({
-          modes: [expect.objectContaining({ key: 'cut', damage: 'sw+1 cut' })],
+          modes: [expect.objectContaining({ key: 'cut', damage: 'sw+2 cut' })],
         }),
+      }),
+    );
+  });
+
+  it('disables the entire item draft while an atomic save is pending', () => {
+    renderForm(true);
+    expect(screen.getByLabelText('Name')).toBeDisabled();
+    expect(screen.getByText('Saving…').closest('button')).toBeDisabled();
+  });
+
+  it('blocks imported conflicting armor facing flags and submits after raw repair', () => {
+    const { onSubmit } = renderForm();
+    const raw = screen.getByLabelText('Raw YAML');
+    fireEvent.change(raw, {
+      target: {
+        value:
+          'name: Facing test armor\nisArmor: true\narmor: { dr: 2, locations: [torso], frontOnly: true, backOnly: true }',
+      },
+    });
+    fireEvent.click(screen.getByText('Equipment facets', { selector: 'summary' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.change(raw, {
+      target: {
+        value:
+          'name: Facing test armor\nisArmor: true\narmor: { dr: 2, locations: [torso], frontOnly: true, backOnly: false }',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isArmor: true,
+        armor: expect.objectContaining({ frontOnly: true, backOnly: false }),
       }),
     );
   });
 });
 
-describe('ArmorFacetEditor repair and common fields', () => {
-  it('keeps malformed starting YAML editable instead of crashing', () => {
-    const onChange = vi.fn();
-    const view = render(
-      <ArmorFacetEditor text={"dr: 'nope'\nlocations: [torso]"} onChange={onChange} />,
-    );
-
-    expect(screen.getByRole('alert')).toBeInTheDocument();
-    const yaml = screen.getByLabelText('Armor data (YAML)');
-    fireEvent.change(yaml, { target: { value: 'dr: 4\nlocations: [torso]' } });
-    view.rerender(<ArmorFacetEditor text={'dr: 4\nlocations: [torso]'} onChange={onChange} />);
+describe('ArmorFacetEditor typed facets', () => {
+  it('switches between visual armor fields and complete typed fields without losing edits', () => {
+    function Harness() {
+      const [text, setText] = useState('dr: 4\nlocations: [torso]');
+      return <ArmorFacetEditor text={text} onChange={setText} />;
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'All armor fields' }));
+    fireEvent.change(screen.getByLabelText('Dr'), { target: { value: '6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Visual armor fields' }));
-
-    expect(screen.getByLabelText('Damage resistance (DR)')).toHaveValue(4);
-    expect(onChange).toHaveBeenLastCalledWith('dr: 4\nlocations: [torso]');
+    expect(screen.getByLabelText('Damage resistance (DR)')).toHaveValue(6);
   });
 
-  it('offers common GURPS armor overrides and facing fields', () => {
+  it('offers armor overrides, custom coverage, and exclusive facing controls', () => {
     render(
       <ArmorFacetEditor
         text={
@@ -112,98 +123,51 @@ describe('ArmorFacetEditor repair and common fields', () => {
         onChange={vi.fn()}
       />,
     );
-
     expect(screen.getByLabelText('Crushing DR override')).toHaveValue(3);
     expect(screen.getByLabelText('Defense Bonus')).toHaveValue(1);
     expect(screen.getByLabelText('Front only')).toBeChecked();
     expect(screen.getByText('Damage-type DR overrides')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Custom armor location'), {
+      target: { value: 'Left vambrace rim' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add location' }));
+    expect(screen.getByRole('button', { name: 'Remove location Left vambrace rim' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove location Left vambrace rim' }));
+    fireEvent.click(screen.getByLabelText('Back only'));
+    expect(screen.getByLabelText('Front only')).not.toBeChecked();
+    expect(screen.getByLabelText('Back only')).toBeChecked();
   });
-});
 
-it('keeps custom coverage visible and repairable while making facing flags exclusive', () => {
-  const onChange = vi.fn();
-  render(<ArmorFacetEditor text={'dr: 3\nlocations: [torso]'} onChange={onChange} />);
-
-  fireEvent.change(screen.getByLabelText('Custom armor location'), {
-    target: { value: 'Left vambrace rim' },
+  it('announces and repairs imported conflicting armor facing flags', () => {
+    render(
+      <ArmorFacetEditor
+        text={'dr: 3\nlocations: [torso]\nfrontOnly: true\nbackOnly: true'}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose Front only or Back only');
+    fireEvent.click(screen.getByLabelText('Front only'));
+    expect(screen.getByLabelText('Front only')).not.toBeChecked();
+    expect(screen.getByLabelText('Back only')).toBeChecked();
+    expect(screen.queryByText('Choose Front only or Back only, not both.')).not.toBeInTheDocument();
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Add location' }));
-  expect(screen.getByRole('button', { name: 'Remove location Left vambrace rim' })).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Remove location Left vambrace rim' }));
-  expect(
-    screen.queryByRole('button', { name: 'Remove location Left vambrace rim' }),
-  ).not.toBeInTheDocument();
 
-  fireEvent.click(screen.getByLabelText('Front only'));
-  fireEvent.click(screen.getByLabelText('Back only'));
-  expect(screen.getByLabelText('Front only')).not.toBeChecked();
-  expect(screen.getByLabelText('Back only')).toBeChecked();
-  expect(screen.queryByText('Choose Front only or Back only, not both.')).not.toBeInTheDocument();
-});
-
-it('announces and repairs imported conflicting armor facing flags', () => {
-  render(
-    <ArmorFacetEditor
-      text={'dr: 3\nlocations: [torso]\nfrontOnly: true\nbackOnly: true'}
-      onChange={vi.fn()}
-    />,
-  );
-
-  expect(screen.getByRole('alert')).toHaveTextContent('Choose Front only or Back only');
-  fireEvent.click(screen.getByLabelText('Front only'));
-  expect(screen.getByLabelText('Front only')).not.toBeChecked();
-  expect(screen.getByLabelText('Back only')).toBeChecked();
-  expect(screen.queryByText('Choose Front only or Back only, not both.')).not.toBeInTheDocument();
-});
-
-it('uses distinct descriptions for base DR errors in simultaneous drafts', () => {
-  render(
-    <>
-      <ArmorFacetEditor text="dr: 0" onChange={vi.fn()} />
-      <ArmorFacetEditor text="dr: 0" onChange={vi.fn()} />
-    </>,
-  );
-  for (const field of screen.getAllByLabelText('Damage resistance (DR)')) {
-    fireEvent.change(field, { target: { value: '-1' } });
-  }
-  const fields = screen.getAllByLabelText('Damage resistance (DR)');
-  expect(fields[0]).toHaveAttribute('aria-describedby');
-  expect(fields[1]).toHaveAttribute('aria-describedby');
-  expect(fields[0]?.getAttribute('aria-describedby')).not.toBe(
-    fields[1]?.getAttribute('aria-describedby'),
-  );
-});
-
-it('disables the entire item draft while an atomic save is pending', () => {
-  render(<ItemForm definitions={[]} isPending onCancel={vi.fn()} onSubmit={vi.fn()} />);
-
-  expect(screen.getByLabelText('Name *')).toBeDisabled();
-  expect(screen.getByText('Saving…').closest('button')).toBeDisabled();
-});
-
-it('blocks invalid imported facing YAML and saves after repair', () => {
-  const onSubmit = vi.fn();
-  render(<ItemForm definitions={[]} isPending={false} onCancel={vi.fn()} onSubmit={onSubmit} />);
-  fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Facing test armor' } });
-  fireEvent.click(screen.getByText('Armor facets', { selector: 'summary' }));
-  fireEvent.click(screen.getByLabelText('Armor item'));
-  fireEvent.click(screen.getByRole('button', { name: 'Edit armor YAML' }));
-  fireEvent.change(screen.getByLabelText('Armor data (YAML)'), {
-    target: { value: 'dr: 2\nlocations: [torso]\nfrontOnly: true\nbackOnly: true' },
+  it('uses distinct descriptions for base DR errors in simultaneous drafts', () => {
+    render(
+      <>
+        <ArmorFacetEditor text="dr: 0" onChange={vi.fn()} />
+        <ArmorFacetEditor text="dr: 0" onChange={vi.fn()} />
+      </>,
+    );
+    for (const field of screen.getAllByLabelText('Damage resistance (DR)')) {
+      fireEvent.change(field, { target: { value: '-1' } });
+    }
+    const fields = screen.getAllByLabelText('Damage resistance (DR)');
+    expect(fields[0]).toHaveAttribute('aria-describedby');
+    expect(fields[1]).toHaveAttribute('aria-describedby');
+    expect(fields[0]?.getAttribute('aria-describedby')).not.toBe(
+      fields[1]?.getAttribute('aria-describedby'),
+    );
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
-
-  expect(screen.getByRole('alert')).toHaveTextContent('cannot be both front only and back only');
-  expect(onSubmit).not.toHaveBeenCalled();
-
-  fireEvent.change(screen.getByLabelText('Armor data (YAML)'), {
-    target: { value: 'dr: 2\nlocations: [torso]\nfrontOnly: true' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
-  expect(onSubmit).toHaveBeenCalledWith(
-    expect.objectContaining({
-      isArmor: true,
-      armor: expect.objectContaining({ frontOnly: true, backOnly: false }),
-    }),
-  );
 });

@@ -113,15 +113,17 @@ test('resolves and reopens an item price without clipping the modal at supported
   await page.getByLabel('Publication title').fill('Pricing Rules');
   await expect(page.getByLabel('Source key')).toHaveCount(0);
   await page.getByLabel('Abbreviation').fill('PR');
+  await page.getByLabel('Edition setting').selectOption('value');
   await page.getByLabel('Edition', { exact: true }).fill('First edition');
+  await page.getByLabel('Notes setting').selectOption('value');
   await page
-    .getByLabel('Notes')
+    .getByLabel('Notes', { exact: true })
     .fill(
       'Long source note retained verbatim: a campaign-authored publication record with provenance, errata context, and editorial details for this complete pricing rule.',
     );
   await context.setOffline(true);
   await page.evaluate(() => window.dispatchEvent(new Event('offline')));
-  await page.getByRole('button', { name: 'Save source' }).click();
+  await page.getByRole('button', { name: 'Add sourcebook' }).click();
   await expect(page.getByText('Pricing Rules', { exact: true })).toBeVisible();
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -140,71 +142,63 @@ test('resolves and reopens an item price without clipping the modal at supported
   await page.getByRole('button', { name: /Modifiers/ }).click();
   await page.getByRole('button', { name: /\+ Add modifier/i }).click();
   const modifierName = 'Flexible grip across extended operating range';
-  await page.getByLabel('Modifier name').fill(modifierName);
+  await page.getByRole('textbox', { name: 'Name' }).fill(modifierName);
   await page
     .locator('summary')
     .filter({ hasText: /^Source and completeness/ })
     .click();
   await page.getByLabel('Sourcebook').selectOption(pricingSourceId);
-  await page.getByLabel('Tags (comma-separated)').fill('grip, long-form');
-  await page.getByLabel('Mutually exclusive group').fill('handling');
-  await page.getByLabel('Legacy citation').fill('PR, p. 99');
+  await page.getByLabel('Source setting').selectOption('value');
+  await page.getByLabel('Source', { exact: true }).fill('PR, p. 99');
   await page
-    .getByRole('textbox', { name: 'Description' })
+    .locator('summary')
+    .filter({ hasText: /^Groups and tags/ })
+    .click();
+  await page.getByRole('button', { name: 'Add tags', exact: true }).click();
+  await page.locator('[data-field-path="tags.0"]').fill('grip');
+  await page.getByRole('button', { name: 'Add tags', exact: true }).click();
+  await page.locator('[data-field-path="tags.1"]').fill('long-form');
+  await page.getByLabel('Group setting').selectOption('value');
+  await page.getByLabel('Group', { exact: true }).fill('handling');
+  await page.getByLabel('Description setting').selectOption('value');
+  await page
+    .locator('[contenteditable="true"]')
     .fill(
       'A long descriptive note for this modifier explains its fictional handling tradeoff and reminds campaign authors to keep the rule connected to its source edition.',
     );
-  const calculationRule = page.getByRole('group', { name: 'Calculation rule' });
-  await calculationRule
+  await page
     .locator('summary')
-    .filter({ hasText: /^Advanced rule \(YAML\)$/ })
+    .filter({ hasText: /^Pricing and trait options/ })
     .click();
-  await expect(page.getByLabel('Advanced rule (YAML)')).toBeVisible();
-  await page.getByLabel('Advanced rule (YAML)').fill(`version: 1
-inputs:
-  - key: magnitude
-    kind: number
-    label: Magnitude across the selected handling adjustment range
-    unit: count
-    min: 1
-    max: 10
-    step: 1
-    default: 2
-tables: []
-nodes:
-  - id: one-percent-per-rank
-    op: constant
-    value: 10
-  - id: chosen-magnitude
-    op: input
-    key: magnitude
-  - id: modifier-total
-    op: multiply
-    args: [one-percent-per-rank, chosen-magnitude]
-outputs:
-  - key: modifier
-    node: modifier-total
-    unit: percentage
-    min: 0
-    max: 100
-    increment: 1
-    rounding: nearest`);
-  await expect(page.getByText(/1 inputs · 0 tables · Outputs: modifier/)).toBeVisible();
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Effects and capabilities/ })
+    .click();
+  await page.getByLabel('All traits', { exact: true }).check();
+  const calculationRule = page.getByRole('group', { name: 'Calculation rule' });
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Calculated pricing/ })
+    .click();
+  await page.getByLabel('Pattern').selectOption('per-unit');
+  await page.getByLabel('Amount').fill('10');
+  await page.getByLabel('Minimum').fill('1');
+  await page.getByLabel('Maximum').fill('10');
+  await page.getByLabel('Step').fill('1');
+  await page.getByRole('button', { name: 'Use pattern' }).click();
+  await expect(page.getByText(/1 inputs · 0 tables · Outputs:/)).toBeVisible();
   await page.setViewportSize({ width: 320, height: 800 });
   const editorBox = await calculationRule.boundingBox();
   if (!editorBox) throw new Error('calculation editor is not visible at 320px');
   expect(editorBox.x).toBeGreaterThanOrEqual(0);
   expect(editorBox.x + editorBox.width).toBeLessThanOrEqual(320);
   await calculationRule.scrollIntoViewIfNeeded();
-  await page.getByLabel('Advanced rule (YAML)').evaluate((field) => {
-    field.scrollTop = 0;
-  });
   await captureReviewScreenshot(page, {
     path: testInfo.outputPath('calculation-editor-320.png'),
     fullPage: false,
   });
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.getByRole('button', { name: 'Save modifier' }).click();
+  await page.getByRole('button', { name: 'Add modifier' }).click();
   const savedModifier = page.getByRole('button', { name: modifierName, exact: true });
   await expect(savedModifier).toBeVisible();
   await expect(savedModifier.locator('.badge')).toHaveCount(0);
@@ -340,7 +334,7 @@ outputs:
   await expect(traitDialog).toBeVisible();
   await traitDialog.getByRole('checkbox', { name: modifierName, exact: true }).check();
   await expect(traitDialog).not.toContainText('pricing-rules');
-  await traitDialog.getByLabel('Magnitude across the selected handling adjustment range').fill('3');
+  await traitDialog.getByLabel('level').fill('3');
   await expect(traitDialog.getByText(`${modifierName}: 30%`)).toBeVisible();
   await expect(traitDialog.getByText('Total: 13 points')).toBeVisible();
   await page.setViewportSize({ width: 320, height: 800 });

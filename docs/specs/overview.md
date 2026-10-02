@@ -151,7 +151,8 @@ abbreviation or edition keeps its links intact. Sourcebook forms require a title
 and abbreviation, with no source key input; entry pickers show
 `<abbreviation>: <publication title>`, with a compact **Page** field beside the
 picker at every width. Entry editors preserve their definition keys without
-showing a key input. Portable YAML labels translate to/from
+showing a key input; **Match another edition** chooses an existing named
+definition's stable key. Portable YAML labels translate to/from
 UUIDs at import/export, including nested pricing references. Migration 0068
 backfills existing links; Dexie v17 upgrades cached and queued edits.
 
@@ -371,7 +372,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   caller-supplied mechanics with the definition's current revision and complete owned
   snapshot. Definition edits refresh linked library/character items; deletion or
   campaign transfer clears only the live ID, leaving offline mechanics intact.
-- **Active effects and skill procedures.** Active effects and conditional modifiers are behind the owner-only **Campaign settings → Rules → Experimental features → Enable active effects** (`experimentalActiveEffects`), off for new and existing campaigns. Disabled campaigns hide all related controls/library authoring and ignore their calculations while retaining stored data; manual temporary stat modifiers and skill procedures remain available. When enabled, campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v15. See [the subsystem spec](active-effects-skill-procedures.md).
+- **Active effects and skill procedures.** Active effects and conditional modifiers are behind the owner-only **Campaign settings → Rules → Experimental features → Enable active effects** (`experimentalActiveEffects`), off for new and existing campaigns. Disabled campaigns hide character instance management and ignore active/conditional calculations while retaining stored data. Campaign owners can still author archived library definitions and conditional declarations through complete typed editors, outbox CRUD and staged packages; manual temporary stat modifiers and skill procedures remain available. When enabled, campaign-defined and custom effect instances retain their owned mechanics, offline sync, REST/MCP operations and typed capability/sense/resistance labels, and the Combat → Active Effects panel lets players apply library/custom effects, inspect notes and duration, deactivate, expire, detach or remove instances. Skills carry contextual modifiers, action previews and level-threshold benefits through owned snapshots, REST/MCP and YAML v15. See [the subsystem spec](active-effects-skill-procedures.md).
 - **Temporary effects.** Per-stat ✦ modifier popovers are the single
   way to add temp modifiers, backed by a reserved `manual` sentinel
   entry in the `characters.temp_effects` JSONB list. There is no longer
@@ -452,7 +453,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   declarations: attribute plus offset or another trained skill plus offset.
   An empty list means no default; absent/null legacy definitions mean unknown,
   shown with an explanatory tooltip and no invented roll target at zero points.
-  Defaults are authored through library YAML/API and character REST/sync fields;
+  Defaults are authored through typed library controls, YAML/API, and character REST/sync fields;
   skill-source declarations support exact, same-specialty, and any-specialty matching.
   Library skills also carry an explicit TL policy: not applicable, fixed, or
   required `/TL`. A required definition cannot be learned until the player
@@ -937,17 +938,22 @@ settings sections; switching sections retains drafts.
   characters are **excluded from `/characters`** and browsable only from the
   campaign detail page; full-share and editable-manager rows remain listed.
   See campaign-content-sharing.md.
-- **Library authoring guidance.** `/help/campaign-library` explains first entries, sources/editions, completeness, character adoption, advanced rules and safe bulk maintenance. The Library guide link opens separately to preserve an unfinished form. Optional metadata, calculated pricing and mechanical fields use disclosures that retain drafts. Common skill prerequisites/defaults have guided controls with a lossless advanced JSON editor. Item armor has guided DR, coverage and facing fields with a lossless YAML mode. Source validation labels required fields and focuses the first invalid input.
+- **Library authoring guidance.** `/help/campaign-library` explains first entries, sources/editions, completeness, character adoption, advanced rules and safe bulk maintenance. The Library guide link opens separately to preserve an unfinished form. All categories share one complete schema-backed draft with grouped typed controls and a subtle closed **Raw YAML** disclosure. Nested prerequisites, conditional defaults, specialization overrides, procedures and complete calculation expression graphs are editable through controls. Exact list rows preserve commas in tags/groups; optional, null and empty declarations remain distinct. Armor keeps its guided DR, coverage and facing controls. Invalid drafts remain open with named errors.
 - **Faithful library pricing and editions.** Sources and standalone modifiers share the local-first library. Complete definitions resolve bounded declarative points, percentage, cost and weight rules; character purchases retain pricing snapshots and require explicit re-resolution after source changes. Incomplete/example/reference records stay searchable but cannot be adopted. Source-qualified editions coexist, with campaign priority and preferred overrides. Items support independent stable weapon modes and simultaneous facets. See [calculation rules](library-calculation-rules.md).
 - **New-campaign sourcebooks.** Campaign creation seeds 16 common GURPS Fourth Edition source records, including the combined Basic Set, Fourth Edition Revised (`B`) in place of the separate unrevised Characters and Campaigns books. Sources appear as a flat list without a Publications group heading or group folding. Library rows and expanded details contain no metadata badges. Citations appear beside the summary on collapsed rows at every width. The owner can delete any source they want to exclude; existing campaigns are not changed.
-- **Campaign library**: per-campaign catalog of traits, skills, spells,
+- **Campaign library**: per-campaign catalog of sources, modifiers, races, traits, skills, spells,
   items, enchantments, active effects, languages, techniques, and styles. It is
   **fully sync-backed**: every member browses it from Dexie (offline too), and
   the owner's creates, edits and deletes go through the outbox (edits are
   whole-entry patches, AGENTS.md S13) with the standard rejection toast and row
   flash. **Restricted** entries remain GM-only across library reads, export,
   sync and history; existing character snapshots remain usable. The in-app catalog editor (`/campaigns/:id/library`) offers dedicated
-  CRUD forms for ten standard categories plus the opt-in Active Effects experiment, including **languages, techniques and styles**.
+  CRUD forms for all twelve categories, including **languages, techniques and styles**.
+  Owners can author archived Active Effects and conditional declarations while the
+  experiment is disabled; instance management and runtime calculations remain gated.
+  Item controls include optional container, armor, weapon, powerstone and magic-item
+  facets plus attached enchantment levels, notes and independent mechanics snapshots.
+  Unrelated edits preserve imported details and dormant facet values.
   The dedicated character-sheet Languages and Techniques panels consume their
   definitions through autocompletes; styles remain library reference packages. Built for
   libraries with hundreds of entries: each category is one compact table with
@@ -955,7 +961,7 @@ settings sections; switching sections retains drafts.
   light category groups that fold (traits by kind, skills by attribute, spells
   by college, items by category, languages by spoken/sign form, techniques by
   default skill, styles by first component skill, enchantments by applicability,
-  enabled active effects by first tag) and a jump strip to any group. Group anchors retain
+  active effects by first tag) and a jump strip to any group. Group anchors retain
   distinct identities for Unicode, case and punctuation variations. Group labels
   and mobile row metadata wrap long unspaced category names while preserving the
   count and fold control. Rows show the name, key numbers
@@ -978,10 +984,15 @@ settings sections; switching sections retains drafts.
   **importable/exportable as versioned YAML**
   for sharing between campaigns. The campaign workspace's **Import & export** tab
   (`/campaigns/:id/library-transfer`) holds whole-library and sourcebook-scoped
-  transfers; long sourcebook selection labels wrap beside their checkboxes within
+  transfers plus a structured **Edit package** composer for coordinated changes
+  across categories and optional campaign settings. The composer offers category
+  inclusion, source scope and Merge/Replace, with a closed Raw YAML disclosure;
+  excluding a category preserves its baseline rather than implicitly pruning it.
+  Review reuses the file import's graph validation and confirmation, retaining
+  same-campaign enchantment links in staged packages. Long sourcebook selection labels wrap beside their checkboxes within
   the transfer card. `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
-  Import is the one online-only library action; the page pulls its result into
+  File and staged-package imports are the one online-only bulk library action; the page pulls their result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization
   policies and per-catalog-option rule overrides; portable YAML v15 retains them.
@@ -1276,7 +1287,14 @@ src/
                  (cached human-readable-field matcher), plus EffectsEditor, the
                  reusable ordered effect authoring UI shared with
                  character-owned trait mechanics, and LibraryFormFooter
-                 (the Cancel/Add-or-Save actions every entry form shares)
+                 (the Cancel/Add-or-Save actions every entry form shares),
+                 LibraryEntryEditor (complete draft, validation, raw YAML),
+                 LibraryEntryFields and StructuredFields (grouped domain controls
+                 and recursive schema controls), EditorValidity (nested draft
+                 validation and explicit-removal cleanup), editorSchema/libraryEditorSchemas
+                 (runtime schema helpers and category mapping),
+                 LibraryAuthoringContext/SourcebooksContext (campaign references),
+                 LibraryPackageEditor (staged multi-category transfer authoring)
       help/      CampaignLibraryHelpPage and campaign-library.md (in-app authoring guide)
       characters/CharacterCard.tsx  Shared character cards for home, listing, campaign roster and GM dashboard
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
@@ -1318,9 +1336,9 @@ src/
     lib/editingFocusBounds.ts  Rich-text selection and textarea caret geometry for library focus scrolling
     features/library/  CalculationEditor, PricingResolver, RepriceEntry, WeaponModesEditor,
                  LibraryMetadataEditor, LibraryAdvancedFields, SkillRequirementsEditor,
-                 ArmorFacetEditor, LibraryPackagesForms (language/technique/style authoring),
+                 ArmorFacetEditor, ItemEnchantmentEditor, LibraryPackagesForms (language/technique/style adapters),
                  libraryFormErrors and source/modifier CatalogSection; category form files (Trait/Skill/Spell/Item/Enchantment/
-                 ActiveEffectForm) used by the sync-backed library sections
+                 ActiveEffect/RaceForm) adapt the shared complete editor for the sync-backed library sections
     components/ui/Table.tsx  Default-enabled client-only column filter framework:
                  Table, TableHeader, TableBody/TableRow, source-value labels,
                  grouped row hiding, portaled value checklist and persistence

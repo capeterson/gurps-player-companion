@@ -569,7 +569,10 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
   use `--ulimit core=0:0` on local diagnostic runners to surface it promptly.
   Do not overlap server/shared integration tests with OAuth/MCP browser tests
   on the same database: configured-client reconciliation changes global OAuth
-  state. Run them serially. Never add cooldowns without evidence they help.
+  state. Run them serially. Stop this worktree's app service before database
+  integration suites; its development notification worker can claim test history
+  rows. Keep Postgres running and use `run --no-deps` for the test commands.
+  Never add cooldowns without evidence they help.
 
 ## Test discipline
 

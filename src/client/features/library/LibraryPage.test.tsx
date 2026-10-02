@@ -301,7 +301,7 @@ it('searches descriptions and source across words, reports empty results and cle
   expect(await screen.findByRole('button', { name: 'Fearfulness' })).toBeVisible();
 });
 
-it('hides stored active-effect definitions from library navigation and search until campaign opt-in', async () => {
+it('shows stored active-effect definitions in authoring even before campaign opt-in', async () => {
   await seed();
   await getLocalDb().campaignLibraryActiveEffects.put({
     ...activeEffectDefinitionCreate.parse({
@@ -316,15 +316,7 @@ it('hides stored active-effect definitions from library navigation and search un
     revision: 1,
   });
   setup('/?section=activeEffects&q=Hidden%20draught');
-  await screen.findByRole('status');
-  expect(screen.queryByRole('button', { name: /^Active Effects/ })).not.toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Hidden draught' })).not.toBeInTheDocument();
-  expect(screen.getByRole('status')).toHaveTextContent('0 of 2 traits match');
-
-  await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
-  await waitFor(() =>
-    expect(screen.getByRole('button', { name: /^Active Effects/ })).toBeVisible(),
-  );
+  expect(await screen.findByRole('button', { name: /^Active Effects/ })).toBeVisible();
   expect(await screen.findByRole('button', { name: 'Hidden draught' })).toBeVisible();
 });
 
@@ -430,13 +422,13 @@ it('keeps the draft open with the reason when the edit is already known to be in
   await seed();
   setup();
   fireEvent.click(await screen.findByRole('button', { name: 'Edit Fearfulness' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Name *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
     target: { value: 'Night Vision' },
   });
   fireEvent.change(screen.getByLabelText('Kind'), { target: { value: 'advantage' } });
   fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
   expect(await screen.findByText('Duplicate traits edition: Night Vision')).toBeVisible();
-  expect(screen.getByRole('textbox', { name: 'Name *' })).toHaveValue('Night Vision');
+  expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Night Vision');
   expect(await getLocalDb().outbox.count()).toBe(0);
 });
 
@@ -444,7 +436,7 @@ it('creates and deletes a trait through the outbox', async () => {
   await seed();
   setup();
   fireEvent.click(await screen.findByRole('button', { name: '+ Add trait' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Name *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
     target: { value: 'New Trait' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Add trait' }));
@@ -478,19 +470,19 @@ it('creates languages, techniques, and styles through the local-first library ed
 
   fireEvent.click(await screen.findByRole('button', { name: /^Languages/ }));
   fireEvent.click(await screen.findByRole('button', { name: '+ Add language' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Language name *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
     target: { value: 'Trade Sign' },
   });
-  fireEvent.click(screen.getByLabelText('Sign language (no written fluency)'));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Is Sign Language' }));
   fireEvent.click(screen.getByRole('button', { name: 'Add language' }));
   expect(await screen.findByRole('button', { name: 'Trade Sign' })).toBeVisible();
 
   fireEvent.click(screen.getByRole('button', { name: /^Techniques/ }));
   fireEvent.click(await screen.findByRole('button', { name: '+ Add technique' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Technique name *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
     target: { value: 'Elbow Strike' },
   });
-  fireEvent.change(screen.getByRole('textbox', { name: 'Defaults from skill *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Default skill' }), {
     target: { value: 'Karate' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Add technique' }));
@@ -498,13 +490,15 @@ it('creates languages, techniques, and styles through the local-first library ed
 
   fireEvent.click(screen.getByRole('button', { name: /^Styles/ }));
   fireEvent.click(await screen.findByRole('button', { name: '+ Add style' }));
-  fireEvent.change(screen.getByRole('textbox', { name: 'Style name *' }), {
+  fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), {
     target: { value: 'Northern Fist' },
   });
-  fireEvent.change(screen.getByRole('textbox', { name: 'Skills (one per line)' }), {
+  fireEvent.click(screen.getByRole('button', { name: 'Add skills' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Skills 1' }), {
     target: { value: 'Karate, specialized' },
   });
-  fireEvent.change(screen.getByRole('textbox', { name: 'Perks (one per line)' }), {
+  fireEvent.click(screen.getByRole('button', { name: 'Add perks' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Perks 1' }), {
     target: { value: 'Style Adaptation' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Add style' }));

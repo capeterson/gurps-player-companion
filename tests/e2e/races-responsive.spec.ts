@@ -59,41 +59,56 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
     'Northwood caste with a long ceremonial name to exercise narrow viewport wrapping';
   const lensName = 'Synthetic Night Sight lens with a long title for mobile wrapping';
   await page.getByRole('button', { name: '+ Add race', exact: true }).click();
-  await page.getByLabel('Race or lens name').fill(raceName);
-  await page.getByLabel('Package points').first().fill('25');
-  await page.getByText('Component traits · 0', { exact: true }).click();
-  await page.getByRole('button', { name: 'Add component trait' }).click();
-  await page.getByLabel('Trait name').fill('Acute Vision');
-  await page.getByLabel('Trait points').fill('2');
-  await page.getByLabel('Component key').fill('acute-vision');
-  await page.getByText('Variants · 0', { exact: true }).click();
-  await page.getByRole('button', { name: 'Add variant' }).click();
-  await page.getByLabel('Option name').fill(variantName);
-  await page.getByLabel('Option key').fill('northwood');
-  await page.getByLabel('Package points').nth(1).fill('30');
+  const raceNameField = page.locator('[data-field-path="name"]');
+  await raceNameField.fill(raceName);
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Racial profile and options/ })
+    .click();
+  await page.locator('[data-field-path="points"]').fill('25');
+  await page.getByRole('button', { name: 'Add specific traits', exact: true }).click();
+  const racialTrait = page.getByRole('group', { name: 'Specific traits 1' });
+  await racialTrait.locator('[data-field-path="traits.0.name"]').fill('Acute Vision');
+  await racialTrait.locator('[data-field-path="traits.0.points"]').fill('2');
+  await racialTrait.locator('[data-field-path="traits.0.key"]').fill('acute-vision');
+  await page.getByRole('button', { name: 'Add variants', exact: true }).click();
   const variantGroup = page.getByRole('group', { name: 'Variants 1' });
-  await variantGroup.getByLabel('ST', { exact: true }).fill('1');
+  await variantGroup.locator('[data-field-path="variants.0.name"]').fill(variantName);
+  await variantGroup.locator('[data-field-path="variants.0.key"]').fill('northwood');
+  await variantGroup.locator('[data-field-path="variants.0.points"]').fill('30');
+  await variantGroup.getByLabel('Attribute adjustments setting').selectOption('value');
+  await variantGroup.getByLabel('ST setting').selectOption('value');
+  await variantGroup.locator('[data-field-path="variants.0.attributeModifiers.st"]').fill('1');
+  await variantGroup.getByRole('button', { name: 'Add features', exact: true }).click();
   await variantGroup
-    .getByLabel('Features (one per line)')
+    .locator('[data-field-path="variants.0.features.0"]')
     .fill(
       'A ceremonial forest tradition described with enough synthetic detail to confirm preview text wraps cleanly on a phone.',
     );
-  await variantGroup.getByText('Racial skill purchases · 0', { exact: true }).click();
-  await variantGroup.getByRole('button', { name: 'Add racial skill' }).click();
-  await variantGroup.getByLabel('Skill name').fill('Forest Lore');
-  await variantGroup.getByLabel('Purchased points').fill('2');
-  const racialSkillFields = variantGroup.getByRole('group', { name: 'Skill 1' });
-  await racialSkillFields.locator('select').nth(0).selectOption('IQ');
-  await racialSkillFields.locator('select').nth(1).selectOption('A');
-  await page.getByText('Alternate forms · 0', { exact: true }).click();
-  await page.getByRole('button', { name: 'Add form' }).click();
-  await page.getByLabel('Option name').nth(1).fill('Owl form');
-  await page.getByLabel('Option key').nth(1).fill('owl-form');
-  await page
-    .getByRole('group', { name: 'Alternate forms 1' })
-    .getByLabel('ST', { exact: true })
-    .fill('2');
-  const raceNameField = page.getByLabel('Race or lens name');
+  await variantGroup.getByRole('button', { name: 'Add skills', exact: true }).click();
+  const racialSkillFields = variantGroup.getByRole('group', { name: 'Skills 1' });
+  await racialSkillFields
+    .locator('[data-field-path="variants.0.skills.0.name"]')
+    .fill('Forest Lore');
+  await racialSkillFields
+    .locator('[data-field-path="variants.0.skills.0.key"]')
+    .fill('forest-lore');
+  await racialSkillFields.locator('[data-field-path="variants.0.skills.0.points"]').fill('2');
+  await racialSkillFields.getByLabel('Attribute setting').selectOption('value');
+  await racialSkillFields.getByLabel('Difficulty setting').selectOption('value');
+  await racialSkillFields
+    .locator('[data-field-path="variants.0.skills.0.attribute"]')
+    .selectOption('IQ');
+  await racialSkillFields
+    .locator('[data-field-path="variants.0.skills.0.difficulty"]')
+    .selectOption('A');
+  await page.getByRole('button', { name: 'Add forms', exact: true }).click();
+  const formGroup = page.getByRole('group', { name: 'Forms 1' });
+  await formGroup.locator('[data-field-path="forms.0.name"]').fill('Owl form');
+  await formGroup.locator('[data-field-path="forms.0.key"]').fill('owl-form');
+  await formGroup.getByLabel('Attribute adjustments setting').selectOption('value');
+  await formGroup.getByLabel('ST setting').selectOption('value');
+  await formGroup.locator('[data-field-path="forms.0.attributeModifiers.st"]').fill('2');
   await raceNameField.scrollIntoViewIfNeeded();
   await captureReviewScreenshot(page, {
     path: testInfo.outputPath('race-editor-desktop.png'),
@@ -117,9 +132,14 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   await expect(raceRow).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole('button', { name: '+ Add race', exact: true }).click();
-  await page.getByLabel('Race or lens name').fill(lensName);
-  await page.getByLabel('Definition type').selectOption('lens');
-  await page.getByLabel('Package points').first().fill('5');
+  await page.locator('[data-field-path="name"]').fill(lensName);
+  await page.getByLabel('Kind setting').selectOption('value');
+  await page.getByRole('combobox', { name: 'Kind', exact: true }).selectOption('lens');
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Racial profile and options/ })
+    .click();
+  await page.locator('[data-field-path="points"]').fill('5');
   await page.getByRole('button', { name: 'Add race', exact: true }).click();
   await expect(page.getByRole('button', { name: lensName, exact: true })).toBeVisible({
     timeout: 20_000,
@@ -127,7 +147,7 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
 
   const editRace = page.getByRole('button', { name: `Edit ${raceName}` });
   await editRace.click();
-  await page.getByLabel('Race or lens name').fill(`${raceName} revised`);
+  await page.locator('[data-field-path="name"]').fill(`${raceName} revised`);
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   const revisedName = `${raceName} revised`;
   await expect(page.getByRole('button', { name: revisedName, exact: true })).toBeVisible({

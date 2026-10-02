@@ -148,11 +148,15 @@ rejection still uses the standard toast + rollback flash path.
 `experimentalActiveEffects` is owner-controlled and defaults false for new and
 existing campaigns (migration 0064). **Settings → Rules → Experimental features →
 Enable active effects** exposes active instance management, the library category, conditional
-modifier controls/authoring and the experimental guide section. Disabled campaigns
-and campaignless or unresolved local campaigns neither display these tools nor
-apply active instances or conditional declarations in shared calculations. Stored
-data is retained. Dedicated instance/group and definition mutations are gated in
-shared REST/sync/MCP handlers; YAML transfer remains available for archived data.
+modifier controls on character sheets and the experimental guide section. Disabled
+campaigns and campaignless or unresolved local campaigns do not expose instance
+management or apply active instances and conditional declarations in shared
+calculations. Stored data is retained. Instance/group mutations remain gated in
+shared REST/sync/MCP handlers. Campaign owners can still author archived library
+definitions and conditional declarations, including their typed capabilities and
+parameters, through ordinary library CRUD and package editing. Members see the
+library category in the PWA when the experiment is enabled; authorized aggregate
+library reads and YAML transfer retain archived definitions.
 Campaign PATCH is online-only and audited; REST/cursor mirrors preserve the saved
 choice offline. Manual temporary stat modifiers and skill procedures are independent.
 See [active-effects-skill-procedures.md](active-effects-skill-procedures.md).
@@ -429,6 +433,32 @@ seeds the character row's written fluency to `n/a`.
   trait/skill/spell/item/enchantment/language/technique. All of them read the
   synced Dexie stores.
 
+Category forms share one complete writable-schema draft through
+`LibraryEntryEditor` and `LibraryEntryFields`. Guided controls and a subtle
+closed **Raw YAML** disclosure edit that same draft. Reading, folding, or changing
+another field never rebuilds an entry from a partial selection of its properties.
+Raw entry YAML translates sourcebook references to portable source keys; readable
+incomplete values remain correctable through the form, while malformed YAML is
+retained until repaired or explicitly replaced with the last readable draft.
+Schema and domain validation runs before a whole-entry outbox mutation.
+
+Typed controls cover nested ALL/ANY prerequisites, conditional defaults and
+specialization overrides, contextual modifiers/actions/benefits, full bounded
+calculation inputs/tables/expression steps/outputs, and reusable modifier
+applicability. List rows retain exact strings, including commas in groups and
+tags. Optional, null, and explicit-empty declarations retain their distinct
+meanings. Metadata includes the excerpt's own locator, separate from the
+publication page. Ordinary forms preserve definition keys without a key input;
+**Match another edition** chooses an existing named definition's stable key.
+
+Equipment editors cover armor, weapon modes and held side, containers,
+powerstone capacity/starting energy, magic-item modes/charges/energy, and attached
+enchantment levels and notes. Editing an unrelated field preserves dormant
+container values and imported optional facets. Linked enchantment mechanics are
+the source definition's snapshot; **Make independent** retains that snapshot and
+then allows editing its mechanics. Racial profiles and effect definitions use
+the same complete draft and campaign-backed item/reference pickers.
+
 Library enchantments declare `weapon`, `armor`, `shield`, or `any` applicability;
 typed flat effects; optional level-specific effects; and either additive stacking
 or a highest-only stacking key. Library items and character inventory items can
@@ -634,6 +664,27 @@ mechanism for sharing content between campaigns or seeding a new one.
     reports whether anything was actually written (false when the flag was
     off, the document had no `campaign` block, or the block had no
     recognized fields).
+- **Staged package editing:** **Import & export → Edit package** starts from
+  the current library and offers structured add/edit/remove operations across
+  all twelve categories, category inclusion, whole-library or selected-sourcebook
+  scope, optional campaign settings, and Merge/Replace. A subtle **Raw YAML**
+  disclosure edits the package draft; invalid text remains visible and blocks
+  review. Excluded optional categories are omitted, while excluded required
+  `traits`, `skills`, and `items` retain their baseline rows so YAML defaults
+  cannot turn exclusion into accidental pruning. Source records accompany their
+  definitions. Settings are unavailable for source-scoped packages, and the typed
+  settings editor omits the campaign name because imports never rename campaigns.
+  Package Review uses the same final-graph validation, edition decisions,
+  incoming/removal counts, confirmation, and online bulk import handler as a file
+  import. Review names staged changes outside the selected sourcebooks instead of
+  silently filtering them out; unchanged entries outside the scope remain untouched.
+  New entries inherit the selected sourcebook when exactly one is selected. Raw
+  editing waits until invalid local entry fields are corrected, so a raw replacement
+  cannot discard an unresolved field draft. Replace removals apply only after confirmation. This editor stages a
+  package for its current campaign and preserves linked enchantment IDs and owned
+  snapshots; the separate portable download export still strips campaign-local
+  attachment IDs. Import failure keeps the package draft open, and success pulls
+  committed rows into Dexie.
 - **Seed:** `db:seed` imports `bootstrap/sample_library.yaml` into Sample and
   creates The Lantern Coast from the synthetic `bootstrap/lantern_coast.yaml`
   plus six populated character fixtures. Its owner, manager, and member accounts, private/shared
@@ -778,7 +829,8 @@ a new mutating route must be added to the guard test's `MUTATING_ROUTE_FILES`.
 ## Active-effect library and skill procedures (YAML v11)
 
 Library owners can create, search, edit and delete active-effect definitions at
-`/library/active-effects`; members read them in the aggregate library. YAML v11 adds
+the Active Effects library category, even when the campaign experiment is disabled;
+members read them in the aggregate library. YAML v11 adds
 optional `library.activeEffects` and skill `procedures` (modifiers/actions/benefits).
 Omitting the new library section during replace import preserves existing definitions.
 Applied character effects keep owned mechanics on source deletion or campaign
@@ -795,11 +847,13 @@ contents links to focusable headings with the live header scroll offset. It cove
 source identity, completeness, basic authoring and adoption, bounded calculations,
 advanced mechanical rules, import/prune and deliberate updates. The article uses
 original examples rather than distributing rulebook content. Optional editor
-sections retain mounted drafts while folded; invalid advanced fields reopen their
-section. Source metadata validates in place and keeps its correction visible until
-repaired. Source forms present named validation errors, required labels and first-error
-focus. Skill prerequisites/defaults offer common guided rules and preserve nested or
-conditional definitions in their advanced JSON editor.
+sections retain mounted drafts while folded. Raw-YAML parsing errors reopen their
+disclosure. Source metadata validates in place and keeps its correction visible until
+repaired. Entry forms present named validation errors. Skill prerequisites/defaults
+offer complete typed nested and conditional controls, including per-specialization
+inherit/clear/override declarations. Procedures and calculations expose every
+supported schema branch through typed controls. Raw YAML remains available as a
+closed disclosure for the entire entry and for staged packages.
 
 Item armor authoring offers guided base/crushing/typed DR, DB, flexibility, coverage
 (including removable custom locations), facing and notes. Advanced YAML round-trips
@@ -808,7 +862,7 @@ controls prevent simultaneous front-only/back-only selection and explain conflic
 imported data; saving contradictory facing YAML is blocked until repaired.
 Language/technique/style editors use the same whole-entry outbox
 validation as the other categories, disable edits while a submit is pending, and
-preserve commas inside newline-separated style component names. Styles remain
+preserve exact style component names in list rows. Styles remain
 reference packages: players learn constituent entries individually.
 
 ## Image visibility

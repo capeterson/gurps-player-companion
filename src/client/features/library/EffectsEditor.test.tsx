@@ -71,8 +71,8 @@ describe('EffectsEditor', () => {
     ]);
   });
 
-  it('keeps saved conditional declarations but hides condition editing while the campaign flag is off', async () => {
-    await renderEditor(
+  it('keeps portable condition editing available while the campaign flag is off', async () => {
+    const { onChange } = await renderEditor(
       [
         {
           target: 'dx',
@@ -84,10 +84,39 @@ describe('EffectsEditor', () => {
       ],
       false,
     );
+    expect(await screen.findByText('Condition', { selector: 'summary' })).toBeVisible();
+    fireEvent.click(screen.getByText('Condition', { selector: 'summary' }));
+    const label = screen.getByPlaceholderText('Against fear');
+    fireEvent.change(label, { target: { value: 'While focused' } });
+    expect(onChange).toHaveBeenLastCalledWith([
+      {
+        target: 'dx',
+        value: 2,
+        scaling: 'flat',
+        conditionGroup: 'focused',
+        conditionLabel: 'While focused',
+      },
+    ]);
+  });
+
+  it('keeps character-owned condition editing behind the experiment gate', async () => {
+    renderWithQuery(
+      <EffectsEditor
+        effects={[
+          {
+            target: 'dx',
+            value: 2,
+            scaling: 'flat',
+            conditionGroup: 'focused',
+            conditionLabel: 'Focused',
+          },
+        ]}
+        portable={false}
+        onChange={vi.fn()}
+      />,
+    );
     expect(screen.queryByText('Condition', { selector: 'summary' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('focused')).not.toBeInTheDocument();
-    await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
-    expect(await screen.findByText('Condition', { selector: 'summary' })).toBeVisible();
   });
 
   it('retains blank numeric and label-first drafts while reporting field errors', async () => {
@@ -151,6 +180,56 @@ describe('EffectsEditor', () => {
         value: 1,
         scaling: 'flat',
         weaponSelector: { kind: 'weapon_skill', skillName: 'Broadsword' },
+      },
+    ]);
+  });
+
+  it('preserves unresolved name-only library weapons and edits mode key and mode name independently', () => {
+    const onChange = vi.fn();
+    renderWithQuery(
+      <EffectsEditor
+        effects={[
+          {
+            target: 'weapon_attack',
+            value: 2,
+            scaling: 'flat',
+            weaponSelector: {
+              kind: 'library_item',
+              libraryItemName: 'Lost dueling blade',
+              modeKey: 'thrust-key',
+              modeName: 'Quick thrust',
+            },
+          },
+        ]}
+        campaignId={CAMPAIGN}
+        onChange={onChange}
+      />,
+    );
+
+    const name = screen.getByLabelText('Library item name *');
+    expect(name).toHaveValue('Lost dueling blade');
+    fireEvent.change(name, { target: { value: 'Renamed dueling blade' } });
+    const modeKey = screen.getByLabelText('Stable attack mode key (optional)');
+    const modeName = screen.getByLabelText('Exact attack mode name (optional)');
+    expect(modeKey).toHaveValue('thrust-key');
+    expect(modeName).toHaveValue('Quick thrust');
+    fireEvent.change(modeKey, { target: { value: 'alternate-thrust' } });
+    expect(modeName).toHaveValue('Quick thrust');
+    fireEvent.change(modeName, { target: { value: 'Lunging thrust' } });
+    expect(modeKey).toHaveValue('alternate-thrust');
+    fireEvent.change(screen.getByLabelText('Effect 1 bonus'), { target: { value: '3' } });
+
+    expect(onChange).toHaveBeenLastCalledWith([
+      {
+        target: 'weapon_attack',
+        value: 3,
+        scaling: 'flat',
+        weaponSelector: {
+          kind: 'library_item',
+          libraryItemName: 'Renamed dueling blade',
+          modeKey: 'alternate-thrust',
+          modeName: 'Lunging thrust',
+        },
       },
     ]);
   });

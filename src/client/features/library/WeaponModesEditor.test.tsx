@@ -22,7 +22,7 @@ describe('WeaponModesEditor', () => {
     });
   });
 
-  it('preserves imported YAML in advanced mode and emits edits without reshaping them', () => {
+  it('edits imported legacy mode details in the complete typed view', () => {
     const onChange = vi.fn();
     render(
       <WeaponModesEditor
@@ -31,13 +31,26 @@ describe('WeaponModesEditor', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit weapon YAML' }));
-    const editor = screen.getByLabelText('Weapon modes (YAML)');
-    const edited = 'modes:\n  - key: thrust\n    name: Thrust\n    damage: "thr+3 imp"\n';
-    fireEvent.change(editor, { target: { value: edited } });
-    expect(onChange).toHaveBeenLastCalledWith(edited);
-    expect(screen.getByLabelText('Weapon modes (YAML)')).toHaveValue(
-      'modes:\n  - key: thrust\n    name: Thrust\n    damage: "thr+2 imp"\n',
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'All weapon fields' }));
+    fireEvent.change(screen.getByLabelText('Damage'), { target: { value: 'thr+3 imp' } });
+    expect(parse(onChange.mock.lastCall?.[0] as string)).toMatchObject({
+      modes: [{ key: 'thrust', name: 'Thrust', damage: 'thr+3 imp' }],
+    });
+  });
+
+  it('retains an incomplete bulk draft through another edit, then parses the completed number', () => {
+    const onChange = vi.fn();
+    render(<WeaponModesEditor text="" onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Weapon or shield' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ranged statistics' }));
+    fireEvent.change(screen.getByLabelText('bulk'), { target: { value: '-' } });
+    fireEvent.change(screen.getByLabelText('name'), { target: { value: 'Longbow' } });
+    expect(screen.getByLabelText('bulk')).toHaveValue('-');
+
+    fireEvent.change(screen.getByLabelText('bulk'), { target: { value: '-6' } });
+    expect(parse(onChange.mock.lastCall?.[0] as string)).toMatchObject({
+      modes: [{ name: 'Longbow', ranged: { bulk: -6 } }],
+    });
   });
 });

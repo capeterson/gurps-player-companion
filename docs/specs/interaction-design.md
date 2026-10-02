@@ -148,8 +148,9 @@ is absent unless the campaign active-effects experiment is enabled and condition
 groups are declared. Its explanation identifies trait
 effects and Combat → Active Effects as the sources of those optional modifiers.
 Campaign settings has the owner-only **Enable active effects** experiment, off by
-default. Disabled campaigns hide every active/conditional tool, authoring control,
-library category and experimental guide section; permanent effect editors remain.
+default. Disabled campaigns hide character activation/conditional tools and experimental
+guide sections. Owners retain archived library definition authoring and conditional
+declarations; these declarations do not apply while activation is disabled.
 Rollback feedback flashes that panel even while its content is folded.
 
 Identity's Description defaults to sanitized markdown with navigable links.
@@ -435,3 +436,25 @@ and library outbox.
 ## Racial templates
 
 Race uses one control in Overview Identity and a centered bounded preview/Apply dialog. Variants, compatible lenses and alternate forms compose a single purchase; Human is the baseline. Race-only skill projections are read-only. The library authoring form uses visual component rows and shared metadata controls. See [races.md](races.md).
+
+## Complete library authoring drafts
+
+Every category uses one complete schema-backed entry draft, grouped by purpose.
+Typed nested controls cover all supported unions, recursive prerequisites,
+procedures, calculation expressions, records and exact string lists. Optional
+rules distinguish **Not specified**, **None**, and **Set value**, including
+specialization inheritance versus an explicit empty default list. Switching a
+rule branch retains its previous draft; array rows keep stable editing identities
+while reordered. Numeric drafts retain incomplete text until corrected.
+
+The subtle **Raw YAML** disclosure edits the same whole-entry draft. Sourcebook
+references use portable labels in source view and named pickers in normal forms.
+Malformed YAML stays visible and blocks saving until repaired or explicitly
+replaced with the last readable draft. Readable but invalid shapes remain editable
+and receive actionable validation on Save. Manual Save validates the complete
+entry before the existing local-first whole-entry outbox mutation.
+
+Armor and weapons retain their visual editors; their detail toggle opens complete
+typed fields. Nested controls do not add a second raw YAML utility. The package
+editor stages coordinated edits across categories and uses the existing online
+import preview and confirmation, preserving a failed package for correction.
