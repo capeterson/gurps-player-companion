@@ -597,9 +597,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   attachment (`<slug>-library.yaml`) including campaign settings. Authorization,
   campaign settings, and all twelve library sections are read on one read-only
   `REPEATABLE READ` transaction, so concurrent edits cannot produce a torn
-  document assembled from different database moments. `?sourceKeys=` accepts a
-  URL-encoded JSON array of source keys and selects
-  one or more first-class source keys and exports only their source records and
+  document assembled from different database moments. `?sourceIds=` accepts a
+  URL-encoded JSON array of sourcebook UUIDs and selects
+  one or more registered sourcebooks and exports only their source records and
   matching entries across all categories, with no campaign settings. Legacy
   source-less entries are excluded. A member's export omits Restricted entries.
 - **Import** (`POST /campaigns/{id}/library/import`): owner only. The UI parses
@@ -617,7 +617,7 @@ mechanism for sharing content between campaigns or seeding a new one.
     (v4) follows the same optional-section rule.
   - Returns per-section `{ created, updated, deleted }` counts.
   - A scoped v14 file or explicit `sourceKeys` selection from a full file
-    imports only those sourcebooks. Replace prunes only matching source-key
+    imports only those sourcebooks. Replace prunes only matching translated source-UUID
     entries in included sections; other sources and unsourced entries remain.
     Source records are upserted, never pruned by a scoped import. Scoped imports
     cannot apply campaign settings. The final graph is validated under the
@@ -646,11 +646,12 @@ mechanism for sharing content between campaigns or seeding a new one.
   play state is preserved on repeat runs. See the
   [seed guide](../../bootstrap/README.md).
 
-Keys used for upsert matching are section + canonical portable key + source key,
+Portable YAML uses source keys; import translates these into target campaign UUIDs.
+Live entry matching uses section + canonical definition key + source UUID,
 with trait kind additionally included. Source-less rows remain legacy editions.
 Names are display labels and duplicate names can coexist under distinct canonical
-keys or editions. Sources use their own canonical key. The final source/reference
-graph is validated before import writes, including entries retained by omitted
+keys or editions. Sourcebooks are identified by UUID; import matches declared publication metadata.
+The final source/reference graph is validated inside the import transaction, including entries retained by omitted
 sections. Source and modifier sections follow the omission-versus-empty replace
 rule. Export is canonical YAML v15; v1–v14 remain valid compatibility inputs. Older weapon Range strings convert on import; v13 and later require structured Range objects.
 
@@ -662,8 +663,8 @@ pricing snapshots/re-resolution, source preference and independent weapon modes.
 ## Library search and description editing
 
 The campaign **Import & export** tab contains every YAML transfer control. Its
-sourcebook picker selects registered source keys rather than legacy citation
-text. The editor's category search and source filter do not affect transfers.
+sourcebook picker selects registered UUIDs and shows abbreviation-prefixed titles.
+Source keys exist only in portable files and incoming file scopes. The editor's category search and source filter do not affect transfers.
 
 The library management UI filters the current category as the user types in
 **Search library**. Matching is case-insensitive:

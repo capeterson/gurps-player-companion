@@ -49,22 +49,30 @@ export async function validateLibraryPricingChange(
   existingId?: string,
 ): Promise<void> {
   /* compatibility guard; full graph validation follows */
-  if (typeof body.sourceKey === 'string') {
+  if (typeof body.sourceId === 'string') {
     const sources = await tx
       .select()
       .from(campaignLibrarySources)
       .where(eq(campaignLibrarySources.campaignId, campaignId));
-    if (
-      !sources.some((source) => source.key.toLowerCase() === String(body.sourceKey).toLowerCase())
-    )
-      throw new HTTPException(400, { message: 'Unknown source key' });
+    if (!sources.some((source) => source.id === body.sourceId))
+      throw new HTTPException(400, { message: 'Sourcebook does not belong to this campaign' });
   }
+  // A REST source create receives its UUID from PostgreSQL on insert. Adding
+  // an unreferenced book cannot invalidate existing links; its metadata has
+  // already passed the create schema. Updates and sync creates have a UUID.
+  if (section === 'sources' && !existingId) return;
   const catalog = await loadLibraryGraph(tx, campaignId);
   const rows = [...(catalog[section] ?? [])];
   const index = rows.findIndex((row) =>
-    existingId ? row.id === existingId : libraryEntryKey(row) === libraryEntryKey(body as never),
+    existingId
+      ? row.id === existingId
+      : section !== 'sources' && libraryEntryKey(row) === libraryEntryKey(body as never),
   );
-  const merged = { ...(index >= 0 ? rows[index] : {}), ...body } as LibraryGraphEntry;
+  const merged = {
+    ...(index >= 0 ? rows[index] : {}),
+    ...body,
+    ...(section === 'sources' ? { id: existingId } : {}),
+  } as LibraryGraphEntry;
   if (index >= 0) rows[index] = merged;
   else rows.push(merged);
   try {

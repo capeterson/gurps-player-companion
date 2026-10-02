@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
-import { libraryTraitCreate } from '../schemas/campaignLibrary.ts';
+import { type LibraryYamlDoc, libraryTraitCreate } from '../schemas/campaignLibrary.ts';
 import { characterCreate } from '../schemas/character.ts';
 import { libraryRaceOut } from '../schemas/race.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
@@ -121,7 +121,7 @@ it('carries YAML damage declarations through the full character builder', () => 
             { target: 'damage_thrust', value: 1 },
             { target: 'damage_swing', value: 2 },
           ],
-        }),
+        }) as unknown as LibraryYamlDoc['library']['traits'][number],
       ],
       skills: [],
       spells: [],
@@ -227,7 +227,7 @@ describe('character skill effect specialization', () => {
       name: 'Pistol Talent',
       kind: 'advantage',
       effects: [{ target: 'skill', value: 2, skillName: 'Guns', skillSpecialty: 'Pistol' }],
-    });
+    }) as unknown as LibraryYamlDoc['library']['traits'][number];
     const yaml = emitLibraryYaml({
       traits: [definition],
       skills: [],

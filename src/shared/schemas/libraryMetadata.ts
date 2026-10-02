@@ -13,7 +13,7 @@ export const extractionRecord = z
 /** Optional at the compatibility boundary; persistence supplies explicit defaults. */
 export const libraryMetadataShape = {
   key: calculationKey.optional(),
-  sourceKey: calculationKey.nullable().optional(),
+  sourceId: uuid.nullable().optional(),
   sourceLocator: z.string().max(240).nullable().optional(),
   status: z.enum(['complete', 'needs_review', 'reference_only']).optional(),
   role: z.enum(['definition', 'template', 'example', 'reference']).optional(),
@@ -27,7 +27,6 @@ export type LibraryMetadata = z.infer<typeof libraryMetadata>;
 export const librarySourceCreate = z
   .object({
     name: z.string().trim().min(1).max(160).describe('Publication title'),
-    key: calculationKey,
     abbreviation: z.string().trim().min(1).max(40),
     edition: z.string().max(160).nullable().optional(),
     priority: z.number().int().min(0).max(100000).default(100),

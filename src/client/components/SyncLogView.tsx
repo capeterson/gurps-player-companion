@@ -123,6 +123,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
   const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
   const recentChanges = combineBursts(combineAcknowledgements(log ?? []));
+  const sourceHolds = (outbox ?? []).filter((op) => op.localSourceMigrationUnknown);
   const campaignHolds = (outbox ?? []).filter((op) => op.localCampaignDependencyUnknown);
   const confirmCampaignOrder = async (op: OutboxEntry, wait: boolean) => {
     try {
@@ -141,7 +142,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
       toasts.push(
         op.preservedNewerEdit
           ? `${changeName(op)} failed attempt removed; newer local edit kept`
-          : `${changeName(op)} reverted to the last server-synced value`,
+          : op.command === 'create'
+            ? `${changeName(op)} unsaved addition removed`
+            : `${changeName(op)} reverted to the last server-synced value`,
         { kind: 'success' },
       );
       setRevertTarget(null);
@@ -287,6 +290,33 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 )}
               </div>
             </section>
+            {sourceHolds.length > 0 && (
+              <section aria-label="Choose sourcebooks for retained edits">
+                <h3 className="font-semibold text-warning">
+                  Choose a sourcebook for an older edit
+                </h3>
+                <p className="text-sm">
+                  Edit the entry and choose its sourcebook. For an unsaved addition, revert the
+                  older edit and add it again.
+                </p>
+                {sourceHolds.map((op) => (
+                  <article key={op.clientOpId} className="mt-2 space-y-2 text-sm break-words">
+                    <p>
+                      {changeName(op, isOutboxAccessRestricted(op, access), currentEntity(op))}:{' '}
+                      {op.serverReason}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline btn-error"
+                      disabled={working}
+                      onClick={() => setRevertTarget(op)}
+                    >
+                      Revert older edit
+                    </button>
+                  </article>
+                ))}
+              </section>
+            )}
             {campaignHolds.length > 0 && (
               <section aria-label="Confirm campaign order">
                 <h3 className="font-semibold text-warning">Confirm an older unsaved addition</h3>
@@ -518,7 +548,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
         open={revertTarget !== null}
         title="Revert this local change?"
         confirmLabel={working ? 'Reverting…' : 'Revert change'}
-        cancelLabel="Keep retrying"
+        cancelLabel={revertTarget?.localSourceMigrationUnknown ? 'Keep edit' : 'Keep retrying'}
         tone="error"
         onConfirm={() => {
           if (!working) void revert();
@@ -527,8 +557,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           if (!working) setRevertTarget(null);
         }}
       >
-        The local value will return to its last server-synced value and this change will stop
-        retrying.
+        {revertTarget?.command === 'create'
+          ? 'The unsaved addition and its later queued edits will be removed from this device.'
+          : 'The local value will return to its last server-synced value and this change will stop retrying.'}
       </ConfirmDialog>
 
       <ConfirmDialog

@@ -12,6 +12,8 @@ import {
   validatePricingCatalog,
 } from './libraryPricing.ts';
 
+const CORE_ID = '0193b3c0-f1f0-7000-8000-00000000a201';
+
 const trait = (overrides: Partial<PricedDefinition> = {}): PricedDefinition => ({
   id: '00000000-0000-4000-8000-000000000001',
   name: 'Acute Vision',
@@ -52,17 +54,17 @@ describe('library pricing', () => {
   });
 
   test('builds canonical references and finds source/kind-specific entries', () => {
-    const entry = trait({ key: 'acute vision', sourceKey: 'core', kind: 'advantage' });
+    const entry = trait({ key: 'acute vision', sourceId: CORE_ID, kind: 'advantage' });
     expect(definitionReference('traits', entry)).toEqual({
       section: 'traits',
       key: 'acute vision',
-      sourceKey: 'core',
+      sourceId: CORE_ID,
       kind: 'advantage',
     });
     const ref: RuleReference = {
       section: 'traits',
       key: 'ACUTE VISION',
-      sourceKey: 'CORE',
+      sourceId: CORE_ID,
       kind: 'advantage',
     };
     const result = resolveLibraryPricing(catalog({ traits: [entry] }), ref, {});
@@ -70,7 +72,11 @@ describe('library pricing', () => {
     expect(result.reference).toEqual(ref);
     expect(result.outputs).toEqual({ points: 4 });
     expect(() =>
-      resolveLibraryPricing(catalog({ traits: [entry] }), { ...ref, sourceKey: 'other' }, {}),
+      resolveLibraryPricing(
+        catalog({ traits: [entry] }),
+        { ...ref, sourceId: '0193b3c0-f1f0-7000-8000-00000000a202' },
+        {},
+      ),
     ).toThrow(/incomplete or unavailable/);
   });
 
@@ -127,7 +133,7 @@ describe('library pricing', () => {
     const dependencyRef: RuleReference = {
       section: 'traits',
       key: 'training',
-      sourceKey: null,
+      sourceId: null,
       kind: 'advantage',
     };
     const mainRule: CalculationDefinitionV1 = {
@@ -153,7 +159,7 @@ describe('library pricing', () => {
     const main = trait({ calculation: mainRule });
     const resolved = resolveLibraryPricing(
       catalog({ traits: [main, dependency] }),
-      { section: 'traits', key: 'acute-vision', sourceKey: null, kind: 'advantage' },
+      { section: 'traits', key: 'acute-vision', sourceId: null, kind: 'advantage' },
       { rank: 3 },
     );
     expect(resolved.outputs).toEqual({ points: 11 });
@@ -174,7 +180,7 @@ describe('library pricing', () => {
     const dependencyRef: RuleReference = {
       section: 'modifiers',
       key: 'base-modifier',
-      sourceKey: null,
+      sourceId: null,
     };
     const localRule: CalculationDefinitionV1 = {
       version: 1,
@@ -321,7 +327,7 @@ describe('library pricing', () => {
         {
           id: 'missing',
           op: 'call',
-          reference: { section: 'traits', key: 'absent', sourceKey: null, kind: 'advantage' },
+          reference: { section: 'traits', key: 'absent', sourceId: null, kind: 'advantage' },
           output: 'points',
           arguments: {},
         },

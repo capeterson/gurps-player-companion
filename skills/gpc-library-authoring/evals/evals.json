@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": "library-create-approved",
-      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, create Navigation now: IQ/Hard, no specialization, no TL, explicitly no defaults, key navigation, source key frost-handbook, locator p. 12, citation FH p. 12. These rules are approved and complete.",
+      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, create Navigation now: IQ/Hard, no specialization, no TL, explicitly no defaults, key navigation, sourcebook UUID 10000000-0000-4000-8000-000000000101, locator p. 12, citation FH p. 12. These rules are approved and complete.",
       "replies": [
         {
           "id": "campaign",
@@ -86,7 +86,7 @@
                   "attribute": "IQ",
                   "difficulty": "H",
                   "key": "navigation",
-                  "sourceKey": "frost-handbook",
+                  "sourceId": "10000000-0000-4000-8000-000000000101",
                   "sourceLocator": "p. 12",
                   "source": "FH p. 12",
                   "specializationPolicy": {
@@ -126,7 +126,7 @@
                   "attribute": "IQ",
                   "difficulty": "H",
                   "key": "navigation",
-                  "sourceKey": "frost-handbook",
+                  "sourceId": "10000000-0000-4000-8000-000000000101",
                   "sourceLocator": "p. 12",
                   "source": "FH p. 12",
                   "specializationPolicy": {
@@ -151,7 +151,7 @@
     },
     {
       "id": "library-edition-paging",
-      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, update only the Navigation edition with source key frost-handbook-revised: set its description to \"Find a route through snow.\" Search results have one entry per page; preserve the original edition.",
+      "prompt": "In campaign 10000000-0000-4000-8000-000000000003, update only the Navigation edition with sourcebook UUID 10000000-0000-4000-8000-000000000102: set its description to \"Find a route through snow.\" Search results have one entry per page; preserve the original edition.",
       "replies": [
         {
           "id": "campaign",
@@ -208,7 +208,7 @@
                   },
                   "defaults": null,
                   "key": "navigation",
-                  "sourceKey": "frost-handbook",
+                  "sourceId": "10000000-0000-4000-8000-000000000101",
                   "sourceLocator": "p. 12"
                 }
               ]
@@ -246,7 +246,7 @@
                   },
                   "defaults": null,
                   "key": "navigation",
-                  "sourceKey": "frost-handbook-revised",
+                  "sourceId": "10000000-0000-4000-8000-000000000102",
                   "sourceLocator": "p. 18"
                 }
               ]
@@ -303,7 +303,7 @@
                   },
                   "defaults": null,
                   "key": "navigation",
-                  "sourceKey": "frost-handbook-revised",
+                  "sourceId": "10000000-0000-4000-8000-000000000102",
                   "sourceLocator": "p. 18",
                   "description": "Find a route through snow."
                 }

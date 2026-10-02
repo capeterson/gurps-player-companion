@@ -123,7 +123,7 @@ export const raceSourceSnapshot = z
     campaignId: uuid,
     revision: z.number().int().min(-1),
     key,
-    sourceKey: key.nullable(),
+    sourceId: uuid.nullable(),
     name: key,
     source: z.string().max(160).nullable(),
     sourceLocator: z.string().max(240).nullable(),

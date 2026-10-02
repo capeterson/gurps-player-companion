@@ -10,7 +10,7 @@ expose only the public race name, never mechanics or source snapshots.
 ## Campaign definitions
 
 The Races library category uses `libraryRaceCreate` / `libraryRaceUpdate` in
-`src/shared/schemas/race.ts`. Owners author name, source edition and locator,
+`src/shared/schemas/race.ts`. Owners author name, sourcebook and page,
 completeness/restriction metadata, printed total cost, primary and secondary
 attribute deltas, Size Modifier, included trait components, racial skill purchases,
 features, and supported declarative effects. Components have stable local keys.
@@ -73,9 +73,15 @@ migration or repricing would require an explicit new behavior and confirmation.
 
 Migration 0067 creates `campaign_library_races`, with normal revision, history,
 and tombstone triggers, and adds the Human default to existing characters.
+Migration 0068 backfills race sourcebook links and owned provenance to UUIDs,
+using each owned source snapshot's original campaign after character transfers.
+Owned mechanics, forms, and paid package costs remain intact. Sourcebook links
+use campaign-scoped UUID foreign keys; YAML translates portable source labels.
 Dexie v16 adds `campaignLibraryRaces`; `campaign_library_race` participates in
 all library registries, cursor pulls, outbox validation, whole-entry coalescing,
 stale-base handling, rollback toast/flash, access pruning, and logout purge.
+Dexie v17 upgrades cached race definitions, owned provenance, and queued edits
+to sourcebook UUIDs along with the other library categories.
 Race choices use the root character's `race` field patch and `useDraftField`.
 Stale race retries, and campaign retries with a later race choice, retain their
 original enqueue position rather than reordering context-dependent choices.
@@ -89,7 +95,7 @@ minimal-view name so a later privacy sweep uses the current owned race.
 
 YAML v15 exports an optional `races` section, with source-scoped portability and
 canonical keys. Older imports omitting it preserve existing races even in replace
-mode. The shared library graph validates editions and source keys. Campaign and
+mode. The shared library graph validates editions and sourcebook UUIDs. Campaign and
 character history record definition and selection changes respectively.
 `library_race` MCP create/update/delete operations use the same handlers and
 schemas as REST, while existing library reads/import/export and character

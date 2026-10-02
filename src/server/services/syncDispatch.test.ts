@@ -17,6 +17,7 @@ import {
   syncOperationsRequest,
   syncOperationsResponse,
 } from '../../shared/schemas/sync.ts';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { createTestActor } from '../testFixtures.ts';
@@ -173,7 +174,11 @@ function bearer(token: string) {
 }
 
 function jsonHeaders(token: string) {
-  return { ...bearer(token), 'content-type': 'application/json' };
+  return {
+    ...bearer(token),
+    'content-type': 'application/json',
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 async function registerUser(suffix: string) {

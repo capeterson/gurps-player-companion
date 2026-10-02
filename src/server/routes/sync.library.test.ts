@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'bun:test';
 import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
@@ -17,7 +18,11 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 function jsonHeaders(token: string) {
-  return { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  return {
+    Authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 async function registerUser(suffix: string) {
@@ -111,7 +116,7 @@ describe('library classes through /sync/operations', () => {
     {
       entityClass: 'campaign_library_source',
       section: 'sources',
-      body: { name: 'Core Rules', key: 'core', abbreviation: 'CR', priority: 2 },
+      body: { name: 'Core Rules', abbreviation: 'CR', priority: 2 },
     },
     {
       entityClass: 'campaign_library_modifier',
@@ -195,9 +200,20 @@ describe('library classes through /sync/operations', () => {
     },
   );
 
-  it('rejects invalid source references without persisting a REST or sync modifier write', async () => {
+  it('rejects foreign-campaign source UUIDs without persisting a REST or sync modifier write', async () => {
     const owner = await registerUser('modifier-reference-owner');
     const campaignId = await createCampaign(owner.accessToken);
+    const foreignCampaignId = await createCampaign(owner.accessToken);
+    const foreignSourceResponse = await app.request(
+      `/api/v1/campaigns/${foreignCampaignId}/library/sources`,
+      {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name: 'Foreign', abbreviation: 'F' }),
+      },
+    );
+    expect(foreignSourceResponse.status).toBe(201);
+    const foreignSource = (await foreignSourceResponse.json()) as { id: string };
     const rest = await app.request(`/api/v1/campaigns/${campaignId}/library/modifiers`, {
       method: 'POST',
       headers: jsonHeaders(owner.accessToken),
@@ -206,7 +222,7 @@ describe('library classes through /sync/operations', () => {
         category: 'enhancement',
         costType: 'percent',
         calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
-        sourceKey: 'missing-source',
+        sourceId: foreignSource.id,
         applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
       }),
     });
@@ -220,7 +236,7 @@ describe('library classes through /sync/operations', () => {
         name: 'Dangling',
         category: 'enhancement',
         costType: 'percent',
-        sourceKey: 'missing-source',
+        sourceId: foreignSource.id,
         calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
         applicability: { universal: true, traitKinds: [], traitTags: [], traits: [] },
       },

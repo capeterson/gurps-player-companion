@@ -1,9 +1,7 @@
-import { canonicalLibraryKey, libraryEntryKey } from '../domain/libraryIdentity.ts';
+import { canonicalLibraryKey } from '../domain/libraryIdentity.ts';
 import { validateRaceDefinition } from '../domain/race.ts';
 import { upgradeLegacyWeaponRanges } from '../domain/rangedRange.ts';
-import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
-import type { LibraryModifierCreate, LibrarySourceCreate } from '../schemas/libraryMetadata.ts';
-import type { LibraryRaceCreate } from '../schemas/race.ts';
+import type { Portable } from './sourceReferences.ts';
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -25,6 +23,18 @@ import {
   type LibraryYamlDoc,
   libraryYamlDoc,
 } from '../schemas/campaignLibrary.ts';
+
+const libraryEntryKey = (entry: {
+  name: string;
+  key?: string | undefined;
+  kind?: string | undefined;
+  sourceKey?: string | null | undefined;
+}) =>
+  JSON.stringify([
+    entry.kind ?? '',
+    canonicalLibraryKey(entry.key || entry.name),
+    canonicalLibraryKey(entry.sourceKey ?? ''),
+  ]);
 
 /**
  * Current YAML doc version emitted by `emitLibraryYaml`.  v2 added the
@@ -203,26 +213,19 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
   }
 }
 
-export interface LibraryYamlExportInput {
+export type LibraryYamlExportInput = {
   readonly scope?: LibraryYamlDoc['scope'];
-  readonly sources?: readonly LibrarySourceCreate[];
-  readonly modifiers?: readonly LibraryModifierCreate[];
   readonly campaign?: LibraryYamlDoc['campaign'];
-  readonly traits: readonly LibraryTraitCreate[];
-  readonly skills: readonly LibrarySkillCreate[];
-  readonly spells: readonly LibrarySpellCreate[];
-  readonly items: readonly LibraryItemCreate[];
-  readonly languages: readonly LibraryLanguageCreate[];
-  readonly techniques: readonly LibraryTechniqueCreate[];
-  readonly styles: readonly LibraryStyleCreate[];
-  readonly enchantments?: readonly LibraryEnchantmentCreate[];
-  readonly activeEffects?: readonly ActiveEffectDefinition[];
-  readonly races?: readonly LibraryRaceCreate[];
-}
+} & { [K in keyof LibraryYamlDoc['library']]?: LibraryYamlDoc['library'][K] } & Pick<
+    LibraryYamlDoc['library'],
+    'traits' | 'skills' | 'items'
+  >;
 
 /** Stable ordering for byte-stable round trip. */
 const compareText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-function sortedTraits(traits: readonly LibraryTraitCreate[]): LibraryTraitCreate[] {
+function sortedTraits(
+  traits: readonly Portable<LibraryTraitCreate>[],
+): Portable<LibraryTraitCreate>[] {
   return [...traits].sort(
     (a, b) =>
       compareText(a.kind, b.kind) ||
@@ -258,7 +261,7 @@ function compactCampaign(input: NonNullable<LibraryYamlDoc['campaign']>): Record
 }
 
 export function emitLibraryYaml(input: LibraryYamlExportInput): string {
-  const portableEffects = (effects: LibraryTraitCreate['effects']) =>
+  const portableEffects = (effects: Portable<LibraryTraitCreate>['effects']) =>
     effects.map((effect) => {
       if (effect.weaponSelector?.kind !== 'library_item') return effect;
       const { libraryItemId: _libraryItemId, ...weaponSelector } = effect.weaponSelector;
@@ -272,7 +275,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
     ...compact({ ...s, effects: portableEffects(s.effects) }),
     ...(s.defaults != null ? { defaults: s.defaults } : {}),
   }));
-  const spells = sortedByName(input.spells).map((s) => compact(s));
+  const spells = sortedByName(input.spells ?? []).map((s) => compact(s));
   const items = sortedByName(input.items).map((item) =>
     compact({
       ...item,
@@ -281,9 +284,9 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
       ),
     }),
   );
-  const languages = sortedByName(input.languages).map((l) => compact(l));
-  const techniques = sortedByName(input.techniques).map((t) => compact(t));
-  const styles = sortedByName(input.styles).map((st) => compact(st));
+  const languages = sortedByName(input.languages ?? []).map((l) => compact(l));
+  const techniques = sortedByName(input.techniques ?? []).map((t) => compact(t));
+  const styles = sortedByName(input.styles ?? []).map((st) => compact(st));
   const enchantments = sortedByName(input.enchantments ?? []).map((entry) => compact(entry));
 
   const payload: Record<string, unknown> = { version: LIBRARY_YAML_VERSION };

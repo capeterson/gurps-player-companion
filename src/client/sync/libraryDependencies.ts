@@ -2,8 +2,8 @@ import { canonicalLibraryKey } from '../../shared/domain/libraryIdentity.ts';
 import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { OutboxEntry } from '../db/dexie.ts';
 
-type Reference = { section: string; key: string; sourceKey: string; kind?: string };
-type Dependencies = { ids: Set<string>; sources: Set<string>; rules: Reference[] };
+type Reference = { section: string; key: string; sourceId: string; kind?: string };
+type Dependencies = { ids: Set<string>; rules: Reference[] };
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -22,14 +22,15 @@ const precedes = (a: OutboxEntry, b: OutboxEntry) =>
 
 function dependencies(value: unknown): Dependencies {
   const body = record(value);
-  const result: Dependencies = { ids: new Set(), sources: new Set(), rules: [] };
+  const result: Dependencies = { ids: new Set(), rules: [] };
   const reference = (value: unknown) => {
     const ref = record(value);
     if (typeof ref.section !== 'string' || typeof ref.key !== 'string') return;
+    if (typeof ref.sourceId === 'string') result.ids.add(ref.sourceId);
     result.rules.push({
       section: ref.section,
       key: key(ref.key),
-      sourceKey: key(ref.sourceKey),
+      sourceId: typeof ref.sourceId === 'string' ? ref.sourceId : '',
       ...(typeof ref.kind === 'string' ? { kind: ref.kind } : {}),
     });
   };
@@ -45,7 +46,7 @@ function dependencies(value: unknown): Dependencies {
     reference(saved.reference);
     for (const dependency of array(saved.dependencies)) reference(record(dependency).reference);
   };
-  if (typeof body.sourceKey === 'string') result.sources.add(key(body.sourceKey));
+  if (typeof body.sourceId === 'string') result.ids.add(body.sourceId);
   for (const field of [
     'libraryTraitId',
     'librarySkillId',
@@ -84,12 +85,12 @@ function matches(
   if (!campaignId || target.parentId !== campaignId) return false;
   const targetKey = key(body.key || body.name);
   if (!targetKey) return false;
-  if (target.entityClass === 'campaign_library_source') return dependencies.sources.has(targetKey);
+  if (target.entityClass === 'campaign_library_source') return false;
   return dependencies.rules.some(
     (ref) =>
       ref.section === sections[target.entityClass] &&
       ref.key === targetKey &&
-      ref.sourceKey === key(body.sourceKey) &&
+      ref.sourceId === (body.sourceId ?? '') &&
       (!ref.kind || ref.kind === body.kind),
   );
 }
@@ -106,7 +107,7 @@ export function libraryDependencyHeld(
   for (const target of unsettled) {
     if (!isLibraryEntityClass(target.entityClass) || target.entityId === op.entityId) continue;
     const targetBody = { ...record(target.prevValue), ...record(target.attemptedValue) };
-    // Creates have no server row yet. Older edits may introduce a source key or
+    // Creates have no server row yet. Older edits may introduce a sourcebook or
     // rule referenced by this operation. Independent definitions remain parallel.
     if (
       target.command !== 'delete' &&

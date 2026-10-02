@@ -725,7 +725,10 @@ class SyncOrchestrator {
       const db = getLocalDb();
       const op = await db.outbox.get(clientOpId);
       if (!op) throw new Error('This change is no longer pending');
-      if ((op.status !== 'transient_retry' && op.status !== 'pending') || op.attemptCount < 4) {
+      if (
+        (op.status !== 'transient_retry' && op.status !== 'pending') ||
+        (op.attemptCount < 4 && !op.localSourceMigrationUnknown)
+      ) {
         throw new Error('This change is not eligible to be reverted');
       }
       let preservedNewerEdit = false;
@@ -756,13 +759,15 @@ class SyncOrchestrator {
         fieldPath: op.fieldPath,
         humanName: op.humanName,
         batchId: op.batchId,
-        reason: preservedNewerEdit
-          ? `Failed attempt discarded by user after ${op.attemptCount} attempts; a newer local edit was kept${
-              op.serverReason ? ` — ${op.serverReason}` : ''
-            }`
-          : op.serverReason
-            ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
-            : `Discarded by user after ${op.attemptCount} failed attempts`,
+        reason: op.localSourceMigrationUnknown
+          ? `Retained sourcebook edit discarded by user${preservedNewerEdit ? '; newer local edit kept' : ''}`
+          : preservedNewerEdit
+            ? `Failed attempt discarded by user after ${op.attemptCount} attempts; a newer local edit was kept${
+                op.serverReason ? ` — ${op.serverReason}` : ''
+              }`
+            : op.serverReason
+              ? `Discarded by user after ${op.attemptCount} failed attempts — ${op.serverReason}`
+              : `Discarded by user after ${op.attemptCount} failed attempts`,
         // Direction of travel is inverted here: the local row moved away
         // from `attemptedValue`.  It lands on `prevValue` normally, but
         // on the superseding-edit path it keeps the user's newer value

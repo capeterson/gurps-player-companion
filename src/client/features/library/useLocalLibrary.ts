@@ -304,7 +304,6 @@ function naturalKey(section: EditableLibrarySection, body: Record<string, unknow
   const name = String(body.name ?? '')
     .trim()
     .toLowerCase();
-  if (section === 'sources') return String(body.key ?? name).toLowerCase();
   return libraryEntryKey({
     ...body,
     name,
@@ -348,9 +347,14 @@ async function validateEntry(
     ...graph,
     [section]: [
       ...(graph[section] ?? []).filter((row) => row.id !== existingId),
-      { ...body, name: String(body.name ?? '') } as LibraryGraphEntry,
+      {
+        ...body,
+        id: existingId ?? newClientId(),
+        name: String(body.name ?? ''),
+      } as LibraryGraphEntry,
     ],
   });
+  if (section === 'sources') return;
   const entityClass = EDITABLE_LIBRARY_CLASSES[section].entityClass;
   const table = syncEntityTable(entityClass);
   if (!table) return;

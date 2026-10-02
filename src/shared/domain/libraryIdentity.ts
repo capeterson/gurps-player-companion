@@ -7,13 +7,13 @@ export function libraryEntryKey(
   return JSON.stringify([
     entry.kind ?? '',
     canonicalLibraryKey(entry.key || entry.name),
-    canonicalLibraryKey(entry.sourceKey ?? ''),
+    entry.sourceId ?? '',
   ]);
 }
 export function libraryMetadataValues(entry: LibraryMetadata & { name: string }) {
   return {
     key: canonicalLibraryKey(entry.key || entry.name),
-    sourceKey: entry.sourceKey ? canonicalLibraryKey(entry.sourceKey) : null,
+    sourceId: entry.sourceId ?? null,
     sourceLocator: entry.sourceLocator ?? null,
     status: entry.status ?? 'complete',
     role: entry.role ?? 'definition',
@@ -35,17 +35,16 @@ export function canPlayerSelectLibraryEntry(entry: LibraryMetadata): boolean {
 }
 export function preferredLibraryEditions<
   T extends LibraryMetadata & { name: string; kind?: string | undefined },
->(entries: readonly T[], sources: readonly { key: string; priority: number }[]): T[] {
-  const priorities = new Map(sources.map((s) => [canonicalLibraryKey(s.key), s.priority]));
+>(entries: readonly T[], sources: readonly { id: string; priority: number }[]): T[] {
+  const priorities = new Map(sources.map((s) => [s.id, s.priority]));
   const selected = new Map<string, T>();
   function compare(a: T, b: T) {
     return (
       Number(b.preferredEdition ?? false) - Number(a.preferredEdition ?? false) ||
-      (priorities.get(canonicalLibraryKey(a.sourceKey ?? '')) ?? 100000) -
-        (priorities.get(canonicalLibraryKey(b.sourceKey ?? '')) ?? 100000) ||
-      ((a.sourceKey ?? '') < (b.sourceKey ?? '')
+      (priorities.get(a.sourceId ?? '') ?? 100000) - (priorities.get(b.sourceId ?? '') ?? 100000) ||
+      ((a.sourceId ?? '') < (b.sourceId ?? '')
         ? -1
-        : (a.sourceKey ?? '') > (b.sourceKey ?? '')
+        : (a.sourceId ?? '') > (b.sourceId ?? '')
           ? 1
           : 0)
     );
@@ -70,7 +69,7 @@ export function modifierApplies(
       (t) =>
         t.section === 'traits' &&
         canonicalLibraryKey(t.key) === canonicalLibraryKey(trait.key || trait.name) &&
-        canonicalLibraryKey(t.sourceKey ?? '') === canonicalLibraryKey(trait.sourceKey ?? '') &&
+        (t.sourceId ?? '') === (trait.sourceId ?? '') &&
         (!t.kind || t.kind === trait.kind),
     )
   );

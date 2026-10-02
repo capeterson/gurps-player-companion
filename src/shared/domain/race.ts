@@ -136,7 +136,7 @@ export function resolveRaceSelection(
         campaignId: e.campaignId,
         revision: e.revision,
         key: e.key ?? canonicalLibraryKey(e.name),
-        sourceKey: e.sourceKey ?? null,
+        sourceId: e.sourceId ?? null,
         name: e.name,
         source: e.source ?? null,
         sourceLocator: e.sourceLocator ?? null,

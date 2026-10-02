@@ -10,29 +10,31 @@ import {
   preferredLibraryEditions,
 } from './libraryIdentity.ts';
 
+const CORE_ID = '0193b3c0-f1f0-7000-8000-00000000a001';
+const ALT_ID = '0193b3c0-f1f0-7000-8000-00000000a002';
+const LATE_ID = '0193b3c0-f1f0-7000-8000-00000000a003';
+
 describe('library identity and source selection', () => {
   test('canonicalizes keys and builds identities from kind, entry key, and source', () => {
     expect(canonicalLibraryKey('  Acute   Vision ')).toBe('acute vision');
-    const base = { name: 'Acute Vision', key: '  Acute   Vision ', sourceKey: ' Basic Set ' };
-    expect(libraryEntryKey(base)).toBe(
-      libraryEntryKey({ ...base, key: 'acute vision', sourceKey: 'basic set' }),
-    );
+    const base = { name: 'Acute Vision', key: '  Acute   Vision ', sourceId: CORE_ID };
+    expect(libraryEntryKey(base)).toBe(libraryEntryKey({ ...base, key: 'acute vision' }));
     expect(libraryEntryKey({ ...base, kind: 'advantage' })).not.toBe(
       libraryEntryKey({ ...base, kind: 'disadvantage' }),
     );
-    expect(libraryEntryKey(base)).not.toBe(libraryEntryKey({ ...base, sourceKey: 'supplement' }));
+    expect(libraryEntryKey(base)).not.toBe(libraryEntryKey({ ...base, sourceId: ALT_ID }));
   });
 
   test('derives a portable key for legacy persisted rows with an empty key', () => {
-    expect(libraryEntryKey({ name: 'Old entry', key: '', sourceKey: null })).toBe(
-      libraryEntryKey({ name: 'Old entry', key: 'old entry', sourceKey: null }),
+    expect(libraryEntryKey({ name: 'Old entry', key: '', sourceId: null })).toBe(
+      libraryEntryKey({ name: 'Old entry', key: 'old entry', sourceId: null }),
     );
   });
 
   test('normalizes persisted metadata defaults and adoption eligibility', () => {
     expect(libraryMetadataValues({ name: '  Acute   Vision ' })).toEqual({
       key: 'acute vision',
-      sourceKey: null,
+      sourceId: null,
       sourceLocator: null,
       status: 'complete',
       role: 'definition',
@@ -52,21 +54,21 @@ describe('library identity and source selection', () => {
 
   test('selects preferred edition first, then configured source priority deterministically', () => {
     const entries = [
-      { name: 'Foo', key: 'foo', sourceKey: 'late' },
-      { name: 'Foo', key: 'FOO', sourceKey: 'early' },
-      { name: 'Foo', key: 'foo', sourceKey: 'preferred', preferredEdition: true },
-      { name: 'Bar', key: 'bar', sourceKey: 'late' },
+      { name: 'Foo', key: 'foo', sourceId: LATE_ID },
+      { name: 'Foo', key: 'FOO', sourceId: CORE_ID },
+      { name: 'Foo', key: 'foo', sourceId: ALT_ID, preferredEdition: true },
+      { name: 'Bar', key: 'bar', sourceId: LATE_ID },
     ];
     const selected = preferredLibraryEditions(entries, [
-      { key: 'early', priority: 1 },
-      { key: 'late', priority: 20 },
-      { key: 'preferred', priority: 100 },
+      { id: CORE_ID, priority: 1 },
+      { id: LATE_ID, priority: 20 },
+      { id: ALT_ID, priority: 100 },
     ]);
     expect(selected.map((entry) => entry.key)).toEqual(['foo', 'bar']);
     expect(
       preferredLibraryEditions(entries.slice(0, 2), [
-        { key: 'late', priority: 20 },
-        { key: 'early', priority: 1 },
+        { id: LATE_ID, priority: 20 },
+        { id: CORE_ID, priority: 1 },
       ]).map((entry) => entry.key),
     ).toEqual(['FOO']);
   });
@@ -77,7 +79,7 @@ describe('library identity and source selection', () => {
     const trait = {
       name: 'Acute Vision',
       key: 'acute vision',
-      sourceKey: 'core',
+      sourceId: CORE_ID,
       kind: 'advantage',
       tags: ['sensory'],
     };
@@ -105,7 +107,7 @@ describe('library identity and source selection', () => {
           universal: false,
           traitKinds: [],
           traitTags: [],
-          traits: [{ section: 'traits', key: 'Acute Vision', sourceKey: 'CORE' }],
+          traits: [{ section: 'traits', key: 'Acute Vision', sourceId: CORE_ID }],
         }),
         trait,
       ),
@@ -116,7 +118,7 @@ describe('library identity and source selection', () => {
           universal: false,
           traitKinds: [],
           traitTags: [],
-          traits: [{ section: 'traits', key: 'acute vision', sourceKey: 'core' }],
+          traits: [{ section: 'traits', key: 'acute vision', sourceId: CORE_ID }],
         }),
         trait,
       ),
@@ -127,7 +129,7 @@ describe('library identity and source selection', () => {
           universal: false,
           traitKinds: [],
           traitTags: [],
-          traits: [{ section: 'items', key: 'acute vision', sourceKey: 'core' }],
+          traits: [{ section: 'items', key: 'acute vision', sourceId: CORE_ID }],
         }),
         trait,
       ),

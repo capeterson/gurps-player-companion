@@ -9,8 +9,15 @@ import { validatePricingCatalog } from '../../shared/domain/libraryPricing.ts';
 import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
 import { libraryModifierOut, librarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 import { libraryRaceOut } from '../../shared/schemas/race.ts';
+import {
+  exportSourceReferences,
+  importSourceReferences,
+  sourceExportKeys,
+} from '../../shared/yaml/sourceReferences.ts';
+import { campaignLibrarySources } from '../db/schema.ts';
 import { loadLibraryGraph } from '../services/libraryPricing.ts';
 import { loadPricingCatalog } from '../services/libraryPricing.ts';
+import { importSourcebooks } from '../services/librarySourceImport.ts';
 import { modifierEntity, sourceEntity } from './campaignLibraryEntities.ts';
 /**
  * Campaign library CRUD + YAML import/export.
@@ -313,11 +320,11 @@ router.openapi(
     request: {
       params: z.object({ id: uuid }),
       query: z.object({
-        sourceKeys: z
+        sourceIds: z
           .string()
           .max(5000)
           .optional()
-          .describe('JSON array of source keys, URL encoded in the query string'),
+          .describe('JSON array of sourcebook UUIDs, URL encoded in the query string'),
       }),
     },
     responses: {
@@ -335,13 +342,15 @@ router.openapi(
   async (c) => {
     const user = c.get('user');
     const { id } = c.req.valid('param');
-    const rawRequested = c.req.valid('query').sourceKeys;
+    const rawRequested = c.req.valid('query').sourceIds;
     let requested: string[] | undefined;
     if (rawRequested !== undefined) {
       try {
-        requested = z.array(calculationKey).min(1).max(30).parse(JSON.parse(rawRequested));
+        requested = z.array(uuid).min(1).max(30).parse(JSON.parse(rawRequested));
       } catch {
-        throw new HTTPException(400, { message: 'sourceKeys must be a JSON array of source keys' });
+        throw new HTTPException(400, {
+          message: 'sourceIds must be a JSON array of sourcebook UUIDs',
+        });
       }
     }
     const db = getDb();
@@ -397,24 +406,41 @@ router.openapi(
     } = snapshot;
     const visible = <T extends { restricted?: boolean }>(rows: T[]): T[] =>
       campaign.ownerId === user.id ? rows : rows.filter((row) => !row.restricted);
+    const exportKeys = sourceExportKeys(sources);
+    const requestedKeys = requested?.map((sourceId) => {
+      const key = exportKeys.get(sourceId);
+      if (!key)
+        throw new HTTPException(400, {
+          message: 'Selected sourcebook does not belong to this campaign',
+        });
+      return key;
+    });
     const allLibrary = {
-      sources: sources.map(sourceEntity.rowToCreate),
-      modifiers: visible(modifiers).map(modifierEntity.rowToCreate),
-      traits: visible(traits).map(traitEntity.rowToCreate),
-      skills: visible(skills).map(skillEntity.rowToCreate),
-      spells: visible(spells).map(spellEntity.rowToCreate),
-      items: visible(items).map(itemEntity.rowToCreate),
-      languages: visible(languages).map(languageEntity.rowToCreate),
-      techniques: visible(techniques).map(techniqueEntity.rowToCreate),
-      styles: visible(styles).map(styleEntity.rowToCreate),
-      enchantments: visible(enchantments).map(enchantmentEntity.rowToCreate),
-      activeEffects: visible(activeEffects).map(activeEffectEntity.rowToCreate),
-      races: visible(races).map(raceEntity.rowToCreate),
+      ...exportSourceReferences(
+        {
+          modifiers: visible(modifiers).map(modifierEntity.rowToCreate),
+          traits: visible(traits).map(traitEntity.rowToCreate),
+          skills: visible(skills).map(skillEntity.rowToCreate),
+          spells: visible(spells).map(spellEntity.rowToCreate),
+          items: visible(items).map(itemEntity.rowToCreate),
+          languages: visible(languages).map(languageEntity.rowToCreate),
+          techniques: visible(techniques).map(techniqueEntity.rowToCreate),
+          styles: visible(styles).map(styleEntity.rowToCreate),
+          enchantments: visible(enchantments).map(enchantmentEntity.rowToCreate),
+          activeEffects: visible(activeEffects).map(activeEffectEntity.rowToCreate),
+          races: visible(races).map(raceEntity.rowToCreate),
+        },
+        sources,
+      ),
+      sources: sources.map((row) => ({
+        ...sourceEntity.rowToCreate(row),
+        key: exportKeys.get(row.id) as string,
+      })),
     };
     let exported: Parameters<typeof emitLibraryYaml>[0] = allLibrary;
     if (requested) {
       try {
-        const scoped = sourceScopedLibrary(allLibrary, requested);
+        const scoped = sourceScopedLibrary(allLibrary, requestedKeys as string[]);
         exported = {
           ...scoped,
           sources: scoped.sources ?? [],
@@ -432,7 +458,9 @@ router.openapi(
       }
     }
     const yamlText = emitLibraryYaml({
-      ...(requested ? { scope: { kind: 'sources' as const, sourceKeys: requested } } : {}),
+      ...(requested
+        ? { scope: { kind: 'sources' as const, sourceKeys: requestedKeys as string[] } }
+        : {}),
       ...(!requested
         ? {
             campaign: {
@@ -534,9 +562,6 @@ router.openapi(
         throw new HTTPException(400, { message: (error as Error).message });
       }
     }
-    const scopedSet = scopedKeys && new Set(scopedKeys.map(canonicalLibraryKey));
-    const onlySelected = (row: { sourceKey?: string | null }) =>
-      !!row.sourceKey && !!scopedSet?.has(canonicalLibraryKey(row.sourceKey));
 
     // Re-validate the campaign block against the campaign settings
     // schema before touching anything: the YAML doc schema only checks
@@ -597,26 +622,39 @@ router.openapi(
         .where(eq(campaigns.id, id))
         .for('update');
       const currentGraph = await loadLibraryGraph(tx, id);
+      await advanceLibraryCampaignRevision(tx, id);
+      // Books receive database UUIDs first. Any later translation/graph failure
+      // rolls these writes back together with the entire audited import.
+      let bookImport: Awaited<ReturnType<typeof importSourcebooks>>;
       try {
-        validateLibraryGraph(
-          mergeLibraryGraph(currentGraph, incoming as LibraryGraph, mode, scopedKeys),
-        );
+        bookImport = await importSourcebooks(tx, id, incoming.sources);
       } catch (error) {
         throw new HTTPException(400, { message: (error as Error).message });
       }
-      await advanceLibraryCampaignRevision(tx, id);
-      const sources = await upsertByKey(
-        tx,
-        sourceEntity,
-        id,
-        incoming.sources,
-        scopedKeys ? 'merge' : mode,
-      );
+      const sources = bookImport.counts;
+      const books = await selectLibrarySection(tx, sourceEntity, id);
+      let liveIncoming: LibraryGraph;
+      try {
+        liveIncoming = importSourceReferences(incoming, books, bookImport.aliases) as LibraryGraph;
+      } catch (error) {
+        throw new HTTPException(400, { message: (error as Error).message });
+      }
+      const scopedIds = scopedKeys
+        ? (liveIncoming.sources ?? []).map((book) => book.id as string)
+        : undefined;
+      const scopedSet = scopedIds && new Set(scopedIds);
+      const onlySelected = (row: { sourceId?: string | null }) =>
+        !!row.sourceId && !!scopedSet?.has(row.sourceId);
+      try {
+        validateLibraryGraph(mergeLibraryGraph(currentGraph, liveIncoming, mode, scopedIds));
+      } catch (error) {
+        throw new HTTPException(400, { message: (error as Error).message });
+      }
       const modifiers = await upsertByKey(
         tx,
         modifierEntity,
         id,
-        incoming.modifiers,
+        liveIncoming.modifiers?.map((entry) => modifierEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -624,7 +662,7 @@ router.openapi(
         tx,
         traitEntity,
         id,
-        incoming.traits,
+        liveIncoming.traits?.map((entry) => traitEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -632,7 +670,7 @@ router.openapi(
         tx,
         skillEntity,
         id,
-        incoming.skills,
+        liveIncoming.skills?.map((entry) => skillEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -646,7 +684,7 @@ router.openapi(
         tx,
         spellEntity,
         id,
-        incoming.spells,
+        liveIncoming.spells?.map((entry) => spellEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -654,7 +692,7 @@ router.openapi(
         tx,
         itemEntity,
         id,
-        incoming.items,
+        liveIncoming.items?.map((entry) => itemEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -665,7 +703,7 @@ router.openapi(
         tx,
         languageEntity,
         id,
-        incoming.languages,
+        liveIncoming.languages?.map((entry) => languageEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -673,7 +711,7 @@ router.openapi(
         tx,
         techniqueEntity,
         id,
-        incoming.techniques,
+        liveIncoming.techniques?.map((entry) => techniqueEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -681,7 +719,7 @@ router.openapi(
         tx,
         styleEntity,
         id,
-        incoming.styles,
+        liveIncoming.styles?.map((entry) => styleEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -689,7 +727,7 @@ router.openapi(
         tx,
         enchantmentEntity,
         id,
-        incoming.enchantments,
+        liveIncoming.enchantments?.map((entry) => enchantmentEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -698,7 +736,7 @@ router.openapi(
         tx,
         activeEffectEntity,
         id,
-        incoming.activeEffects,
+        liveIncoming.activeEffects?.map((entry) => activeEffectEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
@@ -707,10 +745,22 @@ router.openapi(
         tx,
         raceEntity,
         id,
-        incoming.races,
+        liveIncoming.races?.map((entry) => raceEntity.createSchema.parse(entry)),
         mode,
         scopedSet ? onlySelected : undefined,
       );
+
+      // Prune books only after their old contents have been pruned. The FK
+      // must never force deletion of surviving links in a replace import.
+      if (mode === 'replace' && !scopedKeys && incoming.sources !== undefined) {
+        for (const book of books) {
+          if (!bookImport.assigned.has(book.id)) {
+            await tx.delete(campaignLibrarySources).where(eq(campaignLibrarySources.id, book.id));
+            sources.deleted++;
+          }
+        }
+      }
+
       // Opt-in campaign-settings apply (validated above): only fields
       // actually present in the doc get copied (undefined = leave
       // alone); `name` is never touched.  `campaignSettingsApplied`
@@ -730,7 +780,7 @@ router.openapi(
         mode,
         sources,
         modifiers,
-        editionDecisions: libraryEditionDecisions(currentGraph, incoming as LibraryGraph),
+        editionDecisions: libraryEditionDecisions(currentGraph, liveIncoming),
         incomplete: Object.values(incoming)
           .flat()
           .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length,

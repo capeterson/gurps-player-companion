@@ -172,7 +172,7 @@ export function PricingResolver({
       ...m,
       id: `local:${m.name}`,
       localName: m.name,
-      sourceKey: entry.sourceKey,
+      sourceId: entry.sourceId,
       applicability: { advisory: null },
       calculation:
         m.calculation ??

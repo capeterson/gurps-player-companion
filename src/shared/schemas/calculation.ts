@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { uuid } from './common.ts';
 
 export const calculationKey = z.string().trim().min(1).max(160);
 export const calculationValue = z
@@ -9,7 +10,7 @@ export const ruleReference = z
   .object({
     section: z.enum(['traits', 'items', 'modifiers']),
     key: calculationKey,
-    sourceKey: calculationKey.nullable().default(null),
+    sourceId: uuid.nullable().default(null),
     kind: z.string().max(40).optional(),
   })
   .strict()

@@ -98,11 +98,6 @@
             "maxLength": 160,
             "description": "Publication title"
           },
-          "key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
           "abbreviation": {
             "type": "string",
             "minLength": 1,
@@ -146,7 +141,6 @@
         },
         "required": [
           "name",
-          "key",
           "abbreviation",
           "id",
           "campaignId",
@@ -350,11 +344,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160,
+            "format": "uuid",
             "default": null
           },
           "kind": {
@@ -829,11 +822,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -1055,11 +1047,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -2990,11 +2981,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -4028,11 +4018,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -4994,11 +4983,6 @@
             "maxLength": 160,
             "description": "Publication title"
           },
-          "key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
-          },
           "abbreviation": {
             "type": "string",
             "minLength": 1,
@@ -5023,7 +5007,6 @@
         },
         "required": [
           "name",
-          "key",
           "abbreviation"
         ],
         "additionalProperties": false
@@ -5036,11 +5019,6 @@
             "minLength": 1,
             "maxLength": 160,
             "description": "Publication title"
-          },
-          "key": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 160
           },
           "abbreviation": {
             "type": "string",
@@ -5074,11 +5052,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -5178,11 +5155,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -5277,11 +5253,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -5594,11 +5569,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -5906,11 +5880,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -6297,11 +6270,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "sourceLocator": {
             "type": "string",
@@ -6809,11 +6781,10 @@
             "minLength": 1,
             "maxLength": 160
           },
-          "sourceKey": {
+          "sourceId": {
             "type": "string",
             "nullable": true,
-            "minLength": 1,
-            "maxLength": 160
+            "format": "uuid"
           },
           "name": {
             "type": "string",
@@ -6836,7 +6807,7 @@
           "campaignId",
           "revision",
           "key",
-          "sourceKey",
+          "sourceId",
           "name",
           "source",
           "sourceLocator"
@@ -21369,11 +21340,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -23056,11 +23026,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -23870,11 +23839,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -24747,11 +24715,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -25889,11 +25856,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -26171,11 +26137,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -26517,11 +26482,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -28215,11 +28179,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -29977,11 +29940,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -30182,11 +30144,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -30451,11 +30412,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -30712,11 +30672,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -31036,11 +30995,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -31363,11 +31321,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -31754,11 +31711,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -32288,11 +32244,10 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "type": "string",
                     "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   "sourceLocator": {
                     "type": "string",
@@ -33351,11 +33306,11 @@
             "schema": {
               "type": "string",
               "maxLength": 5000,
-              "description": "JSON array of source keys, URL encoded in the query string"
+              "description": "JSON array of sourcebook UUIDs, URL encoded in the query string"
             },
             "required": false,
-            "description": "JSON array of source keys, URL encoded in the query string",
-            "name": "sourceKeys",
+            "description": "JSON array of sourcebook UUIDs, URL encoded in the query string",
+            "name": "sourceIds",
             "in": "query"
           }
         ],
@@ -33481,9 +33436,10 @@
                           "key": {
                             "type": "string"
                           },
-                          "sourceKey": {
+                          "sourceId": {
                             "type": "string",
-                            "nullable": true
+                            "nullable": true,
+                            "format": "uuid"
                           },
                           "decision": {
                             "type": "string",
@@ -33496,7 +33452,7 @@
                         "required": [
                           "section",
                           "key",
-                          "sourceKey",
+                          "sourceId",
                           "decision"
                         ]
                       }

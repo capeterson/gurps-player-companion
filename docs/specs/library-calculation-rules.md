@@ -6,36 +6,56 @@ schemas. Extraction, OCR and classification remain external responsibilities.
 
 ## Identity, sources and completeness
 
-Every definition has a portable canonical `key`, optional `sourceKey` and
+Every live definition has a canonical `key`, optional sourcebook UUID `sourceId` and
 `sourceLocator`, legacy free-form `source`, `status`, `role`,
 `preferredEdition`, and optional `extraction` evidence. The latter retains
 `rawText`, `reviewNotes` and an optional locator; none is executable.
 Keys normalize whitespace and case. A section's natural identity is key plus
-source key; traits additionally include kind. Display names are not identities.
+sourcebook UUID; traits additionally include kind. Display names are not identities.
 Renaming an entry does not change its explicit key.
 
-Sources are campaign-owned, sync-backed records with key, publication title
+Sources are campaign-owned, sync-backed records with UUID, publication title
 (`name` in the API), abbreviation, edition, priority and notes. Lower priority
 numbers win. Preferred editions resolve by explicit entry override, source
-priority, then stable source-key order. Multiple explicit overrides of the same
+priority, then stable source-UUID order. Multiple explicit overrides of the same
 concept are rejected. Source-less legacy entries are a single legacy edition:
 citations are never guessed or parsed into source identities.
+The database uses campaign-scoped foreign keys to the sourcebook UUID. Titles,
+abbreviations and editions can be edited without changing links. The sourcebook
+form has no key field; entry editors select a book by UUID and show
+`<abbreviation>: <publication title>`. A compact **Page** input stays beside the
+sourcebook on the same row at every width; its text preserves existing ranges
+and section references. The normal metadata editor does not expose the definition
+key; edits preserve it, and new entries use the existing automatic key derivation.
+Definition keys still participate in edition matching and rule references.
+Portable YAML `key`/`sourceKey` labels are
+translated only during import/export, including nested calculation calls and
+modifier applicability. Import matches declared book metadata to target UUIDs;
+export derives distinct labels from the abbreviation/title/edition. Source-scoped
+export selects live UUIDs, while an incoming YAML scope selects its portable labels.
+Migration 0068 backfills existing links within each campaign before removing
+`source_key` columns and the sourcebook's `key` column. Unresolved live links abort
+migration. Character pricing snapshots keep rules and paid values, resolving the
+original definition's campaign even after a character move. Historical audit rows
+remain untouched. Dexie v17 upgrades cached and queued references; unresolved
+older queued intent is retained and held for an explicit sourcebook choice.
+
 New campaigns begin with 16 common Fourth Edition source records (all priority
 100), listed in [campaign content sharing](campaign-content-sharing.md); owners
 can delete any of them. This seed runs only when the campaign is created.
 The combined Basic Set, Fourth Edition Revised replaces the separate unrevised
 Characters and Campaigns books. Library rows, expanded details and pricing
 dialogs omit source-key, completeness, role, restriction and preferred-edition
-labels. These properties remain editable in the existing metadata form and
-continue to govern adoption, access and edition selection. Autocomplete options
+labels. Completeness, role, restriction and preferred-edition properties remain
+editable in the existing metadata form and continue to govern adoption, access and edition selection. Autocomplete options
 show their authored label without automatically appending a raw source key.
 Collapsed library rows show their citation beside the type/points or other
 summary at every screen width. The expanded body does not repeat that citation;
 additional page/PDF locator information remains in the details. Entries without
 a citation use their page/locator text in the summary. The graphical metadata
-editor currently links a sourcebook through its **Source key** text field under
-**Source and completeness**; the separate **Source** citation field does not
-establish that link.
+editor links a sourcebook through its UUID-backed **Sourcebook** picker under
+**Source and completeness**, with a compact **Page** field beside it; the separate
+**Source** citation field does not establish that link.
 
 Only `status: complete` with role `definition` or `template` is adoptable.
 `needs_review`, `reference_only`, examples and references remain searchable in
@@ -177,7 +197,7 @@ modifiers are optional sections: omission preserves them even in replace mode;
 explicit empty arrays prune them. Merge/replace uses canonical edition identity.
 The final graph includes retained existing rows. It is validated under the
 campaign lock before import writes; failures roll back the entire audited
-transaction. CRUD deletion/key changes must also leave the graph valid.
+transaction. CRUD deletion/definition-key changes must also leave the graph valid.
 
 Sources/modifiers use owner-only CRUD under
 `/api/v1/campaigns/{id}/library/{sources|modifiers}`; members read them through
@@ -208,7 +228,7 @@ the calculation editor directly and do not offer absent basic-price fields.
 
 The Lantern Coast bootstrap uses only original fixture definitions. Its four
 fictional sourcebooks have distinct non-default abbreviations (`LCGV`, `LCST`,
-`LCTR`, `LCQO`), and every entry carries an explicit source key, section locator,
+`LCTR`, `LCQO`), and every imported entry links to a sourcebook UUID, section locator,
 completeness status and definition role. Its 30 traits and 48 skills describe
 practical coastal tasks, training and personal obligations in original prose.
 Structured defaults, prerequisites, conditional task modifiers, timed actions and

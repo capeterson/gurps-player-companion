@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LocalLibraryModifier, LocalLibrarySource } from '../../../db/dexie.ts';
 import { emptyLibrary } from '../useLocalLibrary.ts';
 import { CatalogSection } from './CatalogSection.tsx';
@@ -56,6 +56,8 @@ const shell: LibrarySectionShellProps = {
 };
 
 describe('Catalog source validation', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('shows field-specific errors and focuses the first missing field', () => {
     render(<CatalogSection {...shell} section="sources" />);
     const title = screen.getByRole('textbox', { name: 'Publication title' });
@@ -65,15 +67,27 @@ describe('Catalog source validation', () => {
     expect(title).toHaveAttribute('aria-invalid', 'true');
     expect(title).toHaveFocus();
     expect(screen.getByText('Enter publication title.')).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Source key' })).toHaveAttribute(
-      'aria-invalid',
-      'true',
-    );
     expect(screen.getByRole('textbox', { name: 'Abbreviation' })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Check the source fields');
     expect(mutations.create.mutate).not.toHaveBeenCalled();
+  });
+
+  it('creates a sourcebook without a portable key', () => {
+    render(<CatalogSection {...shell} section="sources" />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Publication title' }), {
+      target: { value: 'GURPS Basic Set' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Abbreviation' }), {
+      target: { value: 'BX' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save source' }));
+
+    expect(mutations.create.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'GURPS Basic Set', abbreviation: 'BX' }),
+    );
+    expect(mutations.create.mutate.mock.calls.at(-1)?.[0]).not.toHaveProperty('key');
   });
 });

@@ -2,7 +2,6 @@ const SEARCHED_FIELDS = [
   'name',
   'description',
   'source',
-  'sourceKey',
   'sourceLocator',
   'status',
   'role',
@@ -31,7 +30,9 @@ function strings(value: unknown): string[] {
     : Array.isArray(value)
       ? value.flatMap(strings)
       : value && typeof value === 'object'
-        ? Object.values(value).flatMap(strings)
+        ? Object.entries(value)
+            .filter(([key]) => key !== 'sourceId' && key !== 'definitionId')
+            .flatMap(([, entry]) => strings(entry))
         : [];
 }
 
@@ -54,9 +55,14 @@ export function librarySearchWords(query: string): string[] {
 }
 
 /** Match all query words against the human-readable library fields, never IDs. */
-export function matchesLibrarySearch(entry: object, query: string | readonly string[]): boolean {
+export function matchesLibrarySearch(
+  entry: object,
+  query: string | readonly string[],
+  sourcebooks: readonly { id: string; name: string; abbreviation: string }[] = [],
+): boolean {
   const words = typeof query === 'string' ? librarySearchWords(query) : query;
   if (words.length === 0) return true;
-  const haystack = haystackFor(entry);
+  const book = sourcebooks.find((book) => 'sourceId' in entry && book.id === entry.sourceId);
+  const haystack = `${haystackFor(entry)} ${book ? `${book.abbreviation} ${book.name}`.toLocaleLowerCase() : ''}`;
   return words.every((word) => haystack.includes(word));
 }

@@ -46,7 +46,7 @@ export function definitionReference(
   return {
     section,
     key: entry.key || canonicalLibraryKey(entry.name),
-    sourceKey: entry.sourceKey ?? null,
+    sourceId: entry.sourceId ?? null,
     ...(section === 'traits' && entry.kind ? { kind: entry.kind } : {}),
   };
 }
@@ -284,8 +284,6 @@ export function normalizePricingWrite(
   const patch = { ...body };
   const entry = { ...existing, ...body } as unknown as PricedDefinition;
   if (body.key && typeof body.key === 'string') patch.key = canonicalLibraryKey(body.key);
-  if (body.sourceKey && typeof body.sourceKey === 'string')
-    patch.sourceKey = canonicalLibraryKey(body.sourceKey);
   if (section === 'traits' && body.availableModifiers !== undefined)
     patch.availableModifiers = (body.availableModifiers as TraitModifier[]).map((m) => ({
       ...m,
