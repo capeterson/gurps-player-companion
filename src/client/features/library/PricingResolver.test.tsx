@@ -55,6 +55,7 @@ describe('PricingResolver', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Resolve Night Vision' })).toBeVisible();
+    expect(screen.queryByText('core · complete')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Calculation breakdown')).toHaveTextContent('points: 5');
     expect(screen.getByText('Total: 5 points')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Use these values' }));

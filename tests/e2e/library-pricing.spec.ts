@@ -113,7 +113,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   await page.getByLabel('Publication title').fill('Pricing Rules');
   await expect(page.getByLabel('Source key')).toHaveCount(0);
   await page.getByLabel('Abbreviation').fill('PR');
-  await page.getByLabel('Edition').fill('First edition');
+  await page.getByLabel('Edition', { exact: true }).fill('First edition');
   await page
     .getByLabel('Notes')
     .fill(
@@ -205,7 +205,9 @@ outputs:
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole('button', { name: 'Save modifier' }).click();
-  await expect(page.getByRole('button', { name: new RegExp(`${modifierName} PR`) })).toBeVisible();
+  const savedModifier = page.getByRole('button', { name: modifierName, exact: true });
+  await expect(savedModifier).toBeVisible();
+  await expect(savedModifier.locator('.badge')).toHaveCount(0);
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect
@@ -319,7 +321,9 @@ outputs:
     timeout: 20_000,
   });
   await page.getByRole('searchbox', { name: 'Search library' }).fill('Unreviewed spear');
-  await expect(page.getByRole('button', { name: /Unreviewed spear.*needs review/i })).toBeVisible();
+  const unreviewed = page.getByRole('button', { name: 'Unreviewed spear', exact: true });
+  await expect(unreviewed).toBeVisible();
+  await expect(unreviewed.locator('.badge')).toHaveCount(0);
 
   await page.goto('/characters');
   await expect(page.getByRole('link', { name: 'Pricing character' })).toBeVisible({
@@ -334,9 +338,8 @@ outputs:
   await page.getByRole('option', { name: /Variable Focus/ }).click();
   const traitDialog = page.getByRole('dialog', { name: 'Resolve Variable Focus' });
   await expect(traitDialog).toBeVisible();
-  await traitDialog
-    .getByRole('checkbox', { name: /Flexible grip across extended operating range/ })
-    .check();
+  await traitDialog.getByRole('checkbox', { name: modifierName, exact: true }).check();
+  await expect(traitDialog).not.toContainText('pricing-rules');
   await traitDialog.getByLabel('Magnitude across the selected handling adjustment range').fill('3');
   await expect(traitDialog.getByText(`${modifierName}: 30%`)).toBeVisible();
   await expect(traitDialog.getByText('Total: 13 points')).toBeVisible();
@@ -375,15 +378,28 @@ outputs:
   await page.getByRole('button', { name: 'Other sources' }).click();
   const editionOptions = page.getByRole('option', { name: /Priced spear/ });
   await expect(editionOptions).toHaveCount(2);
-  const firstEdition = page.getByRole('option', {
-    name: /Priced spear.*PR: Pricing Rules/,
-  });
-  const secondEdition = page.getByRole('option', {
-    name: /Priced spear.*PR2: Pricing Rules/,
-  });
-  await expect(firstEdition).toHaveCount(1);
-  await expect(secondEdition).toHaveCount(1);
-  await firstEdition.click();
+  await expect(editionOptions.nth(0)).not.toContainText('pricing-rules');
+  await expect(editionOptions.nth(1)).not.toContainText('pricing-rules-2');
+  for (const width of [320, 639, 640, 641, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const list = page.getByRole('listbox');
+    await expect(list).toBeVisible();
+    await expect(async () => {
+      const box = await list.boundingBox();
+      if (!box) throw new Error('library choices are not visible');
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(800);
+    }).toPass({ timeout: 5_000 });
+    if (width === 320 || width === 640) {
+      await captureReviewScreenshot(page, {
+        path: testInfo.outputPath(`library-choices-${width}.png`),
+        fullPage: false,
+      });
+    }
+  }
+  await editionOptions.nth(0).click();
 
   const dialog = page.getByRole('dialog', { name: 'Resolve Priced spear' });
   await expect(dialog).toBeVisible();

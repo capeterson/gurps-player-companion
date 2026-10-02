@@ -24,10 +24,7 @@ export const languagesConfig: LibrarySectionConfig<LocalLibraryLanguage> = {
   groupOrder: ['Spoken languages', 'Sign languages'],
   meta: (row) => (row.isSignLanguage ? 'Sign language' : 'Spoken language'),
   detail: (row) => (
-    <>
-      {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
-    </>
+    <>{row.description && <Markdown source={row.description} className="text-sm text-muted" />}</>
   ),
   deleteTitle: 'Delete library language',
   deleteNote: 'Existing characters that know this language are not affected.',

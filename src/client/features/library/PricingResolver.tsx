@@ -257,12 +257,6 @@ export function PricingResolver({
         <h2 id={titleId} className="font-display text-xl">
           Resolve {entry.name}
         </h2>
-        <p className="my-2 text-sm">
-          {library?.sources.find((source) => source.id === entry.sourceId)?.abbreviation ??
-            entry.sourceLocator ??
-            'Legacy source'}{' '}
-          · {entry.status ?? 'complete'}
-        </p>
         {initial && (
           <p className="text-sm">
             Previously saved:{' '}
@@ -319,10 +313,7 @@ export function PricingResolver({
                       setSelected(next);
                     }}
                   />{' '}
-                  {modifier.name}{' '}
-                  {modifier.sourceId
-                    ? `· ${library?.sources.find((source) => source.id === modifier.sourceId)?.abbreviation ?? 'Unavailable sourcebook'}`
-                    : ''}
+                  {modifier.name}
                 </label>
                 {modifier.applicability.advisory && (
                   <p className="text-sm">{modifier.applicability.advisory}</p>

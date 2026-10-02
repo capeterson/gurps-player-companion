@@ -40,9 +40,22 @@ original definition's campaign even after a character move. Historical audit row
 remain untouched. Dexie v17 upgrades cached and queued references; unresolved
 older queued intent is retained and held for an explicit sourcebook choice.
 
-New campaigns begin with 17 common Fourth Edition source records (all priority
+New campaigns begin with 16 common Fourth Edition source records (all priority
 100), listed in [campaign content sharing](campaign-content-sharing.md); owners
 can delete any of them. This seed runs only when the campaign is created.
+The combined Basic Set, Fourth Edition Revised replaces the separate unrevised
+Characters and Campaigns books. Library rows, expanded details and pricing
+dialogs omit source-key, completeness, role, restriction and preferred-edition
+labels. Completeness, role, restriction and preferred-edition properties remain
+editable in the existing metadata form and continue to govern adoption, access and edition selection. Autocomplete options
+show their authored label without automatically appending a raw source key.
+Collapsed library rows show their citation beside the type/points or other
+summary at every screen width. The expanded body does not repeat that citation;
+additional page/PDF locator information remains in the details. Entries without
+a citation use their page/locator text in the summary. The graphical metadata
+editor links a sourcebook through its UUID-backed **Sourcebook** picker under
+**Source and completeness**, with a compact **Page** field beside it; the separate
+**Source** citation field does not establish that link.
 
 Only `status: complete` with role `definition` or `template` is adoptable.
 `needs_review`, `reference_only`, examples and references remain searchable in

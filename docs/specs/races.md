@@ -30,6 +30,8 @@ The editor provides ordinary form controls for components, attributes, features,
 effects, variants/forms, and lens rules, alongside the shared metadata editor.
 A definition may retain descriptive rules for physiology, social assumptions,
 transformation conditions, or other capabilities outside the existing calculator.
+Library race citations appear beside the collapsed row's type/points summary,
+matching the other library categories, without repeating in the expanded body.
 Printed racial package cost is authoritative; the application does not reconstruct
 it by summing components or automatically reprice limitations or Size Modifier.
 

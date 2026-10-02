@@ -41,7 +41,6 @@ export const activeEffectsConfig: LibrarySectionConfig<LocalLibraryActiveEffect>
         </p>
       )}
       {row.tags.length > 1 && <p className="text-xs text-dim">Tags · {row.tags.join(', ')}</p>}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
     </>
   ),
   deleteTitle: 'Delete active effect definition',

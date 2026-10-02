@@ -1,9 +1,13 @@
-/** Common GURPS Fourth Edition books and GCS page-reference abbreviations.
+/** Common GURPS Fourth Edition books, with the combined revised Basic Set.
+ * Abbreviations follow the GCS page-reference list.
  * https://gurpscharactersheet.com/page_references
  */
 export const DEFAULT_CAMPAIGN_SOURCES = [
-  { name: 'GURPS Basic Set: Characters', abbreviation: 'B' },
-  { name: 'GURPS Basic Set: Campaigns', abbreviation: 'BX' },
+  {
+    name: 'GURPS Basic Set, Fourth Edition Revised',
+    abbreviation: 'B',
+    edition: 'Fourth Edition Revised',
+  },
   { name: 'GURPS Magic', abbreviation: 'M' },
   { name: 'GURPS Martial Arts', abbreviation: 'MA' },
   { name: 'GURPS Powers', abbreviation: 'P' },
