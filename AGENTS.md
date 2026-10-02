@@ -12,6 +12,14 @@ uncommitted edits block the update, resolve that explicitly without resetting,
 discarding, or automatically stashing the user's work. Re-read any project
 instructions and relevant specs changed by the update.
 
+## Sourcebook references follow GCS
+
+Use the community-standard [GCS page-reference abbreviations](https://gurpscharactersheet.com/page_references)
+for sourcebooks and citations. The combined Basic Set, including Fourth Edition
+Revised, uses `B`; the separate Campaigns volume uses `BX`. Keep revisions
+explicit in source identity and edition fields rather than inventing new
+abbreviations.
+
 ## Keep private task artifacts local
 
 Do not commit private plugin registrations, user-supplied character data,
@@ -102,6 +110,10 @@ need an additional order selector; graphical armor coverage does not need a
 duplicate all-locations DR component. Keep content in its semantic category:
 Move is movement, not a defense. Do not add unsolicited character-sheet
 sections or replacement controls while simplifying an approved surface.
+
+Library rows and details show their content without metadata badges. Do not
+add source-key, completeness, role, restriction or preferred-edition badges
+throughout the library UI.
 
 Product copy explains useful choices and results. Do not append generic
 assurances about sync, account persistence, or internal plumbing. Optional

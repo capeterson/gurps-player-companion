@@ -33,7 +33,6 @@ export const racesConfig: LibrarySectionConfig<LocalLibraryRace> = {
       />
       {row.variants.length > 0 && <p>Variants: {row.variants.map((v) => v.name).join(', ')}</p>}
       {row.forms.length > 0 && <p>Forms: {row.forms.map((v) => v.name).join(', ')}</p>}
-      {row.source && <p className="text-sm text-base-content/70">Source · {row.source}</p>}
     </>
   ),
   deleteTitle: 'Delete library race',

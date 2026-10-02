@@ -46,6 +46,7 @@ export interface LibraryListRow extends LibraryMetadata {
   readonly id: string;
   readonly name: string;
   readonly description?: string | null | undefined;
+  readonly source?: string | null | undefined;
 }
 
 export interface LibraryColumn<R> {
@@ -71,10 +72,11 @@ export interface LibrarySectionConfig<R extends LibraryListRow> {
   readonly noun: string;
   readonly plural: string;
   readonly columns: readonly LibraryColumn<R>[];
-  readonly group: (row: R) => string;
+  /** Null renders a flat list without group headings or folding. */
+  readonly group: ((row: R) => string) | null;
   /** Known group order; unknown groups follow alphabetically. */
   readonly groupOrder?: readonly string[];
-  /** One-line summary: shown under the name on phones and atop the details. */
+  /** Compact summary shown beside the citation under the name at every width. */
   readonly meta: (row: R) => string;
   readonly detail: (row: R) => ReactNode;
   readonly deleteTitle: string;
@@ -85,7 +87,6 @@ export interface LibrarySectionProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly campaignId: string;
   readonly entries: readonly R[];
-  readonly defaultIds?: ReadonlySet<string>;
   /** Normalized, deferred search words. */
   readonly words: readonly string[];
   readonly active: boolean;
@@ -169,7 +170,6 @@ export function LibrarySection<R extends LibraryListRow>({
   config,
   campaignId,
   entries,
-  defaultIds,
   words,
   active,
   isOwner,
@@ -192,6 +192,7 @@ export function LibrarySection<R extends LibraryListRow>({
   const { preferences, sortBy } = usePreferences(campaignId, config.key, allowedSorts);
   const folds = useLibraryGroupFolds(`${campaignId}:library:${config.key}`);
   const searching = words.length > 0;
+  const grouped = config.group !== null;
 
   // Inactive sections keep only an entry being edited mounted (hidden), so a
   // draft survives switching categories without paying for the whole list.
@@ -210,7 +211,7 @@ export function LibrarySection<R extends LibraryListRow>({
     );
     const byGroup = new Map<string, R[]>();
     for (const row of sorted) {
-      const label = config.group(row);
+      const label = config.group?.(row) ?? '';
       const bucket = byGroup.get(label);
       if (bucket) bucket.push(row);
       else byGroup.set(label, [row]);
@@ -236,7 +237,7 @@ export function LibrarySection<R extends LibraryListRow>({
     if (!active || !revealId) return;
     const row = entries.find((entry) => entry.id === revealId);
     if (!row) return;
-    folds.open(config.group(row));
+    if (config.group) folds.open(config.group(row));
     requestAnimationFrame(() => {
       document.getElementById(`library-entry-${revealId}`)?.scrollIntoView({ block: 'start' });
       onRevealed();
@@ -257,7 +258,7 @@ export function LibrarySection<R extends LibraryListRow>({
 
   return (
     <div hidden={!active} className="space-y-3">
-      {active && jumpSlot && groups.length > 1
+      {active && grouped && jumpSlot && groups.length > 1
         ? createPortal(
             <nav aria-label={`Jump to ${config.noun} group`} className="library-jump-strip">
               {groups.map((group) => (
@@ -299,8 +300,9 @@ export function LibrarySection<R extends LibraryListRow>({
             aria-label={config.plural}
           >
             <caption className="sr-only">
-              Campaign library {config.plural}, grouped. Sort with the column headings or
-              right-click to filter values; open an entry to read it.
+              Campaign library {config.plural}
+              {grouped ? ', grouped' : ''}. Sort with the column headings or right-click to filter
+              values; open an entry to read it.
             </caption>
             <thead>
               <tr>
@@ -332,49 +334,51 @@ export function LibrarySection<R extends LibraryListRow>({
             <TableFilterScope>
               {(filtering) =>
                 groups.map((group) => {
-                  const open = filtering || searching || folds.isOpen(group.label);
+                  const open = !grouped || filtering || searching || folds.isOpen(group.label);
                   return (
                     <Fragment key={group.domId}>
-                      <tbody>
-                        <tr>
-                          <th
-                            id={group.domId}
-                            scope="colgroup"
-                            colSpan={colSpan}
-                            className="library-group-heading"
-                          >
-                            {searching ? (
-                              <span className="flex min-w-0 items-center gap-2 px-1 py-1">
-                                <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
-                                  {group.label}
-                                </span>{' '}
-                                <span className="num shrink-0 text-xs text-dim">
-                                  {group.rows.length}
+                      {grouped && (
+                        <tbody>
+                          <tr>
+                            <th
+                              id={group.domId}
+                              scope="colgroup"
+                              colSpan={colSpan}
+                              className="library-group-heading"
+                            >
+                              {searching ? (
+                                <span className="flex min-w-0 items-center gap-2 px-1 py-1">
+                                  <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
+                                    {group.label}
+                                  </span>{' '}
+                                  <span className="num shrink-0 text-xs text-dim">
+                                    {group.rows.length}
+                                  </span>
                                 </span>
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                className="flex w-full min-w-0 items-center gap-2 px-1 py-1 text-left"
-                                aria-expanded={open}
-                                onClick={() => folds.toggle(group.label)}
-                              >
-                                <AppIcon
-                                  name={open ? 'chevronDown' : 'chevronRight'}
-                                  size={14}
-                                  className="shrink-0 text-muted"
-                                />
-                                <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
-                                  {group.label}
-                                </span>{' '}
-                                <span className="num shrink-0 text-xs text-dim">
-                                  {group.rows.length}
-                                </span>
-                              </button>
-                            )}
-                          </th>
-                        </tr>
-                      </tbody>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="flex w-full min-w-0 items-center gap-2 px-1 py-1 text-left"
+                                  aria-expanded={open}
+                                  onClick={() => folds.toggle(group.label)}
+                                >
+                                  <AppIcon
+                                    name={open ? 'chevronDown' : 'chevronRight'}
+                                    size={14}
+                                    className="shrink-0 text-muted"
+                                  />
+                                  <span className="label-eyebrow min-w-0 [overflow-wrap:anywhere]">
+                                    {group.label}
+                                  </span>{' '}
+                                  <span className="num shrink-0 text-xs text-dim">
+                                    {group.rows.length}
+                                  </span>
+                                </button>
+                              )}
+                            </th>
+                          </tr>
+                        </tbody>
+                      )}
                       {group.rows.map((row) =>
                         open || row.id === editId ? (
                           <LibraryRow
@@ -383,7 +387,6 @@ export function LibrarySection<R extends LibraryListRow>({
                             config={config}
                             colSpan={colSpan}
                             hidden={!open}
-                            defaultEdition={defaultIds?.has(row.id) ?? false}
                             expanded={expandedId === row.id}
                             editing={editId === row.id}
                             isOwner={isOwner}
@@ -427,7 +430,6 @@ interface LibraryRowProps<R extends LibraryListRow> {
   readonly config: LibrarySectionConfig<R>;
   readonly colSpan: number;
   readonly hidden: boolean;
-  readonly defaultEdition: boolean;
   readonly expanded: boolean;
   readonly editing: boolean;
   readonly isOwner: boolean;
@@ -442,7 +444,6 @@ function LibraryRowImpl<R extends LibraryListRow>({
   config,
   colSpan,
   hidden,
-  defaultEdition,
   expanded,
   editing,
   isOwner,
@@ -455,6 +456,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
   // Any rejected edit or delete of this entry pulses its name cell (S5).
   const { flashProps } = useFlashState(undefined, undefined, `${config.entityClass}:${row.id}:`);
   const meta = config.meta(row);
+  const citation = row.source?.trim() || row.sourceLocator?.trim();
   const excerpt = expanded || editing ? '' : plainExcerpt(row.description);
   return (
     <TableBody
@@ -483,32 +485,13 @@ function LibraryRowImpl<R extends LibraryListRow>({
               size={14}
               className="mt-1 text-muted"
             />
-            <span className="min-w-0 break-words font-medium">
-              {row.name}
-              <span className="mt-1 flex flex-wrap gap-1 text-xs font-normal">
-                {row.sourceKey && <span className="badge badge-sm">{row.sourceKey}</span>}
-                {row.restricted && <span className="badge badge-sm badge-warning">Restricted</span>}
-                {row.status && row.status !== 'complete' && (
-                  <span className="badge badge-sm badge-warning">
-                    {row.status.replaceAll('_', ' ')}
-                  </span>
-                )}
-                {row.role && row.role !== 'definition' && (
-                  <span className="badge badge-sm">{row.role}</span>
-                )}
-                {config.key !== 'sources' &&
-                  defaultEdition &&
-                  (row.sourceKey || row.preferredEdition) && (
-                    <span className="badge badge-sm">
-                      {row.preferredEdition ? 'Preferred' : 'Default edition'}
-                    </span>
-                  )}
-              </span>
-            </span>
+            <span className="min-w-0 break-words font-medium">{row.name}</span>
           </button>
-          {meta && (
-            <span className="block pl-5 text-[10px] uppercase tracking-wider text-base-content/60 [overflow-wrap:anywhere] sm:hidden">
-              {meta}
+          {(meta || citation) && (
+            <span className="block pl-5 text-[10px] text-base-content/60 [overflow-wrap:anywhere] sm:text-xs">
+              {meta && <span className="uppercase tracking-wider">{meta}</span>}
+              {meta && citation && ' · '}
+              {citation && <span>{citation}</span>}
             </span>
           )}
           {excerpt && (
@@ -561,21 +544,9 @@ function LibraryRowImpl<R extends LibraryListRow>({
               form
             ) : (
               <div className="space-y-1">
-                {meta && (
-                  <p className="hidden text-xs uppercase tracking-widest text-dim sm:block">
-                    {meta}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <span className="badge">{row.sourceKey ?? 'Legacy source'}</span>
-                  <span className="badge">{row.status ?? 'complete'}</span>
-                  <span className="badge">{row.role ?? 'definition'}</span>
-                  {row.restricted && (
-                    <span className="badge badge-warning">Restricted · GM only</span>
-                  )}
-                  {row.preferredEdition && <span className="badge">Preferred edition</span>}
-                </div>
-                {row.sourceLocator && <p>{row.sourceLocator}</p>}
+                {row.source?.trim() &&
+                  row.sourceLocator?.trim() &&
+                  row.sourceLocator.trim() !== row.source.trim() && <p>{row.sourceLocator}</p>}
                 {config.detail(row)}
                 {row.extraction?.rawText && (
                   <pre className="whitespace-pre-wrap break-words text-xs">

@@ -536,8 +536,8 @@ describe('GET /campaigns/{id}/history', () => {
     });
     expect(res.status).toBe(200);
     const events = (await res.json()) as HistoryEvent[];
-    // Campaign insert, owner membership, 17 seeded sources, then the rename.
-    expect(events.length).toBe(20);
+    // Campaign insert, owner membership, 16 seeded sources, then the rename.
+    expect(events.length).toBe(19);
     expect(events[0]?.op).toBe('update');
     expect(events[0]?.entityClass).toBe('campaign');
     expect(events.every((e) => e.scope === 'campaign')).toBe(true);
@@ -582,7 +582,7 @@ describe('GET /campaigns/{id}/history', () => {
   it('before pagination walks older pages without gaps or overlaps', async () => {
     const owner = await registerUser('camp-hist-page');
     const campaign = await createCampaign(owner.accessToken, { name: 'Page Test' });
-    // 3 updates on top of the campaign, membership, and 17 source inserts.
+    // 3 updates on top of the campaign, membership, and 16 source inserts.
     for (let i = 0; i < 3; i++) {
       await app.request(`/api/v1/campaigns/${campaign.id}`, {
         method: 'PATCH',
@@ -606,9 +606,9 @@ describe('GET /campaigns/{id}/history', () => {
       if (events.length < 2) break;
     }
 
-    expect(seen.length).toBe(22);
+    expect(seen.length).toBe(21);
     const ids = seen.map((e) => e.id);
-    expect(new Set(ids).size).toBe(22); // no duplicates across pages.
+    expect(new Set(ids).size).toBe(21); // no duplicates across pages.
     for (let i = 1; i < seen.length; i++) {
       const prev = seen[i - 1];
       const curr = seen[i];

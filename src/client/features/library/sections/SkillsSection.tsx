@@ -28,7 +28,7 @@ export const skillsConfig: LibrarySectionConfig<LocalLibrarySkill> = {
   group: (row) => row.attribute,
   groupOrder: SKILL_ATTRIBUTES,
   meta: librarySkillMeta,
-  detail: (row) => <LibrarySkillDetails skill={row} />,
+  detail: (row) => <LibrarySkillDetails skill={row} showSource={false} />,
   deleteTitle: 'Delete library skill',
   deleteNote: 'Existing characters that use this skill are not affected.',
 };

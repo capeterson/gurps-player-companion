@@ -46,7 +46,6 @@ export const techniquesConfig: LibrarySectionConfig<LocalLibraryTechnique> = {
     <>
       {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
       {row.prereq && <p className="text-xs text-dim">Prerequisites · {row.prereq}</p>}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
     </>
   ),
   deleteTitle: 'Delete library technique',

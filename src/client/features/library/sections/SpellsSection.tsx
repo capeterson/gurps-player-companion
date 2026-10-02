@@ -56,7 +56,6 @@ export const spellsConfig: LibrarySectionConfig<LocalLibrarySpell> = {
       )}
       {row.prerequisites && <p className="text-xs text-dim">Prerequisites · {row.prerequisites}</p>}
       {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
     </>
   ),
   deleteTitle: 'Delete library spell',
