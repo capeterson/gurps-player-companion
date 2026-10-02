@@ -48,9 +48,54 @@ test('a synced edit and its revision response share one item with Request and Re
   ).toBeVisible({ timeout: 15_000 });
   await selectCharacterSection(page, 'Overview');
   const strength = page.getByRole('textbox', { name: 'ST base', exact: true });
-  await strength.fill('14');
-  await strength.blur();
+  const connectedGemColor = await saved()
+    .locator('svg > path')
+    .evaluate((gem) => getComputedStyle(gem).color);
+  // Hold the real upload so the connected, actively syncing icon stays visible.
+  let releaseUpload = () => {};
+  const heldUpload = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
+  });
+  const uploadRoute = '**/api/v1/sync/operations';
+  await page.route(uploadRoute, async (route) => {
+    await heldUpload;
+    await route.continue();
+  });
+  try {
+    const upload = page.waitForRequest(uploadRoute);
+    await strength.fill('14');
+    await strength.blur();
+    await upload;
+    const syncing = page.getByRole('button', { name: 'Syncing changes', exact: true });
+    await expect(syncing).toBeVisible();
+    const gem = syncing.locator('svg > path');
+    await expect(gem).toHaveAttribute('fill', 'currentColor');
+    const colors = await syncing.evaluate((button) => {
+      const center = button.querySelector('svg > path');
+      const arrows = button.querySelector('svg > g');
+      if (!center || !arrows) throw new Error('Expected the syncing gem and arrows');
+      return {
+        center: getComputedStyle(center).color,
+        arrow: getComputedStyle(arrows).color,
+        animation: getComputedStyle(arrows).animationName,
+      };
+    });
+    expect(colors.center).toBe(connectedGemColor);
+    expect(colors.center).not.toBe(colors.arrow);
+    expect(colors.animation).not.toBe('none');
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(syncing).toBeVisible();
+      await captureReviewScreenshot(page, {
+        path: testInfo.outputPath(`sync-connected-active-${width}.png`),
+      });
+    }
+  } finally {
+    releaseUpload();
+    await page.unroute(uploadRoute);
+  }
   await expect(saved()).toBeVisible({ timeout: 15_000 });
+  await expect(saved().locator('svg > path')).toHaveAttribute('fill', 'currentColor');
 
   let push: SyncLogEntry | undefined;
   await expect
