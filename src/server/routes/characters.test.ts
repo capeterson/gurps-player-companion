@@ -21,6 +21,7 @@ import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
 import { LIBRARY_ENTITY_CLASSES } from '../../shared/schemas/sync.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
@@ -516,7 +517,10 @@ describe('character-owned library declarations in the cursor', () => {
 });
 
 function bearer(token: string) {
-  return { Authorization: `Bearer ${token}` };
+  return {
+    Authorization: `Bearer ${token}`,
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 describe('owned mechanics survive source lifecycle changes', () => {

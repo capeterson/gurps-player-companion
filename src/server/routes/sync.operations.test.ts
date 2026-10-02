@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
@@ -27,7 +28,11 @@ function bearer(token: string) {
 }
 
 function jsonHeaders(token: string) {
-  return { ...bearer(token), 'content-type': 'application/json' };
+  return {
+    ...bearer(token),
+    'content-type': 'application/json',
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 async function registerUser(suffix: string) {

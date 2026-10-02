@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import {
+  type LibraryYamlDoc,
   libraryEnchantmentCreate,
   libraryItemCreate,
   libraryLanguageCreate,
@@ -30,13 +31,14 @@ it('packages selected sourcebooks and retains explicit GM restrictions', () => {
         { key: 'beta', name: 'Beta', abbreviation: 'B', priority: 100 },
       ],
       traits: [
-        libraryTraitCreate.parse({
-          name: 'Secret',
-          kind: 'advantage',
+        {
+          ...libraryTraitCreate.parse({ name: 'Secret', kind: 'advantage', restricted: true }),
           sourceKey: 'alpha',
-          restricted: true,
-        }),
-        libraryTraitCreate.parse({ name: 'Public', kind: 'advantage', sourceKey: 'beta' }),
+        } as LibraryYamlDoc['library']['traits'][number],
+        {
+          ...libraryTraitCreate.parse({ name: 'Public', kind: 'advantage' }),
+          sourceKey: 'beta',
+        } as LibraryYamlDoc['library']['traits'][number],
       ],
       skills: [],
       spells: [],
@@ -93,7 +95,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     skills: [],
     spells: [],
     items: [
-      libraryItemCreate.parse({
+      {
         name: 'Enchanted mail',
         enchantments: [
           {
@@ -110,7 +112,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
             },
           },
         ],
-      }),
+      } as unknown as LibraryYamlDoc['library']['items'][number],
     ],
     languages: [],
     techniques: [],

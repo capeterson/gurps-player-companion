@@ -12,6 +12,7 @@ import { describe, expect, it } from 'bun:test';
 import { stringify } from 'yaml';
 import { fixedCalculation } from '../../shared/domain/calculation.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { createTestActor } from '../testFixtures.ts';
@@ -21,7 +22,10 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 function bearer(token: string) {
-  return { Authorization: `Bearer ${token}` };
+  return {
+    Authorization: `Bearer ${token}`,
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 function jsonHeaders(token: string) {
@@ -92,17 +96,19 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
   const id = String(campaign.id);
   await addMember(owner.accessToken, id, member.email);
   const base = `/api/v1/campaigns/${id}/library`;
+  const sourceIds = new Map<string, string>();
   for (const key of ['alpha-book', 'beta-book', 'empty-book']) {
     const response = await app.request(`${base}/sources`, {
       method: 'POST',
       headers: jsonHeaders(owner.accessToken),
-      body: JSON.stringify({ key, name: key, abbreviation: key, priority: 100 }),
+      body: JSON.stringify({ name: key, abbreviation: key, priority: 100 }),
     });
     expect(response.status).toBe(201);
+    sourceIds.set(key, ((await response.json()) as { id: string }).id);
   }
   const secret = await createTrait(owner.accessToken, id, {
     name: 'Secret Alpha',
-    sourceKey: 'alpha-book',
+    sourceId: sourceIds.get('alpha-book'),
     restricted: true,
   });
   expect(secret.res.status).toBe(201);
@@ -110,7 +116,7 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
     (
       await createTrait(owner.accessToken, id, {
         name: 'Public Beta',
-        sourceKey: 'beta-book',
+        sourceId: sourceIds.get('beta-book'),
       })
     ).res.status,
   ).toBe(201);
@@ -122,7 +128,7 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
   const memberExport = await app.request(`${base}/export`, { headers: bearer(member.accessToken) });
   expect(await memberExport.text()).not.toContain('Secret Alpha');
   const ownerExport = await app.request(
-    `${base}/export?sourceKeys=${encodeURIComponent(JSON.stringify(['alpha-book']))}`,
+    `${base}/export?sourceIds=${encodeURIComponent(JSON.stringify([sourceIds.get('alpha-book')]))}`,
     {
       headers: bearer(owner.accessToken),
     },
@@ -133,7 +139,7 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
   expect(scopedYaml).not.toContain('Public Beta');
   expect(scopedYaml).toContain('sourceKeys:');
   const emptyExport = await app.request(
-    `${base}/export?sourceKeys=${encodeURIComponent(JSON.stringify(['empty-book']))}`,
+    `${base}/export?sourceIds=${encodeURIComponent(JSON.stringify([sourceIds.get('empty-book')]))}`,
     { headers: bearer(owner.accessToken) },
   );
   expect(emptyExport.status).toBe(200);
@@ -164,7 +170,7 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
     (
       await createTrait(owner.accessToken, id, {
         name: 'Extra Alpha',
-        sourceKey: 'alpha-book',
+        sourceId: sourceIds.get('alpha-book'),
       })
     ).res.status,
   ).toBe(201);
@@ -172,7 +178,7 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
     (
       await createTrait(owner.accessToken, id, {
         name: 'Extra Beta',
-        sourceKey: 'beta-book',
+        sourceId: sourceIds.get('beta-book'),
       })
     ).res.status,
   ).toBe(201);
@@ -204,12 +210,18 @@ it('keeps restricted entries GM-only and replaces only selected sourcebooks', as
 
   const fullExport = await app.request(`${base}/export`, { headers: bearer(owner.accessToken) });
   const fullYaml = await fullExport.text();
-  await createTrait(owner.accessToken, id, { name: 'Keep Alpha', sourceKey: 'alpha-book' });
-  await createTrait(owner.accessToken, id, { name: 'Remove Beta', sourceKey: 'beta-book' });
+  await createTrait(owner.accessToken, id, {
+    name: 'Keep Alpha',
+    sourceId: sourceIds.get('alpha-book'),
+  });
+  await createTrait(owner.accessToken, id, {
+    name: 'Remove Beta',
+    sourceId: sourceIds.get('beta-book'),
+  });
   const selectedImport = await app.request(`${base}/import`, {
     method: 'POST',
     headers: jsonHeaders(owner.accessToken),
-    body: JSON.stringify({ yaml: fullYaml, sourceKeys: ['beta-book'], mode: 'replace' }),
+    body: JSON.stringify({ yaml: fullYaml, sourceKeys: ['beta-book: beta-book'], mode: 'replace' }),
   });
   expect(selectedImport.status).toBe(200);
   const selectedList = await app.request(base, { headers: bearer(owner.accessToken) });
@@ -311,7 +323,7 @@ it.each([
       ...(kind === 'traits' ? { kind: 'advantage' } : {}),
       ...(kind === 'skills' ? { attribute: 'DX', difficulty: 'A' } : {}),
       ...(kind === 'techniques' ? { defaultSkillName: 'Fencing' } : {}),
-      ...(kind === 'sources' ? { key: 'cursor-source', abbreviation: 'CS' } : {}),
+      ...(kind === 'sources' ? { abbreviation: 'CS' } : {}),
       ...(kind === 'modifiers'
         ? {
             category: 'enhancement',
@@ -389,6 +401,112 @@ describe('library trait CRUD', () => {
 });
 
 describe('library source and modifier CRUD authorization', () => {
+  it('uses source UUIDs for live links while YAML imports translate nested references to target UUIDs', async () => {
+    const owner = await registerUser('sourcebook-uuid-links');
+    const first = await createCampaign(owner.accessToken);
+    const second = await createCampaign(owner.accessToken);
+    const firstBase = `/api/v1/campaigns/${first.id}/library`;
+    const secondBase = `/api/v1/campaigns/${second.id}/library`;
+    const createSource = async (
+      base: string,
+      name: string,
+      abbreviation: string,
+      edition = '4th Edition',
+    ) => {
+      const response = await app.request(`${base}/sources`, {
+        method: 'POST',
+        headers: jsonHeaders(owner.accessToken),
+        body: JSON.stringify({ name, abbreviation, edition, priority: 20 }),
+      });
+      expect(response.status).toBe(201);
+      return (await response.json()) as { id: string; name: string; abbreviation: string };
+    };
+    const source = await createSource(firstBase, 'Rules of the Road', 'RR');
+
+    const trait = await createTrait(owner.accessToken, String(first.id), {
+      name: 'Roadwise',
+      key: 'roadwise',
+      sourceId: source.id,
+    });
+    expect(trait.res.status).toBe(201);
+    const modifierResponse = await app.request(`${firstBase}/modifiers`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({
+        name: 'Roadwise discount',
+        key: 'roadwise-discount',
+        sourceId: source.id,
+        category: 'enhancement',
+        costType: 'percent',
+        calculation: fixedCalculation({ modifier: { value: 10, unit: 'percentage' } }),
+        applicability: {
+          universal: false,
+          traitKinds: [],
+          traitTags: [],
+          traits: [{ section: 'traits', key: 'roadwise', sourceId: source.id, kind: 'advantage' }],
+        },
+      }),
+    });
+    expect(modifierResponse.status).toBe(201);
+
+    const renamed = await app.request(`${firstBase}/sources/${source.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ name: 'Road Rules', abbreviation: 'RDR', edition: 'Revised' }),
+    });
+    expect(renamed.status).toBe(200);
+    const live = (await (
+      await app.request(firstBase, { headers: bearer(owner.accessToken) })
+    ).json()) as {
+      traits: Array<Record<string, unknown>>;
+      modifiers: Array<{
+        sourceId: string;
+        applicability: { traits: Array<{ sourceId: string }> };
+      }>;
+    };
+    expect(live.traits.find((row) => row.name === 'Roadwise')).toMatchObject({
+      sourceId: source.id,
+    });
+    expect(live.modifiers[0]).toMatchObject({
+      sourceId: source.id,
+      applicability: { traits: [{ sourceId: source.id }] },
+    });
+
+    const exported = await app.request(`${firstBase}/export`, {
+      headers: bearer(owner.accessToken),
+    });
+    expect(exported.status).toBe(200);
+    const imported = await app.request(`${secondBase}/import`, {
+      method: 'POST',
+      headers: jsonHeaders(owner.accessToken),
+      body: JSON.stringify({ yaml: await exported.text(), mode: 'merge' }),
+    });
+    expect(imported.status).toBe(200);
+    const target = (await (
+      await app.request(secondBase, { headers: bearer(owner.accessToken) })
+    ).json()) as {
+      sources: Array<{ id: string; name: string; abbreviation: string }>;
+      traits: Array<Record<string, unknown>>;
+      modifiers: Array<{
+        sourceId: string;
+        applicability: { traits: Array<{ sourceId: string }> };
+      }>;
+    };
+    const targetSource = target.sources.find((row) => row.name === 'Road Rules');
+    expect(targetSource).toBeDefined();
+    expect(targetSource?.id).not.toBe(source.id);
+    expect(target.traits.find((row) => row.name === 'Roadwise')).toMatchObject({
+      sourceId: targetSource?.id,
+    });
+    expect(target.modifiers[0]).toMatchObject({
+      sourceId: targetSource?.id,
+      applicability: { traits: [{ sourceId: targetSource?.id }] },
+    });
+    expect(JSON.stringify(target)).not.toContain('sourceKey');
+    const duplicateMetadata = await createSource(firstBase, 'Road Rules', 'RDR', 'Revised');
+    expect(duplicateMetadata.id).not.toBe(source.id);
+  });
+
   it('seeds common fourth-edition sources for each new campaign and lets the owner remove them', async () => {
     const owner = await registerUser('default-sources');
     const first = await createCampaign(owner.accessToken);
@@ -403,7 +521,6 @@ describe('library source and modifier CRUD authorization', () => {
         (await response.json()) as {
           sources: {
             id: string;
-            key: string;
             name: string;
             abbreviation: string;
             edition: string;
@@ -437,7 +554,6 @@ describe('library source and modifier CRUD authorization', () => {
     expect(firstSources).toContainEqual(
       expect.objectContaining({
         name: 'GURPS Basic Set: Characters',
-        key: 'basic-set-characters',
         abbreviation: 'B',
         edition: '4th Edition',
       }),
@@ -456,18 +572,18 @@ describe('library source and modifier CRUD authorization', () => {
         firstSourceIds.has(change.entityId),
       ),
     ).toHaveLength(17);
-    const basic = firstSources.find((source) => source.key === 'basic-set-characters');
+    const basic = firstSources.find((source) => source.name === 'GURPS Basic Set: Characters');
     expect(basic).toBeDefined();
     const removed = await app.request(
       `/api/v1/campaigns/${first.id}/library/sources/${basic?.id}`,
       { method: 'DELETE', headers: bearer(owner.accessToken) },
     );
     expect(removed.status).toBe(204);
-    expect((await readSources(String(first.id))).some((source) => source.key === basic?.key)).toBe(
+    expect((await readSources(String(first.id))).some((source) => source.id === basic?.id)).toBe(
       false,
     );
     expect(
-      (await readSources(String(second.id))).find((source) => source.key === basic?.key),
+      (await readSources(String(second.id))).find((source) => source.name === basic?.name),
     ).toMatchObject({ abbreviation: 'B', edition: '4th Edition' });
   });
 
@@ -482,7 +598,7 @@ describe('library source and modifier CRUD authorization', () => {
   it.each([
     {
       section: 'sources',
-      body: { name: 'Core Rules', key: 'core', abbreviation: 'CR', priority: 1 },
+      body: { name: 'Core Rules', abbreviation: 'CR', priority: 1 },
     },
     { section: 'modifiers', body: modifierCreate },
   ])('$section allows owner CRUD and denies member/manager writes', async ({ section, body }) => {
@@ -1056,24 +1172,23 @@ describe('YAML export/import round trip', () => {
         headers: jsonHeaders(owner.accessToken),
         body: JSON.stringify({
           name,
-          key,
           abbreviation: key.toUpperCase(),
           priority,
           edition: '1st',
         }),
       });
       expect(res.status).toBe(201);
-      return (await res.json()) as { id: string; key: string };
+      return (await res.json()) as { id: string };
     };
     const createEdition = async (
-      sourceKey: string,
+      sourceId: string,
       basePoints: number,
       preferredEdition: boolean,
     ) => {
       const { res, body } = await createTrait(owner.accessToken, String(campaign.id), {
         name: 'Acute Vision',
         key: 'acute-vision',
-        sourceKey,
+        sourceId,
         status: 'complete',
         role: 'definition',
         preferredEdition,
@@ -1084,19 +1199,19 @@ describe('YAML export/import round trip', () => {
     };
     const core = await createSource('Core Rules', 'core', 1);
     const alternate = await createSource('Alternate Rules', 'alternate', 20);
-    const coreTrait = await createEdition('core', 4, false);
-    await createEdition('alternate', 6, true);
+    const coreTrait = await createEdition(core.id, 4, false);
+    await createEdition(alternate.id, 6, true);
     const modifierCalculation = fixedCalculation({ modifier: { value: 10, unit: 'percentage' } });
     const applicability = {
       universal: false,
       traitKinds: [],
       traitTags: [],
-      traits: [{ section: 'traits', key: 'acute-vision', sourceKey: 'core', kind: 'advantage' }],
+      traits: [{ section: 'traits', key: 'acute-vision', sourceId: core.id, kind: 'advantage' }],
     };
     const modifierCreate = {
       name: 'Reliable',
       key: 'reliable',
-      sourceKey: 'core',
+      sourceId: core.id,
       status: 'complete',
       role: 'definition',
       category: 'enhancement',
@@ -1125,11 +1240,11 @@ describe('YAML export/import round trip', () => {
         },
       });
     const coreSourceYaml = {
-      name: 'Core Rules Revised',
+      name: 'Core Rules',
       key: 'core',
-      abbreviation: 'CR',
+      abbreviation: 'CORE',
       priority: 1,
-      edition: '2nd',
+      edition: '1st',
     };
     const coreTraitYaml = {
       name: 'Acute Vision',
@@ -1141,7 +1256,16 @@ describe('YAML export/import round trip', () => {
       kind: 'advantage',
       basePoints: 9,
     };
-    const modifierYaml = { ...modifierCreate, description: 'Updated by v12 import' };
+    const modifierYaml = {
+      ...modifierCreate,
+      sourceId: undefined,
+      sourceKey: 'core',
+      applicability: {
+        ...modifierCreate.applicability,
+        traits: [{ section: 'traits', key: 'acute-vision', sourceKey: 'core', kind: 'advantage' }],
+      },
+      description: 'Updated by v12 import',
+    };
     const mergeRes = await app.request(`${base}/import`, {
       method: 'POST',
       headers: jsonHeaders(owner.accessToken),
@@ -1154,23 +1278,23 @@ describe('YAML export/import round trip', () => {
     const mergeList = (await (
       await app.request(base, { headers: bearer(owner.accessToken) })
     ).json()) as {
-      sources: { id: string; key: string; name: string; edition: string | null }[];
+      sources: { id: string; name: string; edition: string | null }[];
       traits: {
         id: string;
-        sourceKey: string | null;
+        sourceId: string | null;
         basePoints: number;
         preferredEdition: boolean;
       }[];
       modifiers: { id: string; description: string | null }[];
     };
     expect(mergeList.sources).toHaveLength(19);
-    expect(mergeList.sources.find((row) => row.key === 'core')).toMatchObject({
+    expect(mergeList.sources.find((row) => row.id === core.id)).toMatchObject({
       id: core.id,
-      name: 'Core Rules Revised',
-      edition: '2nd',
+      name: 'Core Rules',
+      edition: '1st',
     });
     expect(mergeList.traits).toHaveLength(2);
-    expect(mergeList.traits.find((row) => row.sourceKey === 'core')).toMatchObject({
+    expect(mergeList.traits.find((row) => row.sourceId === core.id)).toMatchObject({
       id: coreTrait.id,
       basePoints: 9,
       preferredEdition: false,
@@ -1184,7 +1308,7 @@ describe('YAML export/import round trip', () => {
       headers: jsonHeaders(owner.accessToken),
       body: JSON.stringify({ key: 'renamed-core' }),
     });
-    expect(invalidSourceRename.status).toBe(400);
+    expect(invalidSourceRename.status).toBe(422);
 
     const failedReplace = await app.request(`${base}/import`, {
       method: 'POST',

@@ -11,7 +11,9 @@ import {
   libraryTraitCreate,
   libraryTraitOut,
 } from '../../../shared/schemas/campaignLibrary.ts';
+import { librarySourceOut } from '../../../shared/schemas/libraryMetadata.ts';
 import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
+import { portableLibraryEntry } from '../../../shared/yaml/sourceReferences.ts';
 import { createApp } from '../../app.ts';
 import { signAccessToken } from '../../auth/jwt.ts';
 import { loadCharacterDetail } from '../../services/characterSummary.ts';
@@ -32,6 +34,7 @@ const identified = z.object({ id: z.string().uuid() });
 const catalogSchema = z.object({
   traits: libraryTraitOut.array(),
   skills: librarySkillOut.array(),
+  sources: librarySourceOut.array(),
 });
 
 async function request(actorId: string, path: string, method = 'GET', body?: unknown) {
@@ -65,8 +68,8 @@ async function oldDemo(ownerId: string) {
     'utf8',
   );
   const document = parseLibraryYaml(text);
-  document.library.traits = libraryTraitCreate.array().parse(legacy.traits);
-  document.library.skills = librarySkillCreate.array().parse(legacy.skills);
+  document.library.traits = z.array(portableLibraryEntry(libraryTraitCreate)).parse(legacy.traits);
+  document.library.skills = z.array(portableLibraryEntry(librarySkillCreate)).parse(legacy.skills);
   const campaign = identified.parse(
     await request(ownerId, '/campaigns', 'POST', {
       ...document.campaign,
@@ -171,15 +174,93 @@ async function oldDemo(ownerId: string) {
 }
 
 describe('Lantern Coast explicit content refresh', () => {
+  it('keeps renamed source UUID links and tolerates a deleted source with no definitions', async () => {
+    await isolated(async (ownerId) => {
+      const old = await oldDemo(ownerId);
+      const before = catalogSchema.parse(await request(ownerId, `${old.path}/library`));
+      const linkedTrait = before.traits.find((entry) => entry.name === 'Breakwater Poise');
+      if (!linkedTrait?.sourceId) throw new Error('Missing linked sourcebook UUID');
+      const linkedBook = before.sources.find((entry) => entry.id === linkedTrait.sourceId);
+      if (!linkedBook) throw new Error('Missing linked sourcebook');
+      const renamed = await request(
+        ownerId,
+        `${old.path}/library/sources/${linkedBook.id}`,
+        'PATCH',
+        {
+          name: 'Greyhaven Lives and Vows: revised',
+          abbreviation: 'LCGV-R',
+          edition: 'Synthetic playtest 2',
+        },
+      );
+      expect(librarySourceOut.parse(renamed)).toMatchObject({
+        id: linkedBook.id,
+        name: 'Greyhaven Lives and Vows: revised',
+        abbreviation: 'LCGV-R',
+        edition: 'Synthetic playtest 2',
+      });
+
+      const unusedBook = {
+        name: 'Refresh-only unused source',
+        key: 'refresh_unused_source',
+        abbreviation: 'RUS',
+        edition: 'Synthetic fixture',
+        priority: 99,
+      };
+      const created = await request(ownerId, `${old.path}/library/sources`, 'POST', {
+        name: unusedBook.name,
+        abbreviation: unusedBook.abbreviation,
+        edition: unusedBook.edition,
+        priority: unusedBook.priority,
+      });
+      const unusedId = identified.parse(created).id;
+      const document = parseLibraryYaml(old.text);
+      document.library.sources ??= [];
+      document.library.sources.push(unusedBook);
+      await request(ownerId, `${old.path}/library/sources/${unusedId}`, 'DELETE');
+
+      await refreshLanternCoast(ownerId, stringify(document));
+      const after = catalogSchema.parse(await request(ownerId, `${old.path}/library`));
+      expect(after.sources.find((entry) => entry.id === linkedBook.id)).toMatchObject({
+        name: 'Greyhaven Lives and Vows: revised',
+        abbreviation: 'LCGV-R',
+        edition: 'Synthetic playtest 2',
+      });
+      expect(after.traits.find((entry) => entry.id === linkedTrait.id)?.sourceId).toBe(
+        linkedBook.id,
+      );
+      expect(after.sources.some((entry) => entry.name === unusedBook.name)).toBe(false);
+      expect(after.sources.some((entry) => entry.id === unusedId)).toBe(false);
+      expect(after.sources).toHaveLength(before.sources.length);
+      const detail = await loadCharacterDetail(old.characterId);
+      expect(detail.traits.find((entry) => entry.id === old.ownedTraitId)?.points).toBe(17);
+      expect(detail.skills.find((entry) => entry.id === old.ownedForagingId)?.points).toBe(4);
+      expect(detail.skills.find((entry) => entry.id === old.ownedBarterId)?.notes).toBe(
+        'My negotiated harbor rates; keep these.',
+      );
+    });
+  }, 30000);
+
   it('enriches untouched defaults while preserving edits, costs, play state and private access', async () => {
     await isolated(async (ownerId) => {
       const old = await oldDemo(ownerId);
-      const restricted = parseLibraryYaml(old.text).library.traits.find(
+      const oldDocument = parseLibraryYaml(old.text);
+      const restricted = oldDocument.library.traits.find(
         (entry) => entry.name === "Beacon Courier's Seal",
       );
       if (!restricted) throw new Error('Missing new courier privilege');
+      const sourcebook = oldDocument.library.sources?.find(
+        (entry) => entry.key === restricted.sourceKey,
+      );
+      const currentCatalog = catalogSchema.parse(await request(ownerId, `${old.path}/library`));
+      const source = currentCatalog.sources.find(
+        (entry) =>
+          entry.name === sourcebook?.name && entry.abbreviation === sourcebook.abbreviation,
+      );
+      if (!source) throw new Error('Missing courier sourcebook');
+      const { sourceKey: _portableSourceKey, ...liveRestricted } = restricted;
       await request(ownerId, `${old.path}/library/traits`, 'POST', {
-        ...restricted,
+        ...liveRestricted,
+        sourceId: source.id,
         restricted: true,
       });
       const oldCatalog = catalogSchema.parse(await request(ownerId, `${old.path}/library`));

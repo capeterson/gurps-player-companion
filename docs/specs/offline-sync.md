@@ -990,7 +990,7 @@ form.
 
 The YAML import stays an online bulk REST operation (up to 20 MB, server-side
 upsert/prune in one transaction), on the campaign Import & export tab. Sourcebook
-replacement prunes only selected source-key entries. On success the page
+replacement prunes only selected source-UUID entries after translating YAML labels. On success the page
 triggers a cursor pull. A GM restriction change sends a removal event to
 non-owner cursors; the client also purges cached restricted rows after an owner
 loses ownership. When a member becomes campaign owner, the client rewinds its
@@ -1074,3 +1074,16 @@ only after attachment acknowledgement. Logout/resync abort media work before
 purging both account stores; public image caches deliberately survive. The sync
 log provides an explicit source export separate from shareable debug data. Full
 lifecycle, access and cache semantics are in [media-uploads.md](media-uploads.md).
+
+### Sourcebook identity upgrade
+
+Dexie v16 converts legacy `sourceKey` references in cached entries, nested pricing
+rules/snapshots and queued attempted/previous values to campaign-scoped sourcebook
+UUIDs. Queued source creates/renames supply both previous and new alias evidence.
+Sourcebook rows no longer carry keys. An unresolved queued legacy reference keeps
+its original intent locally, is held from replay, and is named in the sync log
+with instructions to select a sourcebook and save again. Independent work continues.
+Unresolved speculative additions can be explicitly reverted in the sync log and
+recreated with a selected book; this never discards them automatically.
+Sync protocol 2 rejects older clients before processing operations; upgraded
+clients retain outbox IDs, ordering and delivery-uncertainty state.

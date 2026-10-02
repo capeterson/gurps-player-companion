@@ -33,7 +33,7 @@ function CatalogForm({
   const [source, setSource] = useState<LibrarySourceCreate>(() =>
     initial && section === 'sources'
       ? (initial as LocalLibrarySource)
-      : { name: '', key: '', abbreviation: '', priority: 100 },
+      : { name: '', abbreviation: '', priority: 100 },
   );
   const [modifier, setModifier] = useState<LibraryModifierCreate>(() =>
     initial && section === 'modifiers'
@@ -87,7 +87,7 @@ function CatalogForm({
       ) as Record<string, unknown>;
       onSubmit(schema.parse(body));
     } catch (e) {
-      const labels = { name: 'Publication title', key: 'Source key', abbreviation: 'Abbreviation' };
+      const labels = { name: 'Publication title', abbreviation: 'Abbreviation' };
       const issues = libraryValidationIssues(e);
       if (section === 'sources' && issues.length) {
         const errors = Object.fromEntries(
@@ -129,25 +129,6 @@ function CatalogForm({
             {sourceErrors.name && (
               <span id={`${errorId}-name`} className="text-error">
                 {sourceErrors.name}
-              </span>
-            )}
-          </label>
-          <label>
-            Source key <span aria-hidden="true">*</span>
-            <input
-              name="key"
-              maxLength={160}
-              aria-label="Source key"
-              aria-required="true"
-              aria-invalid={Boolean(sourceErrors.key)}
-              aria-describedby={sourceErrors.key ? `${errorId}-key` : undefined}
-              className="input w-full"
-              value={source.key}
-              onChange={(e) => patchSource({ key: e.target.value })}
-            />
-            {sourceErrors.key && (
-              <span id={`${errorId}-key`} className="text-error">
-                {sourceErrors.key}
               </span>
             )}
           </label>

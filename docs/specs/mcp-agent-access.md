@@ -592,3 +592,9 @@ exclusion alongside `/api/v1/healthz`; both report the running release.
 Adventure-log create/edit actions accept nullable `characterId`: selecting an owned
 character makes the entry private; null attaches to Campaign and shares it. Attachment
 ownership, legacy-private preservation, and history privacy use the shared REST handler.
+
+Sourcebook relationships in library tool inputs/results and nested pricing rules
+use `sourceId` UUIDs. Sourcebook create/update exposes publication metadata without
+a key field. Library export accepts `sourceIds` (a JSON UUID array); source keys
+are limited to portable YAML and incoming file-scope selection. Shared REST/sync
+handlers enforce campaign ownership of each UUID, backed by database foreign keys.

@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import {
+  MIN_SUPPORTED_SYNC_PROTOCOL,
+  SYNC_PROTOCOL_HEADER,
+  SYNC_PROTOCOL_VERSION,
+} from '../shared/syncProtocol.ts';
 import { createApp } from './app.ts';
 import type { AppConfig } from './config.ts';
 
@@ -133,31 +138,38 @@ describe('/sync/* protocol gate', () => {
 
   it('refuses an outdated client with 426 before authentication or validation', async () => {
     for (const path of ['operations', 'cursor']) {
-      const res = await post(path, { 'x-gpc-sync-protocol': '0' });
+      const res = await post(path, {
+        [SYNC_PROTOCOL_HEADER]: String(MIN_SUPPORTED_SYNC_PROTOCOL - 1),
+      });
       expect(res.status).toBe(426);
-      expect(res.headers.get('x-gpc-sync-protocol')).toBe('1');
+      expect(res.headers.get(SYNC_PROTOCOL_HEADER)).toBe(String(SYNC_PROTOCOL_VERSION));
       expect(await res.json()).toEqual({
         error: 'client_outdated',
-        clientProtocol: 0,
-        minProtocol: 1,
-        serverProtocol: 1,
+        clientProtocol: MIN_SUPPORTED_SYNC_PROTOCOL - 1,
+        minProtocol: MIN_SUPPORTED_SYNC_PROTOCOL,
+        serverProtocol: SYNC_PROTOCOL_VERSION,
       });
     }
   });
 
   it('treats a malformed protocol header as outdated', async () => {
-    expect((await post('operations', { 'x-gpc-sync-protocol': 'v1' })).status).toBe(426);
+    expect((await post('operations', { [SYNC_PROTOCOL_HEADER]: 'v1' })).status).toBe(426);
   });
 
   it('asks a client newer than this server to retry', async () => {
-    const res = await post('operations', { 'x-gpc-sync-protocol': '2' });
+    const res = await post('operations', {
+      [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION + 1),
+    });
     expect(res.status).toBe(503);
     expect(res.headers.get('retry-after')).toBe('5');
     expect(await res.json()).toEqual({ error: 'server_outdated' });
   });
 
-  it('passes current and pre-header clients through to authentication', async () => {
-    expect((await post('operations', { 'x-gpc-sync-protocol': '1' })).status).toBe(401);
-    expect((await post('operations')).status).toBe(401);
+  it('passes current clients to authentication and refuses protocol-1 clients', async () => {
+    expect(
+      (await post('operations', { [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION) })).status,
+    ).toBe(401);
+    expect((await post('operations', { [SYNC_PROTOCOL_HEADER]: '1' })).status).toBe(426);
+    expect((await post('operations')).status).toBe(426);
   });
 });

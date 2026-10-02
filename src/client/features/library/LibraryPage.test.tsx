@@ -156,16 +156,36 @@ function setup(initialEntry = '/', transferOnly = false) {
 
 it('searches descriptions and source across words, reports empty results and clears', async () => {
   await seed();
+  const sourceId = '0193b3c0-f1f0-7000-8000-00000000f004';
+  await getLocalDb().campaignLibrarySources.put({
+    id: sourceId,
+    campaignId: CAMPAIGN,
+    name: 'GURPS Basic Set',
+    abbreviation: 'BX',
+    revision: 1,
+  } as never);
+  await getLocalDb().campaignLibraryTraits.update(NIGHT, {
+    sourceId,
+    applicability: { traits: [{ sourceId, definitionId: '0193b3c0-f1f0-7000-8000-00000000f005' }] },
+  } as never);
   setup();
-  await screen.findByRole('button', { name: 'Night Vision' });
+  await screen.findByRole('button', { name: /^Night Vision BX Default edition$/ });
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search library' }), {
     target: { value: 'DARKNESS b71' },
   });
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Fearfulness' })).not.toBeInTheDocument(),
   );
-  expect(screen.getByRole('button', { name: 'Night Vision' })).toBeVisible();
+  expect(screen.getByRole('button', { name: /^Night Vision BX Default edition$/ })).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match');
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'BX Basic Set' } });
+  expect(
+    await screen.findByRole('button', { name: /^Night Vision BX Default edition$/ }),
+  ).toBeVisible();
+  fireEvent.change(screen.getByRole('searchbox'), {
+    target: { value: '00000000f004' },
+  });
+  expect(await screen.findByText(/No matches/)).toBeVisible();
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'No match' } });
   expect(await screen.findByText(/No matches/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
@@ -476,7 +496,7 @@ it('imports only the sourcebook selected from a full YAML file', async () => {
   const file = new File([yaml], 'books.yaml', { type: 'text/yaml' });
   Object.defineProperty(file, 'text', { value: async () => yaml });
   fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
-  const alpha = await screen.findByRole('checkbox', { name: 'A · Alpha' });
+  const alpha = await screen.findByRole('checkbox', { name: 'A: Alpha' });
   fireEvent.click(alpha);
   expect(alpha).toBeChecked();
   expect(screen.getByRole('checkbox', { name: 'Entire file' })).not.toBeChecked();

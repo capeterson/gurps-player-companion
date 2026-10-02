@@ -32,6 +32,10 @@ import {
 } from '../../../shared/domain/libraryIdentity.ts';
 import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
 import type { ImportResult, LibraryYamlDoc } from '../../../shared/schemas/campaignLibrary.ts';
+import {
+  importSourceReferences,
+  previewSourceBooks,
+} from '../../../shared/yaml/sourceReferences.ts';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
@@ -318,7 +322,7 @@ export function LibraryPage({
     doc: LibraryYamlDoc;
   } | null>(null);
   const [selectedImportKeys, setSelectedImportKeys] = useState<string[] | null>(null);
-  const [selectedExportKeys, setSelectedExportKeys] = useState<string[] | null>(null);
+  const [selectedExportIds, setSelectedExportIds] = useState<string[] | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -423,16 +427,25 @@ export function LibraryPage({
       const { sourceScopedLibrary } = await import('../../../shared/yaml/library.ts');
       const { yaml, fileName, doc: parsed } = fileCandidate;
       const sourceKeys = parsed.scope?.sourceKeys ?? selectedImportKeys;
-      const incoming = sourceKeys
+      const portableIncoming = sourceKeys
         ? sourceScopedLibrary(parsed.library, sourceKeys)
         : parsed.library;
+      if (!localLibrary)
+        throw new Error('Wait for the current library before validating an import');
+      const incoming = importSourceReferences(
+        portableIncoming,
+        previewSourceBooks(portableIncoming.sources, localLibrary.sources),
+      ) as LibraryGraph;
+      const scopedIds = sourceKeys
+        ? (incoming.sources ?? []).map((source) => source.id as string)
+        : undefined;
       const mode = importMode;
       const applySettings = !sourceKeys && applyCampaignSettings;
       if (mode === 'replace' && !localLibrary) {
         throw new Error('Reload the current library before replacing it');
       }
       const sections = [
-        ['Sources', 'sources', (entry: { name: string; key?: string }) => entry.key ?? entry.name],
+        ['Sources', 'sources', (entry: { id?: string | undefined }) => entry.id ?? ''],
         ['Modifiers', 'modifiers', libraryEntryKey],
         ['Traits', 'traits', libraryEntryKey],
         ['Skills', 'skills', libraryEntryKey],
@@ -447,12 +460,12 @@ export function LibraryPage({
       if (!localLibrary)
         throw new Error('Wait for the current library before validating an import');
       validateLibraryGraph(
-        mergeLibraryGraph(localLibrary, incoming as LibraryGraph, mode, sourceKeys ?? undefined),
+        mergeLibraryGraph(localLibrary, incoming as LibraryGraph, mode, scopedIds),
       );
       const blocked = Object.values(incoming)
         .flat()
         .filter((entry) => entry != null && !canAdoptLibraryEntry(entry)).length;
-      const selectedSourceKeys = sourceKeys && new Set(sourceKeys.map(canonicalLibraryKey));
+      const selectedSourceIds = scopedIds && new Set(scopedIds);
       const preview = sections
         .filter(([, key]) => key !== 'activeEffects' || activeEffectsEnabled)
         .flatMap(([label, key, naturalKey]) => {
@@ -469,12 +482,10 @@ export function LibraryPage({
                 mode === 'replace' && current
                   ? current.filter(
                       (entry) =>
-                        (!selectedSourceKeys ||
+                        (!selectedSourceIds ||
                           (key !== 'sources' &&
-                            'sourceKey' in entry &&
-                            selectedSourceKeys.has(
-                              canonicalLibraryKey(String(entry.sourceKey)),
-                            ))) &&
+                            'sourceId' in entry &&
+                            selectedSourceIds.has(String(entry.sourceId)))) &&
                         !incomingKeys.has(naturalKey(entry as never)),
                     ).length
                   : null,
@@ -510,8 +521,8 @@ export function LibraryPage({
     // need to pull the bytes via fetch and synthesize a blob URL.
     void (async () => {
       try {
-        const query = selectedExportKeys?.length
-          ? `?sourceKeys=${encodeURIComponent(JSON.stringify(selectedExportKeys))}`
+        const query = selectedExportIds?.length
+          ? `?sourceIds=${encodeURIComponent(JSON.stringify(selectedExportIds))}`
           : '';
         const res = await apiFetch(`/campaigns/${campaignId}/library/export${query}`);
         if (!res.ok) {
@@ -522,7 +533,7 @@ export function LibraryPage({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${slugify(currentCampaign?.name ?? 'library')}-${selectedExportKeys ? 'sourcebooks' : 'library'}.yaml`;
+        a.download = `${slugify(currentCampaign?.name ?? 'library')}-${selectedExportIds ? 'sourcebooks' : 'library'}.yaml`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -565,14 +576,14 @@ export function LibraryPage({
             <h3 className="card-title">Export YAML</h3>
             <p>Choose sourcebooks for a portable package, or export the entire library.</p>
             <SourcebookSelection
-              sources={library.sources}
-              selected={selectedExportKeys}
-              onChange={setSelectedExportKeys}
+              sources={library.sources.map((source) => ({ ...source, key: source.id }))}
+              selected={selectedExportIds}
+              onChange={setSelectedExportIds}
               allLabel="Entire library"
             />
-            {selectedExportKeys !== null && (
+            {selectedExportIds !== null && (
               <p className="text-sm text-base-content/60">
-                Entries without a sourcebook key are excluded from this export.
+                Entries without a sourcebook are excluded from this export.
               </p>
             )}
             {exportError && (
@@ -585,7 +596,7 @@ export function LibraryPage({
                 className="btn btn-sm"
                 type="button"
                 disabled={
-                  !campaignId || (selectedExportKeys !== null && selectedExportKeys.length === 0)
+                  !campaignId || (selectedExportIds !== null && selectedExportIds.length === 0)
                 }
                 onClick={downloadExport}
               >
@@ -812,7 +823,7 @@ export function LibraryPage({
             >
               <option value="">All sources</option>
               {library.sources.map((source) => (
-                <option key={source.id} value={source.key}>
+                <option key={source.id} value={source.id}>
                   {source.abbreviation}
                 </option>
               ))}
@@ -888,7 +899,7 @@ function SourcebookSelection({
         </label>
       )}
       {sources.length === 0 && (
-        <p className="text-sm text-base-content/60">No keyed sourcebooks in this file.</p>
+        <p className="text-sm text-base-content/60">No sourcebooks in this file.</p>
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         {sources.map((source) => (
@@ -913,7 +924,7 @@ function SourcebookSelection({
               }
             />
             <span className="min-w-0 [overflow-wrap:anywhere]">
-              {source.abbreviation} · {source.name}
+              {source.abbreviation}: {source.name}
             </span>
           </label>
         ))}

@@ -1,19 +1,22 @@
+import { useContext } from 'react';
 import { type LibraryMetadata, libraryMetadata } from '../../../shared/schemas/libraryMetadata.ts';
 import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
+import { SourcebooksContext, sourcebookLabel } from './SourcebooksContext.tsx';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 export function LibraryMetadataEditor({
   value,
   onChange,
 }: { value: LibraryMetadata; onChange: (value: LibraryMetadata) => void }) {
+  const sources = useContext(SourcebooksContext);
   const patch = (next: Partial<LibraryMetadata>) => onChange({ ...value, ...next });
   const validation = libraryMetadata.safeParse(value);
   const error = validation.success
     ? null
     : libraryFormError(validation.error, {
-        key: 'Canonical key',
-        sourceKey: 'Source key',
-        sourceLocator: 'Page or locator',
+        key: 'Definition identifier',
+        sourceId: 'Sourcebook',
+        sourceLocator: 'Page',
         rawText: 'Original row or excerpt',
         reviewNotes: 'Review notes',
       });
@@ -30,31 +33,36 @@ export function LibraryMetadataEditor({
             {error}
           </p>
         )}
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label>
-            Canonical key
-            <input
-              className="input input-sm w-full"
-              value={value.key ?? ''}
-              onChange={(e) => patch({ key: e.target.value || undefined })}
-            />
+        <div className="grid grid-cols-[minmax(0,1fr)_4rem] gap-2 sm:grid-cols-[minmax(0,1fr)_5rem]">
+          <label className="min-w-0">
+            Sourcebook
+            <select
+              className="select select-sm min-w-0 w-full"
+              value={value.sourceId ?? ''}
+              onChange={(e) => patch({ sourceId: e.target.value || null })}
+            >
+              <option value="">No sourcebook</option>
+              {value.sourceId && !sources.some((source) => source.id === value.sourceId) && (
+                <option value={value.sourceId}>Unavailable sourcebook</option>
+              )}
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {sourcebookLabel(source)}
+                </option>
+              ))}
+            </select>
           </label>
-          <label>
-            Source key
+          <label className="min-w-0">
+            Page
             <input
-              className="input input-sm w-full"
-              value={value.sourceKey ?? ''}
-              onChange={(e) => patch({ sourceKey: e.target.value || null })}
-            />
-          </label>
-          <label>
-            Page or locator
-            <input
-              className="input input-sm w-full"
+              className="input input-sm min-w-0 w-full"
+              inputMode="numeric"
               value={value.sourceLocator ?? ''}
               onChange={(e) => patch({ sourceLocator: e.target.value || null })}
             />
           </label>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
           <label>
             Status
             <select

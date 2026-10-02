@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   canPlayerSelectLibraryEntry,
+  canonicalLibraryKey,
   libraryEntryKey,
 } from '../../../shared/domain/libraryIdentity.ts';
 import {
@@ -31,6 +32,13 @@ import { skillCreate } from '../../../shared/schemas/skill.ts';
 import { skillProcedures } from '../../../shared/schemas/skillProcedures.ts';
 import { traitCreate } from '../../../shared/schemas/trait.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../../../shared/yaml/library.ts';
+import {
+  exportSourceReferences,
+  importSourceReferences,
+  portableLibraryEntry,
+  sourceExportKeys,
+  sourceImportIdentity,
+} from '../../../shared/yaml/sourceReferences.ts';
 import { createApp } from '../../app.ts';
 import { signAccessToken } from '../../auth/jwt.ts';
 import { loadConfig } from '../../config.ts';
@@ -53,8 +61,8 @@ import { lanternSeedIsCurrent, recordLanternSeedVersion } from './lanternCoastRe
 const purchaseIdentity = (row: { name: string; specialization?: unknown }) =>
   JSON.stringify([row.name, row.specialization ?? null]);
 const baselineSchema = z.object({
-  traits: libraryTraitCreate.array(),
-  skills: librarySkillCreate.array(),
+  traits: portableLibraryEntry(libraryTraitCreate).array(),
+  skills: portableLibraryEntry(librarySkillCreate).array(),
   characters: z.array(
     z.object({
       name: z.string(),
@@ -134,11 +142,77 @@ export async function refreshLanternCoast(
 
     // Import only new definitions. Merge of the complete document would silently
     // restore deleted originals and overwrite GM edits, including purchase prices.
-    const availableSourceKeys = new Set(catalog.sources.map((source) => source.key));
+    // The authored YAML may retain its original labels after the GM renames a
+    // book. Surviving definitions identify that book by UUID. Missing books and
+    // their definitions are deliberately excluded from this conservative refresh.
+    const sourceAliases = new Map<string, string>();
+    for (const source of document.library.sources ?? []) {
+      const metadataMatches = catalog.sources.filter(
+        (book) => sourceImportIdentity(book) === sourceImportIdentity(source),
+      );
+      const linkedIds = new Set<string>();
+      for (const section of ['traits', 'skills'] as const) {
+        for (const authored of document.library[section]) {
+          if (canonicalLibraryKey(authored.sourceKey ?? '') !== canonicalLibraryKey(source.key))
+            continue;
+          for (const existing of catalog[section]) {
+            if (
+              canonicalLibraryKey(existing.key ?? existing.name) ===
+                canonicalLibraryKey(authored.key ?? authored.name) &&
+              existing.name === authored.name &&
+              ('kind' in existing ? existing.kind : null) ===
+                ('kind' in authored ? authored.kind : null) &&
+              existing.sourceId
+            )
+              linkedIds.add(existing.sourceId);
+          }
+        }
+      }
+      const id =
+        metadataMatches.length === 1
+          ? metadataMatches[0]?.id
+          : linkedIds.size === 1
+            ? [...linkedIds][0]
+            : undefined;
+      if (id && catalog.sources.some((book) => book.id === id))
+        sourceAliases.set(canonicalLibraryKey(source.key), id);
+    }
+    const hasUnavailableSource = (value: unknown): boolean => {
+      if (Array.isArray(value)) return value.some(hasUnavailableSource);
+      if (!value || typeof value !== 'object') return false;
+      return Object.entries(value).some(([key, entry]) =>
+        key === 'sourceKey'
+          ? entry != null && !sourceAliases.has(canonicalLibraryKey(String(entry)))
+          : hasUnavailableSource(entry),
+      );
+    };
+    const resolveRefreshContent = (content: {
+      traits: typeof document.library.traits;
+      skills: typeof document.library.skills;
+    }) => {
+      const resolved = importSourceReferences(
+        {
+          traits: content.traits.filter((entry) => !hasUnavailableSource(entry)),
+          skills: content.skills.filter((entry) => !hasUnavailableSource(entry)),
+          sources: document.library.sources?.filter((source) =>
+            sourceAliases.has(canonicalLibraryKey(source.key)),
+          ),
+        },
+        catalog.sources,
+        sourceAliases,
+      ) as { traits: unknown; skills: unknown };
+      return {
+        traits: libraryTraitCreate.array().parse(resolved.traits),
+        skills: librarySkillCreate.array().parse(resolved.skills),
+      };
+    };
+    const authoredLive = resolveRefreshContent(document.library);
+    const baselineLive = resolveRefreshContent(baseline);
+    const availableSourceIds = new Set(catalog.sources.map((source) => source.id));
     const additions = <T extends LibraryMetadata & { name: string; kind?: string | undefined }>(
-      authored: T[],
-      original: T[],
-      existing: T[],
+      authored: readonly T[],
+      original: readonly T[],
+      existing: readonly T[],
     ) => {
       const oldKeys = new Set(original.map(libraryEntryKey));
       const currentKeys = new Set(existing.map(libraryEntryKey));
@@ -148,16 +222,38 @@ export async function refreshLanternCoast(
           !oldKeys.has(libraryEntryKey(entry)) &&
           !currentKeys.has(libraryEntryKey(entry)) &&
           !currentNames.has(entry.name) &&
-          (!entry.sourceKey || availableSourceKeys.has(entry.sourceKey)),
+          (!entry.sourceId || availableSourceIds.has(entry.sourceId)),
       );
     };
-    const newTraits = additions(document.library.traits, baseline.traits, catalog.traits);
-    const newSkills = additions(document.library.skills, baseline.skills, catalog.skills);
+    const newTraits = additions(
+      authoredLive.traits ?? [],
+      baselineLive.traits ?? [],
+      catalog.traits,
+    );
+    const newSkills = additions(
+      authoredLive.skills ?? [],
+      baselineLive.skills ?? [],
+      catalog.skills,
+    );
     if (newTraits.length || newSkills.length) {
       await request(ownerToken, `${campaignPath}/library/import`, 'POST', {
         yaml: emitLibraryYaml({
-          traits: newTraits,
-          skills: newSkills,
+          sources: catalog.sources.map(
+            ({
+              id,
+              campaignId: _campaign,
+              revision: _rev,
+              createdAt: _created,
+              updatedAt: _updated,
+              ...book
+            }) => ({ ...book, key: sourceExportKeys(catalog.sources).get(id) as string }),
+          ),
+          traits: exportSourceReferences(newTraits, catalog.sources) as Parameters<
+            typeof emitLibraryYaml
+          >[0]['traits'],
+          skills: exportSourceReferences(newSkills, catalog.sources) as Parameters<
+            typeof emitLibraryYaml
+          >[0]['skills'],
           spells: [],
           items: [],
           languages: [],
@@ -172,10 +268,12 @@ export async function refreshLanternCoast(
     // Each annotation/rule field is compared independently. Pricing, effects,
     // identity, restriction flags and campaign settings are never refreshed.
     for (const section of ['traits', 'skills'] as const) {
-      for (const original of baseline[section]) {
+      for (const original of baselineLive[section] ?? []) {
         const key = libraryEntryKey(original);
         const current = catalog[section].filter((entry) => libraryEntryKey(entry) === key);
-        const authored = document.library[section].find((entry) => libraryEntryKey(entry) === key);
+        const authored = (authoredLive[section] ?? []).find(
+          (entry) => libraryEntryKey(entry) === key,
+        );
         if (current.length !== 1 || !authored) continue;
         const existing = current[0];
         if (!existing) continue;
@@ -193,7 +291,7 @@ export async function refreshLanternCoast(
               ];
         const patch: Record<string, unknown> = {};
         for (const field of fields) {
-          const originalField = (original as Record<string, unknown>)[field];
+          const originalField = (original as unknown as Record<string, unknown>)[field];
           const currentField = (existing as Record<string, unknown>)[field];
           const oldValue =
             field === 'procedures'
@@ -203,7 +301,7 @@ export async function refreshLanternCoast(
             field === 'procedures'
               ? skillProcedures.parse(currentField ?? {})
               : (currentField ?? null);
-          const nextValue = (authored as Record<string, unknown>)[field];
+          const nextValue = (authored as unknown as Record<string, unknown>)[field];
           if (
             nextValue !== undefined &&
             isDeepStrictEqual(currentValue, oldValue) &&
@@ -283,7 +381,7 @@ export async function refreshLanternCoast(
         .where(eq(characterSkills.characterId, character.id));
 
       for (const row of traits) {
-        const original = baseline.traits.find((entry) => entry.name === row.name);
+        const original = baselineLive.traits?.find((entry) => entry.name === row.name);
         const source = catalog.traits.find((entry) => entry.id === row.libraryTraitId);
         if (
           original &&
@@ -295,7 +393,7 @@ export async function refreshLanternCoast(
           await request(token, `${path}/traits/${row.id}`, 'PATCH', { notes: source.description });
       }
       for (const row of skills) {
-        const original = baseline.skills.find((entry) => entry.name === row.name);
+        const original = baselineLive.skills?.find((entry) => entry.name === row.name);
         const source = catalog.skills.find((entry) => entry.id === row.librarySkillId);
         if (
           !original ||
@@ -331,8 +429,10 @@ export async function refreshLanternCoast(
           traits.some((row) => row.name === entry.name)
         )
           continue;
-        const authored = document.library.traits.find((row) => row.name === entry.name);
-        if (!authored) throw new Error(`Missing Lantern refresh traits: ${entry.name}`);
+        if (!document.library.traits.some((row) => row.name === entry.name))
+          throw new Error(`Missing Lantern refresh traits: ${entry.name}`);
+        const authored = authoredLive.traits?.find((row) => row.name === entry.name);
+        if (!authored) continue;
         const matches = catalog.traits.filter(
           (row) => libraryEntryKey(row) === libraryEntryKey(authored),
         );
@@ -363,8 +463,10 @@ export async function refreshLanternCoast(
           skills.some((row) => purchaseIdentity(row) === purchaseIdentity(entry))
         )
           continue;
-        const authored = document.library.skills.find((row) => row.name === entry.name);
-        if (!authored) throw new Error(`Missing Lantern refresh skills: ${entry.name}`);
+        if (!document.library.skills.some((row) => row.name === entry.name))
+          throw new Error(`Missing Lantern refresh skills: ${entry.name}`);
+        const authored = authoredLive.skills?.find((row) => row.name === entry.name);
+        if (!authored) continue;
         const matches = catalog.skills.filter(
           (row) => libraryEntryKey(row) === libraryEntryKey(authored),
         );

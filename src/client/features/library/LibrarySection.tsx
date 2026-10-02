@@ -13,6 +13,7 @@ import {
   type ReactNode,
   memo,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -33,6 +34,7 @@ import {
   SortableHeader,
   compareTableText,
 } from '../characters/sections/useSortableCharacterRows.tsx';
+import { SourcebooksContext, useSourcebookLabel } from './SourcebooksContext.tsx';
 import { matchesLibrarySearch } from './librarySearch.ts';
 import {
   type LibrarySort,
@@ -191,12 +193,15 @@ export function LibrarySection<R extends LibraryListRow>({
   );
   const { preferences, sortBy } = usePreferences(campaignId, config.key, allowedSorts);
   const folds = useLibraryGroupFolds(`${campaignId}:library:${config.key}`);
+  const sourcebooks = useContext(SourcebooksContext);
   const searching = words.length > 0;
 
   // Inactive sections keep only an entry being edited mounted (hidden), so a
   // draft survives switching categories without paying for the whole list.
   const { groups, matchCount } = useMemo(() => {
-    const matching = active ? entries.filter((row) => matchesLibrarySearch(row, words)) : [];
+    const matching = active
+      ? entries.filter((row) => matchesLibrarySearch(row, words, sourcebooks))
+      : [];
     const visible =
       editId && !matching.some((row) => row.id === editId)
         ? [...matching, ...entries.filter((row) => row.id === editId)]
@@ -227,7 +232,7 @@ export function LibrarySection<R extends LibraryListRow>({
         domId: `library-group-${config.key}-${groupIdSegment(label)}`,
       }));
     return { groups: ordered, matchCount: matching.length };
-  }, [active, entries, words, editId, config, preferences]);
+  }, [active, entries, words, editId, config, preferences, sourcebooks]);
 
   const colSpan = 1 + config.columns.length + (isOwner ? 1 : 0);
 
@@ -452,6 +457,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
   form,
 }: LibraryRowProps<R>) {
   const detailId = useId();
+  const sourceLabel = useSourcebookLabel();
   // Any rejected edit or delete of this entry pulses its name cell (S5).
   const { flashProps } = useFlashState(undefined, undefined, `${config.entityClass}:${row.id}:`);
   const meta = config.meta(row);
@@ -486,7 +492,9 @@ function LibraryRowImpl<R extends LibraryListRow>({
             <span className="min-w-0 break-words font-medium">
               {row.name}
               <span className="mt-1 flex flex-wrap gap-1 text-xs font-normal">
-                {row.sourceKey && <span className="badge badge-sm">{row.sourceKey}</span>}
+                {row.sourceId && (
+                  <span className="badge badge-sm">{sourceLabel(row.sourceId)}</span>
+                )}
                 {row.restricted && <span className="badge badge-sm badge-warning">Restricted</span>}
                 {row.status && row.status !== 'complete' && (
                   <span className="badge badge-sm badge-warning">
@@ -498,7 +506,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
                 )}
                 {config.key !== 'sources' &&
                   defaultEdition &&
-                  (row.sourceKey || row.preferredEdition) && (
+                  (row.sourceId || row.preferredEdition) && (
                     <span className="badge badge-sm">
                       {row.preferredEdition ? 'Preferred' : 'Default edition'}
                     </span>
@@ -567,7 +575,7 @@ function LibraryRowImpl<R extends LibraryListRow>({
                   </p>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  <span className="badge">{row.sourceKey ?? 'Legacy source'}</span>
+                  <span className="badge">{sourceLabel(row.sourceId)}</span>
                   <span className="badge">{row.status ?? 'complete'}</span>
                   <span className="badge">{row.role ?? 'definition'}</span>
                   {row.restricted && (

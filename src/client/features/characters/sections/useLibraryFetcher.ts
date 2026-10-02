@@ -105,7 +105,11 @@ export function useLibraryFetcher<T extends LibraryEntry>(
       const available = normalized.filter(
         owner ? canAdoptLibraryEntry : canPlayerSelectLibraryEntry,
       );
-      const list = allSources ? available : preferredLibraryEditions(available, sources);
+      const editions = allSources ? available : preferredLibraryEditions(available, sources);
+      const list = editions.map((entry) => {
+        const book = sources.find((source) => source.id === entry.sourceId);
+        return book ? { ...entry, sourcebookLabel: `${book.abbreviation}: ${book.name}` } : entry;
+      });
       if (q.length === 0)
         return [...list].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
       const needle = q.toLowerCase();

@@ -105,6 +105,63 @@ async function seedCharacter() {
 }
 
 describe('enqueueFieldPatch', () => {
+  it('lets an explicit source choice replace and unblock a retained unmapped library edit', async () => {
+    const db = getLocalDb();
+    const traitId = '0193b3c0-f1f0-7000-8000-00000000e220';
+    const campaignId = '0193b3c0-f1f0-7000-8000-00000000e221';
+    const selectedSourceId = '0193b3c0-f1f0-7000-8000-00000000e222';
+    await db.campaignLibraryTraits.put({
+      id: traitId,
+      campaignId,
+      name: 'Vision',
+      sourceId: null,
+      revision: 4,
+    } as never);
+    await db.outbox.put({
+      clientOpId: 'retained-source-edit',
+      entityClass: 'campaign_library_trait',
+      entityId: traitId,
+      parentId: campaignId,
+      command: 'patch',
+      coalesceKey: `${traitId}|`,
+      attemptedValue: { name: 'Old vision', sourceKey: 'unmapped-book' },
+      prevValue: { name: 'Vision', sourceId: null },
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: '2026-09-30T00:00:00.000Z',
+      attemptCount: 0,
+      localSourceMigrationUnknown: true,
+      localSourceMigrationIntent: {
+        attemptedValue: { name: 'Old vision', sourceKey: 'unmapped-book' },
+        prevValue: { name: 'Vision', sourceId: null },
+      },
+    });
+
+    await enqueueEntityPatch({
+      entityClass: 'campaign_library_trait',
+      entityId: traitId,
+      campaignId,
+      attemptedValue: { name: 'Vision revised', sourceId: selectedSourceId },
+    });
+
+    const queued = await db.outbox.toArray();
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      entityClass: 'campaign_library_trait',
+      attemptedValue: { name: 'Vision revised', sourceId: selectedSourceId },
+      prevValue: { name: 'Vision', sourceId: null },
+    });
+    expect(queued[0]).not.toHaveProperty('fieldPath');
+    expect(queued[0]).not.toHaveProperty('localSourceMigrationUnknown');
+    expect(queued[0]).not.toHaveProperty('localSourceMigrationIntent');
+    expect((await readDrainableOps(50)).map((op) => op.attemptedValue)).toEqual([
+      { name: 'Vision revised', sourceId: selectedSourceId },
+    ]);
+    expect(await db.campaignLibraryTraits.get(traitId)).toMatchObject({
+      sourceId: selectedSourceId,
+    });
+  });
+
   it('serializes mixed whole-entry and overlapping field patches without coalescing across the boundary', async () => {
     const db = getLocalDb();
     const traitId = '0193b3c0-f1f0-7000-8000-00000000e201';
@@ -1454,13 +1511,14 @@ describe('readDrainableOps', () => {
     const modifierId = '0193b3c0-f1f0-7000-8000-00000000e106';
     const otherCampaignId = '0193b3c0-f1f0-7000-8000-00000000e107';
     const independentId = '0193b3c0-f1f0-7000-8000-00000000e10a';
+    const coreSourceId = '0193b3c0-f1f0-7000-8000-00000000e116';
     await db.outbox.bulkPut([
       createRow({
         clientOpId: 'source-create',
         entityClass: 'campaign_library_source',
         entityId: sourceId,
         parentId: campaignId,
-        attemptedValue: { name: 'Addon rules', key: 'addon' },
+        attemptedValue: { name: 'Addon rules', abbreviation: 'AR', priority: 100 },
         status: 'transient_retry',
         nextEarliestAttemptAt: future,
         enqueuedAt: '2026-01-01T00:00:00.000Z',
@@ -1473,7 +1531,7 @@ describe('readDrainableOps', () => {
         attemptedValue: {
           name: 'Acute Vision',
           key: 'acute-vision',
-          sourceKey: 'core',
+          sourceId: coreSourceId,
           kind: 'advantage',
         },
         status: 'transient_retry',
@@ -1488,7 +1546,7 @@ describe('readDrainableOps', () => {
         attemptedValue: {
           name: 'Fine',
           key: 'fine',
-          sourceKey: 'addon',
+          sourceId,
           calculation: {
             version: 1,
             inputs: [],
@@ -1500,7 +1558,7 @@ describe('readDrainableOps', () => {
                 reference: {
                   section: 'traits',
                   key: 'acute-vision',
-                  sourceKey: 'core',
+                  sourceId: coreSourceId,
                   kind: 'advantage',
                 },
                 output: 'points',
@@ -1598,8 +1656,16 @@ describe('readDrainableOps', () => {
         coalesceKey: `${traitId}|entry`,
         fieldPath: undefined,
         parentId: campaignId,
-        attemptedValue: { name: 'Night Vision', key: 'night-vision', sourceKey: 'core' },
-        prevValue: { name: 'Night Vision', key: 'night-vision', sourceKey: 'core' },
+        attemptedValue: {
+          name: 'Night Vision',
+          key: 'night-vision',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+        },
+        prevValue: {
+          name: 'Night Vision',
+          key: 'night-vision',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+        },
         status: 'transient_retry',
         nextEarliestAttemptAt: future,
         enqueuedAt: '2026-01-01T00:00:00.000Z',
@@ -1618,7 +1684,7 @@ describe('readDrainableOps', () => {
             reference: {
               section: 'traits',
               key: 'night-vision',
-              sourceKey: 'core',
+              sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
               kind: 'advantage',
             },
           },
@@ -1651,7 +1717,7 @@ describe('readDrainableOps', () => {
         prevValue: {
           name: 'Night Vision',
           key: 'night-vision',
-          sourceKey: 'core',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
           calculation: {
             version: 1,
             inputs: [],
@@ -1660,7 +1726,11 @@ describe('readDrainableOps', () => {
               {
                 id: 'modifier',
                 op: 'call',
-                reference: { section: 'modifiers', key: 'accurate', sourceKey: 'core' },
+                reference: {
+                  section: 'modifiers',
+                  key: 'accurate',
+                  sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+                },
                 output: 'modifier',
                 arguments: {},
               },
@@ -1671,7 +1741,7 @@ describe('readDrainableOps', () => {
         attemptedValue: {
           name: 'Night Vision',
           key: 'night-vision',
-          sourceKey: 'core',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
           calculation: null,
         },
         status: 'transient_retry',
@@ -1686,7 +1756,11 @@ describe('readDrainableOps', () => {
         coalesceKey: `${modifierId}|:delete`,
         fieldPath: undefined,
         parentId: campaignId,
-        prevValue: { name: 'Accurate', key: 'accurate', sourceKey: 'core' },
+        prevValue: {
+          name: 'Accurate',
+          key: 'accurate',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+        },
         enqueuedAt: '2026-01-01T00:00:01.000Z',
       }),
     ]);
@@ -1711,7 +1785,7 @@ describe('readDrainableOps', () => {
           reference: {
             section,
             key,
-            sourceKey: 'core',
+            sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
             ...(section === 'traits' ? { kind: 'advantage' } : {}),
           },
           output: section === 'traits' ? 'points' : 'modifier',
@@ -1728,11 +1802,16 @@ describe('readDrainableOps', () => {
         coalesceKey: 'alpha|entry',
         fieldPath: undefined,
         parentId: campaignId,
-        prevValue: { name: 'Alpha', key: 'alpha', sourceKey: 'core', kind: 'advantage' },
+        prevValue: {
+          name: 'Alpha',
+          key: 'alpha',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+          kind: 'advantage',
+        },
         attemptedValue: {
           name: 'Alpha',
           key: 'alpha',
-          sourceKey: 'core',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
           kind: 'advantage',
           calculation: call('modifiers', 'beta'),
         },
@@ -1745,14 +1824,26 @@ describe('readDrainableOps', () => {
         coalesceKey: 'beta|entry',
         fieldPath: undefined,
         parentId: campaignId,
-        prevValue: { name: 'Beta', key: 'beta', sourceKey: 'core', kind: 'advantage' },
+        prevValue: {
+          name: 'Beta',
+          key: 'beta',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+          kind: 'advantage',
+        },
         attemptedValue: {
           name: 'Beta',
           key: 'beta',
-          sourceKey: 'core',
+          sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
           kind: 'advantage',
           applicability: {
-            traits: [{ section: 'traits', key: 'alpha', sourceKey: 'core', kind: 'advantage' }],
+            traits: [
+              {
+                section: 'traits',
+                key: 'alpha',
+                sourceId: '0193b3c0-f1f0-7000-8000-00000000e116',
+                kind: 'advantage',
+              },
+            ],
           },
         },
         enqueuedAt: sameInstant,
@@ -1764,6 +1855,34 @@ describe('readDrainableOps', () => {
 });
 
 describe('claimDrainableOps', () => {
+  it('leaves a source migration with unknown provenance queued and unclaimed', async () => {
+    const db = getLocalDb();
+    await db.outbox.put(
+      opRow({
+        clientOpId: 'unknown-source-reference',
+        entityClass: 'campaign_library_trait',
+        entityId: '0193b3c0-f1f0-7000-8000-00000000e120',
+        command: 'patch',
+        fieldPath: 'sourceId',
+        parentId: '0193b3c0-f1f0-7000-8000-00000000e121',
+        attemptedValue: 'unmapped legacy source',
+        prevValue: null,
+        localSourceMigrationUnknown: true,
+        localSourceMigrationIntent: {
+          attemptedValue: 'unmapped legacy source',
+          prevValue: null,
+        },
+      }),
+    );
+
+    expect(await claimDrainableOps(50)).toEqual([]);
+    expect(await db.outbox.get('unknown-source-reference')).toMatchObject({
+      status: 'pending',
+      attemptedValue: 'unmapped legacy source',
+      localSourceMigrationUnknown: true,
+    });
+  });
+
   it('normalizes a legacy uncertain retry ahead of its pending successor', async () => {
     const db = getLocalDb();
     await db.outbox.bulkPut([

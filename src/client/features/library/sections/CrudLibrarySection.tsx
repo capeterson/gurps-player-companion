@@ -9,6 +9,7 @@ import {
   LibrarySection,
   type LibrarySectionConfig,
 } from '../LibrarySection.tsx';
+import { SourcebooksContext } from '../SourcebooksContext.tsx';
 import type { LibraryMutationState, LocalLibrary } from '../useLocalLibrary.ts';
 
 /** Props every section receives from the page shell. */
@@ -74,14 +75,14 @@ export function CrudLibrarySection<R extends LibraryListRow>({
   }, [setAddOpen, setEditId]);
   const doomed = entries.find((entry) => entry.id === crud.deleteId);
   return (
-    <>
+    <SourcebooksContext.Provider value={shell.library.sources}>
       <LibrarySection
         config={config}
         defaultIds={defaultIds}
         campaignId={shell.campaignId}
         entries={
           shell.sourceFilter
-            ? entries.filter((row) => row.sourceKey === shell.sourceFilter)
+            ? entries.filter((row) => row.sourceId === shell.sourceFilter)
             : entries
         }
         words={shell.words}
@@ -111,6 +112,6 @@ export function CrudLibrarySection<R extends LibraryListRow>({
         }}
         onCancel={() => setDeleteId(null)}
       />
-    </>
+    </SourcebooksContext.Provider>
   );
 }

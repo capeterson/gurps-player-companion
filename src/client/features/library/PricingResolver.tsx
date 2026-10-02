@@ -172,7 +172,7 @@ export function PricingResolver({
       ...m,
       id: `local:${m.name}`,
       localName: m.name,
-      sourceKey: entry.sourceKey,
+      sourceId: entry.sourceId,
       applicability: { advisory: null },
       calculation:
         m.calculation ??
@@ -258,7 +258,10 @@ export function PricingResolver({
           Resolve {entry.name}
         </h2>
         <p className="my-2 text-sm">
-          {entry.sourceKey ?? entry.sourceLocator ?? 'Legacy source'} · {entry.status ?? 'complete'}
+          {library?.sources.find((source) => source.id === entry.sourceId)?.abbreviation ??
+            entry.sourceLocator ??
+            'Legacy source'}{' '}
+          · {entry.status ?? 'complete'}
         </p>
         {initial && (
           <p className="text-sm">
@@ -316,7 +319,10 @@ export function PricingResolver({
                       setSelected(next);
                     }}
                   />{' '}
-                  {modifier.name} {modifier.sourceKey ? `· ${modifier.sourceKey}` : ''}
+                  {modifier.name}{' '}
+                  {modifier.sourceId
+                    ? `· ${library?.sources.find((source) => source.id === modifier.sourceId)?.abbreviation ?? 'Unavailable sourcebook'}`
+                    : ''}
                 </label>
                 {modifier.applicability.advisory && (
                   <p className="text-sm">{modifier.applicability.advisory}</p>

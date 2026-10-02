@@ -242,6 +242,9 @@ Library technique default-penalty and level-cap help wraps within each field on
 narrow screens.
 Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
+Entry metadata keeps the **Sourcebook** picker and compact **Page** input on
+one row at every width. The picker takes the available space; Page is 4rem wide
+below 640px and 5rem from 640px up. The normal editor does not expose definition keys.
 Library group labels and mobile row metadata wrap long unspaced categories.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
 Help and About prose wraps long external links inside its content column.

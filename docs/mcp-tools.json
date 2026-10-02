@@ -6271,11 +6271,6 @@
                 "maxLength": 160,
                 "description": "Publication title"
               },
-              "key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
               "abbreviation": {
                 "type": "string",
                 "minLength": 1,
@@ -6312,7 +6307,6 @@
             },
             "required": [
               "name",
-              "key",
               "abbreviation"
             ],
             "additionalProperties": false
@@ -6325,11 +6319,6 @@
                 "minLength": 1,
                 "maxLength": 160,
                 "description": "Publication title"
-              },
-              "key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
               },
               "abbreviation": {
                 "type": "string",
@@ -6648,12 +6637,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -7383,12 +7371,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -7470,12 +7457,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -10830,11 +10816,6 @@
                 "maxLength": 160,
                 "description": "Publication title"
               },
-              "key": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 160
-              },
               "abbreviation": {
                 "type": "string",
                 "minLength": 1,
@@ -10890,7 +10871,6 @@
             },
             "required": [
               "name",
-              "key",
               "abbreviation",
               "id",
               "campaignId",
@@ -10907,12 +10887,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -11665,12 +11644,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -11752,12 +11730,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -13656,12 +13633,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -14931,12 +14907,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -16697,12 +16672,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -17183,12 +17157,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -18205,12 +18178,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -18512,12 +18484,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -19196,12 +19167,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -21633,12 +21603,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -21870,12 +21839,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -22242,12 +22210,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -23558,12 +23525,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -25411,12 +25377,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -25844,12 +25809,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -26375,12 +26339,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160
+                    "format": "uuid"
                   },
                   {
                     "type": "null"
@@ -26887,12 +26850,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -27221,12 +27183,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -27692,12 +27653,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -27863,12 +27823,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -28169,12 +28128,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -28379,12 +28337,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -28723,12 +28680,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -28961,12 +28917,11 @@
                     "minLength": 1,
                     "maxLength": 160
                   },
-                  "sourceKey": {
+                  "sourceId": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 160
+                        "format": "uuid"
                       },
                       {
                         "type": "null"
@@ -29322,10 +29277,10 @@
           "query": {
             "type": "object",
             "properties": {
-              "sourceKeys": {
+              "sourceIds": {
                 "type": "string",
                 "maxLength": 5000,
-                "description": "JSON array of source keys, URL encoded in the query string"
+                "description": "JSON array of sourcebook UUIDs, URL encoded in the query string"
               }
             },
             "required": [],
@@ -40073,12 +40028,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -46781,12 +46735,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -48541,12 +48494,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {
@@ -54029,12 +53981,11 @@
                 "minLength": 1,
                 "maxLength": 160
               },
-              "sourceKey": {
+              "sourceId": {
                 "anyOf": [
                   {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 160,
+                    "format": "uuid",
                     "default": null
                   },
                   {

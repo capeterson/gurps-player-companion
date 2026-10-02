@@ -20,6 +20,246 @@ import { getLocalDb, migrateLegacyTempScalarsRow, resetLocalDb } from './dexie.t
 
 const DB_NAME = 'gurps-pc-local';
 
+it('v16 migrates cached and queued source references while holding unknown intent', async () => {
+  await resetLocalDb();
+  const campaignId = '0193b3c0-f1f0-7000-8000-00000000b301';
+  const destinationCampaignId = '0193b3c0-f1f0-7000-8000-00000000b306';
+  const sourceId = '0193b3c0-f1f0-7000-8000-00000000b302';
+  const destinationSourceId = '0193b3c0-f1f0-7000-8000-00000000b307';
+  const characterId = '0193b3c0-f1f0-7000-8000-00000000b303';
+  const traitId = '0193b3c0-f1f0-7000-8000-00000000b304';
+  const transferredDefinitionId = '0193b3c0-f1f0-7000-8000-00000000b308';
+  const transferredCharacterId = '0193b3c0-f1f0-7000-8000-00000000b309';
+  const legacy = new Dexie(DB_NAME);
+  legacy.version(15).stores({
+    mediaUploads: 'id, userId, targetId, state',
+    mediaManifests: 'id',
+    characters: 'id, ownerId, campaignId, updatedAt, revision',
+    characterTraits: 'id, characterId, [characterId+kind], updatedAt, revision',
+    characterSkills: 'id, characterId, updatedAt, revision',
+    characterSpells: 'id, characterId, updatedAt, revision',
+    characterLanguages: 'id, characterId, updatedAt, revision',
+    characterTechniques: 'id, characterId, updatedAt, revision',
+    characterInventory: 'id, characterId, parentId, updatedAt, revision',
+    characterCombat: 'characterId, revision',
+    campaigns: 'id, ownerId, revision',
+    campaignLibrarySources: 'id, campaignId, revision',
+    campaignLibraryModifiers: 'id, campaignId, revision',
+    campaignLibraryTraits: 'id, campaignId, revision',
+    campaignLibrarySkills: 'id, campaignId, revision',
+    campaignLibrarySpells: 'id, campaignId, revision',
+    campaignLibraryItems: 'id, campaignId, revision',
+    campaignLibraryLanguages: 'id, campaignId, revision',
+    campaignLibraryTechniques: 'id, campaignId, revision',
+    campaignLibraryStyles: 'id, campaignId, revision',
+    campaignLibraryEnchantments: 'id, campaignId, revision',
+    campaignLibraryActiveEffects: 'id, campaignId, revision',
+    soloEncounters: 'characterId, updatedAt',
+    outbox: 'clientOpId, status, coalesceKey, enqueuedAt, entityId, [status+enqueuedAt]',
+    syncCursors: 'entityClass',
+    syncMeta: 'key',
+    tombstones: '[entityClass+entityId], revision',
+    rejectionToasts: 'id, entityId, dismissedAt',
+    syncLog: 'id, occurredAt, direction, result, [direction+occurredAt]',
+    syncLogBodies: 'id',
+  });
+  await legacy.table('characters').put({ id: characterId, campaignId });
+  await legacy
+    .table('characters')
+    .put({ id: transferredCharacterId, campaignId: destinationCampaignId });
+  await legacy.table('campaignLibrarySources').put({
+    id: sourceId,
+    campaignId,
+    key: 'core',
+    name: 'Core Rules',
+    abbreviation: 'CR',
+    priority: 1,
+    revision: 2,
+  });
+  await legacy.table('campaignLibrarySources').put({
+    id: destinationSourceId,
+    campaignId: destinationCampaignId,
+    key: 'core',
+    name: 'Core Rules',
+    abbreviation: 'CR',
+    priority: 1,
+    revision: 2,
+  });
+  await legacy.table('campaignLibraryTraits').put({
+    id: transferredDefinitionId,
+    campaignId,
+    name: 'Unlinked Definition',
+    key: 'unlinked',
+    sourceKey: null,
+    revision: 3,
+  });
+  await legacy.table('campaignLibraryTraits').put({
+    id: traitId,
+    campaignId,
+    name: 'Acute Vision',
+    key: 'acute-vision',
+    sourceKey: 'core',
+    calculation: {
+      nodes: [
+        { op: 'call', reference: { section: 'traits', key: 'Night Vision', sourceKey: 'core' } },
+      ],
+    },
+    revision: 3,
+  });
+  await legacy.table('characterTraits').put({
+    id: '0193b3c0-f1f0-7000-8000-00000000b305',
+    characterId,
+    sourceKey: 'core',
+    revision: 1,
+  });
+  await legacy.table('characterTraits').put({
+    id: '0193b3c0-f1f0-7000-8000-00000000b310',
+    characterId: transferredCharacterId,
+    libraryMechanics: {
+      sourceId: transferredDefinitionId,
+      campaignId,
+      sourceRevision: 1,
+      effects: [],
+    },
+    pricingResolution: {
+      definitionId: transferredDefinitionId,
+      sourceKey: null,
+      reference: { section: 'traits', key: 'Vision', sourceKey: 'core' },
+    },
+    revision: 1,
+  });
+  const queued = (overrides: Record<string, unknown>) => ({
+    entityId: traitId,
+    entityClass: 'campaign_library_trait',
+    command: 'patch',
+    status: 'pending',
+    parentId: campaignId,
+    enqueuedAt: '2026-10-01T00:00:00.000Z',
+    attemptCount: 0,
+    validationVersion: 1,
+    ...overrides,
+  });
+  await legacy.table('outbox').bulkPut([
+    queued({
+      clientOpId: 'source-rename',
+      entityId: sourceId,
+      entityClass: 'campaign_library_source',
+      coalesceKey: `${sourceId}|entry`,
+      attemptedValue: {
+        name: 'Core Rules Revised',
+        key: 'core-next',
+        abbreviation: 'CR',
+        priority: 1,
+      },
+      prevValue: { name: 'Core Rules', key: 'core', abbreviation: 'CR', priority: 1 },
+    }),
+    queued({
+      clientOpId: 'source-field',
+      fieldPath: 'sourceKey',
+      coalesceKey: `${traitId}|sourceKey`,
+      attemptedValue: 'core-next',
+      prevValue: 'core',
+    }),
+    queued({
+      clientOpId: 'whole-entry',
+      coalesceKey: `${traitId}|entry`,
+      attemptedValue: {
+        name: 'Acute Vision revised',
+        description: 'Keep this text',
+        sourceKey: 'core-next',
+        calculation: { reference: { section: 'traits', key: 'Night Vision', sourceKey: 'core' } },
+      },
+      prevValue: { name: 'Acute Vision', sourceKey: 'core' },
+    }),
+    queued({
+      clientOpId: 'unknown-source',
+      fieldPath: 'sourceKey',
+      coalesceKey: `${traitId}|sourceKey`,
+      attemptedValue: 'unrecognized-book',
+      prevValue: 'core',
+    }),
+    queued({
+      clientOpId: 'unknown-whole-entry',
+      coalesceKey: `${traitId}|`,
+      attemptedValue: {
+        name: 'Acute Vision edited',
+        sourceKey: 'unrecognized-book',
+        calculation: { reference: { section: 'traits', key: 'Night Vision', sourceKey: 'core' } },
+      },
+      prevValue: { name: 'Acute Vision', sourceKey: 'core' },
+    }),
+  ]);
+  legacy.close();
+
+  const db = getLocalDb();
+  await db.open();
+  expect(
+    (await db.campaignLibrarySources.get(sourceId)) as unknown as Record<string, unknown>,
+  ).not.toHaveProperty('key');
+  expect(await db.campaignLibraryTraits.get(traitId)).toMatchObject({
+    sourceId,
+    calculation: { nodes: [{ reference: { sourceId } }] },
+  });
+  expect(
+    (await db.characterTraits.get('0193b3c0-f1f0-7000-8000-00000000b305')) as unknown as Record<
+      string,
+      unknown
+    >,
+  ).toMatchObject({ sourceId });
+  expect(await db.characterTraits.get('0193b3c0-f1f0-7000-8000-00000000b310')).toMatchObject({
+    libraryMechanics: {
+      sourceId: transferredDefinitionId,
+      campaignId,
+    },
+    pricingResolution: {
+      definitionId: transferredDefinitionId,
+      sourceId: null,
+      reference: { section: 'traits', key: 'Vision', sourceId },
+    },
+  });
+  expect(await db.outbox.get('source-field')).toMatchObject({
+    fieldPath: 'sourceId',
+    coalesceKey: `${traitId}|sourceId`,
+    attemptedValue: sourceId,
+    prevValue: sourceId,
+  });
+  expect(await db.outbox.get('whole-entry')).toMatchObject({
+    attemptedValue: {
+      name: 'Acute Vision revised',
+      description: 'Keep this text',
+      sourceId,
+      calculation: { reference: { sourceId } },
+    },
+    prevValue: { name: 'Acute Vision', sourceId },
+  });
+  expect(await db.outbox.get('unknown-source')).toMatchObject({
+    status: 'pending',
+    attemptedValue: null,
+    localSourceMigrationUnknown: true,
+    localSourceMigrationIntent: { attemptedValue: 'unrecognized-book', prevValue: 'core' },
+  });
+  expect(await db.outbox.get('unknown-whole-entry')).toMatchObject({
+    status: 'pending',
+    attemptedValue: {
+      name: 'Acute Vision edited',
+      sourceId: null,
+      calculation: { reference: { section: 'traits', key: 'Night Vision', sourceId } },
+    },
+    localSourceMigrationUnknown: true,
+    localSourceMigrationIntent: {
+      attemptedValue: {
+        name: 'Acute Vision edited',
+        sourceKey: 'unrecognized-book',
+        calculation: { reference: { section: 'traits', key: 'Night Vision', sourceKey: 'core' } },
+      },
+    },
+  });
+  expect((await readDrainableOps(50)).map((op) => op.clientOpId)).not.toContain(
+    'unknown-whole-entry',
+  );
+  expect((await readDrainableOps(50)).map((op) => op.clientOpId)).not.toContain('unknown-source');
+});
+
 it('v13 upgrades cached and queued weapon Range values before offline reads', async () => {
   await resetLocalDb();
   const legacy = new Dexie(DB_NAME);
@@ -262,9 +502,14 @@ it('v9 backfills only trait/skill declarations while retaining rows, pending edi
   await legacy
     .table('characterTraits')
     .put({ id: 'trait', characterId: 'character', kind: 'advantage', name: 'Owned' });
-  await legacy
-    .table('outbox')
-    .put({ clientOpId: 'pending', fieldPath: 'name', attemptedValue: 'My edit' });
+  await legacy.table('outbox').put({
+    clientOpId: 'pending',
+    entityClass: 'character',
+    entityId: 'character',
+    command: 'patch',
+    fieldPath: 'name',
+    attemptedValue: 'My edit',
+  });
   await legacy.table('syncCursors').bulkPut(
     ['character', 'character_trait', 'character_skill'].map((entityClass) => ({
       entityClass,

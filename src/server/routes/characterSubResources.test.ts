@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { createTestActor } from '../testFixtures.ts';
@@ -18,7 +19,10 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 function bearer(token: string) {
-  return { Authorization: `Bearer ${token}` };
+  return {
+    Authorization: `Bearer ${token}`,
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 function jsonHeaders(token: string) {

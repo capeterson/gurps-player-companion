@@ -9,11 +9,11 @@ import { useLocalLibrary } from './useLocalLibrary.ts';
 vi.mock('./useLocalLibrary.ts', () => ({ useLocalLibrary: vi.fn() }));
 
 const entry: PricedDefinition = {
-  id: 'trait-vision',
+  id: '0193b3c0-f1f0-7000-8000-00000000f401',
   revision: 4,
   name: 'Night Vision',
   key: 'night vision',
-  sourceKey: 'core',
+  sourceId: '0193b3c0-f1f0-7000-8000-00000000f402',
   kind: 'advantage',
   status: 'complete',
   role: 'definition',
@@ -21,7 +21,9 @@ const entry: PricedDefinition = {
 };
 
 const graph: LibraryGraph = {
-  sources: [{ name: 'Core', key: 'core', priority: 1 }],
+  sources: [
+    { id: '0193b3c0-f1f0-7000-8000-00000000f402', name: 'Core', abbreviation: 'CR', priority: 1 },
+  ],
   modifiers: [],
   traits: [entry],
   items: [],
@@ -58,7 +60,7 @@ describe('PricingResolver', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use these values' }));
     expect(onResolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        definitionId: 'trait-vision',
+        definitionId: '0193b3c0-f1f0-7000-8000-00000000f401',
         revision: 4,
         outputs: { points: 5 },
       }),

@@ -19,10 +19,10 @@
 export const SYNC_PROTOCOL_HEADER = 'x-gpc-sync-protocol';
 
 /** The protocol this build speaks. */
-export const SYNC_PROTOCOL_VERSION = 1;
+export const SYNC_PROTOCOL_VERSION = 2;
 
 /** The oldest client protocol the server still accepts on `/sync/*`. */
-export const MIN_SUPPORTED_SYNC_PROTOCOL = 1;
+export const MIN_SUPPORTED_SYNC_PROTOCOL = 2;
 
 /** Error code of the HTTP 426 body returned to an outdated client. */
 export const CLIENT_OUTDATED_ERROR = 'client_outdated';

@@ -111,7 +111,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   await expect(page.getByRole('button', { name: /Sources/ })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: /\+ Add source/i }).click();
   await page.getByLabel('Publication title').fill('Pricing Rules');
-  await page.getByLabel('Source key').fill('pricing-rules');
+  await expect(page.getByLabel('Source key')).toHaveCount(0);
   await page.getByLabel('Abbreviation').fill('PR');
   await page.getByLabel('Edition').fill('First edition');
   await page
@@ -123,6 +123,20 @@ test('resolves and reopens an item price without clipping the modal at supported
   await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await page.getByRole('button', { name: 'Save source' }).click();
   await expect(page.getByText('Pricing Rules', { exact: true })).toBeVisible();
+  await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  let pricingSourceId = '';
+  await expect
+    .poll(async () => {
+      const library = (await api(page, 'GET', `/campaigns/${campaign.id}/library`)) as {
+        sources: { id: string; name: string }[];
+      };
+      pricingSourceId = library.sources.find((source) => source.name === 'Pricing Rules')?.id ?? '';
+      return pricingSourceId;
+    })
+    .toMatch(/^[0-9a-f-]{36}$/i);
+  await context.setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await page.getByRole('button', { name: /Modifiers/ }).click();
   await page.getByRole('button', { name: /\+ Add modifier/i }).click();
   const modifierName = 'Flexible grip across extended operating range';
@@ -131,8 +145,7 @@ test('resolves and reopens an item price without clipping the modal at supported
     .locator('summary')
     .filter({ hasText: /^Source and completeness/ })
     .click();
-  await expect(page.getByLabel('Source key')).toBeVisible();
-  await page.getByLabel('Source key').fill('pricing-rules');
+  await page.getByLabel('Sourcebook').selectOption(pricingSourceId);
   await page.getByLabel('Tags (comma-separated)').fill('grip, long-form');
   await page.getByLabel('Mutually exclusive group').fill('handling');
   await page.getByLabel('Legacy citation').fill('PR, p. 99');
@@ -192,9 +205,7 @@ outputs:
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole('button', { name: 'Save modifier' }).click();
-  await expect(
-    page.getByRole('button', { name: new RegExp(`${modifierName} pricing-rules`) }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: new RegExp(`${modifierName} PR`) })).toBeVisible();
   await context.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect
@@ -210,11 +221,17 @@ outputs:
     .toMatchObject({ tags: ['grip', 'long-form'], group: 'handling', source: 'PR, p. 99' });
   await api(page, 'POST', `/campaigns/${campaign.id}/library/sources`, {
     name: 'Pricing Rules',
-    key: 'pricing-rules-2',
     abbreviation: 'PR2',
     edition: 'Second edition',
     priority: 2,
   });
+  const sources = (await api(page, 'GET', `/campaigns/${campaign.id}/library`)) as {
+    sources: { id: string; name: string; abbreviation: string }[];
+  };
+  const secondPricingSourceId = sources.sources.find(
+    (source) => source.name === 'Pricing Rules' && source.abbreviation === 'PR2',
+  )?.id;
+  if (!secondPricingSourceId) throw new Error('Second pricing source was not created');
   await api(page, 'POST', '/characters', {
     name: 'Pricing character',
     campaignId: campaign.id,
@@ -222,7 +239,7 @@ outputs:
   const pricedItem = (await api(page, 'POST', `/campaigns/${campaign.id}/library/items`, {
     name: 'Priced spear',
     key: 'priced-spear',
-    sourceKey: 'pricing-rules',
+    sourceId: pricingSourceId,
     sourceLocator: 'p. 42',
     status: 'complete',
     role: 'template',
@@ -263,7 +280,7 @@ outputs:
   await api(page, 'POST', `/campaigns/${campaign.id}/library/items`, {
     name: 'Priced spear',
     key: 'priced-spear',
-    sourceKey: 'pricing-rules-2',
+    sourceId: secondPricingSourceId,
     status: 'complete',
     role: 'template',
     calculation: itemRule(11),
@@ -279,7 +296,7 @@ outputs:
   await api(page, 'POST', `/campaigns/${campaign.id}/library/items`, {
     name: 'Unreviewed spear',
     key: 'unreviewed-spear',
-    sourceKey: 'pricing-rules',
+    sourceId: pricingSourceId,
     status: 'needs_review',
     role: 'definition',
     cost: 1,
@@ -288,7 +305,7 @@ outputs:
   await api(page, 'POST', `/campaigns/${campaign.id}/library/traits`, {
     name: 'Variable Focus',
     key: 'variable-focus',
-    sourceKey: 'pricing-rules',
+    sourceId: pricingSourceId,
     kind: 'advantage',
     status: 'complete',
     role: 'definition',
@@ -358,9 +375,15 @@ outputs:
   await page.getByRole('button', { name: 'Other sources' }).click();
   const editionOptions = page.getByRole('option', { name: /Priced spear/ });
   await expect(editionOptions).toHaveCount(2);
-  await expect(editionOptions.nth(0)).toContainText('pricing-rules');
-  await expect(editionOptions.nth(1)).toContainText('pricing-rules-2');
-  await editionOptions.nth(0).click();
+  const firstEdition = page.getByRole('option', {
+    name: /Priced spear.*PR: Pricing Rules/,
+  });
+  const secondEdition = page.getByRole('option', {
+    name: /Priced spear.*PR2: Pricing Rules/,
+  });
+  await expect(firstEdition).toHaveCount(1);
+  await expect(secondEdition).toHaveCount(1);
+  await firstEdition.click();
 
   const dialog = page.getByRole('dialog', { name: 'Resolve Priced spear' });
   await expect(dialog).toBeVisible();

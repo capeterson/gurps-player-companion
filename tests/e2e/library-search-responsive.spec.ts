@@ -59,18 +59,21 @@ test('campaign library search and Clear search stay usable across form factors',
   const campaign = await create<{ id: string }>(page, '/campaigns', {
     name: 'Responsive library search',
   });
-  await create(page, `/campaigns/${campaign.id}/library/sources`, {
-    name: 'Synthetic responsive source',
-    key: 'responsive-source',
-    abbreviation: 'RS',
-    edition: 'Synthetic edition',
-    priority: 1,
-  });
+  const sourcebook = await create<{ id: string }>(
+    page,
+    `/campaigns/${campaign.id}/library/sources`,
+    {
+      name: 'Synthetic responsive source',
+      abbreviation: 'RS',
+      edition: 'Synthetic edition',
+      priority: 1,
+    },
+  );
   await create<{ id: string }>(page, `/campaigns/${campaign.id}/library/traits`, {
     name: 'NarrowSearchLayoutProbe',
     kind: 'advantage',
     basePoints: 1,
-    sourceKey: 'responsive-source',
+    sourceId: sourcebook.id,
   });
   await create<{ id: string }>(page, `/campaigns/${campaign.id}/library/traits`, {
     name: 'NoSourceFilterProbe',
@@ -79,7 +82,9 @@ test('campaign library search and Clear search stay usable across form factors',
   });
 
   await page.goto(`/campaigns/${campaign.id}/library?section=traits`);
-  const row = page.getByRole('button', { name: /NarrowSearchLayoutProbe responsive-source/ });
+  const row = page.getByRole('button', {
+    name: /NarrowSearchLayoutProbe RS/,
+  });
   await expect(row).toBeVisible({ timeout: 20_000 });
   const unfilteredRow = page.getByRole('button', {
     name: 'NoSourceFilterProbe',
@@ -87,13 +92,13 @@ test('campaign library search and Clear search stay usable across form factors',
   });
   await expect(unfilteredRow).toBeVisible();
   const search = page.getByRole('searchbox', { name: 'Search library' });
-  const source = page.locator('.library-toolbar select');
-  await expect(source).toBeVisible();
-  await expect(source.locator('option[value="responsive-source"]')).toHaveCount(1);
-  await source.selectOption('responsive-source');
+  const sourceFilter = page.locator('.library-toolbar select');
+  await expect(sourceFilter).toBeVisible();
+  await expect(sourceFilter.locator(`option[value="${sourcebook.id}"]`)).toHaveCount(1);
+  await sourceFilter.selectOption(sourcebook.id);
   await expect(row).toBeVisible();
   await expect(unfilteredRow).toBeHidden();
-  await source.selectOption('');
+  await sourceFilter.selectOption('');
   await expect(unfilteredRow).toBeVisible();
 
   for (const viewport of VIEWPORTS) {
@@ -101,7 +106,7 @@ test('campaign library search and Clear search stay usable across form factors',
       await page.setViewportSize(viewport);
       await search.fill('NarrowSearchLayout');
       await expect(search).toHaveValue('NarrowSearchLayout');
-      await expect(source).toBeVisible();
+      await expect(sourceFilter).toBeVisible();
       const clear = page.getByRole('button', { name: 'Clear search' });
       await expect(clear).toBeVisible();
       await expect(row).toBeVisible();
@@ -110,7 +115,7 @@ test('campaign library search and Clear search stay usable across form factors',
       const [searchBox, clearBox, sourceBox, searchGroupBox] = await Promise.all([
         search.boundingBox(),
         clear.boundingBox(),
-        source.boundingBox(),
+        sourceFilter.boundingBox(),
         search.locator('xpath=../..').boundingBox(),
       ]);
       expect(searchBox).not.toBeNull();

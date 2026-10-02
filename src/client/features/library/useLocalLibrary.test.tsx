@@ -21,7 +21,7 @@ describe('useLocalLibrary pricing views', () => {
         campaignId: CAMPAIGN_ID,
         name: 'Mutable Vision',
         key: 'mutable-vision',
-        sourceKey: 'core',
+        sourceId: '0193b3c0-f1f0-7000-8000-00000000f303',
         status: 'complete',
         role: 'template',
         preferredEdition: false,

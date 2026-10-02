@@ -85,12 +85,7 @@ const value = (v: number | string | boolean): Value =>
 const equal = (a: Value, b: Value) =>
   a instanceof Decimal && b instanceof Decimal ? a.compare(b) === 0 : a === b;
 export const referenceKey = (ref: RuleReference) =>
-  JSON.stringify([
-    ref.section,
-    ref.kind ?? '',
-    canonicalLibraryKey(ref.key),
-    canonicalLibraryKey(ref.sourceKey ?? ''),
-  ]);
+  JSON.stringify([ref.section, ref.kind ?? '', canonicalLibraryKey(ref.key), ref.sourceId ?? '']);
 export type RuleResolver = (ref: RuleReference) => CalculationDefinitionV1 | undefined;
 export function nodeChildren(node: CalculationNode): string[] {
   if ('args' in node) return node.args;

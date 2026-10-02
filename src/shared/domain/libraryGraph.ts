@@ -17,22 +17,24 @@ export type LibraryGraphEntry = {
   LibraryMetadata & { applicability?: { traits: RuleReference[] } | string | undefined };
 export type LibraryGraph = Record<string, readonly LibraryGraphEntry[]>;
 
+function sourceIdentity(entry: LibraryGraphEntry): string {
+  if (!entry.id) throw new Error(`Sourcebook UUID required for ${entry.name}`);
+  return entry.id;
+}
+
 /** Validate the resulting library, not merely the rows carried by a patch/import. */
 export function validateLibraryGraph(graph: LibraryGraph): void {
-  const sources = new Set((graph.sources ?? []).map((s) => canonicalLibraryKey(s.key || s.name)));
+  const sources = new Set((graph.sources ?? []).map((s) => s.id));
   for (const [section, entries] of Object.entries(graph)) {
     const identities = new Set<string>();
     const preferred = new Set<string>();
     for (const entry of entries) {
-      const key =
-        section === 'sources'
-          ? canonicalLibraryKey(entry.key || entry.name)
-          : libraryEntryKey(entry);
+      const key = section === 'sources' ? sourceIdentity(entry) : libraryEntryKey(entry);
       if (identities.has(key)) throw new Error(`Duplicate ${section} edition: ${entry.name}`);
       identities.add(key);
       if (section === 'sources') continue;
-      if (entry.sourceKey && !sources.has(canonicalLibraryKey(entry.sourceKey)))
-        throw new Error(`Unknown source ${entry.sourceKey} for ${entry.name}`);
+      if (entry.sourceId && !sources.has(entry.sourceId))
+        throw new Error(`Unknown source ${entry.sourceId} for ${entry.name}`);
       if (entry.preferredEdition) {
         const canonical = JSON.stringify([
           entry.kind ?? '',
@@ -63,32 +65,22 @@ export function mergeLibraryGraph(
   current: LibraryGraph,
   incoming: LibraryGraph,
   mode: 'merge' | 'replace',
-  sourceKeys?: readonly string[],
+  sourceIds?: readonly string[],
 ): LibraryGraph {
   const result = { ...current };
-  const scope = sourceKeys && new Set(sourceKeys.map(canonicalLibraryKey));
+  const scope = sourceIds && new Set(sourceIds);
   for (const [section, rows] of Object.entries(incoming)) {
     if (rows === undefined) continue;
     if (mode === 'replace') {
       result[section] = scope
         ? section === 'sources'
-          ? [
-              ...(current[section] ?? []).filter(
-                (row) => !scope.has(canonicalLibraryKey(row.key || row.name)),
-              ),
-              ...rows,
-            ]
-          : [
-              ...(current[section] ?? []).filter(
-                (row) => !scope.has(canonicalLibraryKey(row.sourceKey ?? '')),
-              ),
-              ...rows,
-            ]
+          ? [...(current[section] ?? []).filter((row) => !scope.has(row.id ?? '')), ...rows]
+          : [...(current[section] ?? []).filter((row) => !scope.has(row.sourceId ?? '')), ...rows]
         : rows;
       continue;
     }
     const keyOf = (entry: LibraryGraphEntry) =>
-      section === 'sources' ? canonicalLibraryKey(entry.key || entry.name) : libraryEntryKey(entry);
+      section === 'sources' ? sourceIdentity(entry) : libraryEntryKey(entry);
     const merged = new Map((current[section] ?? []).map((row) => [keyOf(row), row]));
     for (const row of rows) merged.set(keyOf(row), row);
     result[section] = [...merged.values()];
@@ -112,7 +104,7 @@ export function libraryEditionDecisions(current: LibraryGraph, incoming: Library
             {
               section,
               key: entry.key || canonicalLibraryKey(entry.name),
-              sourceKey: entry.sourceKey ?? null,
+              sourceId: entry.sourceId ?? null,
               decision: siblings.some((row) => libraryEntryKey(row) === libraryEntryKey(entry))
                 ? ('update_edition' as const)
                 : ('create_separate_edition' as const),

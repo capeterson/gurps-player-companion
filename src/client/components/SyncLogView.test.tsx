@@ -165,6 +165,55 @@ describe('SyncLogView download debug log', () => {
   });
 });
 
+it('shows an explicit recovery control for a held unsaved library addition', async () => {
+  const db = getLocalDb();
+  const campaignId = '0193b3c0-f1f0-7000-8000-00000000f101';
+  await db.outbox.put({
+    clientOpId: 'held-library-create',
+    entityClass: 'campaign_library_trait',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000f102',
+    parentId: campaignId,
+    command: 'create',
+    coalesceKey: 'held-library-create|',
+    attemptedValue: { name: 'Retained definition' },
+    validationVersion: 1,
+    status: 'pending',
+    enqueuedAt: '2026-09-30T00:00:00.000Z',
+    attemptCount: 0,
+    localSourceMigrationUnknown: true,
+    localSourceMigrationIntent: { attemptedValue: { sourceKey: 'old-book' }, prevValue: null },
+    serverReason: 'Choose a sourcebook for the retained edit.',
+  });
+  revertFailedOperation.mockResolvedValue({
+    clientOpId: 'held-library-create',
+    entityClass: 'campaign_library_trait',
+    entityId: '0193b3c0-f1f0-7000-8000-00000000f102',
+    parentId: campaignId,
+    command: 'create',
+    coalesceKey: 'held-library-create|',
+    attemptedValue: { name: 'Retained definition' },
+    validationVersion: 1,
+    status: 'pending',
+    enqueuedAt: '2026-09-30T00:00:00.000Z',
+    attemptCount: 0,
+  });
+  const user = userEvent.setup();
+  renderView();
+
+  expect(
+    await screen.findByRole('region', { name: 'Choose sourcebooks for retained edits' }),
+  ).toHaveTextContent('Choose a sourcebook for an older edit');
+  await user.click(screen.getByRole('button', { name: 'Revert older edit' }));
+  expect(await screen.findByRole('heading', { name: 'Revert this local change?' })).toBeVisible();
+  expect(
+    screen.getByText(
+      'The unsaved addition and its later queued edits will be removed from this device.',
+    ),
+  ).toBeVisible();
+  await user.click(screen.getByRole('button', { name: 'Revert change' }));
+  await waitFor(() => expect(revertFailedOperation).toHaveBeenCalledWith('held-library-create'));
+});
+
 describe('SyncLogView event details', () => {
   it('loads a compressed change only when opened and formats raw payloads only when requested', async () => {
     const db = getLocalDb();

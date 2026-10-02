@@ -540,10 +540,7 @@ describe('delegated operation behavioral parity', () => {
       ['language', { name: `Language ${suffix}` }],
       ['technique', { name: `Technique ${suffix}`, defaultSkillName: 'Broadsword' }],
       ['style', { name: `Style ${suffix}` }],
-      [
-        'source',
-        { name: `Source ${suffix}`, key: `source-${suffix}`, abbreviation: 'MX', priority: 1 },
-      ],
+      ['source', { name: `Source ${suffix}`, abbreviation: 'MX', priority: 1 }],
       [
         'modifier',
         {
