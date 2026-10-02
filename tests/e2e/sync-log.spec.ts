@@ -87,6 +87,7 @@ test('a synced edit and its revision response share one item with Request and Re
     expect(tooltipBox.y + tooltipBox.height).toBeLessThanOrEqual(900);
     await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`sync-connected-tooltip-${width}.png`),
+      animations: 'disabled',
     });
     await saved().click();
     const dialog = page
@@ -135,6 +136,18 @@ test('a synced edit and its revision response share one item with Request and Re
         .toBeGreaterThan(Date.parse(manualAt ?? ''));
       await expect(lastChangesTime).toHaveAttribute('datetime', changeAt ?? '');
     }
+    for (const locator of [lastSyncTime, lastChangesTime]) {
+      const box = await locator.boundingBox();
+      if (!box) throw new Error('Expected a visible connection timestamp');
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(900);
+    }
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath(`sync-connection-${width}.png`),
+      animations: 'disabled',
+    });
     const recent = dialog
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: 'Recently synced' }) });
@@ -169,8 +182,6 @@ test('a synced edit and its revision response share one item with Request and Re
     await expect(dialog.getByText('Raw', { exact: true })).toHaveCount(0);
     for (const locator of [
       dialog.locator('.modal-box'),
-      lastSyncTime,
-      lastChangesTime,
       syncButton,
       request.locator('pre'),
       response.locator('pre'),
