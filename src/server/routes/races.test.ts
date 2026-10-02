@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { createTestActor } from '../testFixtures.ts';
@@ -7,7 +8,11 @@ configureIntegrationTestEnvironment();
 const app = createApp(integrationTestConfig);
 
 function headers(token: string) {
-  return { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  return {
+    authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+    [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+  };
 }
 
 async function createCampaign(token: string) {
@@ -146,7 +151,7 @@ describe('race REST and sync trust boundaries', () => {
             campaignId: campaign.id,
             revision: race.revision - 1,
             key: race.key,
-            sourceKey: null,
+            sourceId: null,
             name: 'Stonekin',
             source: null,
             sourceLocator: 'synthetic test fixture',

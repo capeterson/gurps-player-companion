@@ -363,7 +363,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                     </span>
                   </span>
                   <span className="num text-xs text-base-content/70">
-                    {o.sourceKey ?? ''} ·{' '}
+                    {o.sourceLocator ?? ''} ·{' '}
                     {pricingDisplayValue(o.calculation, 'points', o.basePoints) == null
                       ? 'Calculated'
                       : `${pricingDisplayValue(o.calculation, 'points', o.basePoints)} pts`}

@@ -18,6 +18,7 @@ import {
   bigserial,
   boolean,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -1068,7 +1069,7 @@ export const adventureLogEntries = pgTable(
 function libraryMetadataColumns() {
   return {
     key: varchar('key', { length: 160 }).notNull().default(''),
-    sourceKey: varchar('source_key', { length: 160 }),
+    sourceId: uuid('source_id'),
     sourceLocator: varchar('source_locator', { length: 240 }),
     status: varchar('status', { length: 24 })
       .$type<NonNullable<LibraryMetadata['status']>>()
@@ -1118,13 +1119,17 @@ export const campaignLibraryTraits = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- matches the YAML import loop's
     // `keyOf` (kind::lower(name)); see migration 0021.
     naturalKey: uniqueIndex('campaign_library_traits_key').on(
       t.campaignId,
       t.kind,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_traits_campaign_revision_idx').on(
       t.campaignId,
@@ -1180,11 +1185,15 @@ export const campaignLibrarySkills = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_skills_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_skills_campaign_revision_idx').on(
       t.campaignId,
@@ -1223,11 +1232,15 @@ export const campaignLibrarySpells = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_spells_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_spells_campaign_revision_idx').on(
       t.campaignId,
@@ -1259,11 +1272,15 @@ export const campaignLibraryLanguages = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0026.
     naturalKey: uniqueIndex('campaign_library_languages_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_languages_campaign_revision_idx').on(
       t.campaignId,
@@ -1302,11 +1319,15 @@ export const campaignLibraryTechniques = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0027.
     naturalKey: uniqueIndex('campaign_library_techniques_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_techniques_campaign_revision_idx').on(
       t.campaignId,
@@ -1342,11 +1363,15 @@ export const campaignLibraryStyles = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0027.
     naturalKey: uniqueIndex('campaign_library_styles_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_styles_campaign_revision_idx').on(
       t.campaignId,
@@ -1385,10 +1410,14 @@ export const campaignLibraryEnchantments = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     naturalKey: uniqueIndex('campaign_library_enchantments_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_enchantments_campaign_revision_idx').on(
       t.campaignId,
@@ -1435,11 +1464,15 @@ export const campaignLibraryItems = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     // Case-insensitive natural key -- see migration 0021.
     naturalKey: uniqueIndex('campaign_library_items_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_items_campaign_revision_idx').on(
       t.campaignId,
@@ -1589,10 +1622,14 @@ export const campaignLibraryActiveEffects = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     naturalKey: uniqueIndex('campaign_library_active_effects_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_active_effects_campaign_revision_idx').on(
       t.campaignId,
@@ -1609,7 +1646,6 @@ export const campaignLibrarySources = pgTable(
       .notNull()
       .references(() => campaigns.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 160 }).notNull(),
-    key: varchar('key', { length: 160 }).notNull(),
     abbreviation: varchar('abbreviation', { length: 40 }).notNull(),
     edition: varchar('edition', { length: 160 }),
     priority: integer('priority').notNull().default(100),
@@ -1619,7 +1655,7 @@ export const campaignLibrarySources = pgTable(
     revision: revision(),
   },
   (t) => ({
-    naturalKey: uniqueIndex('campaign_library_sources_key').on(t.campaignId, sql`lower(${t.key})`),
+    campaignIdKey: uniqueIndex('campaign_library_sources_campaign_id_key').on(t.campaignId, t.id),
     campaignRevisionIdx: index('campaign_library_sources_campaign_revision_idx').on(
       t.campaignId,
       t.revision,
@@ -1653,10 +1689,14 @@ export const campaignLibraryModifiers = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }).onDelete('no action'),
     naturalKey: uniqueIndex('campaign_library_modifiers_key').on(
       t.campaignId,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_modifiers_campaign_revision_idx').on(
       t.campaignId,
@@ -1793,11 +1833,16 @@ export const campaignLibraryRaces = pgTable(
     revision: revision(),
   },
   (t) => ({
+    sourceBookFk: foreignKey({
+      name: 'campaign_library_races_source_book_fk',
+      columns: [t.campaignId, t.sourceId],
+      foreignColumns: [campaignLibrarySources.campaignId, campaignLibrarySources.id],
+    }),
     naturalKey: uniqueIndex('campaign_library_races_key').on(
       t.campaignId,
       t.kind,
       sql`lower(coalesce(nullif(${t.key}, ''), ${t.name}))`,
-      sql`coalesce(lower(${t.sourceKey}), '')`,
+      sql`coalesce(${t.sourceId}::text, '')`,
     ),
     campaignRevisionIdx: index('campaign_library_races_campaign_revision_idx').on(
       t.campaignId,

@@ -27,19 +27,18 @@ The **Library guide** link opens this article in another tab, so consulting it d
 
 ## Organize sources, editions, and completeness
 
-Use **Sources → + Add source** for a publication or a house-rule collection. Supply its **Publication title**, **Source key**, and **Abbreviation**. Edition and notes help distinguish revisions; **Priority (lower first)** chooses among otherwise equivalent sources.
+Use **Sources → + Add source** for a publication or a house-rule collection. Supply its **Publication title** and **Abbreviation**. Edition and notes help distinguish revisions; **Priority (lower first)** chooses among otherwise equivalent sources.
 
 For an entry's source metadata:
 
-- **Canonical key** identifies the concept. Use a stable value such as `field-training`; changing the display name need not change that identity.
-- **Source key** associates the entry with a source. Reuse the source's key exactly.
-- **Page or locator** identifies the specific rule. The shorter **Source** citation is useful to readers but does not create a source association by itself.
+- **Sourcebook** selects the publication, labeled with its abbreviation and title.
+- **Page** sits beside the sourcebook in a compact field. Enter the printed page number; existing page ranges and section references are retained. The separate **Source** citation is useful to readers but is not generated from these fields.
 - **Preferred edition** explicitly selects the default version of that concept. Do not mark two versions of the same concept as preferred.
 - **Review notes** explain unresolved questions without pretending they are implemented rules.
 
 Only **Complete** entries whose **Content role** is **Definition** or **Template** can be adopted through character pickers. **Needs review**, **Reference only**, **Example**, and **Reference** entries remain library material rather than purchasable definitions. If an entry is missing from a picker, check these fields before recreating it.
 
-Keep alternate editions under the same canonical key and different source keys. The normal character picker offers preferred adoptable editions; **Other sources** reveals alternatives. Verify which edition you selected before accepting its price.
+The normal character picker offers preferred adoptable editions; **Other sources** reveals alternatives. Verify which edition you selected before accepting its price.
 
 ## Choose the right kind of definition
 
@@ -168,7 +167,7 @@ In **Import YAML**, select a file, choose the entire file or specific sourcebook
 - **Merge** adds new identities and updates matching ones without deleting other entries. It can still overwrite matching definitions.
 - **Replace** also removes existing entries absent from the uploaded sections. Use it only when the file is intended to be authoritative. A sourcebook Replace removes entries only from the selected books. Optional omitted sections are preserved; explicitly empty arrays request an empty section.
 
-Identity uses canonical key and source edition, plus kind for traits. Changing an explicit key is different from renaming an entry and can create a new identity. Read the preview rather than assuming names alone control replacement. Review the campaign-settings option before importing settings along with content.
+Imports match entries by their YAML `key` and source edition, plus kind for traits. Changing a YAML `key` can create a separate entry. Read the preview rather than assuming names alone control replacement. Review the campaign-settings option before importing settings along with content.
 
 Mark a definition **Restricted** in its source and completeness editor to keep it GM-only. Players cannot browse, export or newly add it to characters; existing character copies continue to work. An older file that omits the restriction flag preserves existing restrictions on matching entries.
 
@@ -197,3 +196,7 @@ Before a campaign-wide correction, test one definition and one character. Compar
 **A saved value reverts:** inspect the error message and the header sync log. Resolve the rejected value or conflicting edit before retrying. Avoid repeatedly creating a new entry to work around a failed update.
 
 **The source rule cannot be represented faithfully:** preserve a citation and explanation, leave unresolved definitions as **Needs review** or **Reference only**, and record the manual procedure. A partly automated rule should clearly identify which steps the player or GM still performs.
+
+Sourcebooks need a publication title and abbreviation. Choose them from an entry's
+**Sourcebook** picker, which shows the abbreviation followed by the title. Renaming
+a book keeps its existing links. Source keys appear only in portable YAML files.

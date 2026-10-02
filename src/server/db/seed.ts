@@ -8,7 +8,9 @@
 
 import { readFile } from 'node:fs/promises';
 import { and, eq, sql } from 'drizzle-orm';
+import type { LibraryGraph } from '../../shared/domain/libraryGraph.ts';
 import { parseLibraryYaml } from '../../shared/yaml/library.ts';
+import { importSourceReferences } from '../../shared/yaml/sourceReferences.ts';
 import { upsertByKey } from '../routes/campaignLibraryCrud.ts';
 import {
   itemEntity,
@@ -18,7 +20,7 @@ import {
 } from '../routes/campaignLibraryEntities.ts';
 import { withAudit } from './auditContext.ts';
 import { closeDb, getDb, runInDbTransaction } from './client.ts';
-import { campaignMemberships, campaigns } from './schema.ts';
+import { campaignLibrarySources, campaignMemberships, campaigns } from './schema.ts';
 import { ensureDemoUser } from './seeds/accounts.ts';
 import { seedLanternCoast } from './seeds/lanternCoast.ts';
 
@@ -70,10 +72,39 @@ async function seedLibrary(actorId: string, campaignId: string): Promise<void> {
   const doc = parseLibraryYaml(yamlText);
 
   await withAudit(actorId, undefined, async (tx) => {
-    await upsertByKey(tx, traitEntity, campaignId, doc.library.traits, 'merge');
-    await upsertByKey(tx, skillEntity, campaignId, doc.library.skills, 'merge');
-    await upsertByKey(tx, spellEntity, campaignId, doc.library.spells, 'merge');
-    await upsertByKey(tx, itemEntity, campaignId, doc.library.items, 'merge');
+    const books = await tx
+      .select()
+      .from(campaignLibrarySources)
+      .where(eq(campaignLibrarySources.campaignId, campaignId));
+    const live = importSourceReferences(doc.library, books) as LibraryGraph;
+    await upsertByKey(
+      tx,
+      traitEntity,
+      campaignId,
+      live.traits?.map((entry) => traitEntity.createSchema.parse(entry)),
+      'merge',
+    );
+    await upsertByKey(
+      tx,
+      skillEntity,
+      campaignId,
+      live.skills?.map((entry) => skillEntity.createSchema.parse(entry)),
+      'merge',
+    );
+    await upsertByKey(
+      tx,
+      spellEntity,
+      campaignId,
+      live.spells?.map((entry) => spellEntity.createSchema.parse(entry)),
+      'merge',
+    );
+    await upsertByKey(
+      tx,
+      itemEntity,
+      campaignId,
+      live.items?.map((entry) => itemEntity.createSchema.parse(entry)),
+      'merge',
+    );
   });
 }
 

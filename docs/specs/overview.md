@@ -144,6 +144,17 @@ change server permissions or install a client plugin automatically.
 
 ## User-facing features
 
+### Sourcebooks
+
+Library entries link to campaign sourcebooks by UUID. Editing a book's title,
+abbreviation or edition keeps its links intact. Sourcebook forms require a title
+and abbreviation, with no source key input; entry pickers show
+`<abbreviation>: <publication title>`, with a compact **Page** field beside the
+picker at every width. Entry editors preserve their definition keys without
+showing a key input. Portable YAML labels translate to/from
+UUIDs at import/export, including nested pricing references. Migration 0068
+backfills existing links; Dexie v17 upgrades cached and queued edits.
+
 ### Library selection
 
 Library autocomplete menus render above sheet navigation, outside their form's
@@ -1319,7 +1330,7 @@ src/
                  gestureBatch (explicit IDs for rapid pool-control bursts),
                  state, flashBus, minimalViewSweep,
                  wsSubscriber — the local-first engine
-    db/          dexie.ts and syncEntityStore.ts — IndexedDB stores and shared
+    db/          dexie.ts, migrateSourcebookReferences.ts and syncEntityStore.ts — IndexedDB stores and shared
                  sync row lookup/writes (UI source of truth),
                   plus per-character device-only solo tracker scratchpads
     components/ui/AppIcon.tsx  Shared Lucide icon names, size and stroke conventions
@@ -1373,7 +1384,8 @@ src/
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties),
                  rangePenalty (B550 reference steps), magic
-    yaml/        library.ts — round-trippable campaign-library YAML codec
+    yaml/        library.ts + sourceReferences.ts — round-trippable campaign-library YAML codec
+                 and portable source-key ↔ live UUID translation
     history/     summarize.ts — shared history one-liner formatter
   sw/            Service worker registration and app-shell precache. It never
                  caches authenticated API responses, does not replay the
@@ -1461,6 +1473,8 @@ handlers for validated writes, owned mechanics, history and revisions.
 The explicit `bun run db:seed:lantern:refresh` upgrades recognized older defaults
 once while preserving edits, deleted older content and play state; its transactional
 revision marker makes subsequent runs no-ops, preserving later deletions too.
+Its YAML boundary resolves renamed books through surviving definition UUID links
+and excludes unavailable sourcebooks rather than restoring them.
 Ordinary seeding does not refresh existing Lantern campaigns.
 
 Before a new development task on local `main`, fetch and fast-forward from

@@ -558,7 +558,7 @@ describe('MCP canonical schema conversion', () => {
               campaignId,
               revision: 4,
               key: 'source-race',
-              sourceKey: 'fantasy',
+              sourceId: '0193b3c0-f1f0-7000-8000-00000000c051',
               name: sourceName,
               source: 'F 105',
               sourceLocator: 'Chapter 6, p. 105',

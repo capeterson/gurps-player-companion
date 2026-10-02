@@ -9,6 +9,7 @@ import {
 } from './race.ts';
 
 const campaignId = '00000000-0000-4000-8000-000000000001';
+const sourceId = '00000000-0000-4000-8000-000000000030';
 const createdAt = '2026-10-01T12:00:00.000Z';
 
 function race(overrides: Record<string, unknown> = {}): LibraryRaceOut {
@@ -19,7 +20,7 @@ function race(overrides: Record<string, unknown> = {}): LibraryRaceOut {
     createdAt,
     updatedAt: createdAt,
     key: 'stonekin',
-    sourceKey: 'fantasy',
+    sourceId,
     sourceLocator: 'p. 42',
     status: 'complete',
     role: 'definition',
@@ -84,9 +85,9 @@ describe('race composition', () => {
     ]);
     expect(result.snapshot?.skills.map((entry) => entry.key)).toEqual(['masonry', 'mining']);
     expect(result.snapshot?.features).toEqual(['Can sense worked stone.', 'Sees in dim tunnels.']);
-    expect(result.snapshot?.sources.map((source) => [source.key, source.sourceKey])).toEqual([
-      ['stonekin', 'fantasy'],
-      ['deep-delver', 'fantasy'],
+    expect(result.snapshot?.sources.map((source) => [source.key, source.sourceId])).toEqual([
+      ['stonekin', sourceId],
+      ['deep-delver', sourceId],
     ]);
   });
 

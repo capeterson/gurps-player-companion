@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import {
+  type LibraryYamlDoc,
   libraryEnchantmentCreate,
   libraryItemCreate,
   libraryLanguageCreate,
@@ -21,6 +22,7 @@ import {
   parseLibraryYaml,
   sourceScopedLibrary,
 } from './library.ts';
+import { portableLibraryEntry } from './sourceReferences.ts';
 
 it('packages selected sourcebooks and retains explicit GM restrictions', () => {
   const doc = parseLibraryYaml(
@@ -31,13 +33,14 @@ it('packages selected sourcebooks and retains explicit GM restrictions', () => {
         { key: 'beta', name: 'Beta', abbreviation: 'B', priority: 100 },
       ],
       traits: [
-        libraryTraitCreate.parse({
-          name: 'Secret',
-          kind: 'advantage',
+        {
+          ...libraryTraitCreate.parse({ name: 'Secret', kind: 'advantage', restricted: true }),
           sourceKey: 'alpha',
-          restricted: true,
-        }),
-        libraryTraitCreate.parse({ name: 'Public', kind: 'advantage', sourceKey: 'beta' }),
+        } as LibraryYamlDoc['library']['traits'][number],
+        {
+          ...libraryTraitCreate.parse({ name: 'Public', kind: 'advantage' }),
+          sourceKey: 'beta',
+        } as LibraryYamlDoc['library']['traits'][number],
       ],
       skills: [],
       spells: [],
@@ -94,7 +97,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     skills: [],
     spells: [],
     items: [
-      libraryItemCreate.parse({
+      {
         name: 'Enchanted mail',
         enchantments: [
           {
@@ -111,7 +114,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
             },
           },
         ],
-      }),
+      } as unknown as LibraryYamlDoc['library']['items'][number],
     ],
     languages: [],
     techniques: [],
@@ -131,7 +134,8 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
 });
 
 it('round-trips v15 racial profiles and keeps source-scoped race and lens entries together', () => {
-  const race = libraryRaceCreate.parse({
+  const portableRace = portableLibraryEntry(libraryRaceCreate);
+  const race = portableRace.parse({
     key: 'stonekin',
     name: 'Stonekin',
     sourceKey: 'alpha',
@@ -154,7 +158,7 @@ it('round-trips v15 racial profiles and keeps source-scoped race and lens entrie
     ],
     tags: ['underground'],
   });
-  const lens = libraryRaceCreate.parse({
+  const lens = portableRace.parse({
     key: 'abyssal',
     name: 'Abyssal',
     sourceKey: 'alpha',
@@ -163,7 +167,7 @@ it('round-trips v15 racial profiles and keeps source-scoped race and lens entrie
     removesTraits: ['night-vision'],
     traits: [{ key: 'dark-vision', name: 'Dark Vision', points: 25 }],
   });
-  const other = libraryRaceCreate.parse({
+  const other = portableRace.parse({
     key: 'moonfolk',
     name: 'Moonfolk',
     sourceKey: 'beta',

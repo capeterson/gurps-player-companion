@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MANA_LEVELS } from '../constants/magic.ts';
+import { portableLibraryEntry } from '../yaml/sourceReferences.ts';
 import { activeEffectDefinitionCreate } from './activeEffects.ts';
 import { calculationDefinition } from './calculation.ts';
 import { campaignHouseRules } from './campaign.ts';
@@ -441,7 +442,7 @@ export const importResult = z.object({
       z.object({
         section: z.string(),
         key: z.string(),
-        sourceKey: z.string().nullable(),
+        sourceId: uuid.nullable(),
         decision: z.enum(['update_edition', 'create_separate_edition']),
       }),
     )
@@ -528,28 +529,30 @@ export const libraryYamlDoc = z
       .optional(),
     library: z
       .object({
-        sources: z.array(librarySourceCreate).optional(),
-        modifiers: z.array(libraryModifierCreate).optional(),
-        traits: z.array(libraryTraitCreate).default([]),
-        skills: z.array(librarySkillCreate).default([]),
+        sources: z
+          .array(librarySourceCreate.extend({ key: z.string().trim().min(1).max(160) }))
+          .optional(),
+        modifiers: z.array(portableLibraryEntry(libraryModifierCreate)).optional(),
+        traits: z.array(portableLibraryEntry(libraryTraitCreate)).default([]),
+        skills: z.array(portableLibraryEntry(librarySkillCreate)).default([]),
         /** Optional (no default): pre-spell-library exports lack this
          * section, and a replace-mode import must be able to tell "no
          * spells section" (leave existing spells alone) apart from an
          * explicit empty list (delete them all). */
-        spells: z.array(librarySpellCreate).optional(),
-        items: z.array(libraryItemCreate).default([]),
+        spells: z.array(portableLibraryEntry(librarySpellCreate)).optional(),
+        items: z.array(portableLibraryEntry(libraryItemCreate)).default([]),
         /** Optional for the same reason as `spells`: pre-v4 exports have no
          * languages section, and a replace-mode import of one of those files
          * must not wipe the campaign's language library. */
-        languages: z.array(libraryLanguageCreate).optional(),
+        languages: z.array(portableLibraryEntry(libraryLanguageCreate)).optional(),
         /** Optional for the same reason as `languages`. */
-        techniques: z.array(libraryTechniqueCreate).optional(),
+        techniques: z.array(portableLibraryEntry(libraryTechniqueCreate)).optional(),
         /** Optional for the same reason as `languages`. */
-        styles: z.array(libraryStyleCreate).optional(),
+        styles: z.array(portableLibraryEntry(libraryStyleCreate)).optional(),
         /** Reusable typed enchantment definitions were added in v10. */
-        enchantments: z.array(libraryEnchantmentCreate).optional(),
-        activeEffects: z.array(activeEffectDefinitionCreate).optional(),
-        races: z.array(libraryRaceCreate).optional(),
+        enchantments: z.array(portableLibraryEntry(libraryEnchantmentCreate)).optional(),
+        activeEffects: z.array(portableLibraryEntry(activeEffectDefinitionCreate)).optional(),
+        races: z.array(portableLibraryEntry(libraryRaceCreate)).optional(),
       })
       .strict(),
   })
@@ -591,7 +594,7 @@ export type LibraryYamlDoc = z.infer<typeof libraryYamlDoc>;
 export const libraryPortableFieldManifest = {
   races: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -616,7 +619,6 @@ export const libraryPortableFieldManifest = {
     tags: true,
   } satisfies Record<keyof z.infer<typeof libraryRaceCreate>, true>,
   sources: {
-    key: true,
     name: true,
     abbreviation: true,
     edition: true,
@@ -625,7 +627,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof z.infer<typeof librarySourceCreate>, true>,
   modifiers: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -644,7 +646,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof z.infer<typeof libraryModifierCreate>, true>,
   activeEffects: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -675,7 +677,7 @@ export const libraryPortableFieldManifest = {
   traits: {
     calculation: true,
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -696,7 +698,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibraryTraitCreate, true>,
   skills: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -723,7 +725,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibrarySkillCreate, true>,
   spells: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -744,7 +746,7 @@ export const libraryPortableFieldManifest = {
   items: {
     calculation: true,
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -770,7 +772,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibraryItemCreate, true>,
   enchantments: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -788,7 +790,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibraryEnchantmentCreate, true>,
   languages: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -802,7 +804,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibraryLanguageCreate, true>,
   techniques: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,
@@ -820,7 +822,7 @@ export const libraryPortableFieldManifest = {
   } satisfies Record<keyof LibraryTechniqueCreate, true>,
   styles: {
     key: true,
-    sourceKey: true,
+    sourceId: true,
     sourceLocator: true,
     status: true,
     role: true,

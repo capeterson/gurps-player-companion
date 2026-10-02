@@ -3,6 +3,11 @@
  * exactly as it was and hand over to the forced reload, never roll back.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  MIN_SUPPORTED_SYNC_PROTOCOL,
+  SYNC_PROTOCOL_HEADER,
+  SYNC_PROTOCOL_VERSION,
+} from '../../shared/syncProtocol.ts';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
@@ -21,9 +26,9 @@ const outdated = () =>
   new Response(
     JSON.stringify({
       error: 'client_outdated',
-      clientProtocol: 0,
-      minProtocol: 1,
-      serverProtocol: 1,
+      clientProtocol: MIN_SUPPORTED_SYNC_PROTOCOL - 1,
+      minProtocol: MIN_SUPPORTED_SYNC_PROTOCOL,
+      serverProtocol: SYNC_PROTOCOL_VERSION,
     }),
     { status: 426, headers: { 'content-type': 'application/json' } },
   );
@@ -80,7 +85,9 @@ describe('sync against a server that refuses this build', () => {
     await orchestrator.maybeDrainOnce();
 
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Record<string, string>)['x-gpc-sync-protocol']).toBe('1');
+    expect((init.headers as Record<string, string>)[SYNC_PROTOCOL_HEADER]).toBe(
+      String(SYNC_PROTOCOL_VERSION),
+    );
     const db = getLocalDb();
     expect(await db.outbox.get('op-1')).toMatchObject({
       status: 'pending',

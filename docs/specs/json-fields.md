@@ -151,6 +151,12 @@ name fallback, which still requires non-null `inventory_items.library_item_id`.
 | `character_skills.library_mechanics.skillRules.procedures` | Optional `skillProcedures` within `ownedSkillRules`; captured, refreshed and retained with existing owned mechanics. |
 | Dexie `campaigns.activeEffectDefinitions` | Read-only `activeEffectDefinitionOut[]` cursor projection; validated at emission/application, retained by campaign mirrors, purged with campaigns. No additional server JSON column. |
 
+Race source snapshots, calculation rule references, modifier applicability and pricing-resolution
+snapshots qualify editions with nullable `sourceId` UUIDs. Migration 0068 converts
+legacy nested `sourceKey` labels without recalculating paid values; only portable
+YAML translates these references back to labels. Append-only history snapshots
+retain their original recorded shape.
+
 ## Race ownership and definitions
 
 | JSONB field | Schema and boundaries |

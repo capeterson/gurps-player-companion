@@ -816,7 +816,8 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       .filter(
         (op) =>
           op.command === 'create' &&
-          (op.localCampaignDependencyUnknown ||
+          (op.localSourceMigrationUnknown ||
+            op.localCampaignDependencyUnknown ||
             (op.localRequiredCampaignId === undefined && !op.localWaitForCampaignAssignment)) &&
           op.parentId !== undefined,
       )
@@ -895,6 +896,7 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
       mixedPatchHeld ||
       (op.predecessorClientOpId !== undefined &&
         unsettledClientOpIds.has(op.predecessorClientOpId)) ||
+      op.localSourceMigrationUnknown === true ||
       op.localCampaignDependencyUnknown === true ||
       (op.entityClass === 'character' &&
         op.fieldPath === 'campaignId' &&

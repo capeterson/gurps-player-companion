@@ -307,7 +307,7 @@ still mid-deploy cannot cause a reload loop.
 
 ## Library pricing and source editions
 
-The shared pure TypeScript calculation engine evaluates bounded declarative graphs with exact decimal arithmetic. Sources and modifiers join the existing library registry; metadata identifies canonical concepts and source editions independently of display names. Character pricing snapshots are immutable until explicit re-resolution, unlike live mechanics refresh. Typed rules, source evidence and snapshots are catalogued in [json-fields.md](json-fields.md). Full semantics and migration details: [library-calculation-rules.md](library-calculation-rules.md).
+The shared pure TypeScript calculation engine evaluates bounded declarative graphs with exact decimal arithmetic. Sources and modifiers join the existing library registry; campaign-scoped sourcebook UUID foreign keys keep live relationships independent of publication labels, while YAML translates portable keys at its boundary; metadata identifies canonical concepts and source editions independently of display names. Character pricing snapshots are immutable until explicit re-resolution, unlike live mechanics refresh. Typed rules, source evidence and snapshots are catalogued in [json-fields.md](json-fields.md). Full semantics and migration details: [library-calculation-rules.md](library-calculation-rules.md).
 
 ## Data model (Postgres 18)
 

@@ -220,7 +220,7 @@ describe('calculation expressions', () => {
       ],
       outputs: [{ ...output('total'), key: 'cost' }],
     };
-    const ref = { section: 'traits' as const, key: 'Target', sourceKey: null };
+    const ref = { section: 'traits' as const, key: 'Target', sourceId: null };
     const caller = definition([
       { id: 'value', op: 'constant', value: 7 },
       { id: 'call', op: 'call', reference: ref, output: 'cost', arguments: { base: 'value' } },
@@ -324,7 +324,7 @@ describe('calculation expressions', () => {
       nodes.push({
         id: 'nested',
         op: 'call',
-        reference: { section: 'traits', key: `nested-${index + 1}`, sourceKey: null },
+        reference: { section: 'traits', key: `nested-${index + 1}`, sourceId: null },
         output: 'result',
         arguments: {},
       });

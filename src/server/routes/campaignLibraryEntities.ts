@@ -161,7 +161,11 @@ export interface LibraryEntityConfig<
   readonly validateRow?: (row: TTable['$inferSelect']) => void;
   /** Natural key for YAML upsert matching (lowercased name, +kind for traits). */
   readonly keyOf: (
-    input: LibraryMetadata & { readonly name: string; readonly kind?: string },
+    input: LibraryMetadata & {
+      readonly id?: string;
+      readonly name: string;
+      readonly kind?: string;
+    },
   ) => string;
   /** Values for a new row — shared by the POST route and YAML import-insert. */
   readonly toInsertValues: (campaignId: string, body: TCreate) => TTable['$inferInsert'];
@@ -1012,7 +1016,10 @@ export const sourceEntity: LibraryEntityConfig<
     patch: 'Update a library source (owner only)',
     delete: 'Delete a library source (owner only)',
   },
-  keyOf: (input) => (input.key ?? input.name).toLowerCase(),
+  keyOf: (source) => {
+    if (!source.id) throw new Error('Sourcebooks require UUID translation before import');
+    return source.id;
+  },
   toOut: (row) =>
     librarySourceOut.parse({
       ...row,
@@ -1021,7 +1028,6 @@ export const sourceEntity: LibraryEntityConfig<
     }),
   toInsertValues: (campaignId, body) => ({
     ...body,
-    key: body.key.toLowerCase(),
     edition: body.edition ?? null,
     notes: body.notes ?? null,
     campaignId,

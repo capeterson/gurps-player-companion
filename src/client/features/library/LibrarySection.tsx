@@ -13,6 +13,7 @@ import {
   type ReactNode,
   memo,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -33,6 +34,7 @@ import {
   SortableHeader,
   compareTableText,
 } from '../characters/sections/useSortableCharacterRows.tsx';
+import { SourcebooksContext } from './SourcebooksContext.tsx';
 import { matchesLibrarySearch } from './librarySearch.ts';
 import {
   type LibrarySort,
@@ -191,13 +193,16 @@ export function LibrarySection<R extends LibraryListRow>({
   );
   const { preferences, sortBy } = usePreferences(campaignId, config.key, allowedSorts);
   const folds = useLibraryGroupFolds(`${campaignId}:library:${config.key}`);
+  const sourcebooks = useContext(SourcebooksContext);
   const searching = words.length > 0;
   const grouped = config.group !== null;
 
   // Inactive sections keep only an entry being edited mounted (hidden), so a
   // draft survives switching categories without paying for the whole list.
   const { groups, matchCount } = useMemo(() => {
-    const matching = active ? entries.filter((row) => matchesLibrarySearch(row, words)) : [];
+    const matching = active
+      ? entries.filter((row) => matchesLibrarySearch(row, words, sourcebooks))
+      : [];
     const visible =
       editId && !matching.some((row) => row.id === editId)
         ? [...matching, ...entries.filter((row) => row.id === editId)]
@@ -228,7 +233,7 @@ export function LibrarySection<R extends LibraryListRow>({
         domId: `library-group-${config.key}-${groupIdSegment(label)}`,
       }));
     return { groups: ordered, matchCount: matching.length };
-  }, [active, entries, words, editId, config, preferences]);
+  }, [active, entries, words, editId, config, preferences, sourcebooks]);
 
   const colSpan = 1 + config.columns.length + (isOwner ? 1 : 0);
 

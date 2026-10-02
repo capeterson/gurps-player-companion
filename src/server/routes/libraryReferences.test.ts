@@ -4,6 +4,7 @@ import { fixedCalculation, legacyTraitCalculation } from '../../shared/domain/ca
 import { definitionReference, resolveLibraryPricing } from '../../shared/domain/libraryPricing.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
+import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
 import { withAudit } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
@@ -19,7 +20,11 @@ function request(token: string, path: string, body?: unknown, method = 'POST') {
   return Promise.resolve(
     app.request(`/api/v1${path}`, {
       method,
-      headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+        [SYNC_PROTOCOL_HEADER]: String(SYNC_PROTOCOL_VERSION),
+      },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }),
   );

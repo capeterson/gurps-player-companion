@@ -85,10 +85,19 @@ test('new campaigns show revised sources and citations on collapsed library rows
       restricted: true,
     },
   ];
+  const libraryResponse = await page.request.get(`/api/v1/campaigns/${id}/library`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const sourcebooks = (await libraryResponse.json()).sources as { id: string; name: string }[];
+  const revisedId = sourcebooks.find(
+    (book) => book.name === 'GURPS Basic Set, Fourth Edition Revised',
+  )?.id;
+  const magicId = sourcebooks.find((book) => book.name === 'GURPS Magic')?.id;
+  if (!revisedId || !magicId) throw new Error('Expected default sourcebooks');
   for (const entry of entries) {
     const saved = await page.request.post(`/api/v1/campaigns/${id}/library/traits`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { ...entry, sourceKey: 'basic-set-fourth-edition-revised' },
+      data: { ...entry, sourceId: revisedId },
     });
     expect(saved.status(), await saved.text()).toBe(201);
   }
@@ -161,16 +170,14 @@ test('new campaigns show revised sources and citations on collapsed library rows
     }
   }
 
-  // Confirm the current source-key field creates the actual publication link.
+  // Confirm the picker changes the publication link by UUID.
   await page.getByRole('button', { name: `Edit ${entries[0].name}`, exact: true }).click();
   await page
     .locator('summary')
     .filter({ hasText: /^Source and completeness/ })
     .click();
-  await expect(page.getByLabel('Source key', { exact: true })).toHaveValue(
-    'basic-set-fourth-edition-revised',
-  );
-  await page.getByLabel('Source key', { exact: true }).fill('magic');
+  await expect(page.getByLabel('Sourcebook')).toHaveValue(revisedId);
+  await page.getByLabel('Sourcebook').selectOption(magicId);
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect
     .poll(async () => {
@@ -179,7 +186,7 @@ test('new campaigns show revised sources and citations on collapsed library rows
       });
       const library = await saved.json();
       return library.traits.find((trait: { name: string }) => trait.name === entries[0].name)
-        ?.sourceKey;
+        ?.sourceId;
     })
-    .toBe('magic');
+    .toBe(magicId);
 });

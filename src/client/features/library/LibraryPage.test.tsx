@@ -163,7 +163,6 @@ it('shows publication details without content-entry metadata badges on sourceboo
   await getLocalDb().campaignLibrarySources.put({
     id: '0193b3c0-f1f0-7000-8000-00000000b001',
     campaignId: CAMPAIGN,
-    key: 'basic-set-fourth-edition-revised',
     name: 'GURPS Basic Set, Fourth Edition Revised',
     abbreviation: 'B',
     edition: 'Fourth Edition Revised',
@@ -198,13 +197,13 @@ it('shows publication details without content-entry metadata badges on sourceboo
 it('shows library content without source, completeness, role or preference badges', async () => {
   await seed();
   await getLocalDb().campaignLibraryTraits.update(NIGHT, {
-    sourceKey: 'core',
+    sourceId: '0193b3c0-f1f0-7000-8000-00000000b001',
     status: 'complete',
     role: 'definition',
     preferredEdition: true,
   });
   await getLocalDb().campaignLibraryTraits.update(FEAR, {
-    sourceKey: 'core',
+    sourceId: '0193b3c0-f1f0-7000-8000-00000000b001',
     status: 'needs_review',
     role: 'example',
     restricted: true,
@@ -268,6 +267,18 @@ it('keeps citations beside the collapsed summary without repeating them in the d
 
 it('searches descriptions and source across words, reports empty results and clears', async () => {
   await seed();
+  const sourceId = '0193b3c0-f1f0-7000-8000-00000000f004';
+  await getLocalDb().campaignLibrarySources.put({
+    id: sourceId,
+    campaignId: CAMPAIGN,
+    name: 'GURPS Basic Set',
+    abbreviation: 'BX',
+    revision: 1,
+  } as never);
+  await getLocalDb().campaignLibraryTraits.update(NIGHT, {
+    sourceId,
+    applicability: { traits: [{ sourceId, definitionId: '0193b3c0-f1f0-7000-8000-00000000f005' }] },
+  } as never);
   setup();
   await screen.findByRole('button', { name: 'Night Vision' });
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search library' }), {
@@ -278,6 +289,12 @@ it('searches descriptions and source across words, reports empty results and cle
   );
   expect(screen.getByRole('button', { name: 'Night Vision' })).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match');
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'BX Basic Set' } });
+  expect(await screen.findByRole('button', { name: 'Night Vision' })).toBeVisible();
+  fireEvent.change(screen.getByRole('searchbox'), {
+    target: { value: '00000000f004' },
+  });
+  expect(await screen.findByText(/No matches/)).toBeVisible();
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'No match' } });
   expect(await screen.findByText(/No matches/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
@@ -588,7 +605,7 @@ it('imports only the sourcebook selected from a full YAML file', async () => {
   const file = new File([yaml], 'books.yaml', { type: 'text/yaml' });
   Object.defineProperty(file, 'text', { value: async () => yaml });
   fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
-  const alpha = await screen.findByRole('checkbox', { name: 'A · Alpha' });
+  const alpha = await screen.findByRole('checkbox', { name: 'A: Alpha' });
   fireEvent.click(alpha);
   expect(alpha).toBeChecked();
   expect(screen.getByRole('checkbox', { name: 'Entire file' })).not.toBeChecked();

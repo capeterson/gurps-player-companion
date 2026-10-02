@@ -7,6 +7,7 @@ import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/
 import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
 import type { CharacterRace, LibraryRaceOut } from '../../shared/schemas/race.ts';
 import type { SyncLogPayloadMetadata } from '../../shared/schemas/syncLog.ts';
+import { migrateSourcebookReferences } from './migrateSourcebookReferences.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
  *
@@ -355,6 +356,9 @@ export interface LocalCampaignTransferUndo {
 }
 
 export interface OutboxEntry {
+  /** Unresolved legacy source reference; preserved locally and never sent. */
+  localSourceMigrationUnknown?: boolean;
+  localSourceMigrationIntent?: { attemptedValue: unknown; prevValue: unknown };
   localMediaUploadId?: string | undefined;
   localMediaReady?: boolean | undefined;
   /** Create was queued under an optimistic campaign; wait for assignment settlement. Never sent. */
@@ -651,6 +655,7 @@ class LocalDb extends Dexie {
 
   constructor() {
     super('gurps-pc-local');
+    this.version(17).stores({}).upgrade(migrateSourcebookReferences);
     // Existing journal rows remain readable inline; new large bodies are lazy.
     this.version(16).stores({ campaignLibraryRaces: 'id, campaignId, revision' });
     this.version(15).stores({ syncLogBodies: 'id' });

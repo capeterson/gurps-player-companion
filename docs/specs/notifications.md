@@ -109,7 +109,7 @@ in their existing transaction. No SQL trigger writes a notification JSON payload
 The invitation creation route respects the invitee's inbox preference.
 Workers claim rows with `FOR UPDATE SKIP LOCKED`; inbox fan-out and queue
 consumption commit together. Advisory locks serialize updates to a grouped
-notice across workers. Migration 0068 adds queue triggers that issue an empty
+notice across workers. Migration 0069 adds queue triggers that issue an empty
 `NOTIFY gpc_notification_queue` on history inserts and eligible email inserts or
 retry-deadline updates. Postgres delivers these wakeups after commit; no character
 data or email content travels on the channel.
