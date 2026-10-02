@@ -290,9 +290,7 @@ it('searches descriptions and source across words, reports empty results and cle
   expect(screen.getByRole('button', { name: 'Night Vision', exact: true })).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'BX Basic Set' } });
-  expect(
-    await screen.findByRole('button', { name: 'Night Vision', exact: true }),
-  ).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Night Vision', exact: true })).toBeVisible();
   fireEvent.change(screen.getByRole('searchbox'), {
     target: { value: '00000000f004' },
   });
