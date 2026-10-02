@@ -91,7 +91,7 @@ test('new campaigns show revised sources and citations on collapsed library rows
   const sourcebooks = (await libraryResponse.json()).sources as { id: string; name: string }[];
   const revisedId = sourcebooks.find(
     (book) => book.name === 'GURPS Basic Set, Fourth Edition Revised',
-  )!.id;
+  )?.id;
   const magicId = sourcebooks.find((book) => book.name === 'GURPS Magic')?.id;
   if (!revisedId || !magicId) throw new Error('Expected default sourcebooks');
   for (const entry of entries) {

@@ -163,7 +163,6 @@ it('shows publication details without content-entry metadata badges on sourceboo
   await getLocalDb().campaignLibrarySources.put({
     id: '0193b3c0-f1f0-7000-8000-00000000b001',
     campaignId: CAMPAIGN,
-    key: 'basic-set-fourth-edition-revised',
     name: 'GURPS Basic Set, Fourth Edition Revised',
     abbreviation: 'B',
     edition: 'Fourth Edition Revised',
