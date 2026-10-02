@@ -472,6 +472,13 @@
       "breakpoints": true
     },
     {
+      "idx": 67,
+      "version": "7",
+      "when": 1800022000000,
+      "tag": "0067_races",
+      "breakpoints": true
+    },
+    {
       "idx": 68,
       "version": "7",
       "when": 1800023000000,

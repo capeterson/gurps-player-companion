@@ -98,7 +98,10 @@ It offers no sheet mutations. Roll results and table preferences stay local to
 the embedded UI. Portraits are not loaded by this self-contained view.
 
 `bun run build:mcp-ui` builds the resource; `dev`, `dev:server-only`, and `build`
-include this step. Restart development after changing embedded UI source.
+include this step. `scripts/inline-mcp-assets.ts` resolves the original HTML asset
+tags in one pass before injecting JavaScript and CSS, so HTML strings inside the
+bundled code cannot consume a stylesheet tag. Unknown external script/link
+references fail the build. Restart development after changing embedded UI source.
 Ordinary PWA HMR remains unchanged. This follows the
 [MCP UI MCP Apps pattern](https://mcpui.dev/guide/server/typescript/usage-examples).
 Protocol/resource tests, shared read-only component tests, browser bridge and
@@ -320,7 +323,7 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 51 player-domain tools covering 106 exact operations and gives each excluded
+method/path. It exposes 52 player-domain tools covering 109 exact operations and gives each excluded
 infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
@@ -394,7 +397,7 @@ The same generated tools expose library `techLevelPolicy`, nested
 and `campaign.skillPrerequisitePolicy`. Because MCP executes the raw OpenAPI
 handler, required-TL and block/warn enforcement is identical to REST and sync.
 
-Library export returns YAML v14 as typed text, retaining effect order, scaling,
+Library export returns YAML v15 as typed text, retaining effect order, scaling,
 conditions and mode names. Library-item selectors export their portable name
 without the campaign-local library UUID. Import accepts the existing v1–v12
 formats and preserves shared merge/replace and campaign-settings options. No
@@ -528,7 +531,7 @@ introduced. See [library-calculation-rules.md](library-calculation-rules.md).
 ## Structured weapon Range parity
 
 Inventory and campaign-library item `weaponData` use the shared `rangedRange`
-schema at REST, sync, MCP and YAML v14 boundaries. Each attack mode may carry
+schema at REST, sync, MCP and YAML v15 boundaries. Each attack mode may carry
 a fixed-yard Max and optional 1/2D/minimum, or an ST multiplier with an explicit
 wielder/weapon strength source. Legacy notation is retained for repair after
 migration; the roll path does not parse it. MCP tool schemas and the checked-in catalog are generated from the
@@ -538,7 +541,7 @@ same route schemas; old free-text Range writes are rejected.
 
 One `media` tool exposes four explicit actions: `capabilities` and `status`
 require `gpc:read`; `upload` and `cancel` require `gpc:write`. The 51-tool catalog
-maps 106 player operations; each action retains an exact method/path mapping,
+maps 109 player operations; each action retains an exact method/path mapping,
 canonical request/response validators and REST parity coverage. An unknown
 action, a mixed-action payload or insufficient scope cannot dispatch a request.
 
@@ -592,3 +595,7 @@ exclusion alongside `/api/v1/healthz`; both report the running release.
 Adventure-log create/edit actions accept nullable `characterId`: selecting an owned
 character makes the entry private; null attaches to Campaign and shares it. Attachment
 ownership, legacy-private preservation, and history privacy use the shared REST handler.
+
+## Racial templates
+
+The `library_race` tool covers owner-only race create/update/delete with REST-shared schemas and handlers. Existing library list, YAML import/export and character operations include races. The owned-snapshot server trust boundary, campaign restrictions, audit/history, cursor invalidation and minimal-view masking apply equally to MCP. See [races.md](races.md).

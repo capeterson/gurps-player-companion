@@ -12,6 +12,7 @@ import {
   campaignLibraryActiveEffects,
   campaignLibraryEnchantments,
   campaignLibraryLanguages,
+  campaignLibraryRaces,
   campaignLibrarySkills,
   campaignLibrarySpells,
   campaignLibraryStyles,
@@ -86,6 +87,7 @@ export async function loadLibraryGraph(tx: AuditTx, campaignId: string): Promise
     styles: campaignLibraryStyles,
     enchantments: campaignLibraryEnchantments,
     activeEffects: campaignLibraryActiveEffects,
+    races: campaignLibraryRaces,
   };
   return Object.fromEntries(
     await Promise.all(

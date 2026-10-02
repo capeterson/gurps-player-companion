@@ -12,6 +12,7 @@ import {
 } from '../../../shared/domain/libraryGraph.ts';
 import { libraryEntryKey } from '../../../shared/domain/libraryIdentity.ts';
 import { validateLibrarySkillSpecializationDefault } from '../../../shared/domain/librarySkillSpecializations.ts';
+import { validateRaceDefinition } from '../../../shared/domain/race.ts';
 import {
   activeEffectDefinitionCreate,
   activeEffectDefinitionUpdate,
@@ -40,7 +41,9 @@ import {
   librarySourceCreate,
   librarySourceUpdate,
 } from '../../../shared/schemas/libraryMetadata.ts';
+import { libraryRaceCreate, libraryRaceUpdate } from '../../../shared/schemas/race.ts';
 import type { LibraryEntityClass } from '../../../shared/schemas/sync.ts';
+import type { LocalLibraryRace } from '../../db/dexie.ts';
 import { LIBRARY_STORE_NAMES } from '../../db/dexie.ts';
 import type { LocalLibraryModifier, LocalLibrarySource } from '../../db/dexie.ts';
 import {
@@ -64,6 +67,7 @@ import {
 } from '../../sync/outbox.ts';
 
 export type LocalLibrary = {
+  races: LocalLibraryRace[];
   sources: LocalLibrarySource[];
   modifiers: LocalLibraryModifier[];
   traits: LocalLibraryTrait[];
@@ -129,6 +133,7 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
     if (!campaignId) return emptyLibrary();
     const db = getLocalDb();
     const [
+      races,
       traits,
       skills,
       spells,
@@ -142,6 +147,7 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
       modifiers,
       pending,
     ] = await Promise.all([
+      db.campaignLibraryRaces.where('campaignId').equals(campaignId).toArray(),
       db.campaignLibraryTraits.where('campaignId').equals(campaignId).toArray(),
       db.campaignLibrarySkills.where('campaignId').equals(campaignId).toArray(),
       db.campaignLibrarySpells.where('campaignId').equals(campaignId).toArray(),
@@ -168,6 +174,7 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
       rows.map((row) => (speculative.has(row.id) ? { ...row, revision: -1 } : row));
     const { keep, commit } = reuse();
     const library: LocalLibrary = {
+      races: keep(pricingRows(races)).sort(byName),
       traits: keep(pricingRows(traits)).sort(
         (a, b) => a.kind.localeCompare(b.kind) || byName(a, b),
       ),
@@ -189,6 +196,7 @@ export function useLocalLibrary(campaignId: string | null): LocalLibrary | undef
 
 export function emptyLibrary(): LocalLibrary {
   return {
+    races: [],
     sources: [],
     modifiers: [],
     traits: [],
@@ -205,6 +213,12 @@ export function emptyLibrary(): LocalLibrary {
 
 /** Sections the in-app editor writes, with the shared schemas the server applies too. */
 export const EDITABLE_LIBRARY_CLASSES = {
+  races: {
+    entityClass: 'campaign_library_race',
+    noun: 'race',
+    create: libraryRaceCreate,
+    update: libraryRaceUpdate,
+  },
   sources: {
     entityClass: 'campaign_library_source',
     noun: 'source',
@@ -318,6 +332,10 @@ async function validateEntry(
   body: Record<string, unknown>,
   existingId: string | null,
 ): Promise<void> {
+  if (section === 'races')
+    validateRaceDefinition(
+      Object.fromEntries(Object.keys(libraryRaceCreate.shape).map((key) => [key, body[key]])),
+    );
   if (section === 'skills') {
     validateLibrarySkillSpecializationDefault(
       String(body.name ?? ''),

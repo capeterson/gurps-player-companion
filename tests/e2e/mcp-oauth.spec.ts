@@ -246,7 +246,7 @@ test.describe('delegated MCP OAuth acceptance', () => {
           'get_character_history',
         ]),
       );
-      expect(tools.tools).toHaveLength(51);
+      expect(tools.tools).toHaveLength(52);
       expect(tools.tools.some((tool) => tool.name.startsWith('gpc_'))).toBe(false);
       expect(
         tools.tools.find((tool) => tool.name === 'get_character')?.annotations?.readOnlyHint,

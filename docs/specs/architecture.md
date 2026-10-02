@@ -599,3 +599,7 @@ and the same Bun process serves public immutable URLs, with optional CDN caching
 Garage's single-node Compose overlay can use Unraid bind-mounted storage; it does
 not add an application service or put blobs in PostgreSQL. See
 [media-uploads.md](media-uploads.md) and [../media-storage.md](../media-storage.md).
+
+## Racial templates
+
+Racial templates live in `campaign_library_races` (migration 0067), while `characters.race` stores one authoritative owned purchase. The shared race schema/domain and character detail builder drive both server and local calculations; no live library query is required to calculate an owned race. See [races.md](races.md).
