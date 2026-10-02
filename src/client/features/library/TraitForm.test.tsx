@@ -2,22 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { TraitForm } from './TraitForm.tsx';
 
-vi.mock('../../components/markdown/RichTextEditor.tsx', () => ({
-  RichTextEditor: (props: {
-    value: string;
-    onChange: (value: string) => void;
-    'aria-label': string;
-  }) => (
-    <textarea
-      aria-label={props['aria-label']}
-      value={props.value}
-      onChange={(event) => props.onChange(event.target.value)}
-    />
-  ),
-}));
-
-describe('TraitForm modifier source', () => {
-  it('retains invalid YAML, blocks saving, then saves a corrected calculation rule', () => {
+describe('TraitForm shared authoring', () => {
+  it('keeps invalid whole-entry YAML and submits the corrected calculation definition', () => {
     const onSubmit = vi.fn();
     render(
       <TraitForm
@@ -28,20 +14,40 @@ describe('TraitForm modifier source', () => {
         libraryItems={[]}
       />,
     );
-
-    fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Flexible trait' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Edit modifier YAML' }));
-    const editor = screen.getByLabelText('Modifier definitions (YAML)');
-    const invalidYaml = '- name: Incomplete\n  category: enhancement\n';
+    const editor = screen.getByLabelText('Raw YAML');
+    const invalidYaml = 'name: [unfinished\n';
     fireEvent.change(editor, { target: { value: invalidYaml } });
 
-    expect(screen.getByLabelText('Modifier definitions (YAML)')).toHaveValue(invalidYaml);
+    expect(screen.getByLabelText('Raw YAML')).toHaveValue(invalidYaml);
     expect(screen.getByRole('alert')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Add trait' })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
 
-    const validYaml =
-      '- name: Calculated\n  category: enhancement\n  costType: flat\n  costValue: 0\n  calculation:\n    version: 1\n    inputs: []\n    tables: []\n    nodes:\n      - id: value\n        op: constant\n        value: 0.001\n    outputs:\n      - key: points\n        node: value\n        unit: points\n        min: -100\n        max: 100\n        increment: 0.001\n        rounding: exact\n';
+    const validYaml = `name: Flexible trait
+kind: advantage
+basePoints: 1
+availableModifiers:
+  - name: Calculated
+    category: enhancement
+    costType: flat
+    costValue: 0
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+        - id: value
+          op: constant
+          value: 0.001
+      outputs:
+        - key: points
+          node: value
+          unit: points
+          min: -100
+          max: 100
+          increment: 0.001
+          rounding: exact
+`;
     fireEvent.change(editor, { target: { value: validYaml } });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add trait' })).toBeEnabled();

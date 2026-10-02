@@ -6,7 +6,9 @@ import {
   calculationDefinition,
 } from '../../../shared/schemas/calculation.ts';
 
+import type { ReactNode } from 'react';
 import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
+import { type StructuredFieldProps, StructuredFields } from './StructuredFields.tsx';
 import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
 
@@ -19,6 +21,7 @@ export function CalculationEditor({
   defaultAmount = 0,
   defaultWeight = 0,
   allowBasic = true,
+  renderField,
 }: {
   value: CalculationDefinitionV1 | null | undefined;
   onChange: (rule: CalculationDefinitionV1 | null) => void;
@@ -28,12 +31,13 @@ export function CalculationEditor({
   defaultWeight?: number;
   allowBasic?: boolean;
   unit?: 'points' | 'percentage' | 'currency' | 'pounds';
+  renderField?: ((props: StructuredFieldProps) => ReactNode | undefined) | undefined;
 }) {
   const [text, setText] = useState(() => (value ? stringify(value) : ''));
   const [error, setError] = useState<string | null>(null);
   const [amountDraft, setAmount] = useState<string | null>(null);
-  const amountOutput = value?.outputs.find((entry) => entry.key === output);
-  const amountNode = value?.nodes.find((entry) => entry.id === amountOutput?.node);
+  const amountOutput = value?.outputs?.find((entry) => entry.key === output);
+  const amountNode = value?.nodes?.find((entry) => entry.id === amountOutput?.node);
   const amount =
     amountDraft ??
     String(
@@ -50,8 +54,8 @@ export function CalculationEditor({
     { editorId: newEditorId(), key: 'option-a', label: 'Option A', amount: '0' },
   ]);
   const [weightDraft, setWeight] = useState<string | null>(null);
-  const weightOutput = value?.outputs.find((entry) => entry.key === 'weightLbs');
-  const weightNode = value?.nodes.find((entry) => entry.id === weightOutput?.node);
+  const weightOutput = value?.outputs?.find((entry) => entry.key === 'weightLbs');
+  const weightNode = value?.nodes?.find((entry) => entry.id === weightOutput?.node);
   const weight =
     weightDraft ??
     String(
@@ -315,27 +319,36 @@ export function CalculationEditor({
           Use pattern replaces the rule. Advanced rules remain editable below; no book values are
           supplied.
         </p>
-        <LibraryAdvancedFields title="Advanced rule (YAML)" error={error}>
-          <label>
-            Advanced rule (YAML)
-            <textarea
-              className="textarea w-full font-mono text-xs"
-              rows={12}
-              value={text}
-              onChange={(e) => accept(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-        </LibraryAdvancedFields>
+        {value && (
+          <StructuredFields
+            schema={calculationDefinition}
+            value={value}
+            label="Calculation definition"
+            path="calculation"
+            renderField={renderField}
+            onChange={(next) => {
+              setText(stringify(next));
+              onChange(next as CalculationDefinitionV1);
+              try {
+                validateCalculation(calculationDefinition.parse(next));
+                setError(null);
+                onValidityChange(true);
+              } catch (cause) {
+                setError(libraryFormError(cause));
+                onValidityChange(false);
+              }
+            }}
+          />
+        )}
         {value && (
           <p className="text-sm break-words">
             {value.inputs.length} inputs · {value.tables.length} tables · Outputs:{' '}
             {value.outputs.map((o) => `${o.key} (${o.unit})`).join(', ')}
           </p>
         )}
-        {allowBasic && (value || text) && (
+        {(value || text) && (
           <button type="button" className="btn btn-ghost btn-sm w-fit" onClick={() => accept('')}>
-            Use basic price fields
+            {allowBasic ? 'Use basic price fields' : 'Remove calculation'}
           </button>
         )}
         {error && (

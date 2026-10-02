@@ -58,20 +58,17 @@ const shell: LibrarySectionShellProps = {
 describe('Catalog source validation', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows field-specific errors and focuses the first missing field', () => {
+  it('shows the validation reason and focuses the first missing field', () => {
     render(<CatalogSection {...shell} section="sources" />);
     const title = screen.getByRole('textbox', { name: 'Publication title' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add sourcebook' }));
 
-    expect(title).toHaveAttribute('aria-invalid', 'true');
     expect(title).toHaveFocus();
-    expect(screen.getByText('Enter publication title.')).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Abbreviation' })).toHaveAttribute(
-      'aria-invalid',
-      'true',
+    expect(screen.getByRole('alert')).toHaveTextContent('name: String must contain at least 1');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'abbreviation: String must contain at least 1',
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Check the source fields');
     expect(mutations.create.mutate).not.toHaveBeenCalled();
   });
 
@@ -83,7 +80,7 @@ describe('Catalog source validation', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Abbreviation' }), {
       target: { value: 'BX' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save source' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add sourcebook' }));
 
     expect(mutations.create.mutate).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'GURPS Basic Set', abbreviation: 'BX' }),

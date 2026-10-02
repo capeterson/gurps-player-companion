@@ -7,9 +7,10 @@ adds a non-null boolean defaulting to false for every existing campaign; new
 campaigns also default false. Missing cached flags, unresolved campaigns, and
 campaignless characters are disabled.
 
-While disabled, Overview's Conditional effects, Combat's Active Effects, the
-library category/pickers/forms, conditional authoring rows and previews, and the
-experimental help section are hidden. Shared server/player/GM calculations ignore
+While disabled, Overview's Conditional effects, Combat's Active Effects, character
+pickers and the experimental help section are hidden. Owners can still maintain
+archived definitions in Library → Active Effects and author conditional library
+mechanics. Shared server/player/GM calculations ignore
 active instances and condition-gated declarations (including their capabilities),
 regardless of stored state. Automatic expiry and solo-turn instance advancement
 stop. Manual `tempEffects`, permanent mechanics, skill procedures, and the
@@ -18,14 +19,15 @@ separately gated turn tracker remain independent.
 The setting is owner-only, online-only, audited, and propagated through REST and
 the read-only campaign cursor into Dexie. Turning it off retains definitions,
 instances, and selected condition groups. Re-enabling resolves saved state against
-the current time; wall-clock durations are not paused. Dedicated definition CRUD
-and character instance/group writes reject with 403 while disabled, through shared
+the current time; wall-clock durations are not paused. Owner-only definition CRUD
+remains available through the ordinary library REST/sync/MCP handlers while
+disabled. Character instance/group writes reject with 403 through shared
 REST/sync/MCP handlers. Empty defaults on ordinary character creation remain valid.
 YAML import/export and read/history/sync payloads retain stored data without enabling
-the experiment; import previews omit the disabled category. Archived conditional
+the experiment; import previews include archived definitions. Archived conditional
 trait/skill declarations may still be stored but cannot contribute while disabled.
 
-When enabled, campaign owners manage reusable active effects in Library → Active Effects. Each
+Campaign owners manage reusable active effects in Library → Active Effects. Each
 has description, source, tags, numeric declarations, typed capability declarations,
 duration, and an explicit stacking key/policy. Character effect instances can be applied and managed in the sheet’s
 Combat → Active Effects panel, alongside their API, MCP, sync and calculation model.
@@ -35,8 +37,18 @@ duration; advancing the optional turn tracker also advances round effects when
 the active-effects experiment is enabled. Source inventory links are optional; applying an effect
 does not consume the item. A deleted source item remains a historical reference and
 does not prevent subsequent instance edits.
-The definition form marks its name and stacking key as required, focuses a missing
-field after Save, and explains how shared keys combine effects.
+The definition editor exposes numeric mechanics, capability kinds and labels,
+typed parameters (including ranges and notes), condition groups/labels, duration,
+and stacking choices as structured controls. A subtle Raw YAML disclosure edits
+the same full draft. Library conditions remain authorable while the experiment is
+off; authoring a declaration does not activate it on a character.
+
+The shared effect editor accepts an existing library weapon or an exact library
+item name without a resolved definition, retaining that name for later matching.
+Attack-mode key and attack-mode name have separate optional fields, so imported
+selectors containing either or both retain their meaning when edited. Portable
+definitions cannot bind a character inventory row; character-owned effect editing
+retains its activation gate and exact inventory selector.
 
 ## Persistence and ownership
 
@@ -111,9 +123,16 @@ expired effect. Manual temporary stat adjustments retain their existing behavior
 `benefits` arrays. It is validated at REST/YAML writes and included in the owned
 `libraryMechanics.skillRules` snapshot, so edits, deletion/detachment, transfer,
 MCP and offline calculation share the existing skill-library lifecycle. Missing
-arrays remain compatible. The library skill form exposes a validated structured
-rules editor alongside descriptive prose. Legacy flat situational modifiers migrate
+arrays remain compatible. The library skill form exposes validated structured
+controls for nested predicates, every modifier value kind, destinations and
+stacking limits, action roll bases/time/costs/contests/outcomes, and benefit
+thresholds/effects alongside descriptive prose. A subtle Raw YAML disclosure
+shares the complete draft with those controls. Legacy flat situational modifiers migrate
 to opt-in task rules, retaining labels and source text.
+Their generated procedure mirrors stay attached to the draft but are edited
+through the original choice once, rather than appearing as duplicate controls.
+When a skill declares a TL policy, its fixed TL is edited within that policy;
+the legacy TL field is only offered when no policy is specified.
 
 `schemas/skillProcedures.ts` and `domain/skillProcedures.ts` define and evaluate:
 

@@ -82,8 +82,8 @@ test('focused library fields remain reachable below the sticky toolbar after pho
   await expect(addTrait).toBeVisible({ timeout: 20_000 });
   await addTrait.tap();
 
-  const name = page.getByRole('textbox', { name: 'Name *' });
-  const nameLabel = page.getByText('Name *', { exact: true });
+  const name = page.getByRole('textbox', { name: 'Name' });
+  const nameLabel = page.getByText('Name', { exact: true });
   await name.tap();
   await name.fill('A focused trait draft retained through rotation');
   await expectFocusedAndHittable(name);
@@ -142,7 +142,7 @@ test('focused library fields remain reachable below the sticky toolbar after pho
     })
     .tap();
 
-  const editName = page.getByRole('textbox', { name: 'Name *' });
+  const editName = page.getByRole('textbox', { name: 'Name' });
   await editName.tap();
   await editName.fill('An edited trait draft retained through rotation');
   await expectFocusedAndHittable(editName);
@@ -160,7 +160,7 @@ test('focused library fields remain reachable below the sticky toolbar after pho
     await page.setViewportSize({ width, height: 320 });
     await expectFocusedAndHittable(editName);
     await expect(editName).toHaveValue('An edited trait draft retained through rotation');
-    await expect(page.getByRole('textbox', { name: 'Name *' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Name' })).toBeVisible();
     await captureReviewScreenshot(page, {
       path: testInfo.outputPath(`library-focused-name-short-${width}.png`),
       animations: 'disabled',

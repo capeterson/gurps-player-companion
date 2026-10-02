@@ -3,9 +3,26 @@ import { parse, stringify } from 'yaml';
 import { normalizeWeaponData } from '../../../shared/domain/weaponModes.ts';
 import { type WeaponData, weaponData } from '../../../shared/schemas/inventory.ts';
 import { RangedRangeInputs } from '../characters/sections/inventory/RangedRangeField.tsx';
+import { StructuredFields } from './StructuredFields.tsx';
 import { newEditorId } from './editorId.ts';
+import { libraryFormError } from './libraryFormErrors.ts';
 
-/** A single editor, with lossless source mode for imported structures. */
+function readDraft(text: string): unknown {
+  try {
+    return text.trim() ? parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Incomplete text belongs to the draft until the schema accepts a number. */
+function numberDraft(text: string): number | null {
+  if (text.trim() === '') return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : (text as unknown as number);
+}
+
+/** Concise attack modes and complete typed fields share one weapon draft. */
 export function WeaponModesEditor({
   text,
   onChange,
@@ -20,11 +37,16 @@ export function WeaponModesEditor({
   }
   const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState('');
-  const [data, setData] = useState<WeaponData | null>(() =>
-    text.trim() ? normalizeWeaponData(weaponData.parse(parse(text))) : null,
-  );
+  const [draft, setDraft] = useState<unknown>(() => readDraft(text));
+  const [data, setData] = useState<WeaponData | null>(() => {
+    const result = weaponData.nullable().safeParse(readDraft(text));
+    return result.success ? normalizeWeaponData(result.data) : null;
+  });
   function update(next: WeaponData | null) {
     setData(next);
+    setDraft(next);
+    const result = weaponData.nullable().safeParse(next);
+    setError(result.success ? '' : libraryFormError(result.error));
     onChange(next ? stringify(next) : '');
   }
   function toggle() {
@@ -36,6 +58,8 @@ export function WeaponModesEditor({
         setError((e as Error).message);
         return;
       }
+    } else {
+      setDraft(readDraft(text));
     }
     setAdvanced(!advanced);
   }
@@ -43,18 +67,22 @@ export function WeaponModesEditor({
     <fieldset className="fieldset min-w-0 rounded-box border border-base-300 p-3">
       <legend className="fieldset-legend">Weapon and shield facets</legend>
       <button type="button" className="btn btn-sm w-fit" onClick={toggle}>
-        {advanced ? 'Visual modes' : 'Edit weapon YAML'}
+        {advanced ? 'Visual modes' : 'All weapon fields'}
       </button>
       {advanced ? (
-        <label>
-          Weapon modes (YAML)
-          <textarea
-            className="textarea w-full font-mono text-xs"
-            rows={10}
-            value={text}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </label>
+        <StructuredFields
+          schema={weaponData.nullable()}
+          value={draft}
+          label="Weapon data"
+          path="weaponData"
+          onChange={(next) => {
+            setDraft(next);
+            const result = weaponData.nullable().safeParse(next);
+            setError(result.success ? '' : libraryFormError(result.error));
+            if (result.success) setData(normalizeWeaponData(result.data));
+            onChange(next == null ? '' : stringify(next));
+          }}
+        />
       ) : (
         <>
           <label>
@@ -75,16 +103,34 @@ export function WeaponModesEditor({
           {data && (
             <>
               <label>
+                Held side
+                <select
+                  className="select select-sm min-w-0 w-full"
+                  value={data.wieldedSide ?? ''}
+                  onChange={(event) =>
+                    update({
+                      ...data,
+                      wieldedSide: event.target.value
+                        ? (event.target.value as 'left' | 'right')
+                        : undefined,
+                    })
+                  }
+                >
+                  <option value="">Not specified</option>
+                  <option value="left">Left</option>
+                  <option value="right">Right</option>
+                </select>
+              </label>
+              <label>
                 Shield defense bonus (blank for no shield)
                 <input
                   className="input input-sm w-full"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   min={0}
                   max={4}
                   value={data.db ?? ''}
-                  onChange={(e) =>
-                    update({ ...data, db: e.target.value === '' ? null : Number(e.target.value) })
-                  }
+                  onChange={(e) => update({ ...data, db: numberDraft(e.target.value) })}
                 />
               </label>
               {(data.modes ?? []).map((mode, index) => {
@@ -121,13 +167,14 @@ export function WeaponModesEditor({
                         Minimum ST
                         <input
                           className="input input-sm w-full"
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           min={0}
                           max={99}
                           value={mode.stRequired ?? ''}
                           onChange={(e) =>
                             change({
-                              stRequired: e.target.value === '' ? null : Number(e.target.value),
+                              stRequired: numberDraft(e.target.value),
                             })
                           }
                         />
@@ -158,7 +205,7 @@ export function WeaponModesEditor({
                                       e.target.value === ''
                                         ? null
                                         : ['acc', 'bulk', 'recoil'].includes(field)
-                                          ? Number(e.target.value)
+                                          ? numberDraft(e.target.value)
                                           : e.target.value,
                                   },
                                 })

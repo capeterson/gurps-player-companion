@@ -19,12 +19,15 @@ describe('Race library authoring', () => {
   it('creates a structured race through labeled fields', () => {
     const submit = vi.fn();
     render(<RaceForm isPending={false} onSubmit={submit} onCancel={() => {}} />);
-    fireEvent.change(screen.getByLabelText('Race or lens name'), { target: { value: 'Stonekin' } });
-    fireEvent.change(screen.getByLabelText('Package points'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Stonekin' } });
+    fireEvent.click(screen.getByText('Racial profile and options', { selector: 'summary' }));
+    fireEvent.change(screen.getByLabelText('Points'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('ST setting'), { target: { value: 'value' } });
     fireEvent.change(screen.getByLabelText('ST'), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText('Features (one per line)'), {
-      target: { value: 'Stone skin\nLong lived' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add features' }));
+    fireEvent.change(screen.getByLabelText('Features 1'), { target: { value: 'Stone skin' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add features' }));
+    fireEvent.change(screen.getByLabelText('Features 2'), { target: { value: 'Long lived' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add race' }));
     expect(submit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -38,26 +41,30 @@ describe('Race library authoring', () => {
   it('keeps invalid drafts available for correction', () => {
     const submit = vi.fn();
     render(<RaceForm isPending={false} onSubmit={submit} onCancel={() => {}} />);
+    fireEvent.click(screen.getByText('Racial profile and options', { selector: 'summary' }));
+    fireEvent.change(screen.getByLabelText('ST setting'), { target: { value: 'value' } });
     fireEvent.change(screen.getByLabelText('ST'), { target: { value: '1.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add race' }));
     expect(submit).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('ST')).toHaveValue(1.5);
+    expect(screen.getByLabelText('ST')).toHaveValue('1.5');
     expect(screen.getByRole('button', { name: 'Add race' })).toBeEnabled();
+    expect(screen.getByRole('alert')).toBeVisible();
   });
   it('exposes lens compatibility and explicit replacement keys', () => {
     const submit = vi.fn();
     render(<RaceForm isPending={false} onSubmit={submit} onCancel={() => {}} />);
-    fireEvent.change(screen.getByLabelText('Definition type'), { target: { value: 'lens' } });
-    fireEvent.change(screen.getByLabelText('Compatible race keys (one per line)'), {
-      target: { value: 'human\nstonekin' },
+    fireEvent.change(screen.getByLabelText('Raw YAML'), {
+      target: {
+        value:
+          'name: Stonekin lens\nkind: lens\ncompatibleRaceKeys: [human, stonekin]\nremovesTraits: [night-vision]',
+      },
     });
-    fireEvent.change(screen.getByLabelText('Replaced trait keys (one per line)'), {
-      target: { value: 'night-vision' },
-    });
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Stonekin Lens' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add race' }));
     expect(submit).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'lens',
+        name: 'Stonekin Lens',
         compatibleRaceKeys: ['human', 'stonekin'],
         removesTraits: ['night-vision'],
       }),

@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback } from 'react';
+import { LibraryAuthoringContext } from '../LibraryAuthoringContext.tsx';
 import {
   LibraryDeleteDialog,
   type LibraryListRow,
@@ -63,41 +64,45 @@ export function CrudLibrarySection<R extends LibraryListRow>({
   const doomed = entries.find((entry) => entry.id === crud.deleteId);
   return (
     <SourcebooksContext.Provider value={shell.library.sources}>
-      <LibrarySection
-        config={config}
-        campaignId={shell.campaignId}
-        entries={
-          shell.sourceFilter
-            ? entries.filter((row) => row.sourceId === shell.sourceFilter)
-            : entries
-        }
-        words={shell.words}
-        active={shell.active}
-        isOwner={shell.isOwner}
-        expandedId={shell.expandedId}
-        onToggleExpanded={shell.onToggleExpanded}
-        editId={crud.editId}
-        onEdit={onEdit}
-        addOpen={crud.addOpen}
-        onAdd={onAdd}
-        renderForm={renderForm}
-        onDeleteRequest={setDeleteId}
-        jumpSlot={shell.jumpSlot}
-        revealId={shell.revealId}
-        onRevealed={shell.onRevealed}
-      />
-      <LibraryDeleteDialog
-        open={!!crud.deleteId}
-        title={config.deleteTitle}
-        name={doomed?.name}
-        note={config.deleteNote}
-        pending={crud.remove.isPending}
-        error={crud.remove.error}
-        onConfirm={() => {
-          if (crud.deleteId && !crud.remove.isPending) crud.remove.mutate(crud.deleteId);
-        }}
-        onCancel={() => setDeleteId(null)}
-      />
+      <LibraryAuthoringContext.Provider
+        value={{ campaignId: shell.campaignId, library: shell.library }}
+      >
+        <LibrarySection
+          config={config}
+          campaignId={shell.campaignId}
+          entries={
+            shell.sourceFilter
+              ? entries.filter((row) => row.sourceId === shell.sourceFilter)
+              : entries
+          }
+          words={shell.words}
+          active={shell.active}
+          isOwner={shell.isOwner}
+          expandedId={shell.expandedId}
+          onToggleExpanded={shell.onToggleExpanded}
+          editId={crud.editId}
+          onEdit={onEdit}
+          addOpen={crud.addOpen}
+          onAdd={onAdd}
+          renderForm={renderForm}
+          onDeleteRequest={setDeleteId}
+          jumpSlot={shell.jumpSlot}
+          revealId={shell.revealId}
+          onRevealed={shell.onRevealed}
+        />
+        <LibraryDeleteDialog
+          open={!!crud.deleteId}
+          title={config.deleteTitle}
+          name={doomed?.name}
+          note={config.deleteNote}
+          pending={crud.remove.isPending}
+          error={crud.remove.error}
+          onConfirm={() => {
+            if (crud.deleteId && !crud.remove.isPending) crud.remove.mutate(crud.deleteId);
+          }}
+          onCancel={() => setDeleteId(null)}
+        />
+      </LibraryAuthoringContext.Provider>
     </SourcebooksContext.Provider>
   );
 }

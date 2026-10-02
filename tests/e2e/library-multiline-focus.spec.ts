@@ -301,9 +301,10 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
   await page.goto(`/campaigns/${campaign.id}/library?section=traits`);
   await page.getByRole('button', { name: '+ Add trait', exact: true }).tap();
   await page
-    .getByRole('textbox', { name: 'Name *' })
+    .getByRole('textbox', { name: 'Name' })
     .fill('Synthetic multiline caret regression trait');
 
+  await page.getByLabel('Description setting').selectOption('value');
   const editor = page.locator('[contenteditable="true"]');
   await editor.fill(longDescription);
   await expect(editor).toContainText('Synthetic paragraph 24');
@@ -393,7 +394,7 @@ test('long library rich-text caret stays reachable through resize, rotation, zoo
   await expect(savedEditor).toContainText('unusually long unbroken token.');
   await expect(savedEditor).toContainText(finalMarker);
   await page
-    .getByRole('textbox', { name: 'Name *' })
+    .getByRole('textbox', { name: 'Name' })
     .fill('Synthetic multiline caret regression trait saved from edit');
   const saveChanges = page.getByRole('button', { name: 'Save changes', exact: true });
   await expectFooterPointerReachable(saveChanges);

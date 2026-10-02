@@ -107,25 +107,66 @@ export function LibraryMetadataEditor({
           </label>
         </div>
         <label>
-          Original row or excerpt
-          <textarea
-            className="textarea w-full"
-            value={value.extraction?.rawText ?? ''}
-            onChange={(e) =>
-              patch({ extraction: { ...value.extraction, rawText: e.target.value } })
+          Research record
+          <select
+            className="select select-sm w-full"
+            value={
+              value.extraction === undefined
+                ? 'omitted'
+                : value.extraction === null
+                  ? 'null'
+                  : 'value'
             }
-          />
+            onChange={(event) => {
+              if (event.target.value === 'omitted') {
+                const { extraction: _extraction, ...remaining } = value;
+                onChange(remaining);
+              } else
+                patch({
+                  extraction: event.target.value === 'null' ? null : (value.extraction ?? {}),
+                });
+            }}
+          >
+            <option value="omitted">Not specified</option>
+            <option value="null">None</option>
+            <option value="value">Set value</option>
+          </select>
         </label>
-        <label>
-          Review notes
-          <textarea
-            className="textarea w-full"
-            value={value.extraction?.reviewNotes ?? ''}
-            onChange={(e) =>
-              patch({ extraction: { ...value.extraction, reviewNotes: e.target.value } })
-            }
-          />
-        </label>
+        {value.extraction != null && (
+          <>
+            <label>
+              Original row or excerpt
+              <textarea
+                className="textarea w-full"
+                value={value.extraction?.rawText ?? ''}
+                onChange={(e) =>
+                  patch({ extraction: { ...value.extraction, rawText: e.target.value } })
+                }
+              />
+            </label>
+            <label>
+              Excerpt location
+              <input
+                className="input input-sm w-full"
+                maxLength={240}
+                value={value.extraction?.locator ?? ''}
+                onChange={(event) =>
+                  patch({ extraction: { ...value.extraction, locator: event.target.value } })
+                }
+              />
+            </label>
+            <label>
+              Review notes
+              <textarea
+                className="textarea w-full"
+                value={value.extraction?.reviewNotes ?? ''}
+                onChange={(e) =>
+                  patch({ extraction: { ...value.extraction, reviewNotes: e.target.value } })
+                }
+              />
+            </label>
+          </>
+        )}
       </fieldset>
     </LibraryAdvancedFields>
   );

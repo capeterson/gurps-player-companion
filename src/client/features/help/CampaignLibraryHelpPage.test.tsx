@@ -68,7 +68,7 @@ describe('CampaignLibraryHelpPage', () => {
       match[1]?.includes('levelCost'),
     )?.[1];
     expect(code).toBeTruthy();
-    const definition = calculationDefinition.parse(parseYaml(code ?? ''));
+    const definition = calculationDefinition.parse(parseYaml(code ?? '').calculation);
 
     expect(evaluateCalculation(definition, { level: 1 })).toEqual({ points: 8 });
     expect(evaluateCalculation(definition, { level: 2 })).toEqual({ points: 11 });

@@ -26,8 +26,16 @@ variant, or form keys and implicit conflicting replacements are rejected. Lenses
 cannot themselves declare complete variants or forms. This separates the Fantasy
 sourcebook's full templates from its additive undead lenses and alternate forms.
 
-The editor provides ordinary form controls for components, attributes, features,
-effects, variants/forms, and lens rules, alongside the shared metadata editor.
+The editor provides ordinary form controls for tags, components, attributes,
+features, effects, complete variants/forms, and lens rules, alongside the shared
+metadata editor. Exact tag values are edited as list entries rather than split on
+commas. Component removals and compatible bases retain stable references.
+Conditional declarations and library weapon references are available throughout
+the base profile, racial traits, variants and forms. Owners can author archived
+conditions even when active effects are disabled; the character calculation gate
+still ignores those declarations until the campaign enables the experiment.
+A subtle Raw YAML disclosure edits the same complete draft, preserving optional,
+nullable, and imported values during ordinary field edits.
 A definition may retain descriptive rules for physiology, social assumptions,
 transformation conditions, or other capabilities outside the existing calculator.
 Library race citations appear beside the collapsed row's type/points summary,

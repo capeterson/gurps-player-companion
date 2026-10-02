@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { parse, stringify } from 'yaml';
 import { HIT_LOCATIONS } from '../../../shared/constants/hitLocations.ts';
 import { type ArmorData, armorData } from '../../../shared/schemas/inventory.ts';
+import { StructuredFields } from './StructuredFields.tsx';
 import { libraryFormError } from './libraryFormErrors.ts';
 
 const DR_TYPES = [
@@ -34,7 +35,15 @@ function readArmor(text: string): { data: ArmorData | null; error: string | null
   }
 }
 
-/** Visual editor for common armor fields, with YAML retained for full schema access. */
+function readDraft(text: string): unknown {
+  try {
+    return text.trim() ? parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Visual coverage and complete typed fields share the same armor draft. */
 export function ArmorFacetEditor({
   text,
   onChange,
@@ -50,9 +59,11 @@ export function ArmorFacetEditor({
   const [error, setError] = useState(initial.error ?? '');
   const [custom, setCustom] = useState('');
   const [data, setData] = useState<ArmorData | null>(initial.data);
+  const [draft, setDraft] = useState<unknown>(() => readDraft(text));
 
   function update(next: ArmorData | null) {
     setData(next);
+    setDraft(next);
     setError('');
     onChange(next ? stringify(next) : '');
   }
@@ -70,6 +81,7 @@ export function ArmorFacetEditor({
       return;
     }
     setAdvanced(true);
+    setDraft(readDraft(text));
   }
 
   const locations = data?.locations ?? [];
@@ -78,8 +90,10 @@ export function ArmorFacetEditor({
   );
   const facingConflict = Boolean(data?.frontOnly && data.backOnly);
   useEffect(() => {
-    onValidityChange?.(!facingConflict);
-  }, [facingConflict, onValidityChange]);
+    onValidityChange?.(
+      !error && !facingConflict && (data === null || armorData.safeParse(data).success),
+    );
+  }, [data, error, facingConflict, onValidityChange]);
   function numericError(value: number, label: string): string | null {
     if (!Number.isInteger(value)) return `${label} must be a whole number.`;
     if (value < 0 || value > 1000) return `${label} must be between 0 and 1000.`;
@@ -89,21 +103,22 @@ export function ArmorFacetEditor({
     <fieldset className="fieldset min-w-0 space-y-3 rounded-box border border-base-300 p-3">
       <legend className="fieldset-legend">Armor protection</legend>
       <button type="button" className="btn btn-sm w-fit" onClick={toggleAdvanced}>
-        {advanced ? 'Visual armor fields' : 'Edit armor YAML'}
+        {advanced ? 'Visual armor fields' : 'All armor fields'}
       </button>
       {advanced ? (
-        <label className="form-control">
-          <span className="label-text">Armor data (YAML)</span>
-          <textarea
-            className="textarea textarea-bordered w-full font-mono text-xs"
-            rows={8}
-            value={text}
-            onChange={(event) => {
-              onChange(event.target.value);
-              setError('');
-            }}
-          />
-        </label>
+        <StructuredFields
+          schema={armorData.nullable()}
+          value={draft}
+          label="Armor data"
+          path="armor"
+          onChange={(next) => {
+            setDraft(next);
+            const result = armorData.nullable().safeParse(next);
+            setError(result.success ? '' : libraryFormError(result.error));
+            if (result.success) setData(result.data);
+            onChange(next == null ? '' : stringify(next));
+          }}
+        />
       ) : (
         <>
           <label className="flex items-center gap-2">

@@ -164,11 +164,16 @@ it('defaults active effects off, preserves saved rows while disabled, and applie
       },
     ],
   });
-  const forbiddenDefinition = await request(token, path, 'POST', definition);
-  expect(forbiddenDefinition.status).toBe(403);
-  expect(await forbiddenDefinition.json()).toMatchObject({
-    error: 'Active effects are disabled for this campaign',
+  const savedWhileDisabled = await create(token, path, definition);
+  const restUpdated = await request(token, `${path}/${savedWhileDisabled.id}`, 'PATCH', {
+    description: 'Edited while activation is disabled',
   });
+  expect(restUpdated.status).toBe(200);
+  const disposable = await create(token, path, {
+    ...definition,
+    name: 'Disposable disabled definition',
+  });
+  expect((await request(token, `${path}/${disposable.id}`, 'DELETE')).status).toBe(204);
   const rejectedCharacterPatch = await request(token, `/characters/${character.id}`, 'PATCH', {
     activeEffects: [],
   });
@@ -192,13 +197,56 @@ it('defaults active effects off, preserves saved rows while disabled, and applie
         ],
       })
     ).json();
+  const librarySync = async (
+    command: 'create' | 'patch' | 'delete',
+    entityId: string,
+    attemptedValue?: unknown,
+  ) =>
+    (
+      await request(token, '/sync/operations', 'POST', {
+        operations: [
+          {
+            clientOpId: randomUUID(),
+            entityClass: 'campaign_library_active_effect',
+            entityId,
+            parentId: campaign.id,
+            command,
+            createdAt: new Date().toISOString(),
+            ...(attemptedValue === undefined ? {} : { attemptedValue }),
+          },
+        ],
+      })
+    ).json();
+  expect(
+    (await librarySync('patch', savedWhileDisabled.id, { source: 'Rules reference' })).outcomes[0]
+      .status,
+  ).toBe('applied');
+  const syncedOnlyId = randomUUID();
+  expect(
+    (
+      await librarySync('create', syncedOnlyId, {
+        ...definition,
+        name: 'Sync-created while disabled',
+      })
+    ).outcomes[0].status,
+  ).toBe('applied');
+  expect((await librarySync('delete', syncedOnlyId)).outcomes[0].status).toBe('applied');
+  const definitionsWhileDisabled = (
+    await (await request(token, `/campaigns/${campaign.id}/library`)).json()
+  ).activeEffects;
+  expect(
+    definitionsWhileDisabled.find((row: { id: string }) => row.id === savedWhileDisabled.id),
+  ).toMatchObject({
+    description: 'Edited while activation is disabled',
+    source: 'Rules reference',
+  });
   expect((await sync('activeEffects', [])).outcomes[0].status).toBe('unauthorized');
   expect((await sync('activeConditionGroups', ['focused'])).outcomes[0].status).toBe(
     'unauthorized',
   );
 
   await request(token, `/campaigns/${campaign.id}`, 'PATCH', { experimentalActiveEffects: true });
-  const saved = await create(token, path, definition);
+  const saved = savedWhileDisabled;
   let detail = await (
     await request(token, `/characters/${character.id}`, 'PATCH', {
       activeEffects: [
