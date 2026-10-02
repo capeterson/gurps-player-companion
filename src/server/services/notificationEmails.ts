@@ -1,11 +1,22 @@
 /** Only invitation, acceptance and unconditional security mail can enter this worker. */
-import { and, eq, isNull, lt, lte } from 'drizzle-orm';
+import { and, eq, isNull, lt, lte, min } from 'drizzle-orm';
 import { notificationEmailPayload } from '../../shared/schemas/notification.ts';
 import { notificationPreferences } from '../../shared/schemas/notificationPreferences.ts';
 import { appUrl, loadConfig } from '../config.ts';
 import { getDb, runInDbTransaction } from '../db/client.ts';
 import { campaignInvitations, notificationEmailQueue, users } from '../db/schema.ts';
 import { getResend, sendNotificationEmail } from '../email.ts';
+
+/** Schedule only known pending mail; unconfigured delivery must remain idle. */
+export async function nextNotificationEmailAttemptAt(): Promise<Date | null> {
+  const config = loadConfig();
+  if (!getResend(config) || !config.resendFromEmail) return null;
+  const [row] = await getDb()
+    .select({ nextAttemptAt: min(notificationEmailQueue.nextAttemptAt) })
+    .from(notificationEmailQueue)
+    .where(and(isNull(notificationEmailQueue.sentAt), lt(notificationEmailQueue.attempts, 8)));
+  return row?.nextAttemptAt ? new Date(row.nextAttemptAt) : null;
+}
 
 export async function processNotificationEmails(
   sendEmail: typeof sendNotificationEmail = sendNotificationEmail,
