@@ -5,6 +5,7 @@ import { createApp } from '../app.ts';
 import { getDb } from '../db/client.ts';
 import { entityHistory, notifications } from '../db/schema.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+import { processNotificationEvents } from './notificationEvents.ts';
 import { NOTIFICATION_QUEUE_CHANNEL, NotificationMaintenance } from './notificationMaintenance.ts';
 
 configureIntegrationTestEnvironment();
@@ -113,19 +114,33 @@ describe('PostgreSQL notification wakeups', () => {
     const actor = await registerUser('backlog-actor');
     await addHistory(owner.userId, actor.userId, 'After');
 
+    const deliveries = new Map<string, () => void>();
+    const deliveredTo = (userId: string) =>
+      new Promise<void>((resolve) => deliveries.set(userId, resolve));
+    const backlogDelivered = deliveredTo(owner.userId);
     const worker = new NotificationMaintenance({
+      processEvents: async () => {
+        const count = await processNotificationEvents();
+        // Observe committed delivery after each real processing pass. Unrelated
+        // fixtures can fill earlier batches; their drain time is not a deadline.
+        for (const [userId, resolve] of deliveries) {
+          const [notice] = await getDb()
+            .select({ id: notifications.id })
+            .from(notifications)
+            .where(eq(notifications.userId, userId));
+          if (notice) {
+            deliveries.delete(userId);
+            resolve();
+          }
+        }
+        return count;
+      },
       processEmails: async () => 0,
       nextEmailAttemptAt: async () => null,
     });
     workers.push(worker);
     worker.start();
-    await waitFor(async () => {
-      const [row] = await getDb()
-        .select({ id: notifications.id })
-        .from(notifications)
-        .where(eq(notifications.userId, owner.userId));
-      return Boolean(row);
-    });
+    await backlogDelivered;
     const [notice] = await getDb()
       .select()
       .from(notifications)
@@ -139,13 +154,16 @@ describe('PostgreSQL notification wakeups', () => {
     // it immediately instead of waiting for a periodic scan.
     const secondOwner = await registerUser('live-owner');
     const secondActor = await registerUser('live-actor');
+    const liveDelivered = deliveredTo(secondOwner.userId);
     await addHistory(secondOwner.userId, secondActor.userId, 'Live update');
-    await waitFor(async () => {
-      const [row] = await getDb()
-        .select({ id: notifications.id })
-        .from(notifications)
-        .where(eq(notifications.userId, secondOwner.userId));
-      return Boolean(row);
+    await liveDelivered;
+    const [liveNotice] = await getDb()
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, secondOwner.userId));
+    expect(liveNotice?.payload).toMatchObject({
+      title: 'Live update old was updated',
+      actorId: secondActor.userId,
     });
   });
 
