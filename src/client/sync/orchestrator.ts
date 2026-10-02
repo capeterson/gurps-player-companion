@@ -92,7 +92,7 @@ import {
   redactSyncLogForCharacters,
   rememberRevokedCampaigns,
   rememberRevokedCharacters,
-  rememberSuccessfulManualSync,
+  rememberSuccessfulSync,
   snapshotValue,
 } from './syncLog.ts';
 
@@ -407,7 +407,6 @@ class SyncOrchestrator {
     await this.triggerCursorPull(false, true);
     if (!this.sessionIsCurrent(generation) || this.isClientOutdated())
       throw new Error('Sync was interrupted');
-    await rememberSuccessfulManualSync();
   }
 
   /**
@@ -565,6 +564,9 @@ class SyncOrchestrator {
       // belongs to -- so the authoritative `accessible` set on the last
       // page is the only signal. Absent on old servers -> no-op.
       await this.pruneInaccessibleLocally(lastAccessible);
+      if (!this.sessionIsCurrent(generation)) return false;
+      await rememberSuccessfulSync(() => this.sessionIsCurrent(generation));
+      if (!this.sessionIsCurrent(generation)) return false;
       this.fireCycleDone();
       // A pull that completed is the one thing that clears an
       // outstanding failure.

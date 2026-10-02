@@ -170,7 +170,7 @@ works offline.**
 | WS subscriber | `src/client/sync/wsSubscriber.ts` | Consumes `sync_invalidate` nudges → triggers a pull. |
 | Minimal-view sweep | `src/client/sync/minimalViewSweep.ts` | Purges private rows from Dexie when share access downgrades (see campaign-content-sharing.md). |
 | Draft hook | `src/client/hooks/useDraftField.ts` | Canonical draft-on-blur input; queues same-field edits, syncs per-field when clean, fires toast+flash on rollback. |
-| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to focused before/after values, metadata, and adjacent folded Request/Response payloads. Subject names link to existing local entities using supported sheet anchors or library section/open routes. The dialog shows independent WebSocket status, relative last-connected time when disconnected, and the last successful sync time. **Sync now** explicitly runs the HTTP outbox drain and cursor pull; a completed empty check updates that time, while an error leaves it unchanged. Automatic empty polls do not change it. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. In short viewports the dialog uses more of the available height and compacts its footer actions to preserve reading space for the scrollable log. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
+| Sync log UI | `src/client/components/SyncStatusIndicator.tsx`, `SyncLogView.tsx` | Clicking the toolbar status opens pending changes and the latest 1,000 push/pull events, grouping each successful push with its matching revision-only cursor response. Items expand (collapsed by default) to focused before/after values, metadata, and adjacent folded Request/Response payloads. Subject names link to existing local entities using supported sheet anchors or library section/open routes. The dialog shows independent WebSocket status, relative last-connected time when disconnected, and separate Last sync/Last changes times. **Sync now** explicitly runs the HTTP outbox drain and cursor pull; every completed successful check, including empty automatic polls, updates Last sync, while only applied uploads or downloaded data changes update Last changes. A red badge shows its reason in a banner here. Operations failing at least four consecutive attempts are promoted in red with folded raw diagnostics and an explicit local revert action. In short viewports the dialog uses more of the available height and compacts its footer actions to preserve reading space for the scrollable log. A "Download sync debug log" button (`src/client/sync/debugDump.ts`) exports the outbox, rejection records, sync-log journal, and cursors as a JSON file for bug reports. |
 | Server dispatch | `src/server/services/syncDispatch.ts` | `dispatchOperation()` — the single server write chokepoint for character ops. |
 | Sync routes | `src/server/routes/sync.ts` | `POST /sync/operations` (drain) and `POST /sync/cursor` (pull). |
 | WS route | `src/server/routes/syncWs.ts` + `services/wsBus.ts` | Invalidation push channel. |
@@ -577,13 +577,19 @@ connection or its timestamp. A failed socket does not make working HTTP sync fai
 Last connected is the last
 successful socket-open time, persisted under an account-scoped `syncMeta` key and
 shown relatively when disconnected; an unknown time says **Not yet connected**.
-The last successful sync time means an applied upload or downloaded data change,
-including aggregate online campaign/import writes, or a completed explicit
-**Sync now** HTTP check. An empty manual check advances it; automatic empty cursor
-polls, revision-only echoes, retries, rollbacks, and failed checks do not. Its monotonic
-account-scoped metadata survives journal pruning; logout/resync purges both timestamp
-keys with all local stores. Relative times refresh every 30 seconds while the dialog
-is open and retain exact timestamps on the corresponding `time` elements.
+**Last sync** is the last completed successful HTTP cursor check, whether automatic,
+bootstrap, or explicit **Sync now**, even when no rows changed. It advances only after
+all pages and access reconciliation complete; failed, skipped, or interrupted checks
+do not advance it. **Last changes** separately records the latest applied upload or
+downloaded data change, including aggregate online campaign/import writes. Empty
+checks, revision-only echoes, retries, rollbacks, and failures do not advance it.
+Both use monotonic account-scoped metadata that survives journal pruning; logout/resync
+purges these timestamps and the socket timestamp with all local stores. The legacy
+sync timestamp remains a valid Last sync value; Last changes uses a separate key and
+falls back to successful changed journal entries, so old empty manual checks are never
+mislabelled as data changes. Relative times refresh every 30 seconds while the dialog
+is open and retain exact timestamps on the corresponding `time` elements. Unknown
+times show **No successful sync recorded** and **No changes recorded** respectively.
 
 **Compressed diagnostic bodies.**
 
@@ -737,8 +743,13 @@ field, before/after values, entity class + id, operation, timing, attempt
 count, and the failure reason. The summary line stays a scannable one-liner.
 
 **Indicator presentation.** The header uses one outline arrow-orbit control:
-muted gem when synced, violet rotating arrows while syncing, a neutral pause
-mark when offline, and a copper exclamation for an error. A known error retains
+muted outline gem when synced with no connected socket, a filled green gem when
+synced with the WebSocket connected, primary-colored rotating arrows while syncing,
+a neutral pause mark when offline, and a copper exclamation for an error. Socket
+connecting/reconnecting/stopped states retain the ordinary synced gem; HTTP sync
+does not depend on socket connectivity. Only the gem gains success ink when connected;
+the orbit stays muted and still. Syncing and offline take priority over connected.
+A known error retains
 priority while offline; its tooltip includes the reason and offline context.
 The offline presentation changes no outbox/replay behavior. The control opens
 the existing sync log in every state; reduced-motion users get static arrows.

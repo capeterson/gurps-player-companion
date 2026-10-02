@@ -426,21 +426,42 @@ export function lastSuccessfulSyncKey(): string {
   return `lastSuccessfulSyncOperation:${readUserIdFromToken() ?? 'session'}`;
 }
 
-/** A requested HTTP check counts even when the server has no new rows. */
-export async function rememberSuccessfulManualSync(): Promise<void> {
+/** Separate from the legacy sync time, which also included empty manual checks. */
+export function lastChangesSyncKey(): string {
+  return `lastSyncChanges:${readUserIdFromToken() ?? 'session'}`;
+}
+
+/** Every completed HTTP cursor check counts, including empty background polls. */
+export async function rememberSuccessfulSync(isCurrent: () => boolean): Promise<void> {
+  const generation = journalGeneration;
   const db = getLocalDb();
   const key = lastSuccessfulSyncKey();
   const at = new Date().toISOString();
-  await db.transaction('rw', db.syncMeta, async () => {
-    const previous = (await db.syncMeta.get(key))?.value;
-    if (
-      typeof previous !== 'string' ||
+  try {
+    await db.transaction('rw', db.syncMeta, async () => {
+      if (generation !== journalGeneration || !isCurrent()) return;
+      await rememberNewerTime(key, at, () => generation === journalGeneration && isCurrent());
+    });
+  } catch {
+    // Diagnostic persistence must never turn a completed check into a sync failure.
+  }
+}
+
+async function rememberNewerTime(
+  key: string,
+  at: string,
+  isCurrent: () => boolean = () => true,
+): Promise<void> {
+  const db = getLocalDb();
+  const previous = (await db.syncMeta.get(key))?.value;
+  if (
+    isCurrent() &&
+    (typeof previous !== 'string' ||
       !Number.isFinite(Date.parse(previous)) ||
-      Date.parse(previous) < Date.parse(at)
-    ) {
-      await db.syncMeta.put({ key, value: at });
-    }
-  });
+      Date.parse(previous) < Date.parse(at))
+  ) {
+    await db.syncMeta.put({ key, value: at });
+  }
 }
 
 export function isSuccessfulSyncOperation(entry: SyncLogEntry): boolean {
@@ -464,14 +485,5 @@ async function rememberSuccessfulOperations(entries: readonly SyncLogEntry[]): P
     .filter((at) => Number.isFinite(Date.parse(at)))
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
   if (!latest) return;
-  const db = getLocalDb();
-  const key = lastSuccessfulSyncKey();
-  const previous = (await db.syncMeta.get(key))?.value;
-  if (
-    typeof previous !== 'string' ||
-    !Number.isFinite(Date.parse(previous)) ||
-    Date.parse(previous) < Date.parse(latest)
-  ) {
-    await db.syncMeta.put({ key, value: latest });
-  }
+  await rememberNewerTime(lastChangesSyncKey(), latest);
 }

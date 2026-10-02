@@ -8,6 +8,7 @@ import { readDrainableOps } from '../sync/outbox.ts';
 import { syncStateStore } from '../sync/state.ts';
 import {
   appendSyncLog,
+  lastChangesSyncKey,
   lastSuccessfulSyncKey,
   redactSyncLogForCharacters,
 } from '../sync/syncLog.ts';
@@ -789,6 +790,8 @@ it('shows independent WebSocket status and the last successful changed operation
   const now = Date.now();
   wsStatus.state = 'reconnecting';
   wsStatus.lastConnectedAt = new Date(now - 10 * 60_000).toISOString();
+  const checkAt = new Date(now - 60_000).toISOString();
+  await getLocalDb().syncMeta.put({ key: lastSuccessfulSyncKey(), value: checkAt });
   await appendSyncLog({
     id: 'success',
     direction: 'push',
@@ -812,6 +815,11 @@ it('shows independent WebSocket status and the last successful changed operation
   expect(within(connection).getByText('WebSocket')).toBeVisible();
   expect(within(connection).getByText('Disconnected · Reconnecting')).toBeVisible();
   expect(within(connection).getByText('10 minutes ago')).toBeVisible();
+  const lastSync = within(connection).getByText('Last sync').parentElement;
+  const lastChanges = within(connection).getByText('Last changes').parentElement;
+  if (!lastSync || !lastChanges) throw new Error('Expected both timestamp summaries');
+  expect(await within(lastSync).findByText('1 minute ago')).toHaveAttribute('datetime', checkAt);
+  expect(await within(lastChanges).findByText('2 minutes ago')).toBeVisible();
   expect(await within(connection).findByText('2 minutes ago')).toBeVisible();
   expect(
     within(connection).getByText('HTTP sync continues while WebSocket reconnects.'),
@@ -826,6 +834,7 @@ it('shows unknown connection and sync times without fabricating timestamps', asy
   expect(within(connection).getByText('Connecting')).toBeVisible();
   expect(within(connection).getByText('Not yet connected')).toBeVisible();
   expect(within(connection).getByText('No successful sync recorded')).toBeVisible();
+  expect(within(connection).getByText('No changes recorded')).toBeVisible();
 });
 
 it('runs a requested sync and shows its successful empty-check time', async () => {
@@ -840,6 +849,7 @@ it('runs a requested sync and shows its successful empty-check time', async () =
   expect(syncNow).toHaveBeenCalledOnce();
   const connection = await screen.findByRole('region', { name: 'Connection status' });
   expect(await within(connection).findByText('just now')).toBeVisible();
+  expect(within(connection).getByText('No changes recorded')).toBeVisible();
   expect(await screen.findByText('Sync completed')).toBeVisible();
 });
 
@@ -850,6 +860,36 @@ it('reports a failed requested sync without changing the last-sync time', async 
   expect(await screen.findByText("Couldn't sync — server unavailable")).toBeVisible();
   const connection = screen.getByRole('region', { name: 'Connection status' });
   expect(within(connection).getByText('No successful sync recorded')).toBeVisible();
+});
+
+it('keeps separate sync and change times after the journal is pruned', async () => {
+  const now = Date.now();
+  const changeAt = new Date(now - 5 * 60_000).toISOString();
+  await appendSyncLog({ direction: 'push', result: 'synced', occurredAt: changeAt });
+  await getLocalDb().syncLog.clear();
+  await getLocalDb().syncMeta.put({
+    key: lastSuccessfulSyncKey(),
+    value: new Date(now - 60_000).toISOString(),
+  });
+  expect((await getLocalDb().syncMeta.get(lastChangesSyncKey()))?.value).toBe(changeAt);
+  renderView();
+  const connection = await screen.findByRole('region', { name: 'Connection status' });
+  expect(await within(connection).findByText('1 minute ago')).toBeVisible();
+  expect(await within(connection).findByText('5 minutes ago')).toHaveAttribute(
+    'datetime',
+    changeAt,
+  );
+});
+
+it('does not treat a legacy empty-check timestamp as the last data change', async () => {
+  await getLocalDb().syncMeta.put({
+    key: lastSuccessfulSyncKey(),
+    value: new Date().toISOString(),
+  });
+  renderView();
+  const connection = await screen.findByRole('region', { name: 'Connection status' });
+  expect(await within(connection).findByText('just now')).toBeVisible();
+  expect(within(connection).getByText('No changes recorded')).toBeVisible();
 });
 
 it('shows one net HP change for a continuous burst while retaining each compressed request and response', async () => {

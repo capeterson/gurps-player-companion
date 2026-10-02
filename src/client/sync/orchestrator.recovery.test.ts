@@ -127,7 +127,7 @@ describe('SyncOrchestrator.clearLocalAndFullResync', () => {
     expect(counts.campaigns).toBe(0);
     expect(counts.outbox).toBe(0);
     expect(counts.syncCursors).toBe(1);
-    expect(counts.syncMeta).toBe(2);
+    expect(counts.syncMeta).toBe(3);
     expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(expect.any(String));
     expect(counts.tombstones).toBe(0);
     expect(counts.rejectionToasts).toBe(0);

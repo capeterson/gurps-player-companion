@@ -469,9 +469,7 @@ test('overview stays compact and description and conditional effects work at sup
     }),
   );
   await context.setOffline(false);
-  await expect(
-    page.getByRole('button', { name: 'All changes saved', exact: true }).first(),
-  ).toBeVisible({
+  await expect(page.getByRole('button', { name: /^All changes saved/ }).first()).toBeVisible({
     timeout: 20_000,
   });
   await page.getByRole('button', { name: 'Edit description', exact: true }).click();

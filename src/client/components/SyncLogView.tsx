@@ -18,6 +18,7 @@ import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
 import {
   isSuccessfulSyncOperation,
+  lastChangesSyncKey,
   lastSuccessfulSyncKey,
   readRevokedCampaigns,
   readRevokedCharacters,
@@ -56,6 +57,10 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     const value = (await getLocalDb().syncMeta.get(lastSuccessfulSyncKey()))?.value;
     return typeof value === 'string' ? value : undefined;
   }, []);
+  const lastChanges = useLiveQuery(async () => {
+    const value = (await getLocalDb().syncMeta.get(lastChangesSyncKey()))?.value;
+    return typeof value === 'string' ? value : undefined;
+  }, []);
   const outbox = useLiveQuery(
     () => getLocalDb().outbox.orderBy('enqueuedAt').reverse().toArray(),
     [],
@@ -89,7 +94,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     entityClass?: string | undefined;
     entityId?: string | undefined;
   }) => entities?.get(`${record.entityClass}:${record.entityId}`);
-  const lastOperation = [lastSuccess, (log ?? []).find(isSuccessfulSyncOperation)?.occurredAt]
+  const lastOperation = [lastChanges, (log ?? []).find(isSuccessfulSyncOperation)?.occurredAt]
     .filter((at): at is string => typeof at === 'string' && Number.isFinite(Date.parse(at)))
     .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
   // The outbox is deliberately NOT swept when access is downgraded --
@@ -251,7 +256,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
           <div className="min-h-0 space-y-6 overflow-y-auto px-5 py-4">
             <section
               aria-label="Connection status"
-              className="grid gap-4 border-b border-base-300 pb-4 sm:grid-cols-2"
+              className="grid gap-4 border-b border-base-300 pb-4 sm:grid-cols-3"
             >
               <div>
                 <p className="text-xs text-base-content/60">WebSocket</p>
@@ -275,10 +280,10 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 )}
               </div>
               <div>
-                <p className="text-xs text-base-content/60">Last successful sync</p>
+                <p className="text-xs text-base-content/60">Last sync</p>
                 <p className="mt-1 font-medium">
-                  {lastOperation ? (
-                    <RelativeTime at={lastOperation} now={now} />
+                  {lastSuccess && Number.isFinite(Date.parse(lastSuccess)) ? (
+                    <RelativeTime at={lastSuccess} now={now} />
                   ) : (
                     'No successful sync recorded'
                   )}
@@ -288,6 +293,16 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                     HTTP sync continues while WebSocket reconnects.
                   </p>
                 )}
+              </div>
+              <div>
+                <p className="text-xs text-base-content/60">Last changes</p>
+                <p className="mt-1 font-medium">
+                  {lastOperation ? (
+                    <RelativeTime at={lastOperation} now={now} />
+                  ) : (
+                    'No changes recorded'
+                  )}
+                </p>
               </div>
             </section>
             {sourceHolds.length > 0 && (

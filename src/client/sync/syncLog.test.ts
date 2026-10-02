@@ -11,6 +11,7 @@ import {
   appendSyncLog,
   appendSyncLogEntries,
   flushSyncLogPrune,
+  lastChangesSyncKey,
   lastSuccessfulSyncKey,
   markRejectionDismissed,
   pruneRejectionToasts,
@@ -20,6 +21,7 @@ import {
   redactSyncLogForCharacters,
   rememberRevokedCampaigns,
   rememberRevokedCharacters,
+  rememberSuccessfulSync,
   snapshotValue,
 } from './syncLog.ts';
 
@@ -340,7 +342,29 @@ it('keeps the last successful operation through journal pruning without advancin
   });
   await appendSyncLog({ direction: 'push', result: 'failed', occurredAt: '2026-09-29T12:02:00Z' });
   await db.syncLog.clear();
-  expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toBe(at);
+  expect((await db.syncMeta.get(lastChangesSyncKey()))?.value).toBe(at);
   await appendSyncLog({ direction: 'push', result: 'synced', occurredAt: '2026-09-29T11:00:00Z' });
+  expect((await db.syncMeta.get(lastChangesSyncKey()))?.value).toBe(at);
+});
+
+it('keeps check timestamps monotonic without changing the data-change timestamp', async () => {
+  const db = getLocalDb();
+  const at = new Date(Date.now() + 60_000).toISOString();
+  await db.syncMeta.put({ key: lastSuccessfulSyncKey(), value: at });
+  await rememberSuccessfulSync(() => true);
   expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toBe(at);
+  expect(await db.syncMeta.get(lastChangesSyncKey())).toBeUndefined();
+});
+
+it('does not persist a check for a changed session or report diagnostic storage failures as sync failures', async () => {
+  const db = getLocalDb();
+  await rememberSuccessfulSync(() => false);
+  expect(await db.syncMeta.get(lastSuccessfulSyncKey())).toBeUndefined();
+  const put = vi.spyOn(db.syncMeta, 'put').mockRejectedValue(new Error('quota exceeded'));
+  try {
+    await expect(rememberSuccessfulSync(() => true)).resolves.toBeUndefined();
+    expect(put).toHaveBeenCalledOnce();
+  } finally {
+    put.mockRestore();
+  }
 });

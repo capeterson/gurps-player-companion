@@ -2,7 +2,7 @@
  * Toolbar sync indicator.
  *
  * Icon-only control with a DaisyUI tooltip that surfaces:
- *   - Current sync state (synced / syncing / error / offline)
+ *   - Current sync state (connected / synced / syncing / error / offline)
  *   - Local IndexedDB storage usage & percentage of browser quota
  *
  * Min-1-second state visibility is enforced inside the store (see
@@ -17,11 +17,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
+import { useSyncWsStatus } from '../sync/useSyncWsStatus.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 import { InfoTooltip } from './ui/InfoTooltip.tsx';
 
 export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const { state, error } = useSyncStatus();
+  const websocket = useSyncWsStatus();
 
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [logOpen, setLogOpen] = useState(false);
@@ -44,7 +46,14 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
   });
 
   // A sync failure stays actionable when connectivity also drops.
-  const visualState = state === 'error' ? 'error' : !online ? 'offline' : state;
+  const visualState =
+    state === 'error'
+      ? 'error'
+      : !online
+        ? 'offline'
+        : state === 'synced' && websocket.state === 'connected'
+          ? 'connected'
+          : state;
   const meta = STATE_META[visualState];
 
   // Build a single-line tooltip: state message · storage info
@@ -97,6 +106,11 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
 }
 
 const STATE_META = {
+  connected: {
+    colorClass: 'text-muted',
+    ariaLabel: 'All changes saved — live updates connected',
+    tooltip: 'All changes synced · Live updates connected',
+  },
   syncing: {
     colorClass: 'text-primary',
     ariaLabel: 'Syncing changes',
@@ -141,7 +155,11 @@ function SyncSymbol({ state }: { state: keyof typeof STATE_META }) {
       ) : state === 'offline' ? (
         <path d="M10 9v6m4-6v6" />
       ) : (
-        <path d="m12 8 3 4-3 4-3-4Z" />
+        <path
+          d="m12 8 3 4-3 4-3-4Z"
+          className={state === 'connected' ? 'text-success' : undefined}
+          fill={state === 'connected' ? 'currentColor' : 'none'}
+        />
       )}
     </svg>
   );

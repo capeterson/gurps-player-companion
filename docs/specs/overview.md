@@ -1081,8 +1081,9 @@ settings sections; switching sections retains drafts.
   persistent header instead of being repeated as homepage buttons or shortcut
   cards.
 - **Sync status indicator and log** (header): a quiet etched arrow orbit replaces
-  filled success/warning badges. Synced uses a still gem and muted ink; syncing
-  rotates violet arrows around the gem; offline uses a neutral pause mark; errors
+  filled success/warning badges. Synced uses a still outline gem and muted ink;
+  a connected WebSocket fills the gem with success green while the orbit stays muted.
+  Syncing rotates primary-colored arrows around the gem; offline uses a neutral pause mark; errors
   use a copper exclamation and take precedence if the browser is also offline.
   Hover/focus text and the accessible name describe the state. An error always
   names its reason (in the tooltip and in a banner at the top of the log) rather than pointing at a toast that may never
@@ -1103,9 +1104,11 @@ settings sections; switching sections retains drafts.
   before/after focuses on changed fields and nested settings. Campaign creation,
   settings, ownership changes, deletion, and aggregate YAML imports journal their
   online-only writes. WebSocket status and its relative last-connection time
-  stay separate from the HTTP last-successful-sync time. The log's **Sync now**
-  button runs an HTTP outbox/cursor cycle and refreshes the last-sync time after
-  success, even when nothing changed. Automatic empty polls leave that time alone.
+  stay separate from **Last sync** (the latest completed HTTP check, including empty
+  background checks) and **Last changes** (the latest applied upload or downloaded
+  data change). Both times survive journal pruning. The log's **Sync now** button
+  runs an HTTP outbox/cursor cycle; successful empty checks refresh Last sync without
+  changing Last changes. Failed or interrupted checks leave Last sync unchanged.
   Larger diagnostic payloads use device-local gzip storage and load when a
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
