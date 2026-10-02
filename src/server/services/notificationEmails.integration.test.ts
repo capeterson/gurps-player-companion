@@ -7,6 +7,7 @@ import { getDb } from '../db/client.ts';
 import { notificationEmailQueue, passkeyCredentials } from '../db/schema.ts';
 import { sendNotificationEmail } from '../email.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
+import { nextNotificationEmailAttemptAt } from './notificationEmails.ts';
 import { processNotificationEmails } from './notificationEmails.ts';
 
 configureIntegrationTestEnvironment();
@@ -21,9 +22,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (priorResendApiKey === undefined) process.env.RESEND_API_KEY = undefined;
+  if (priorResendApiKey === undefined) process.env.RESEND_API_KEY = '';
   else process.env.RESEND_API_KEY = priorResendApiKey;
-  if (priorResendFromEmail === undefined) process.env.RESEND_FROM_EMAIL = undefined;
+  if (priorResendFromEmail === undefined) process.env.RESEND_FROM_EMAIL = '';
   else process.env.RESEND_FROM_EMAIL = priorResendFromEmail;
   resetConfigCache();
 });
@@ -127,6 +128,63 @@ async function keepOnlyTheseUsersDue<T>(userIds: string[], run: () => Promise<T>
 }
 
 describe('notification email policy', () => {
+  it('schedules only the earliest pending retry and stays idle without delivery credentials', async () => {
+    const user = await registerUser('deadline');
+    await keepOnlyTheseUsersDue([user.userId], async () => {
+      await getDb()
+        .update(notificationEmailQueue)
+        .set({ attempts: 8, nextAttemptAt: new Date('2099-01-01T00:00:00.000Z') })
+        .where(eq(notificationEmailQueue.userId, user.userId));
+      const dueAt = new Date(Date.now() + 30_000);
+      const laterAt = new Date(Date.now() + 60_000);
+      await getDb()
+        .insert(notificationEmailQueue)
+        .values([
+          {
+            userId: user.userId,
+            kind: 'security',
+            eventKey: `deadline-due:${crypto.randomUUID()}`,
+            subject: 'test',
+            message: 'test',
+            nextAttemptAt: dueAt,
+          },
+          {
+            userId: user.userId,
+            kind: 'security',
+            eventKey: `deadline-later:${crypto.randomUUID()}`,
+            subject: 'test',
+            message: 'test',
+            nextAttemptAt: laterAt,
+          },
+          {
+            userId: user.userId,
+            kind: 'security',
+            eventKey: `deadline-exhausted:${crypto.randomUUID()}`,
+            subject: 'test',
+            message: 'test',
+            attempts: 8,
+            nextAttemptAt: new Date(Date.now() - 1_000),
+          },
+          {
+            userId: user.userId,
+            kind: 'security',
+            eventKey: `deadline-sent:${crypto.randomUUID()}`,
+            subject: 'test',
+            message: 'test',
+            sentAt: new Date(),
+            nextAttemptAt: new Date(Date.now() - 1_000),
+          },
+        ]);
+      expect((await nextNotificationEmailAttemptAt())?.getTime()).toBe(dueAt.getTime());
+
+      process.env.RESEND_API_KEY = '';
+      resetConfigCache();
+      expect(await nextNotificationEmailAttemptAt()).toBeNull();
+      process.env.RESEND_API_KEY = 'test-resend-key';
+      resetConfigCache();
+    });
+  });
+
   it('emails campaign invitations and accepted invitations by default, then does not duplicate sent jobs', async () => {
     const delivered: DeliveredEmail[] = [];
     const inviter = await registerUser('default-inviter');

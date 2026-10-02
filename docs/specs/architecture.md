@@ -37,6 +37,13 @@ with test configuration and `ENVIRONMENT=test`. They generate metadata without
 starting media, notification, or account-purge maintenance, so they need no database
 connection and terminate after producing or checking the snapshot.
 
+Notification maintenance shares this process and uses a dedicated Postgres
+session on `DATABASE_URL` for queue `LISTEN/NOTIFY`. The connection must preserve
+session state (direct Postgres or session pooling). Queue writes emit empty wakeups
+after commit; startup and reconnect scan the durable backlog after registering
+the listener. Empty queues do not poll; timers handle known email deadlines and
+failure retries. See [notifications.md](notifications.md).
+
 Every request receives a server-generated UUID in `X-Request-ID`; incoming
 values are never trusted. Unhandled server failures log that request ID, the
 verified user ID when authentication already resolved, the method, and the

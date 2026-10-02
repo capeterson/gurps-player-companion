@@ -157,7 +157,7 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `ENVIRONMENT` | `development` | `development`, `test`, or `production`. Production disables the API docs UI and live OpenAPI endpoint. Production Compose sets this to `production`. |
 | `HOST` | `0.0.0.0` | Server bind address. |
 | `PORT` | `3000` | Server listening port. Dev/test also uses it in the derived public URL, so host and container ports must match; dev Compose sets both to `3001` (the worktree wrapper chooses its own port). Production uses HTTPS/443 publicly and can map the internal port separately. |
-| `DATABASE_URL` | Required | PostgreSQL 18 connection URL. Compose uses `postgres://gurps:gurps@db:5432/gurps`; host tools for the dev database use `localhost:5434`. |
+| `DATABASE_URL` | Required | PostgreSQL 18 connection URL with session state preserved (direct connection or session pooling), required by notification `LISTEN/NOTIFY`. Compose uses `postgres://gurps:gurps@db:5432/gurps`; host tools for the dev database use `localhost:5434`. |
 | `JWT_SECRET` | Required; at least 32 characters | Signing secret; placeholders are rejected. Generate with `openssl rand -hex 32`. |
 | `JWT_ACCESS_TTL_MINUTES` | `15` | Access-token lifetime in minutes. |
 | `JWT_REFRESH_TTL_DAYS` | `14` | Refresh-token lifetime in days. |

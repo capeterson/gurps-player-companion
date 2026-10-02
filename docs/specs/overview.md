@@ -1119,7 +1119,10 @@ settings sections; switching sections retains drafts.
   other topics support email. Desktop is per-user on this browser, default off,
   and only its explicit enable gesture can request permission. It delivers new
   notices while the app is open in the background; no closed-app push. The bell
-  panel stays within the dynamic viewport. See [notifications.md](notifications.md).
+  panel stays within the dynamic viewport. Server notification queues wake via
+  Postgres `LISTEN/NOTIFY`, drain on startup/reconnect, and schedule pending email
+  retries by their due time; empty queues have no processing timer. See
+  [notifications.md](notifications.md).
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
