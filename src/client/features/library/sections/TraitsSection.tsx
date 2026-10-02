@@ -46,7 +46,6 @@ export const traitsConfig: LibrarySectionConfig<LocalLibraryTrait> = {
   detail: (row) => (
     <>
       {row.description && <Markdown source={row.description} className="text-sm text-muted" />}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
       {row.availableModifiers.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {row.availableModifiers.map((m) => (

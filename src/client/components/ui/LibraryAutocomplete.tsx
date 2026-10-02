@@ -289,12 +289,6 @@ export function LibraryAutocomplete<T>({
                   }}
                 >
                   {renderOption(opt, highlighted)}
-                  {typeof opt === 'object' &&
-                    opt !== null &&
-                    'sourceKey' in opt &&
-                    typeof opt.sourceKey === 'string' && (
-                      <span className="block text-xs text-dim">{opt.sourceKey}</span>
-                    )}
                 </button>
               );
             })}

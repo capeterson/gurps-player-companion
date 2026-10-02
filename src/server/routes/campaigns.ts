@@ -228,9 +228,9 @@ router.openapi(
       });
       await tx.insert(campaignLibrarySources).values(
         DEFAULT_CAMPAIGN_SOURCES.map((source) => ({
+          edition: '4th Edition',
           ...source,
           campaignId: row.id,
-          edition: '4th Edition',
         })),
       );
       return row;

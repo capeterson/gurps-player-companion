@@ -382,16 +382,22 @@ A per-campaign catalog of reusable content, backed by eleven tables:
 advantages, skills, spells, gear, languages, and martial-arts content
 once and have players pull them onto their sheets.
 
-Creating a campaign inserts the owner membership and 17 common GURPS Fourth
-Edition source records in the same audited transaction. The books are Basic Set:
-Characters and Campaigns, Magic, Martial Arts, Powers, Fantasy, Space, Low-Tech,
+Creating a campaign inserts the owner membership and 16 common GURPS Fourth
+Edition source records in the same audited transaction. The books are the combined
+Basic Set, Fourth Edition Revised, Magic, Martial Arts, Powers, Fantasy, Space, Low-Tech,
 High-Tech, Ultra-Tech, Bio-Tech, Thaumatology, Social Engineering, Horror,
-Supers, Psionic Powers, and Mass Combat. Their abbreviations follow the
+Supers, Psionic Powers, and Mass Combat. The revised Basic Set uses key
+`basic-set-fourth-edition-revised`, abbreviation `B`, and edition
+`Fourth Edition Revised`; the separate unrevised Characters and Campaigns books
+are not seeded. Supplement abbreviations follow the
 [GURPS Character Sheet page-reference list](https://gurpscharactersheet.com/page_references)
-(`B`, `BX`, `M`, `MA`, `P`, `F`, `S`, `LT`, `HT`, `UT`, `BT`, `T`, `SE`, `H`, `SU`,
+(`M`, `MA`, `P`, `F`, `S`, `LT`, `HT`, `UT`, `BT`, `T`, `SE`, `H`, `SU`,
 `PSI`, `MC`). They are ordinary campaign-owned sources: the owner may edit or
 delete them to control the campaign's allowed books. Creation does not add
 entries to existing campaigns.
+
+Sources appear as a flat, sortable list with no Publications group heading or
+group fold control. Each sourcebook can still expand to show its notes or editor.
 
 Library languages carry only the book definition — `name`, `description`,
 `source`, and `isSignLanguage`. Fluency and point cost are per-character and

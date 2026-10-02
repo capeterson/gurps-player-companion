@@ -39,7 +39,6 @@ export const stylesConfig: LibrarySectionConfig<LocalLibraryStyle> = {
           ))}
         </ul>
       )}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
     </div>
   ),
   deleteTitle: 'Delete library style',

@@ -242,7 +242,11 @@ Library technique default-penalty and level-cap help wraps within each field on
 narrow screens.
 Sourcebook selection labels wrap long unspaced titles beside fixed-size
 checkboxes within the import/export card.
-Library group labels and mobile row metadata wrap long unspaced categories.
+Library group labels and row summaries wrap long unspaced categories. Citations
+sit beside the type/points summary under each name at every width, visible while
+collapsed, and wrap within the name cell on narrow screens.
+The Sources list has no category heading or group folding; its sourcebook rows
+appear directly below the column heading.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
 Help and About prose wraps long external links inside its content column.
 Focused library form fields retain their draft and stay below the sticky toolbar

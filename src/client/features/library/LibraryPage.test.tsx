@@ -154,6 +154,118 @@ function setup(initialEntry = '/', transferOnly = false) {
   );
 }
 
+it('shows publication details without content-entry metadata badges on sourcebooks', async () => {
+  await seed();
+  localStorage.setItem(
+    `gpc:fold:${CAMPAIGN}:library:sources`,
+    JSON.stringify(['Publications', '']),
+  );
+  await getLocalDb().campaignLibrarySources.put({
+    id: '0193b3c0-f1f0-7000-8000-00000000b001',
+    campaignId: CAMPAIGN,
+    key: 'basic-set-fourth-edition-revised',
+    name: 'GURPS Basic Set, Fourth Edition Revised',
+    abbreviation: 'B',
+    edition: 'Fourth Edition Revised',
+    priority: 100,
+    notes: 'Combined Characters and Campaigns with revised addenda.',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    revision: 3,
+  });
+  setup();
+  fireEvent.click(await screen.findByRole('button', { name: /^Sources/ }));
+  const source = await screen.findByRole('button', {
+    name: 'GURPS Basic Set, Fourth Edition Revised',
+  });
+  expect(source).toBeVisible();
+  expect(screen.queryByRole('button', { name: /^Publications/ })).not.toBeInTheDocument();
+  expect(screen.queryByText('Publications', { exact: true })).not.toBeInTheDocument();
+  expect(source.querySelector('.badge')).toBeNull();
+  fireEvent.click(source);
+  expect(
+    await screen.findByText('Combined Characters and Campaigns with revised addenda.'),
+  ).toBeVisible();
+  expect(screen.getAllByText('B · Priority 100')[0]).toBeVisible();
+  expect(
+    document.getElementById(source.getAttribute('aria-controls') ?? '')?.querySelector('.badge'),
+  ).toBeNull();
+  for (const label of ['Legacy source', 'complete', 'definition']) {
+    expect(screen.queryByText(label, { exact: true })).not.toBeInTheDocument();
+  }
+});
+
+it('shows library content without source, completeness, role or preference badges', async () => {
+  await seed();
+  await getLocalDb().campaignLibraryTraits.update(NIGHT, {
+    sourceKey: 'core',
+    status: 'complete',
+    role: 'definition',
+    preferredEdition: true,
+  });
+  await getLocalDb().campaignLibraryTraits.update(FEAR, {
+    sourceKey: 'core',
+    status: 'needs_review',
+    role: 'example',
+    restricted: true,
+  });
+  setup();
+  for (const [name, description] of [
+    ['Night Vision', /in darkness/],
+    ['Fearfulness', 'Easily frightened'],
+  ] as const) {
+    const entry = await screen.findByRole('button', { name });
+    expect(entry).toBeVisible();
+    expect(entry.querySelector('.badge')).toBeNull();
+    fireEvent.click(entry);
+    expect(await screen.findByText(description)).toBeVisible();
+    const detail = document.getElementById(entry.getAttribute('aria-controls') ?? '');
+    expect(detail?.querySelector('.badge')).toBeNull();
+    for (const label of [
+      'Legacy source',
+      'complete',
+      'needs review',
+      'definition',
+      'example',
+      'Preferred',
+      'Default edition',
+      'Restricted',
+      'Restricted · GM only',
+    ]) {
+      expect(
+        within(detail as HTMLElement).queryByText(label, { exact: true }),
+      ).not.toBeInTheDocument();
+    }
+  }
+});
+
+it('keeps citations beside the collapsed summary without repeating them in the details', async () => {
+  await seed();
+  await getLocalDb().campaignLibraryTraits.update(NIGHT, { sourceLocator: 'B71' });
+  await getLocalDb().campaignLibraryTraits.update(FEAR, {
+    source: null,
+    sourceLocator: 'B136',
+  });
+  setup();
+  for (const [name, summary, citation] of [
+    ['Night Vision', 'Advantage · 1 pt', 'B71'],
+    ['Fearfulness', 'Disadvantage · -2 pt', 'B136'],
+  ] as const) {
+    const entry = await screen.findByRole('button', { name });
+    expect(entry).toHaveAttribute('aria-expanded', 'false');
+    const row = entry.closest('tr') as HTMLTableRowElement;
+    expect(within(row).getByText(summary)).toBeVisible();
+    expect(within(row).getByText(citation)).toBeVisible();
+    fireEvent.click(entry);
+    const detail = document.getElementById(
+      entry.getAttribute('aria-controls') ?? '',
+    ) as HTMLElement;
+    expect(within(detail).queryByText(citation)).not.toBeInTheDocument();
+    expect(within(detail).queryByText(`Source · ${citation}`)).not.toBeInTheDocument();
+    expect(within(row).getByText(citation)).toBeVisible();
+  }
+});
+
 it('searches descriptions and source across words, reports empty results and clears', async () => {
   await seed();
   setup();

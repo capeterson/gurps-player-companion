@@ -20,9 +20,22 @@ numbers win. Preferred editions resolve by explicit entry override, source
 priority, then stable source-key order. Multiple explicit overrides of the same
 concept are rejected. Source-less legacy entries are a single legacy edition:
 citations are never guessed or parsed into source identities.
-New campaigns begin with 17 common Fourth Edition source records (all priority
+New campaigns begin with 16 common Fourth Edition source records (all priority
 100), listed in [campaign content sharing](campaign-content-sharing.md); owners
 can delete any of them. This seed runs only when the campaign is created.
+The combined Basic Set, Fourth Edition Revised replaces the separate unrevised
+Characters and Campaigns books. Library rows, expanded details and pricing
+dialogs omit source-key, completeness, role, restriction and preferred-edition
+labels. These properties remain editable in the existing metadata form and
+continue to govern adoption, access and edition selection. Autocomplete options
+show their authored label without automatically appending a raw source key.
+Collapsed library rows show their citation beside the type/points or other
+summary at every screen width. The expanded body does not repeat that citation;
+additional page/PDF locator information remains in the details. Entries without
+a citation use their page/locator text in the summary. The graphical metadata
+editor currently links a sourcebook through its **Source key** text field under
+**Source and completeness**; the separate **Source** citation field does not
+establish that link.
 
 Only `status: complete` with role `definition` or `template` is adoptable.
 `needs_review`, `reference_only`, examples and references remain searchable in

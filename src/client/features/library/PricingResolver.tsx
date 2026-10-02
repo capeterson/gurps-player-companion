@@ -257,9 +257,6 @@ export function PricingResolver({
         <h2 id={titleId} className="font-display text-xl">
           Resolve {entry.name}
         </h2>
-        <p className="my-2 text-sm">
-          {entry.sourceKey ?? entry.sourceLocator ?? 'Legacy source'} · {entry.status ?? 'complete'}
-        </p>
         {initial && (
           <p className="text-sm">
             Previously saved:{' '}
@@ -316,7 +313,7 @@ export function PricingResolver({
                       setSelected(next);
                     }}
                   />{' '}
-                  {modifier.name} {modifier.sourceKey ? `· ${modifier.sourceKey}` : ''}
+                  {modifier.name}
                 </label>
                 {modifier.applicability.advisory && (
                   <p className="text-sm">{modifier.applicability.advisory}</p>

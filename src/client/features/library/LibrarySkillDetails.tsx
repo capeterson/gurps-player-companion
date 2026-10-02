@@ -18,9 +18,11 @@ export function librarySkillMeta(
 export function LibrarySkillDetails({
   skill,
   activeEffectsSnapshot,
+  showSource = true,
 }: {
   skill: LibrarySkillOut;
   activeEffectsSnapshot?: boolean | undefined;
+  showSource?: boolean;
 }) {
   return (
     <>
@@ -34,7 +36,7 @@ export function LibrarySkillDetails({
             ` · ${skill.specializationPolicy.options.map((option) => option.name).join(', ')}`}
         </p>
       )}
-      {skill.source && <p className="text-xs text-dim">Source · {skill.source}</p>}
+      {showSource && skill.source && <p className="text-xs text-dim">Source · {skill.source}</p>}
       {skill.prerequisites && (
         <p className="text-xs text-dim">Prerequisites · {skill.prerequisites}</p>
       )}

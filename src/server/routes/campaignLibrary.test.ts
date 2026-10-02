@@ -412,11 +412,10 @@ describe('library source and modifier CRUD authorization', () => {
       ).sources;
     };
     const firstSources = await readSources(String(first.id));
-    expect(firstSources).toHaveLength(17);
+    expect(firstSources).toHaveLength(16);
     expect(firstSources.map(({ abbreviation }) => abbreviation).sort()).toEqual(
       [
         'B',
-        'BX',
         'M',
         'MA',
         'P',
@@ -436,12 +435,22 @@ describe('library source and modifier CRUD authorization', () => {
     );
     expect(firstSources).toContainEqual(
       expect.objectContaining({
-        name: 'GURPS Basic Set: Characters',
-        key: 'basic-set-characters',
+        name: 'GURPS Basic Set, Fourth Edition Revised',
+        key: 'basic-set-fourth-edition-revised',
         abbreviation: 'B',
-        edition: '4th Edition',
+        edition: 'Fourth Edition Revised',
       }),
     );
+    expect(
+      firstSources.some(
+        ({ key }) => key === 'basic-set-characters' || key === 'basic-set-campaigns',
+      ),
+    ).toBe(false);
+    expect(
+      firstSources
+        .filter(({ key }) => key !== 'basic-set-fourth-edition-revised')
+        .every(({ edition }) => edition === '4th Edition'),
+    ).toBe(true);
     const cursor = await app.request('/api/v1/sync/cursor', {
       method: 'POST',
       headers: jsonHeaders(owner.accessToken),
@@ -455,8 +464,8 @@ describe('library source and modifier CRUD authorization', () => {
       ((await cursor.json()) as SyncCursorResponse).changes.filter((change) =>
         firstSourceIds.has(change.entityId),
       ),
-    ).toHaveLength(17);
-    const basic = firstSources.find((source) => source.key === 'basic-set-characters');
+    ).toHaveLength(16);
+    const basic = firstSources.find((source) => source.key === 'basic-set-fourth-edition-revised');
     expect(basic).toBeDefined();
     const removed = await app.request(
       `/api/v1/campaigns/${first.id}/library/sources/${basic?.id}`,
@@ -468,7 +477,7 @@ describe('library source and modifier CRUD authorization', () => {
     );
     expect(
       (await readSources(String(second.id))).find((source) => source.key === basic?.key),
-    ).toMatchObject({ abbreviation: 'B', edition: '4th Edition' });
+    ).toMatchObject({ abbreviation: 'B', edition: 'Fourth Edition Revised' });
   });
 
   const modifierCreate = {
@@ -1163,7 +1172,7 @@ describe('YAML export/import round trip', () => {
       }[];
       modifiers: { id: string; description: string | null }[];
     };
-    expect(mergeList.sources).toHaveLength(19);
+    expect(mergeList.sources).toHaveLength(18);
     expect(mergeList.sources.find((row) => row.key === 'core')).toMatchObject({
       id: core.id,
       name: 'Core Rules Revised',
@@ -1198,7 +1207,7 @@ describe('YAML export/import round trip', () => {
     const afterRollback = (await (
       await app.request(base, { headers: bearer(owner.accessToken) })
     ).json()) as typeof mergeList;
-    expect(afterRollback.sources).toHaveLength(19);
+    expect(afterRollback.sources).toHaveLength(18);
     expect(afterRollback.traits).toHaveLength(2);
     expect(afterRollback.modifiers).toHaveLength(1);
 
