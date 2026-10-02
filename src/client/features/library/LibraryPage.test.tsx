@@ -280,17 +280,17 @@ it('searches descriptions and source across words, reports empty results and cle
     applicability: { traits: [{ sourceId, definitionId: '0193b3c0-f1f0-7000-8000-00000000f005' }] },
   } as never);
   setup();
-  await screen.findByRole('button', { name: 'Night Vision', exact: true });
+  await screen.findByRole('button', { name: 'Night Vision' });
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search library' }), {
     target: { value: 'DARKNESS b71' },
   });
   await waitFor(() =>
     expect(screen.queryByRole('button', { name: 'Fearfulness' })).not.toBeInTheDocument(),
   );
-  expect(screen.getByRole('button', { name: 'Night Vision', exact: true })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Night Vision' })).toBeVisible();
   expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'BX Basic Set' } });
-  expect(await screen.findByRole('button', { name: 'Night Vision', exact: true })).toBeVisible();
+  expect(await screen.findByRole('button', { name: 'Night Vision' })).toBeVisible();
   fireEvent.change(screen.getByRole('searchbox'), {
     target: { value: '00000000f004' },
   });
