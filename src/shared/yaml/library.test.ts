@@ -22,6 +22,7 @@ import {
   parseLibraryYaml,
   sourceScopedLibrary,
 } from './library.ts';
+import { portableLibraryEntry } from './sourceReferences.ts';
 
 it('packages selected sourcebooks and retains explicit GM restrictions', () => {
   const doc = parseLibraryYaml(
@@ -133,7 +134,8 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
 });
 
 it('round-trips v15 racial profiles and keeps source-scoped race and lens entries together', () => {
-  const race = libraryRaceCreate.parse({
+  const portableRace = portableLibraryEntry(libraryRaceCreate);
+  const race = portableRace.parse({
     key: 'stonekin',
     name: 'Stonekin',
     sourceKey: 'alpha',
@@ -156,7 +158,7 @@ it('round-trips v15 racial profiles and keeps source-scoped race and lens entrie
     ],
     tags: ['underground'],
   });
-  const lens = libraryRaceCreate.parse({
+  const lens = portableRace.parse({
     key: 'abyssal',
     name: 'Abyssal',
     sourceKey: 'alpha',
@@ -165,7 +167,7 @@ it('round-trips v15 racial profiles and keeps source-scoped race and lens entrie
     removesTraits: ['night-vision'],
     traits: [{ key: 'dark-vision', name: 'Dark Vision', points: 25 }],
   });
-  const other = libraryRaceCreate.parse({
+  const other = portableRace.parse({
     key: 'moonfolk',
     name: 'Moonfolk',
     sourceKey: 'beta',
