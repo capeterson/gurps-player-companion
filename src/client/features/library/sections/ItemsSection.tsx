@@ -51,10 +51,7 @@ export const itemsConfig: LibrarySectionConfig<LocalLibraryItem> = {
   meta: (row) =>
     `${categoryLabel(row.category)} · ${pricingDisplayValue(row.calculation, 'weightLbs', Number(row.weightLbs)) ?? 'Calculated'} lb · ${pricingDisplayValue(row.calculation, 'cost', Number(row.cost)) == null ? 'Calculated cost' : `${pricingDisplayValue(row.calculation, 'cost', Number(row.cost))}`}`,
   detail: (row) => (
-    <>
-      {row.description && <p className="text-sm text-muted">{row.description}</p>}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
-    </>
+    <>{row.description && <p className="text-sm text-muted">{row.description}</p>}</>
   ),
   deleteTitle: 'Delete library item',
   deleteNote: 'Existing characters that have this item are not affected.',

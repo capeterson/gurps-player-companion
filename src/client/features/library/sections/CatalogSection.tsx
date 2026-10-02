@@ -337,11 +337,9 @@ export function CatalogSection({
     noun,
     plural: section,
     columns: [],
-    group: (row) => ('category' in row ? row.category : 'Publications'),
+    group: section === 'sources' ? null : (row) => ('category' in row ? row.category : ''),
     meta: (row) =>
-      'priority' in row
-        ? `${row.abbreviation} · Priority ${row.priority}`
-        : `${row.category} · ${row.status ?? 'complete'}`,
+      'priority' in row ? `${row.abbreviation} · Priority ${row.priority}` : row.category,
     detail: (row) => (
       <p className="whitespace-pre-wrap break-words">
         {'notes' in row ? row.notes : 'description' in row ? row.description : ''}

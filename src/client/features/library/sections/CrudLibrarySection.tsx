@@ -1,8 +1,4 @@
-import { type ReactNode, useCallback, useMemo } from 'react';
-import {
-  canAdoptLibraryEntry,
-  preferredLibraryEditions,
-} from '../../../../shared/domain/libraryIdentity.ts';
+import { type ReactNode, useCallback } from 'react';
 import {
   LibraryDeleteDialog,
   type LibraryListRow,
@@ -51,15 +47,6 @@ export function CrudLibrarySection<R extends LibraryListRow>({
   crud: LibraryCrudControls;
   renderForm: (row: R | null) => ReactNode;
 }) {
-  const defaultIds = useMemo(
-    () =>
-      new Set(
-        preferredLibraryEditions(entries.filter(canAdoptLibraryEntry), shell.library.sources).map(
-          (row) => row.id,
-        ),
-      ),
-    [entries, shell.library.sources],
-  );
   const { setEditId, setAddOpen, setDeleteId } = crud;
   const onEdit = useCallback(
     (id: string) => {
@@ -77,7 +64,6 @@ export function CrudLibrarySection<R extends LibraryListRow>({
     <>
       <LibrarySection
         config={config}
-        defaultIds={defaultIds}
         campaignId={shell.campaignId}
         entries={
           shell.sourceFilter

@@ -48,7 +48,6 @@ export const enchantmentsConfig: LibrarySectionConfig<LocalLibraryEnchantment> =
             .join(' · ')}
         </p>
       )}
-      {row.source && <p className="text-xs text-dim">Source · {row.source}</p>}
     </>
   ),
   deleteTitle: 'Delete enchantment definition',

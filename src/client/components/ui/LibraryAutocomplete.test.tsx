@@ -50,6 +50,27 @@ function Harness({
 }
 
 describe('LibraryAutocomplete', () => {
+  it('shows the option label without appending a raw source key and preserves its source when picked', async () => {
+    const option = { id: 'a', name: 'Alpha', sourceKey: 'technical-source-key' };
+    const onPick = vi.fn();
+    render(
+      <LibraryAutocomplete
+        value="Alpha"
+        onChange={vi.fn()}
+        onPick={onPick}
+        fetchOptions={async () => [option]}
+        getOptionKey={(entry) => entry.id}
+        renderOption={(entry) => entry.name}
+        debounceMs={0}
+      />,
+    );
+    const choice = await screen.findByRole('option', { name: 'Alpha' });
+    expect(choice).toBeVisible();
+    expect(screen.queryByText('technical-source-key')).not.toBeInTheDocument();
+    fireEvent.mouseDown(choice);
+    expect(onPick).toHaveBeenCalledWith(option);
+  });
+
   it('fires onPick (only) when the user clicks an option — does not echo onChange', async () => {
     const onPick = vi.fn();
     const onChange = vi.fn();
