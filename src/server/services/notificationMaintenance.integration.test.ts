@@ -37,8 +37,8 @@ async function waitFor(condition: () => Promise<boolean>, attempts = 100): Promi
   expect(await condition()).toBe(true);
 }
 
-async function addHistory(ownerUserId: string, actorUserId: string, name: string): Promise<void> {
-  await getDb()
+async function addHistory(ownerUserId: string, actorUserId: string, name: string): Promise<string> {
+  const [history] = await getDb()
     .insert(entityHistory)
     .values({
       revision: Date.now(),
@@ -50,7 +50,10 @@ async function addHistory(ownerUserId: string, actorUserId: string, name: string
       actorUserId,
       oldRow: { name: `${name} old` },
       newRow: { name },
-    });
+    })
+    .returning({ id: entityHistory.id });
+  if (!history) throw new Error('history row was not inserted');
+  return history.id;
 }
 
 afterEach(async () => {
@@ -199,6 +202,61 @@ describe('PostgreSQL notification wakeups', () => {
       }, 600);
     } finally {
       await terminator.end();
+    }
+  });
+
+  it('retries a committed history row after the locking worker rolls back', async () => {
+    const owner = await registerUser('skip-locked-owner');
+    const actor = await registerUser('skip-locked-actor');
+    const historyId = await addHistory(owner.userId, actor.userId, 'Locked history');
+    const lockHolder = new Client({ connectionString: integrationTestConfig.databaseUrl });
+    await lockHolder.connect();
+    await lockHolder.query('BEGIN');
+    const locked = await lockHolder.query(
+      'SELECT history_id FROM notification_history_queue WHERE history_id = $1 FOR UPDATE',
+      [historyId],
+    );
+    expect(locked.rowCount).toBe(1);
+
+    const timers: Array<{ callback: () => void; delay: number; active: boolean }> = [];
+    const worker = new NotificationMaintenance({
+      processEmails: async () => 0,
+      nextEmailAttemptAt: async () => null,
+      setTimer: (callback, delay) => {
+        const timer = { callback, delay, active: true };
+        timers.push(timer);
+        return timer as unknown as ReturnType<typeof setTimeout>;
+      },
+      clearTimer: (timer) => {
+        const found = timer as unknown as { active: boolean };
+        found.active = false;
+      },
+    });
+    workers.push(worker);
+    try {
+      worker.start();
+      await waitFor(async () => timers.some((timer) => timer.active));
+      const retry = timers.find((timer) => timer.active);
+      expect(retry?.delay).toBe(1_000);
+      expect(
+        await getDb().select().from(notifications).where(eq(notifications.userId, owner.userId)),
+      ).toHaveLength(0);
+
+      await lockHolder.query('ROLLBACK');
+      if (!retry) throw new Error('pending history retry timer was not created');
+      retry.active = false;
+      retry.callback();
+      await waitFor(async () => {
+        const [row] = await getDb()
+          .select({ id: notifications.id })
+          .from(notifications)
+          .where(eq(notifications.userId, owner.userId));
+        return Boolean(row);
+      });
+      await waitFor(async () => !timers.some((timer) => timer.active));
+    } finally {
+      await lockHolder.query('ROLLBACK').catch(() => undefined);
+      await lockHolder.end();
     }
   });
 });

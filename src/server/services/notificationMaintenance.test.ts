@@ -52,6 +52,7 @@ function harness(
   overrides: {
     createClient?: () => FakeClient;
     processEvents?: () => Promise<number>;
+    hasPendingEvents?: () => Promise<boolean>;
     processEmails?: () => Promise<number>;
     nextEmailAttemptAt?: () => Promise<Date | null>;
   } = {},
@@ -67,6 +68,7 @@ function harness(
         return client;
       })) as unknown as NotificationMaintenanceDependencies['createClient'],
     processEvents: overrides.processEvents ?? (async () => 0),
+    hasPendingEvents: overrides.hasPendingEvents ?? (async () => false),
     processEmails: overrides.processEmails ?? (async () => 0),
     nextEmailAttemptAt: overrides.nextEmailAttemptAt ?? (async () => null),
     now: () => now,
@@ -268,6 +270,42 @@ describe('notification maintenance scheduler', () => {
 
   it('keeps a positive subsecond email deadline exact', async () => {
     const h = harness({
+      nextEmailAttemptAt: async () => new Date(1_000_250),
+    });
+    running.push(h.maintenance);
+    h.maintenance.start();
+    await until(() => h.timers.some((timer) => timer.active));
+    expect(h.timers.find((timer) => timer.active)?.delay).toBe(250);
+  });
+
+  it('retries known locked history and returns to idle once the row clears', async () => {
+    let eventCalls = 0;
+    let pendingChecks = 0;
+    let deadlineChecks = 0;
+    const h = harness({
+      processEvents: async () => {
+        eventCalls++;
+        return 0;
+      },
+      hasPendingEvents: async () => ++pendingChecks === 1,
+      nextEmailAttemptAt: async () => {
+        deadlineChecks++;
+        return deadlineChecks === 1 ? new Date(1_004_000) : null;
+      },
+    });
+    running.push(h.maintenance);
+    h.maintenance.start();
+    await until(() => h.timers.some((timer) => timer.active));
+    expect(h.timers.find((timer) => timer.active)?.delay).toBe(1_000);
+    h.fireNextTimer();
+    await until(() => eventCalls === 2 && pendingChecks === 2);
+    await turn();
+    expect(h.timers.filter((timer) => timer.active)).toHaveLength(0);
+  });
+
+  it('uses the earlier mail deadline than the pending-history retry', async () => {
+    const h = harness({
+      hasPendingEvents: async () => true,
       nextEmailAttemptAt: async () => new Date(1_000_250),
     });
     running.push(h.maintenance);

@@ -198,6 +198,15 @@ async function eventPayload(
   return null;
 }
 
+/** MVCC reads also see committed work another worker currently has locked. */
+export async function hasPendingNotificationEvents(): Promise<boolean> {
+  const [job] = await getDb()
+    .select({ historyId: notificationHistoryQueue.historyId })
+    .from(notificationHistoryQueue)
+    .limit(1);
+  return Boolean(job);
+}
+
 /** Processes only newly queued events; never backfills historical notifications. */
 export async function processNotificationEvents(): Promise<number> {
   return runInDbTransaction(async () => {

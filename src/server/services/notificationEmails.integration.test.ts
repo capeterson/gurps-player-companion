@@ -22,9 +22,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (priorResendApiKey === undefined) process.env.RESEND_API_KEY = '';
+  if (priorResendApiKey === undefined) Reflect.deleteProperty(process.env, 'RESEND_API_KEY');
   else process.env.RESEND_API_KEY = priorResendApiKey;
-  if (priorResendFromEmail === undefined) process.env.RESEND_FROM_EMAIL = '';
+  if (priorResendFromEmail === undefined) Reflect.deleteProperty(process.env, 'RESEND_FROM_EMAIL');
   else process.env.RESEND_FROM_EMAIL = priorResendFromEmail;
   resetConfigCache();
 });
@@ -177,7 +177,7 @@ describe('notification email policy', () => {
         ]);
       expect((await nextNotificationEmailAttemptAt())?.getTime()).toBe(dueAt.getTime());
 
-      process.env.RESEND_API_KEY = '';
+      Reflect.deleteProperty(process.env, 'RESEND_API_KEY');
       resetConfigCache();
       expect(await nextNotificationEmailAttemptAt()).toBeNull();
       process.env.RESEND_API_KEY = 'test-resend-key';

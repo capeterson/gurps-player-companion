@@ -121,8 +121,10 @@ pooling, not transaction pooling). Wakeups coalesce during active processing;
 the worker drains bounded history/email batches until caught up without waiting
 between batches. An empty queue schedules no processing timer. Pending email
 retries schedule a timer for their earliest eligible `next_attempt_at`; delivery
-without configured credentials schedules no email timer. Already-due mail locked
-by another worker gets a bounded delay to avoid spinning. Listener reconnection
+without configured credentials schedules no email timer. Committed history rows
+still locked by another worker retain a short retry timer: that worker's rollback
+or exit releases the work without producing a new insertion wakeup. Already-due
+mail locked by another worker also gets a bounded delay to avoid spinning. Listener reconnection
 and processing failures retry with exponential backoff capped at one minute.
 Automatic maintenance remains disabled in ordinary tests. Shutdown cancels timers,
 closes the listener session and waits for active processing to finish.

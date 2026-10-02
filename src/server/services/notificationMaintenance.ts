@@ -2,13 +2,14 @@ import { Client } from 'pg';
 import { loadConfig } from '../config.ts';
 import { isDraining } from '../lifecycle.ts';
 import { nextNotificationEmailAttemptAt, processNotificationEmails } from './notificationEmails.ts';
-import { processNotificationEvents } from './notificationEvents.ts';
+import { hasPendingNotificationEvents, processNotificationEvents } from './notificationEvents.ts';
 
 export const NOTIFICATION_QUEUE_CHANNEL = 'gpc_notification_queue';
 type Timer = ReturnType<typeof setTimeout>;
 export interface NotificationMaintenanceDependencies {
   createClient: () => Pick<Client, 'connect' | 'query' | 'on' | 'end'>;
   processEvents: () => Promise<number>;
+  hasPendingEvents: () => Promise<boolean>;
   processEmails: () => Promise<number>;
   nextEmailAttemptAt: () => Promise<Date | null>;
   setTimer: (callback: () => void, delay: number) => Timer;
@@ -41,6 +42,7 @@ export class NotificationMaintenance {
           keepAliveInitialDelayMillis: 10_000,
         }),
       processEvents: processNotificationEvents,
+      hasPendingEvents: hasPendingNotificationEvents,
       processEmails: processNotificationEmails,
       nextEmailAttemptAt: nextNotificationEmailAttemptAt,
       setTimer: (callback, delay) => {
@@ -145,13 +147,19 @@ export class NotificationMaintenance {
       if (events === 200 || emails === 10) this.requested = true;
     }
     if (!this.running || isDraining()) return;
+    // SKIP LOCKED can return an empty batch while another worker owns committed
+    // history rows. Its rollback/crash emits no NOTIFY, so retry known work.
+    const pendingEvents = await this.deps.hasPendingEvents();
     const nextAttempt = await this.deps.nextEmailAttemptAt();
     this.processingFailures = 0;
+    let delay = pendingEvents ? 1_000 : null;
     if (nextAttempt) {
       // An already-due row may be locked by another worker; avoid a busy loop.
-      const delay = nextAttempt.getTime() - this.deps.now();
-      this.scheduleWork(delay > 0 ? delay : 1_000);
+      const remaining = nextAttempt.getTime() - this.deps.now();
+      const emailDelay = remaining > 0 ? remaining : 1_000;
+      delay = delay === null ? emailDelay : Math.min(delay, emailDelay);
     }
+    if (delay !== null) this.scheduleWork(delay);
   }
 
   private scheduleWork(delay: number): void {
