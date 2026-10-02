@@ -176,8 +176,8 @@ test('new campaigns show revised sources and citations on collapsed library rows
     .locator('summary')
     .filter({ hasText: /^Source and completeness/ })
     .click();
-  await expect(page.getByLabel('Sourcebook', { exact: true })).toHaveValue(revisedId);
-  await page.getByLabel('Sourcebook', { exact: true }).selectOption(magicId);
+  await expect(page.getByLabel('Sourcebook')).toHaveValue(revisedId);
+  await page.getByLabel('Sourcebook').selectOption(magicId);
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect
     .poll(async () => {
