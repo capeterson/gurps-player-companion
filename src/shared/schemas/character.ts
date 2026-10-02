@@ -7,6 +7,7 @@ import { isoTimestamp, revision, timestamps, uuid } from './common.ts';
 import { effectTarget, weaponSelector } from './effects.ts';
 import { inventoryItemOut } from './inventory.ts';
 import { languageOut } from './language.ts';
+import { characterRace, ownedRacialSkill } from './race.ts';
 import { skillOut } from './skill.ts';
 import { spellOut } from './spell.ts';
 import { techniqueOut } from './technique.ts';
@@ -141,6 +142,7 @@ export const characterAttributesShape = {
   moveMod: mod.default(0),
 
   tempEffects: tempEffectsField.default([]),
+  race: characterRace.optional(),
   activeEffects: activeEffectsField.default([]),
   activeConditionGroups: z
     .array(
@@ -232,7 +234,7 @@ export const derivedStatsOut = z.object({
  * for UI breakdowns.
  */
 export const resolvedEffectOut = z.object({
-  sourceKind: z.enum(['trait', 'skill', 'item', 'active_effect']),
+  sourceKind: z.enum(['trait', 'skill', 'item', 'active_effect', 'race']),
   sourceName: z.string(),
   sourceId: uuid,
   target: effectTarget,
@@ -249,6 +251,7 @@ export const resolvedEffectOut = z.object({
 });
 
 export const pointBreakdownOut = z.object({
+  race: z.number().int().optional(),
   attributes: z.number().int(),
   secondary: z.number().int(),
   advantages: z.number().int(),
@@ -297,6 +300,7 @@ export const characterListItem = z.object({
 });
 
 export const characterDetail = z.object({
+  racialSkills: z.array(ownedRacialSkill).optional(),
   portraitAssetId: uuid.nullable().optional(),
   capabilities: z
     .array(z.object({ sourceId: uuid, sourceName: z.string(), capability: capabilityEffect }))
@@ -355,6 +359,7 @@ export const characterDetail = z.object({
  * accessing private stats / inventory / log entries.
  */
 export const characterMinimalOut = z.object({
+  raceName: z.string().optional(),
   portraitAssetId: uuid.nullable().optional(),
   view: z.literal('minimal'),
   id: uuid,

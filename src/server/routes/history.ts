@@ -280,6 +280,7 @@ router.openapi(
             AND NOT EXISTS (SELECT 1 FROM campaign_library_techniques r WHERE r.id = ${table.entityId} AND r.restricted)
             AND NOT EXISTS (SELECT 1 FROM campaign_library_styles r WHERE r.id = ${table.entityId} AND r.restricted)
             AND NOT EXISTS (SELECT 1 FROM campaign_library_enchantments r WHERE r.id = ${table.entityId} AND r.restricted)
+            AND NOT EXISTS (SELECT 1 FROM campaign_library_races r WHERE r.id = ${table.entityId} AND r.restricted)
             AND NOT EXISTS (SELECT 1 FROM campaign_library_active_effects r WHERE r.id = ${table.entityId} AND r.restricted)
             AND NOT EXISTS (SELECT 1 FROM campaign_library_modifiers r WHERE r.id = ${table.entityId} AND r.restricted)
           )

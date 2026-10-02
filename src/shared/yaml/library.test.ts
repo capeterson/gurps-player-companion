@@ -13,6 +13,7 @@ import {
   libraryYamlDoc,
 } from '../schemas/campaignLibrary.ts';
 import { libraryModifierCreate, librarySourceCreate } from '../schemas/libraryMetadata.ts';
+import { libraryRaceCreate } from '../schemas/race.ts';
 import {
   LIBRARY_YAML_MAX_BYTES,
   LibraryYamlError,
@@ -117,7 +118,7 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     styles: [],
     enchantments: [definition],
   });
-  expect(yaml).toContain('version: 14');
+  expect(yaml).toContain('version: 15');
   expect(yaml).not.toContain('definitionId');
   const parsed = parseLibraryYaml(yaml).library;
   expect(parsed.enchantments).toEqual([definition]);
@@ -127,6 +128,84 @@ it('round-trips mechanical enchantment definitions and portable owned snapshots'
     definitionRevision: 7,
     mechanics: { applicability: 'armor', stackingPolicy: { kind: 'highest', key: 'fortify' } },
   });
+});
+
+it('round-trips v15 racial profiles and keeps source-scoped race and lens entries together', () => {
+  const race = libraryRaceCreate.parse({
+    key: 'stonekin',
+    name: 'Stonekin',
+    sourceKey: 'alpha',
+    source: 'Fantasy, p. 106',
+    points: 25,
+    attributeModifiers: { st: 2, hp: 1, sizeModifier: 1 },
+    traits: [{ key: 'night-vision', name: 'Night Vision', points: 2, level: 2 }],
+    skills: [
+      {
+        key: 'stonecraft',
+        name: 'Stonecraft',
+        attribute: 'IQ',
+        difficulty: 'A',
+        points: 2,
+      },
+    ],
+    variants: [{ key: 'deep', name: 'Deep Stonekin', points: 5, attributeModifiers: { ht: 1 } }],
+    forms: [
+      { key: 'granite', name: 'Granite Form', features: ['Cannot speak while transformed.'] },
+    ],
+    tags: ['underground'],
+  });
+  const lens = libraryRaceCreate.parse({
+    key: 'abyssal',
+    name: 'Abyssal',
+    sourceKey: 'alpha',
+    kind: 'lens',
+    compatibleRaceKeys: ['stonekin'],
+    removesTraits: ['night-vision'],
+    traits: [{ key: 'dark-vision', name: 'Dark Vision', points: 25 }],
+  });
+  const other = libraryRaceCreate.parse({
+    key: 'moonfolk',
+    name: 'Moonfolk',
+    sourceKey: 'beta',
+  });
+  const first = emitLibraryYaml({
+    scope: { kind: 'sources', sourceKeys: ['alpha'] },
+    sources: [
+      { key: 'alpha', name: 'Alpha', abbreviation: 'A', priority: 100 },
+      { key: 'beta', name: 'Beta', abbreviation: 'B', priority: 100 },
+    ],
+    traits: [],
+    skills: [],
+    spells: [],
+    items: [],
+    languages: [],
+    techniques: [],
+    styles: [],
+    races: [race, lens, other],
+  });
+  expect(first).toContain('version: 15');
+  const parsed = parseLibraryYaml(first);
+  const selected = sourceScopedLibrary(parsed.library, ['alpha']);
+  expect(selected.races?.map((entry) => entry.key)).toEqual(['abyssal', 'stonekin']);
+  expect(selected.races?.[1]?.variants[0]?.attributeModifiers).toEqual({ ht: 1 });
+  expect(selected.races?.[0]?.removesTraits).toEqual(['night-vision']);
+
+  const second = emitLibraryYaml({
+    sources: parsed.library.sources ?? [],
+    traits: parsed.library.traits,
+    skills: parsed.library.skills,
+    spells: parsed.library.spells ?? [],
+    items: parsed.library.items,
+    languages: parsed.library.languages ?? [],
+    techniques: parsed.library.techniques ?? [],
+    styles: parsed.library.styles ?? [],
+    races: parsed.library.races ?? [],
+  });
+  expect(parseLibraryYaml(second).library.races?.map((entry) => entry.key)).toEqual([
+    'abyssal',
+    'moonfolk',
+    'stonekin',
+  ]);
 });
 
 const SAMPLE = `version: 1
@@ -239,7 +318,7 @@ it('round-trips specialization catalogs and structured default matchers', () => 
     techniques: [],
     styles: [],
   });
-  expect(yaml).toContain('version: 14');
+  expect(yaml).toContain('version: 15');
   expect(parseLibraryYaml(yaml).library.skills[0]).toEqual(skill);
 });
 
@@ -550,7 +629,7 @@ describe('emitLibraryYaml', () => {
       techniques: doc.library.techniques ?? [],
       styles: doc.library.styles ?? [],
     });
-    expect(first).toContain('version: 14');
+    expect(first).toContain('version: 15');
     expect(first).toContain('manaLevel: high');
 
     const docB = parseLibraryYaml(first);

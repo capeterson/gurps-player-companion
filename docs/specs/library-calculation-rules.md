@@ -1,7 +1,7 @@
 # Library calculation rules and source editions
 
 This subsystem represents user-supplied material without supplying book content or
-extracting PDFs. YAML v14, REST, MCP and local-first authoring share the same
+extracting PDFs. YAML v15, REST, MCP and local-first authoring share the same
 schemas. Extraction, OCR and classification remain external responsibilities.
 
 ## Identity, sources and completeness
@@ -159,7 +159,7 @@ Migrations 0054–0056 add common metadata, sources/modifiers, typed JSON rules 
 snapshots, edition-qualified indexes, history/revision/tombstone triggers and
 compatibility backfills. Character paid values are not recalculated.
 
-YAML parsers accept v1–v14; exporters emit only canonical v14. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
+YAML parsers accept v1–v15; exporters emit only canonical v15. Legacy weapon Range strings convert at import; fixed-yard and ST-multiplier values are typed in storage, API, MCP and visual editors. Sources and
 modifiers are optional sections: omission preserves them even in replace mode;
 explicit empty arrays prune them. Merge/replace uses canonical edition identity.
 The final graph includes retained existing rows. It is validated under the
@@ -213,3 +213,7 @@ logs and three private journals apiece. The explicit `db:seed:lantern:refresh` c
 conservatively updates recognized unchanged older defaults once; edited fields,
 deleted older entries and play state are preserved. A completion marker preserves
 later deletions on subsequent runs. See the [seed guide](../../bootstrap/README.md).
+
+## Racial templates
+
+Races use printed package points rather than the pricing expression engine. Components retain their printed cost for inspection but are not billed independently. One owned resolved snapshot applies racial attribute deltas, traits/effects and training; complete variants/forms replace profiles and lenses add explicit deltas/replacements. Source changes do not reprice existing race purchases. See [races.md](races.md).

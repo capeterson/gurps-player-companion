@@ -1,7 +1,9 @@
 import { canonicalLibraryKey, libraryEntryKey } from '../domain/libraryIdentity.ts';
+import { validateRaceDefinition } from '../domain/race.ts';
 import { upgradeLegacyWeaponRanges } from '../domain/rangedRange.ts';
 import type { ActiveEffectDefinition } from '../schemas/activeEffects.ts';
 import type { LibraryModifierCreate, LibrarySourceCreate } from '../schemas/libraryMetadata.ts';
+import type { LibraryRaceCreate } from '../schemas/race.ts';
 /**
  * Campaign library YAML codec.  Round-trippable: import → export → diff
  * yields the same bytes (canonical sort + ordered keys).
@@ -39,8 +41,9 @@ import {
  * editions, standalone modifiers, calculation rules, and normalized weapon modes.
  * v13 replaces weapon Range text with structured fixed/ST-multiplier values.
  * v14 adds GM restrictions and sourcebook-scoped packages.
+ * v15 adds racial templates with complete variants/forms and additive lenses.
  */
-export const LIBRARY_YAML_VERSION = 14 as const;
+export const LIBRARY_YAML_VERSION = 15 as const;
 export const LIBRARY_YAML_MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
 export class LibraryYamlError extends Error {
@@ -121,6 +124,7 @@ export function sourceScopedLibrary(
     styles: library.styles?.filter(selected),
     enchantments: library.enchantments?.filter(selected),
     activeEffects: library.activeEffects?.filter(selected),
+    races: library.races?.filter(selected),
   };
 }
 
@@ -177,6 +181,13 @@ function assertNoDuplicateKeys(doc: LibraryYamlDoc): void {
     if (styleKeys.has(k)) throw new LibraryYamlError(`duplicate style (${st.name})`);
     styleKeys.add(k);
   }
+  const raceKeys = new Set<string>();
+  for (const entry of doc.library.races ?? []) {
+    validateRaceDefinition(entry);
+    const key = libraryEntryKey(entry);
+    if (raceKeys.has(key)) throw new LibraryYamlError(`duplicate race (${entry.name})`);
+    raceKeys.add(key);
+  }
   const effectKeys = new Set<string>();
   for (const entry of doc.library.activeEffects ?? []) {
     const key = libraryEntryKey(entry);
@@ -206,6 +217,7 @@ export interface LibraryYamlExportInput {
   readonly styles: readonly LibraryStyleCreate[];
   readonly enchantments?: readonly LibraryEnchantmentCreate[];
   readonly activeEffects?: readonly ActiveEffectDefinition[];
+  readonly races?: readonly LibraryRaceCreate[];
 }
 
 /** Stable ordering for byte-stable round trip. */
@@ -289,6 +301,7 @@ export function emitLibraryYaml(input: LibraryYamlExportInput): string {
     styles,
     enchantments,
     activeEffects: sortedByName(input.activeEffects ?? []).map((entry) => compact(entry)),
+    races: sortedByName(input.races ?? []).map((entry) => compact(entry)),
   };
 
   const doc = new Document(payload);

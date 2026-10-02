@@ -1112,7 +1112,7 @@ describe('YAML export/import round trip', () => {
     expect(modifierResponse.status).toBe(201);
     const modifier = (await modifierResponse.json()) as { id: string };
     const exportBefore = await exportYaml(owner.accessToken, String(campaign.id));
-    expect(exportBefore).toContain('version: 14');
+    expect(exportBefore).toContain('version: 15');
     expect(exportBefore).toContain('preferredEdition: true');
 
     const doc = (sources: unknown[], traits: unknown[], modifiers: unknown[]) =>
@@ -1225,7 +1225,7 @@ describe('YAML export/import round trip', () => {
     const campaign = await createCampaign(owner.accessToken);
     await seedLibrary(owner.accessToken, campaign.id as string);
     const yaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(yaml).toContain('version: 14');
+    expect(yaml).toContain('version: 15');
     expect(yaml).toContain('Toughness');
     expect(yaml).toContain('Fencing');
     expect(yaml).toContain('Fireball');
@@ -1699,7 +1699,7 @@ library:
     expect(list.items.find((i) => i.name === 'Phoenix Cloak')?.enchantments).toEqual(enchantments);
 
     const firstYaml = await exportYaml(owner.accessToken, campaign.id as string);
-    expect(firstYaml).toContain('version: 14');
+    expect(firstYaml).toContain('version: 15');
     expect(firstYaml).toContain('enchantments:');
 
     const importRes = await app.request(`/api/v1/campaigns/${campaign.id}/library/import`, {

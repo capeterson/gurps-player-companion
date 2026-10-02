@@ -5,6 +5,7 @@ import type {
 import type { PricingResolution } from '../../shared/schemas/calculation.ts';
 import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
+import type { CharacterRace, LibraryRaceOut } from '../../shared/schemas/race.ts';
 import type { SyncLogPayloadMetadata } from '../../shared/schemas/syncLog.ts';
 /**
  * Local Dexie database — the source of truth for the UI.
@@ -68,6 +69,8 @@ import { inferLegacyCampaignOrder, legacyReferenceFields } from './legacyCampaig
  * verbatim.  Numbers are stored as numbers; ISO strings remain strings.
  */
 export interface LocalCharacter {
+  race?: CharacterRace | undefined;
+  raceName?: string | undefined;
   portraitAssetId?: string | null | undefined;
   id: string;
   ownerId: string;
@@ -295,6 +298,7 @@ export type LocalLibraryTrait = LocalLibraryRow<LibraryTraitOut>;
 export type LocalLibrarySkill = LocalLibraryRow<LibrarySkillOut>;
 export type LocalLibrarySpell = LocalLibraryRow<LibrarySpellOut>;
 export type LocalLibraryItem = LocalLibraryRow<LibraryItemOut>;
+export type LocalLibraryRace = LocalLibraryRow<LibraryRaceOut>;
 export type LocalLibraryLanguage = LocalLibraryRow<LibraryLanguageOut>;
 export type LocalLibraryTechnique = LocalLibraryRow<LibraryTechniqueOut>;
 export type LocalLibraryStyle = LocalLibraryRow<LibraryStyleOut>;
@@ -630,6 +634,7 @@ class LocalDb extends Dexie {
   campaignLibrarySkills!: Table<LocalLibrarySkill, string>;
   campaignLibrarySpells!: Table<LocalLibrarySpell, string>;
   campaignLibraryItems!: Table<LocalLibraryItem, string>;
+  campaignLibraryRaces!: Table<LocalLibraryRace, string>;
   campaignLibraryLanguages!: Table<LocalLibraryLanguage, string>;
   campaignLibraryTechniques!: Table<LocalLibraryTechnique, string>;
   campaignLibraryStyles!: Table<LocalLibraryStyle, string>;
@@ -647,6 +652,7 @@ class LocalDb extends Dexie {
   constructor() {
     super('gurps-pc-local');
     // Existing journal rows remain readable inline; new large bodies are lazy.
+    this.version(16).stores({ campaignLibraryRaces: 'id, campaignId, revision' });
     this.version(15).stores({ syncLogBodies: 'id' });
     this.version(14).stores({ mediaUploads: 'id, userId, targetId, state', mediaManifests: 'id' });
     this.version(1).stores({
@@ -846,6 +852,7 @@ export const LIBRARY_STORE_NAMES = [
   'campaignLibrarySkills',
   'campaignLibrarySpells',
   'campaignLibraryItems',
+  'campaignLibraryRaces',
   'campaignLibraryLanguages',
   'campaignLibraryTechniques',
   'campaignLibraryStyles',
@@ -900,6 +907,7 @@ const STORE_BY_ENTITY_CLASS: Readonly<Record<EntityClass, keyof LocalDb | null>>
   campaign_library_skill: 'campaignLibrarySkills',
   campaign_library_spell: 'campaignLibrarySpells',
   campaign_library_item: 'campaignLibraryItems',
+  campaign_library_race: 'campaignLibraryRaces',
   campaign_library_language: 'campaignLibraryLanguages',
   campaign_library_technique: 'campaignLibraryTechniques',
   campaign_library_style: 'campaignLibraryStyles',

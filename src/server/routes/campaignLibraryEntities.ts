@@ -1,5 +1,6 @@
 import { fixedCalculation, legacyTraitCalculation } from '../../shared/domain/calculation.ts';
 import { libraryEntryKey, libraryMetadataValues } from '../../shared/domain/libraryIdentity.ts';
+import { validateRaceDefinition } from '../../shared/domain/race.ts';
 import { withLegacyModifiers } from '../../shared/domain/skillProcedures.ts';
 import { normalizeWeaponData } from '../../shared/domain/weaponModes.ts';
 import {
@@ -16,11 +17,12 @@ import {
   librarySourceOut,
   librarySourceUpdate,
 } from '../../shared/schemas/libraryMetadata.ts';
+import { libraryRaceCreate, libraryRaceOut, libraryRaceUpdate } from '../../shared/schemas/race.ts';
 import { campaignLibraryModifiers, campaignLibrarySources } from '../db/schema.ts';
+import { campaignLibraryRaces } from '../db/schema.ts';
 import { campaignLibraryActiveEffects } from '../db/schema.ts';
 /**
- * Per-entity configuration for the four campaign-library kinds (traits,
- * skills, spells, items).  `campaignLibraryCrud.ts` consumes these configs
+ * Per-entity configuration for every campaign-library category.  `campaignLibraryCrud.ts` consumes these configs
  * to register the POST/PATCH/DELETE routes and drive the YAML
  * upsert-by-key import loop generically; `campaignLibrary.ts` uses them
  * for the GET list, YAML export, and import handlers.
@@ -131,6 +133,7 @@ export interface LibraryEntityConfig<
     | 'styles'
     | 'enchantments'
     | 'activeEffects'
+    | 'races'
     | 'sources'
     | 'modifiers';
   readonly table: TTable;
@@ -940,6 +943,53 @@ export const activeEffectEntity: LibraryEntityConfig<
     ),
 };
 
+export const raceEntity: LibraryEntityConfig<
+  typeof campaignLibraryRaces,
+  z.infer<typeof libraryRaceCreate>,
+  z.infer<typeof libraryRaceUpdate>,
+  z.infer<typeof libraryRaceOut>,
+  'raceId'
+> = {
+  pathSegment: 'races',
+  paramName: 'raceId',
+  entityLabel: 'race',
+  yamlKey: 'races',
+  table: campaignLibraryRaces,
+  orderBy: [asc(campaignLibraryRaces.name)],
+  createSchema: libraryRaceCreate,
+  updateSchema: libraryRaceUpdate,
+  outSchema: libraryRaceOut,
+  summaries: {
+    post: 'Add a library race (owner only)',
+    patch: 'Update a library race (owner only)',
+    delete: 'Delete a library race (owner only)',
+  },
+  toOut: (row) =>
+    libraryRaceOut.parse({
+      ...row,
+      revision: Number(row.revision),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }),
+  validateCreate: validateRaceDefinition,
+  validateRow: validateRaceDefinition,
+  keyOf: libraryEntryKey,
+  toInsertValues: (campaignId, body) => ({
+    ...body,
+    ...libraryMetadataValues(body),
+    description: body.description ?? null,
+    source: body.source ?? null,
+    campaignId,
+  }),
+  toUpdateValues: (body) => ({ ...body, ...libraryMetadataValues(body) }),
+  rowToCreate: (row) =>
+    libraryRaceCreate.parse(
+      Object.fromEntries(
+        Object.keys(libraryRaceCreate.shape).map((key) => [key, row[key as keyof typeof row]]),
+      ),
+    ),
+};
+
 /** All entity configs, in the order routes/list/export/import must process them. */
 export const sourceEntity: LibraryEntityConfig<
   typeof campaignLibrarySources,
@@ -1042,6 +1092,7 @@ export const libraryEntities = [
   styleEntity,
   enchantmentEntity,
   activeEffectEntity,
+  raceEntity,
 ] as const;
 
 /** Entity-class → config, shared by the sync dispatcher and cursor reader. */
@@ -1055,6 +1106,7 @@ export const LIBRARY_ENTITY_CONFIGS = {
   campaign_library_style: styleEntity,
   campaign_library_enchantment: enchantmentEntity,
   campaign_library_active_effect: activeEffectEntity,
+  campaign_library_race: raceEntity,
   campaign_library_source: sourceEntity,
   campaign_library_modifier: modifierEntity,
 } as const satisfies Record<LibraryEntityClass, unknown>;

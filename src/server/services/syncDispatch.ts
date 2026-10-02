@@ -2,6 +2,7 @@ import { campaignMediaPatch } from '../../shared/schemas/media.ts';
 import { prepareActiveEffects } from './activeEffects.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 import { prepareMediaAttachment } from './media/service.ts';
+import { prepareRace } from './races.ts';
 /**
  * Per-operation dispatcher for /api/v1/sync/operations.
  *
@@ -26,7 +27,6 @@ import { prepareMediaAttachment } from './media/service.ts';
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { z } from 'zod';
-import { computeDerived } from '../../shared/domain/characterCalc.ts';
 import { characterCreate, characterSyncPatch } from '../../shared/schemas/character.ts';
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
@@ -81,7 +81,7 @@ import {
   insertCharacterChild,
   isCharacterChildClass,
 } from './characterChildren.ts';
-import { characterAttrsFromRow } from './characterSummary.ts';
+import { loadCharacterDetail } from './characterSummary.ts';
 import {
   characterInsertValues,
   combatUpsertValues,
@@ -138,6 +138,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   campaign_library_technique: null,
   campaign_library_style: null,
   campaign_library_enchantment: null,
+  campaign_library_race: null,
   campaign_library_active_effect: null,
   campaign_library_source: null,
   campaign_library_modifier: null,
@@ -210,6 +211,7 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'campaign_library_technique',
   'campaign_library_style',
   'campaign_library_enchantment',
+  'campaign_library_race',
   'campaign_library_active_effect',
   'campaign_library_source',
   'campaign_library_modifier',
@@ -591,6 +593,7 @@ async function dispatchOperationInner(
     case 'campaign_library_technique':
     case 'campaign_library_style':
     case 'campaign_library_enchantment':
+    case 'campaign_library_race':
     case 'campaign_library_active_effect':
     case 'campaign_library_source':
     case 'campaign_library_modifier':
@@ -619,6 +622,7 @@ async function dispatchCharacter(
       enforceAttributeCaps = campaign.enforceAttributeCaps;
     }
     assertAttributeCaps(enforceAttributeCaps, body);
+    await prepareRace(tx, ctx.userId, null, body.campaignId ?? null, body);
     await prepareActiveEffects(tx, ctx.userId, null, body.campaignId ?? null, body);
     // Honor a client-supplied id so the local Dexie row keeps its
     // identity after the create round-trips.  If the id is already
@@ -675,6 +679,15 @@ async function dispatchCharacter(
     table: characters,
     prepareUpdates: async (updates) => {
       await prepareMediaAttachment(tx, 'character', op.entityId, updates);
+      await prepareRace(
+        tx,
+        ctx.userId,
+        op.entityId,
+        updates.campaignId === undefined
+          ? access.character.campaignId
+          : (updates.campaignId as string | null),
+        updates,
+      );
       await prepareActiveEffects(
         tx,
         ctx.userId,
@@ -1056,7 +1069,7 @@ async function dispatchCombat(
   // and the cursor pull would clobber the local pool.  The legacy CRUD
   // route in characterSubResources.ts already computes derived for the
   // same reason.
-  const derived = computeDerived(characterAttrsFromRow(access.character));
+  const { derived } = await loadCharacterDetail(characterId, tx);
   const [row] = await tx
     .insert(combatStates)
     .values(combatUpsertValues(body, { characterId, derived }))

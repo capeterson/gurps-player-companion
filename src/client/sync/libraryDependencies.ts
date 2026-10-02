@@ -11,6 +11,7 @@ const record = (value: unknown): Record<string, unknown> =>
 const array = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 const key = (value: unknown) => canonicalLibraryKey(typeof value === 'string' ? value : '');
 const sections: Record<string, string> = {
+  campaign_library_race: 'races',
   campaign_library_trait: 'traits',
   campaign_library_item: 'items',
   campaign_library_modifier: 'modifiers',
@@ -56,6 +57,9 @@ function dependencies(value: unknown): Dependencies {
   ]) {
     if (typeof body[field] === 'string') result.ids.add(body[field]);
   }
+  const raceSelection = record(record(body.race).selection);
+  if (typeof raceSelection.raceId === 'string') result.ids.add(raceSelection.raceId);
+  for (const id of array(raceSelection.lensIds)) if (typeof id === 'string') result.ids.add(id);
   calculation(body.calculation);
   snapshot(body.pricingResolution);
   for (const modifier of [...array(body.availableModifiers), ...array(body.modifiers)]) {
