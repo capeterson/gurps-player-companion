@@ -83,7 +83,8 @@ test('campaign library search and Clear search stay usable across form factors',
 
   await page.goto(`/campaigns/${campaign.id}/library?section=traits`);
   const row = page.getByRole('button', {
-    name: /NarrowSearchLayoutProbe RS/,
+    name: 'NarrowSearchLayoutProbe',
+    exact: true,
   });
   await expect(row).toBeVisible({ timeout: 20_000 });
   const unfilteredRow = page.getByRole('button', {
