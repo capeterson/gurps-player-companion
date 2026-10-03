@@ -66,8 +66,10 @@ function isActive(item: ItemInput, effect: EnchantmentEffect): boolean {
   if (effect.target === 'dr') return item.isArmor && item.armor != null && item.equipped;
   if (effect.target === 'db')
     return item.equipped && ((item.isArmor && item.armor != null) || item.weaponData?.db != null);
+  // The legacy worn field marks a carried root. Weight reduction changes
+  // the physical load; carrying alone must not activate equipment bonuses.
   if (effect.target === 'weight_reduction_percent') return item.worn;
-  return item.equipped || item.worn;
+  return item.equipped;
 }
 
 function candidates(item: ItemInput): Candidate[] {

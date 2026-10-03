@@ -93,6 +93,54 @@ describe('resolveItemEnchantments', () => {
     expect(result.weightReductionPercent).toBe(30);
   });
 
+  it('keeps carried weight reduction active but disables skill effects until equipped', () => {
+    const result = resolveItemEnchantments({
+      ...base,
+      worn: true,
+      equipped: false,
+      weightReductionPercent: 5,
+      enchantments: [
+        {
+          spellName: 'Burden-Bearing Charm',
+          mechanics: {
+            applicability: 'any',
+            effects: [
+              { target: 'weight_reduction_percent', value: 20 },
+              { target: 'skill', skillName: 'Hiking', value: 2 },
+            ],
+            levels: [],
+            stackingPolicy: { kind: 'stack' },
+          },
+        },
+      ],
+    });
+
+    expect(result.weightReductionPercent).toBe(25);
+    expect(result.effects).toEqual([]);
+    expect(result.breakdown).toMatchObject([
+      { target: 'weight_reduction_percent', active: true },
+      { target: 'skill', active: false },
+    ]);
+
+    const equipped = resolveItemEnchantments({
+      ...base,
+      worn: true,
+      equipped: true,
+      enchantments: [
+        {
+          spellName: 'Burden-Bearing Charm',
+          mechanics: {
+            applicability: 'any',
+            effects: [{ target: 'skill', skillName: 'Hiking', value: 2 }],
+            levels: [],
+            stackingPolicy: { kind: 'stack' },
+          },
+        },
+      ],
+    });
+    expect(equipped.effects).toMatchObject([{ target: 'skill', skillName: 'Hiking', value: 2 }]);
+  });
+
   it('keeps inactive mechanics visible in the breakdown without applying them', () => {
     const result = resolveItemEnchantments({
       ...base,

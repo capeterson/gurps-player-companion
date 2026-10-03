@@ -104,14 +104,14 @@ export function LandingPage() {
           <figure className="card card-border overflow-hidden bg-base-100">
             <img
               src="/screenshots/inventory-desktop.png"
-              alt="GPC inventory in Illuminated Manuscript with worn equipment and nested containers."
+              alt="GPC inventory in Illuminated Manuscript with carried equipment and nested containers."
               width="1224"
               height="1506"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
-              A pack with a place for everything. Track worn gear, nested containers, weight, armor,
-              and weapon modes.
+              A pack with a place for everything. Track carried gear, nested containers, weight,
+              armor, and weapon modes.
             </figcaption>
           </figure>
           <p className="text-center">

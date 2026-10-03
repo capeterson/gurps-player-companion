@@ -635,6 +635,23 @@ describe('summarizeEvent character_inventory', () => {
     expect(summary.toLowerCase()).toContain('sword');
   });
 
+  it('describes a root item becoming carried and then stashed', () => {
+    const carried = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', worn: false },
+      newRow: { name: 'Shortsword', worn: true },
+    });
+    const stashed = summarizeEvent({
+      entityClass: 'character_inventory',
+      op: 'update',
+      oldRow: { name: 'Shortsword', worn: true },
+      newRow: { name: 'Shortsword', worn: false },
+    });
+    expect(carried.summary).toBe('Carrying Shortsword');
+    expect(stashed.summary).toBe('Stashed Shortsword');
+  });
+
   it('isArmor set: "Shortsword: set as armor" (not raw field name)', () => {
     const { summary } = summarizeEvent({
       entityClass: 'character_inventory',
@@ -875,7 +892,7 @@ describe('groupIntoBatches', () => {
         entityId: itemId,
         entityClass: 'character_inventory',
         createdAt: new Date(t0.getTime() + 59_000).toISOString(),
-        summary: 'Wearing Shortsword',
+        summary: 'Carrying Shortsword',
       }),
     ];
     const groups = groupIntoBatches(events);

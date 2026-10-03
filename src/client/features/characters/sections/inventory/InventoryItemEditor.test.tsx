@@ -127,6 +127,18 @@ afterEach(() => {
 });
 
 describe('inline inventory editing', () => {
+  it('keeps Equipped in item details without exposing a duplicate Worn field', async () => {
+    const user = await setup();
+    await user.click(screen.getByRole('button', { name: 'Edit Coat' }));
+    const editor = screen.getByRole('region', { name: 'Coat: Item details' });
+
+    expect(within(editor).getByRole('checkbox', { name: 'Equipped' })).toBeChecked();
+    expect(within(editor).queryByRole('checkbox', { name: 'Worn' })).not.toBeInTheDocument();
+
+    await user.click(within(editor).getByRole('checkbox', { name: 'Equipped' }));
+    await waitFor(async () => expect((await stored()).equipped).toBe(false));
+  });
+
   it('toggles the same category closed with click or keyboard, without removing it or selecting the row', async () => {
     const user = await setup();
     const chip = screen.getByRole('button', { name: 'Armor settings for Coat' });

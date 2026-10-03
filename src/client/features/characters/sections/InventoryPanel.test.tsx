@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { getLocalDb, resetLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { InventoryPanel } from './InventoryPanel.tsx';
+
+const CHARACTER_ID = '0193b3c0-f1f0-7000-8000-00000000c101';
+const PACK_ID = '0193b3c0-f1f0-7000-8000-00000000c102';
 
 function item(
   id: string,
@@ -14,7 +18,7 @@ function item(
 ): InventoryItemOut {
   return {
     id,
-    characterId: 'character',
+    characterId: CHARACTER_ID,
     name,
     quantity: 1,
     weightLbs: 1,
@@ -57,15 +61,15 @@ function renderPanel(
   options: { canWrite?: boolean; inventory?: InventoryItemOut[] } = {},
 ) {
   const inventory = options.inventory ?? [
-    item('pack', 'Backpack', null, { container: true }),
-    item('apple', 'Apple', 'pack'),
-    item('pouch', 'Small pouch', 'pack', { container: true }),
+    item(PACK_ID, 'Backpack', null, { container: true }),
+    item('apple', 'Apple', PACK_ID),
+    item('pouch', 'Small pouch', PACK_ID, { container: true }),
     item('gem', 'Moon Gem', 'pouch'),
-    item('sword', 'Broadsword', 'pack', { weapon: true }),
+    item('sword', 'Broadsword', PACK_ID, { weapon: true }),
     item('tent', 'Tent', null, { worn: false }),
   ];
   const character = {
-    id: 'character',
+    id: CHARACTER_ID,
     campaignId: null,
     inventory,
     skills: [],
@@ -86,7 +90,98 @@ function renderPanel(
   );
 }
 
-afterEach(() => window.localStorage.clear());
+beforeEach(async () => {
+  await resetLocalDb();
+});
+
+afterEach(() => {
+  window.localStorage.clear();
+});
+
+describe('Inventory location and equipment controls', () => {
+  it('uses location instead of a Worn state and stores carried status from the selected location', async () => {
+    const db = getLocalDb();
+    await db.characterInventory.put({
+      ...item(PACK_ID, 'Backpack', null, { container: true }),
+      revision: 1,
+    });
+    renderPanel(undefined, { canWrite: true });
+
+    expect(screen.queryByText('Worn', { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Worn' })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('combobox', { name: 'Filter inventory by tag' })).queryByRole(
+        'option',
+        { name: 'Worn' },
+      ),
+    ).not.toBeInTheDocument();
+
+    const location = screen.getByRole('combobox', { name: 'Location' });
+    expect(location).toHaveValue('');
+    expect(within(location).getByRole('option', { name: 'On the player' })).toHaveValue('');
+    expect(within(location).getByRole('option', { name: 'Stashed' })).toHaveValue('stashed');
+    expect(within(location).getByRole('option', { name: 'in Backpack' })).toHaveValue(PACK_ID);
+
+    fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Carried knife' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(async () => expect(await db.outbox.count()).toBe(1));
+    const carriedOp = (await db.outbox.toArray()).find(
+      (op) => (op.attemptedValue as { name?: string }).name === 'Carried knife',
+    );
+    expect(carriedOp?.attemptedValue).toMatchObject({
+      name: 'Carried knife',
+      parentId: null,
+      worn: true,
+      equipped: false,
+    });
+    expect(await db.characterInventory.get(carriedOp?.entityId ?? '')).toMatchObject({
+      name: 'Carried knife',
+      worn: true,
+      equipped: false,
+    });
+
+    fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Stored knife' } });
+    fireEvent.change(location, { target: { value: 'stashed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(async () => expect(await db.outbox.count()).toBe(2));
+    const stashedOp = (await db.outbox.toArray()).find(
+      (op) => (op.attemptedValue as { name?: string }).name === 'Stored knife',
+    );
+    expect(stashedOp?.attemptedValue).toMatchObject({
+      name: 'Stored knife',
+      parentId: null,
+      worn: false,
+      equipped: false,
+    });
+    expect(await db.characterInventory.get(stashedOp?.entityId ?? '')).toMatchObject({
+      name: 'Stored knife',
+      worn: false,
+      equipped: false,
+    });
+
+    fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Packed knife' } });
+    fireEvent.change(location, { target: { value: PACK_ID } });
+    fireEvent.click(screen.getByRole('button', { name: 'More options' }));
+    expect(screen.getByLabelText('Equipped')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(async () => expect(await db.outbox.count()).toBe(3));
+    const packedOp = (await db.outbox.toArray()).find(
+      (op) => (op.attemptedValue as { name?: string }).name === 'Packed knife',
+    );
+    expect(packedOp?.attemptedValue).toMatchObject({
+      name: 'Packed knife',
+      parentId: PACK_ID,
+      worn: false,
+      equipped: false,
+    });
+    expect(await db.characterInventory.get(packedOp?.entityId ?? '')).toMatchObject({
+      name: 'Packed knife',
+      parentId: PACK_ID,
+      worn: false,
+      equipped: false,
+    });
+  });
+});
 
 describe('Inventory container disclosure', () => {
   it('reveals a linked item through nested closed containers', () => {
@@ -109,8 +204,14 @@ describe('Inventory container disclosure', () => {
     renderPanel();
 
     expect(screen.getByText('0.0 lbs')).toBeVisible();
-    expect(screen.getByText('Tent')).toBeVisible();
+    expect(screen.getByRole('table', { name: 'Carried inventory' })).toContainElement(
+      screen.getByText('Backpack'),
+    );
+    expect(screen.getByRole('table', { name: 'Stashed inventory' })).toContainElement(
+      screen.getByText('Tent'),
+    );
     expect(screen.getByText('1.0 lb')).toBeVisible();
+    expect(screen.queryByRole('table', { name: 'Worn inventory' })).not.toBeInTheDocument();
   });
 
   it('remembers expansion on this device without forcing nested containers open', () => {

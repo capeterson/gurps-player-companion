@@ -377,7 +377,7 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   }
 
   await selectCharacterSection(page, 'Inventory');
-  const inventory = page.getByRole('table', { name: 'Worn inventory', exact: true });
+  const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
   const pack = page.locator(`#inventory-${fixture.pack.id}`);
   const pouch = page.locator(`#inventory-${fixture.pouch.id}`);
   const nested = page.locator(`#inventory-${fixture.nested.id}`);

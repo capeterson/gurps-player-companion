@@ -193,6 +193,12 @@ facets and container values; mode key and mode name restrictions are independent
 Ambiguous extraction belongs in evidence with incomplete status, not fabricated
 damage/skill/reach fields.
 
+Character item equipment bonuses, including typed skill enchantments, require
+`equipped`; merely carrying an item does not activate them. Physical weight
+reductions follow carried weight instead. The legacy inventory `worn` field
+marks a root as on the player, with nested contents inheriting that location.
+It does not represent wearing an item for use.
+
 ## Persistence, import and public access
 
 Migrations 0054–0056 add common metadata, sources/modifiers, typed JSON rules and

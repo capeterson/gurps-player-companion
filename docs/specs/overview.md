@@ -573,10 +573,14 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. Both encumbrance summaries
+  encumbrance, armor and weapon data, cost/weight rollups. Location determines what is carried:
+  On the player, Stashed, or inside a container; nested contents inherit their
+  root's carried/stashed location. Equipped means worn or wielded for use and
+  is the only equipment status; there is no separate Worn toggle or badge.
+  Quick-add defaults to On the player. Both encumbrance summaries
   use player-carried weight, excluding stashed items; the raw weight total covers all items. A compact filter
   combines case-insensitive item-name substring matching with a category/status
-  tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
+  tag (weapon, armor, container, powerstone, magic item, enchanted, or
   equipped). Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Containers
   start collapsed; their expanded/collapsed choice is remembered per character and
@@ -597,7 +601,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
   **+ Category**, in the pencil's item-details editor, adds another role
-  without changing siblings or equipped/worn state. Category removal has a separate inline confirmation; containers with
+  without changing siblings, location or equipped state. Category removal has a separate inline confirmation; containers with
   contents must be emptied first. Read-only viewers see summary badges only.
   Fields save on blur through `useDraftField` and the local outbox. JSON leaf
   edits merge with the latest stored item inside a Dexie transaction so rapid
@@ -615,10 +619,11 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   and shared validation. Legacy enchantment rows remain display metadata, while
   typed campaign or character-local enchantments contribute attack, damage, Accuracy,
   Parry/Block/DB, DR, armor divisor, weight reduction, or skill modifiers only under
-  their equipped/worn rule. Rows show the base-to-effective contribution breakdown,
+  their activation rule: equipment bonuses require Equipped; physical weight
+  reductions apply to carried weight. Rows show the base-to-effective contribution breakdown,
   including inactive and highest-policy-suppressed effects.
   Library templates still populate the quick-add form, and its small optional
-  category/equipped/worn controls remain available; detailed editing uses the
+  category/equipped controls and location selector remain available; detailed editing uses the
   new item's category chips.
   Every row leads with a container chevron or an item-type icon, and each
   nesting level indents one step with a faint guide line under its parent's

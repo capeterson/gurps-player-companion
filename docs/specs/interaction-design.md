@@ -303,6 +303,15 @@ shrinking (`min-w-0`, `w-full`) and summary text allows word wrapping. Use the
 app's existing daisyUI components and semantic theme colors; avoid bespoke
 palettes, nested decorative cards, and additional display fonts.
 
+Inventory location uses the existing move/drop interaction, with On the player,
+Stashed and nested containers. Quick-add has one Location selector with those
+choices and defaults to On the player. Carried contents inherit their root's
+location. Equipped means worn or wielded for use; there is no additional Worn
+control, filter or status badge. The stored/API `worn` field remains a legacy
+root-location flag for compatibility, not an equipment status. The move menu
+wraps long container names, scrolls internally, and uses shared viewport collision
+handling to stay below the sticky app header and within the visible viewport.
+
 Inventory preserves its desktop columns and uses a compact two-line item row
 below 640px: name and chips on the left, weight over quantity and cost on the
 right, then the edit action. Quantity 1 is implied rather than repeated, and

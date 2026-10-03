@@ -409,7 +409,9 @@ export const inventoryItemOut = z.object({
   notes: z.string().max(20_000).nullable(),
   parentId: uuid.nullable(),
   externalLocation: z.string().max(160).nullable(),
+  /** Legacy name: a root is on the player; nested items inherit their root location. */
   worn: z.boolean(),
+  /** Worn or wielded for use, independently of carried/stashed location. */
   equipped: z.boolean(),
   isContainer: z.boolean(),
   hideawayCapacityLbs: z.number().min(0).max(1_000_000),
@@ -441,6 +443,7 @@ export const inventoryItemCreate = z.object({
   notes: z.string().max(20_000).nullable().optional(),
   parentId: uuid.nullable().optional(),
   externalLocation: z.string().max(160).trim().nullable().optional(),
+  /** Legacy location flag, not a separate wearing/equipment status. */
   worn: z.boolean().default(false),
   equipped: z.boolean().default(false),
   isContainer: z.boolean().default(false),

@@ -63,7 +63,6 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
         number('weightLbs', 'Weight (lb)'),
         number('cost', 'Cost'),
         check('equipped', 'Equipped'),
-        ...(item.parentId === null ? [check('worn', 'Worn')] : []),
         ...(item.parentId === null && !item.worn
           ? [text('externalLocation', 'External location', true)]
           : []),
@@ -288,8 +287,8 @@ function ItemListEditor({
       <h4 className="label-eyebrow">{enchantments ? 'Enchantments' : 'Alternate attacks'}</h4>
       {enchantments && (
         <p className="text-xs text-base-content/60">
-          Campaign definitions and custom typed effects change stats while this item is equipped or
-          worn. Older note-only records remain non-mechanical.
+          Equipment bonuses apply while this item is equipped. Weight reductions apply to carried
+          weight. Older note-only records remain non-mechanical.
         </p>
       )}
       {list.map((listEntry, index) => {

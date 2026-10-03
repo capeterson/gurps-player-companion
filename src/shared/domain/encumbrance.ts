@@ -6,21 +6,21 @@
  *
  *   1. Each inventory item has weightLbs * quantity raw weight.
  *   2. Items live in a tree of containers via parentId.
- *   3. A "worn root" is a container whose parentId is null and worn=true.
- *   4. For a worn root, the *outermost* worn container's enchantments
+ *   3. A carried root has parentId=null and the legacy worn=true location flag.
+ *   4. For a carried root, the *outermost* carried container's enchantments
  *      apply to the entire subtree:
  *        - hideawayCapacityLbs is deducted from the contents subtotal
  *          first (down to zero, never negative);
  *        - the remaining subtotal is multiplied by
  *          (1 - weightReductionPercent / 100).
  *      Inner-container enchantments are ignored when nested inside
- *      another worn container.
+ *      another carried container.
  *   5. Items at the root with parentId=null and worn=false do not
  *      contribute to encumbrance ("off-player" stash).
  *
  * Per-item "effective weight" (what the UI shows next to a row) is the
- * raw weight for non-worn items, and a proportional share of the worn
- * root's reduced weight for items inside a worn root.
+ * raw weight for stashed items, and a proportional share of the carried
+ * root's reduced weight for items inside a carried root.
  */
 
 export interface InventoryItemRow {
@@ -35,7 +35,7 @@ export interface InventoryItemRow {
 }
 
 export interface WeightContribution {
-  /** Total worn weight (used for encumbrance level). */
+  /** Total carried weight (used for encumbrance level). */
   readonly playerWeightLbs: number;
   /** Per-item effective weight, keyed by item id. */
   readonly perItem: Map<string, number>;
@@ -90,7 +90,7 @@ function distributePerItem(
   rawTotal: number,
   out: Map<string, number>,
 ): void {
-  // Distribute the worn root's reduced total proportionally to each
+  // Distribute the carried root's reduced total proportionally to each
   // descendant's raw share so the UI's per-item weights still sum to the
   // root's effective weight.
   const ratio = rawTotal === 0 ? 0 : effectiveTotal / rawTotal;

@@ -108,7 +108,18 @@ test('nested inventory names and expanded item controls stay in view at supporte
 
     await page.goto(characterPath);
     await selectCharacterSection(page, 'Inventory');
-    const inventory = page.getByRole('table', { name: 'Worn inventory', exact: true });
+    const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
+    await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
+    const location = page.getByLabel('Location');
+    await expect(location).toHaveValue('');
+    await expect(location.locator('option', { hasText: 'On the player' })).toHaveAttribute(
+      'value',
+      '',
+    );
+    await expect(location.locator('option', { hasText: 'Stashed' })).toHaveAttribute(
+      'value',
+      'stashed',
+    );
     const rows = [pack, pouch, caseItem, item].map(({ item: row }) =>
       page.locator(`#inventory-${row.id}`),
     );
@@ -178,6 +189,77 @@ test('nested inventory names and expanded item controls stay in view at supporte
             { fullPage: true, animations: 'disabled' },
           );
         }
+      });
+    }
+
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    const stashedName = `Stashed item ${runId}`;
+    await page.getByLabel('Item name').fill(stashedName);
+    await location.selectOption('stashed');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const stashedInventory = page.getByRole('table', { name: 'Stashed inventory', exact: true });
+    await expect(stashedInventory).toContainText(stashedName, { timeout: 15_000 });
+    await expect(inventory).not.toContainText(stashedName);
+
+    const createdName = `Carried and equipped ${runId}`;
+    const addForm = location.locator('xpath=ancestor::form');
+    await addForm.getByLabel('Item name').fill(createdName);
+    await expect(location).toHaveValue('');
+    await addForm.getByRole('button', { name: 'More options' }).click();
+    const equipped = addForm.getByLabel('Equipped', { exact: true });
+    await equipped.check();
+    await addForm.getByRole('button', { name: 'Add', exact: true }).click();
+    const createdRow = inventory.getByRole('row').filter({ hasText: createdName });
+    await expect(createdRow).toBeVisible({ timeout: 15_000 });
+    await expect(inventory).toContainText(createdName);
+    await expect(stashedInventory).not.toContainText(createdName);
+    await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
+    await createdRow.locator('.inventory-item-title').click();
+    await expect(page.getByText('1 selected')).toBeVisible();
+
+    const moveDropdown = page.getByRole('button', { name: 'Move to ▾' }).locator('xpath=..');
+    const moveMenu = moveDropdown.locator('ul.dropdown-content');
+    for (const viewport of VIEWPORTS) {
+      await test.step(`Move menu at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await moveDropdown.getByRole('button', { name: 'Move to ▾' }).click();
+        await expect(moveMenu).toBeVisible();
+        await moveMenu.evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await expect(moveMenu.getByRole('button', { name: 'On the player' })).toBeVisible();
+        const longContainerOption = moveMenu.getByRole('button', {
+          name: PACK_NAME,
+          exact: true,
+        });
+        await longContainerOption.scrollIntoViewIfNeeded();
+        await expect(longContainerOption).toBeVisible();
+        const box = await geometry(moveMenu);
+        expect(box.x).toBeGreaterThanOrEqual(-1);
+        expect(box.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(box.height).toBeGreaterThan(0);
+        const optionBox = await geometry(longContainerOption);
+        expect(optionBox.x).toBeGreaterThanOrEqual(-1);
+        expect(optionBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(optionBox.scrollWidth).toBeLessThanOrEqual(optionBox.clientWidth + 1);
+        const vertical = await moveMenu.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, bottom: rect.bottom };
+        });
+        const banner = await page.getByRole('banner').boundingBox();
+        expect(banner).not.toBeNull();
+        expect(vertical.top).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(vertical.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        if ([320, 568, 639, 640, 641, 768, 1440].includes(viewport.width)) {
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `inventory-move-menu-${viewport.width}x${viewport.height}`,
+            { fullPage: true, animations: 'disabled' },
+          );
+        }
+        await page.mouse.click(2, viewport.height / 2);
+        await expect(moveMenu).not.toBeVisible();
       });
     }
   } finally {
