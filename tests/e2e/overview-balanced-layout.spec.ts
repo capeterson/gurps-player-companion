@@ -11,7 +11,9 @@ async function box(locator: Locator) {
 }
 
 function card(page: Page, title: string) {
-  return page.getByRole('heading', { name: title, exact: true }).locator('xpath=ancestor::section[1]');
+  return page
+    .getByRole('heading', { name: title, exact: true })
+    .locator('xpath=ancestor::section[1]');
 }
 
 test('Overview stat cards align without gaps and utilities retain their natural height', async ({
@@ -33,7 +35,9 @@ test('Overview stat cards align without gaps and utilities retain their natural 
   });
   expect(response.ok(), await response.text()).toBeTruthy();
   const character = await response.json();
-  const widths = [320, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025, 1212, 1279, 1280, 1281, 1440];
+  const widths = [
+    320, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025, 1212, 1279, 1280, 1281, 1440,
+  ];
   try {
     for (const state of [
       { name: 'base', data: { st: 15, dx: 17, iq: 14, ht: 15 } },
@@ -74,7 +78,10 @@ test('Overview stat cards align without gaps and utilities retain their natural 
         await expect(page.locator('#attribute-Move')).toContainText('9');
       }
       for (const theme of ['gilded-tome', 'illuminated-manuscript']) {
-        await page.evaluate((name) => document.documentElement.setAttribute('data-theme', name), theme);
+        await page.evaluate(
+          (name) => document.documentElement.setAttribute('data-theme', name),
+          theme,
+        );
         for (const width of widths) {
           await page.setViewportSize({ width, height: width === 1212 ? 880 : 900 });
           const primary = card(page, 'Attributes');
