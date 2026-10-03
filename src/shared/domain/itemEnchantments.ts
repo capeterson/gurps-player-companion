@@ -1,3 +1,4 @@
+import type { ManaLevel } from '../constants/magic.ts';
 import type {
   ArmorData,
   EnchantmentEffect,
@@ -13,6 +14,7 @@ export interface EnchantmentContribution {
   target: EnchantmentEffect['target'];
   value: number;
   active: boolean;
+  inactiveReason?: string | undefined;
   stackingKey: string | null;
   suppressedByStacking: boolean;
 }
@@ -29,6 +31,9 @@ export interface ItemEnchantmentResolution {
 interface ItemInput {
   id: string;
   name: string;
+  quantity?: number;
+  parentId?: string | null;
+  externalLocation?: string | null;
   worn: boolean;
   equipped: boolean;
   isArmor: boolean;
@@ -44,6 +49,7 @@ interface Candidate {
   instanceKey: string;
   stackingKey: string | null;
   active: boolean;
+  inactiveReason?: string | undefined;
 }
 
 function applies(item: ItemInput, applicability: string): boolean {
@@ -54,6 +60,8 @@ function applies(item: ItemInput, applicability: string): boolean {
 }
 
 function isActive(item: ItemInput, effect: EnchantmentEffect): boolean {
+  if ((item.quantity ?? 1) <= 0 || (!item.parentId && (!item.worn || item.externalLocation)))
+    return false;
   if (
     effect.target === 'weapon_attack' ||
     effect.target === 'weapon_damage' ||
@@ -65,25 +73,53 @@ function isActive(item: ItemInput, effect: EnchantmentEffect): boolean {
     return item.weaponData != null && item.equipped;
   if (effect.target === 'dr') return item.isArmor && item.armor != null && item.equipped;
   if (effect.target === 'db')
-    return item.equipped && ((item.isArmor && item.armor != null) || item.weaponData?.db != null);
-  if (effect.target === 'weight_reduction_percent') return item.worn;
-  return item.equipped || item.worn;
+    return item.equipped && ((item.isArmor && item.armor != null) || item.weaponData != null);
+  // Lighten only reduces armor/shields actually in use (M67).
+  if (effect.target === 'weight_reduction_percent')
+    return item.equipped && (item.isArmor || item.weaponData?.db != null);
+  return item.equipped;
 }
 
-function candidates(item: ItemInput): Candidate[] {
+function candidates(item: ItemInput, mana: ManaLevel): Candidate[] {
   const out: Candidate[] = [];
   for (const [index, instance] of item.enchantments.entries()) {
     const mechanics = instance.mechanics;
     if (!mechanics || !applies(item, mechanics.applicability)) continue;
+    const inactiveReason =
+      mana === 'none'
+        ? 'No mana (M17)'
+        : instance.spellLevel == null
+          ? 'Item Power unrecorded; confirm with the GM (M17)'
+          : instance.spellLevel - (mana === 'low' ? 5 : 0) < 15
+            ? 'Effective item Power below 15 (M17)'
+            : undefined;
     const sourceName = `${item.name}: ${instance.spellName}`;
     const instanceKey = `${instance.definitionId ?? instance.spellName}:${index}`;
     const stackingKey =
       mechanics.stackingPolicy.kind === 'highest' ? mechanics.stackingPolicy.key : null;
     for (const effect of mechanics.effects)
-      out.push({ effect, sourceName, instanceKey, active: isActive(item, effect), stackingKey });
+      out.push({
+        effect,
+        sourceName,
+        instanceKey,
+        active: !inactiveReason && isActive(item, effect),
+        inactiveReason:
+          inactiveReason ??
+          (isActive(item, effect) ? undefined : 'Item is not equipped or available'),
+        stackingKey,
+      });
     const selected = mechanics.levels.find((entry) => entry.level === instance.level);
     for (const effect of selected?.effects ?? [])
-      out.push({ effect, sourceName, instanceKey, active: isActive(item, effect), stackingKey });
+      out.push({
+        effect,
+        sourceName,
+        instanceKey,
+        active: !inactiveReason && isActive(item, effect),
+        inactiveReason:
+          inactiveReason ??
+          (isActive(item, effect) ? undefined : 'Item is not equipped or available'),
+        stackingKey,
+      });
   }
   return out;
 }
@@ -95,12 +131,15 @@ function candidateKey(candidate: Candidate): string | null {
 
 /** Resolve typed item-local declarations once. Base item columns are never
  * rewritten, so legacy manual values remain the single base layer. */
-export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolution {
-  const all = candidates(item);
+export function resolveItemEnchantments(
+  item: ItemInput,
+  mana: ManaLevel = 'normal',
+): ItemEnchantmentResolution {
+  const all = candidates(item, mana);
   const totals = new Map<string, Map<string, number>>();
   for (const candidate of all) {
     const key = candidateKey(candidate);
-    if (!key) continue;
+    if (!key || !candidate.active) continue;
     const byInstance = totals.get(key) ?? new Map<string, number>();
     byInstance.set(
       candidate.instanceKey,
@@ -132,6 +171,7 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
   const armor = item.armor
     ? {
         ...item.armor,
+        ...(mana === 'none' && item.armor.db != null ? { db: 0 } : {}),
         dr: Math.max(0, item.armor.dr + sum('dr')),
         ...(item.armor.drCrushing == null
           ? {}
@@ -142,21 +182,9 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
             value == null ? value : Math.max(0, value + sum('dr')),
           ]),
         ),
-        ...(item.armor.db == null
-          ? sum('db') === 0
-            ? {}
-            : { db: Math.max(0, sum('db')) }
-          : { db: Math.max(0, item.armor.db + sum('db')) }),
       }
     : null;
-  const weaponData = item.weaponData
-    ? {
-        ...item.weaponData,
-        // Presence of base DB is the shield marker. Never turn an ordinary
-        // weapon into a shield merely because it carries a DB declaration.
-        ...(item.weaponData.db == null ? {} : { db: Math.max(0, item.weaponData.db + sum('db')) }),
-      }
-    : null;
+  const weaponData = item.weaponData;
   const effects: ResolvedEffect[] = active.flatMap((candidate) => {
     const target = candidate.effect.target;
     if (
@@ -191,7 +219,10 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
     weaponData,
     weightReductionPercent: Math.min(
       100,
-      Math.max(0, item.weightReductionPercent + sum('weight_reduction_percent')),
+      Math.max(
+        0,
+        (mana === 'none' ? 0 : item.weightReductionPercent) + sum('weight_reduction_percent'),
+      ),
     ),
     armorDivisor: divisors.length ? Math.max(...divisors) : null,
     effects,
@@ -203,8 +234,10 @@ export function resolveItemEnchantments(item: ItemInput): ItemEnchantmentResolut
         target: candidate.effect.target,
         value: candidate.effect.value,
         active: candidate.active,
+        ...(candidate.inactiveReason ? { inactiveReason: candidate.inactiveReason } : {}),
         stackingKey: candidate.stackingKey,
-        suppressedByStacking: key !== null && winners.get(key) !== candidate.instanceKey,
+        suppressedByStacking:
+          candidate.active && key !== null && winners.get(key) !== candidate.instanceKey,
       };
     }),
   };

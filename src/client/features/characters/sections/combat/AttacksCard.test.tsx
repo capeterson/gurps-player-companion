@@ -26,6 +26,8 @@ interface WeaponOverrides {
   readonly name?: string;
   readonly skill?: string | null;
   readonly stRequired?: number | null;
+  readonly weaponSt?: number | null;
+  readonly strengthKind?: 'ordinary' | 'bow' | 'crossbow' | 'natural';
   readonly ranged?: Record<string, unknown> | null;
 }
 
@@ -44,6 +46,8 @@ function makeCharacter(damage: string, overrides: WeaponOverrides = {}): Charact
           reach: '1',
           parry: '0',
           stRequired: overrides.stRequired ?? null,
+          ...(overrides.weaponSt == null ? {} : { weaponSt: overrides.weaponSt }),
+          ...(overrides.strengthKind == null ? {} : { strengthKind: overrides.strengthKind }),
           skill: overrides.skill ?? null,
           ranged: overrides.ranged ?? null,
         },
@@ -61,6 +65,106 @@ describe('AttacksCard', () => {
       'href',
       '#inventory-w1',
     );
+  });
+
+  it('does not list stashed or zero-quantity weapons even if equipped remains true', () => {
+    const character = makeCharacter('sw cut');
+    const weapon = character.inventory[0];
+    if (!weapon) throw new Error('Missing weapon fixture');
+    character.inventory = [
+      { ...weapon, id: 'stashed', name: 'Stashed sword', worn: false, quantity: 1, parentId: null },
+      { ...weapon, id: 'empty', name: 'Empty sword', worn: true, quantity: 0, parentId: null },
+    ] as CharacterDetail['inventory'];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(screen.queryByRole('rowgroup', { name: 'Stashed sword' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('rowgroup', { name: 'Empty sword' })).not.toBeInTheDocument();
+  });
+
+  it('caps displayed and rolled ordinary melee damage at three times MinST', () => {
+    const character = makeCharacter('sw cut', { stRequired: 6 });
+    character.derived = { ...character.derived, effectiveSt: 30, thrust: '3d', swing: '5d+2' };
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    const damage = screen.getByRole('button', { name: '3d cut' });
+    fireEvent.click(damage);
+    expect(openRoll.mock.calls.at(-1)?.[0].damage.dice).toEqual({ dice: 3, adds: 0 });
+    expect(screen.queryByRole('button', { name: '5d+2 cut' })).not.toBeInTheDocument();
+  });
+
+  it('uses purchased bow ST for displayed and rolled damage and weapon-ST range', () => {
+    const character = makeCharacter('thr+1 imp', {
+      name: 'Short Bow',
+      skill: 'Bow',
+      stRequired: 8,
+      weaponSt: 8,
+      strengthKind: 'bow',
+      ranged: {
+        acc: 3,
+        range: {
+          kind: 'st_multiplier',
+          halfDamageFactor: 15,
+          maxFactor: 20,
+          strengthSource: 'weapon',
+        },
+        rof: '1',
+        shots: null,
+        bulk: null,
+        recoil: null,
+      },
+    });
+    character.derived = { ...character.derived, effectiveSt: 15, thrust: '1d+1', swing: '2d+1' };
+    character.skills = [
+      { id: 'bow', name: 'Bow', level: 14 },
+    ] as unknown as CharacterDetail['skills'];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: '1d-2 imp' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage.dice).toEqual({ dice: 1, adds: -2 });
+    fireEvent.click(
+      within(screen.getByRole('rowgroup', { name: 'Short Bow' })).getByRole('button', {
+        name: 'Bow 14',
+      }),
+    );
+    expect(openRoll.mock.calls.at(-1)?.[0].attack?.range).toMatchObject({
+      halfDamageYards: 120,
+      maxYards: 160,
+    });
+  });
+
+  it('uses legacy crossbow ST for range without applying an attack ST shortfall penalty', () => {
+    const character = makeCharacter('thr imp', {
+      name: 'Heavy Crossbow',
+      skill: 'Crossbow',
+      stRequired: 96,
+      strengthKind: 'crossbow',
+      ranged: {
+        acc: 4,
+        range: {
+          kind: 'st_multiplier',
+          halfDamageFactor: 15,
+          maxFactor: 20,
+          strengthSource: 'weapon',
+        },
+        rof: '1',
+        shots: null,
+        bulk: null,
+        recoil: null,
+      },
+    });
+    character.derived = { ...character.derived, effectiveSt: 15, thrust: '1d+1', swing: '2d+1' };
+    character.skills = [
+      { id: 'crossbow', name: 'Crossbow', level: 14 },
+    ] as CharacterDetail['skills'];
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    const row = screen.getByRole('rowgroup', { name: 'Heavy Crossbow' });
+    expect(row).not.toHaveTextContent(/ST 96 \(−/);
+    fireEvent.click(within(row).getByRole('button', { name: 'Crossbow 14' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(14);
+    expect(openRoll.mock.calls.at(-1)?.[0].attack?.range).toMatchObject({
+      halfDamageYards: 1440,
+      maxYards: 1920,
+    });
   });
 
   function withMultipleWeapons() {

@@ -2,6 +2,8 @@ import type { ActiveEffectInstance } from '../schemas/activeEffects.ts';
 import type { PricingResolution } from '../schemas/calculation.ts';
 import { type CharacterRace, HUMAN_RACE } from '../schemas/race.ts';
 import { resolveActiveEffects } from './activeEffects.ts';
+import { armorLayering } from './armorDr.ts';
+import { inventoryAvailability } from './inventoryAvailability.ts';
 import { racialProfile } from './race.ts';
 import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
 import type { ResolvedEffect } from './traitEffects.ts';
@@ -300,6 +302,7 @@ function characterAttrsFromRow(c: CharacterDetailInputCharacter): CharacterAttrs
 function inventoryRowFor(
   i: CharacterDetailInputInventory,
   enchantments?: ItemEnchantmentResolution,
+  mana: ManaLevel = 'normal',
 ): InventoryItemRow {
   return {
     id: i.id,
@@ -307,8 +310,12 @@ function inventoryRowFor(
     weightLbs: Number(i.weightLbs),
     quantity: i.quantity,
     worn: i.worn,
+    equipped: i.equipped,
+    isArmor: i.isArmor,
+    weaponData: i.weaponData as InventoryItemOut['weaponData'],
+    externalLocation: i.externalLocation,
     isContainer: i.isContainer,
-    hideawayCapacityLbs: Number(i.hideawayCapacityLbs),
+    hideawayCapacityLbs: mana === 'none' ? 0 : Number(i.hideawayCapacityLbs),
     weightReductionPercent: enchantments?.weightReductionPercent ?? i.weightReductionPercent,
   };
 }
@@ -535,16 +542,25 @@ export function buildCharacterDetail(
   // time).  Active conditional groups gate which effects are "on".
   const activeEffectsEnabled = campaign?.experimentalActiveEffects === true;
   const activeGroups = new Set(activeEffectsEnabled ? (character.activeConditionGroups ?? []) : []);
+  const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
+  const availability = inventoryAvailability(inventory);
+  const layering = armorLayering(
+    inventory.map((item) => ({ ...item, armor: item.armor as InventoryItemOut['armor'] })),
+  );
   const itemEnchantments = new Map(
     inventory.map((item) => [
       item.id,
-      resolveItemEnchantments({
-        ...item,
-        armor: (item.armor as InventoryItemOut['armor']) ?? null,
-        weaponData: normalizeWeaponData(item.weaponData as InventoryItemOut['weaponData']),
-        weightReductionPercent: item.weightReductionPercent,
-        enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
-      }),
+      resolveItemEnchantments(
+        {
+          ...item,
+          equipped: availability.get(item.id)?.equipped ?? false,
+          armor: (item.armor as InventoryItemOut['armor']) ?? null,
+          weaponData: normalizeWeaponData(item.weaponData as InventoryItemOut['weaponData']),
+          weightReductionPercent: item.weightReductionPercent,
+          enchantments: (item.enchantments as InventoryItemOut['enchantments']) ?? [],
+        },
+        manaLevel,
+      ),
     ]),
   );
   const activeResolution = resolveActiveEffects(
@@ -620,7 +636,8 @@ export function buildCharacterDetail(
   // / block / dr already include the trait contributions when the UI
   // reads them.
   const attrs = applyEffectsToAttrs(racialAttrs, resolved);
-  const derived = computeDerived(attrs);
+  const baseDerived = computeDerived(attrs);
+  const derived = { ...baseDerived, effectiveDx: baseDerived.effectiveDx - layering.dxPenalty };
 
   const traitInputs: CharacterTraitInput[] = traits.map((t) => ({
     kind: t.kind,
@@ -649,7 +666,7 @@ export function buildCharacterDetail(
   );
 
   const weights = computeWeights(
-    inventory.map((item) => inventoryRowFor(item, itemEnchantments.get(item.id))),
+    inventory.map((item) => inventoryRowFor(item, itemEnchantments.get(item.id), manaLevel)),
   );
   const encumbrance = computeEncumbrance(weights.playerWeightLbs, derived.basicLift);
   const inventoryOut = inventory.map((item) =>
@@ -792,7 +809,6 @@ export function buildCharacterDetail(
   const magery = mageryLevel(
     [...traits, ...racial.traits].map((t) => ({ name: t.name, level: t.level })),
   );
-  const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
   const techLevel: number | null = campaign?.techLevel ?? null;
   // A character in a campaign whose row we don't have yet (client-side,
   // before the campaign mirror lands in Dexie) gets the 'normal'
@@ -992,6 +1008,19 @@ export function buildCharacterDetail(
     },
     dismissed,
   );
+
+  if (layering.invalidLocations.length && !dismissed.has('inventory.armor_layers'))
+    warnings.push({
+      code: 'inventory.armor_layers',
+      severity: 'warn',
+      message: `Resolve armor layers at ${layering.invalidLocations.join(', ')}: an inner layer must be flexible and concealable (B286). Armor DR at these locations is unavailable until corrected.`,
+    });
+  if (layering.dxPenalty && !dismissed.has('inventory.armor_layer_dx'))
+    warnings.push({
+      code: 'inventory.armor_layer_dx',
+      severity: 'note',
+      message: 'Layered armor outside the head gives −1 DX and DX-based skills (B286).',
+    });
 
   return {
     view: 'full',

@@ -9249,6 +9249,9 @@
                                       "type": "boolean",
                                       "default": false
                                     },
+                                    "concealable": {
+                                      "type": "boolean"
+                                    },
                                     "frontOnly": {
                                       "type": "boolean",
                                       "default": false
@@ -9262,7 +9265,7 @@
                                         {
                                           "type": "integer",
                                           "minimum": 0,
-                                          "maximum": 4
+                                          "maximum": 5
                                         },
                                         {
                                           "type": "null"
@@ -9320,6 +9323,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -9501,6 +9532,34 @@
                                         }
                                       ]
                                     },
+                                    "weaponSt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 1,
+                                          "maximum": 999
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "strengthKind": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "ordinary",
+                                            "bow",
+                                            "crossbow",
+                                            "natural"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "skill": {
                                       "anyOf": [
                                         {
@@ -9650,6 +9709,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -23720,6 +23807,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -23733,7 +23823,7 @@
                               {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 4
+                                "maximum": 5
                               },
                               {
                                 "type": "null"
@@ -23791,6 +23881,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -23972,6 +24090,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -24121,6 +24267,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -25035,6 +25209,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -25048,7 +25225,7 @@
                               {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 4
+                                "maximum": 5
                               },
                               {
                                 "type": "null"
@@ -25106,6 +25283,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -25287,6 +25492,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -25436,6 +25669,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -41399,6 +41660,9 @@
                                       "type": "boolean",
                                       "default": false
                                     },
+                                    "concealable": {
+                                      "type": "boolean"
+                                    },
                                     "frontOnly": {
                                       "type": "boolean",
                                       "default": false
@@ -41473,6 +41737,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -41654,6 +41946,34 @@
                                         }
                                       ]
                                     },
+                                    "weaponSt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 1,
+                                          "maximum": 999
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "strengthKind": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "ordinary",
+                                            "bow",
+                                            "crossbow",
+                                            "natural"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "skill": {
                                       "anyOf": [
                                         {
@@ -41802,6 +42122,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -42504,6 +42852,9 @@
                                       "type": "boolean",
                                       "default": false
                                     },
+                                    "concealable": {
+                                      "type": "boolean"
+                                    },
                                     "frontOnly": {
                                       "type": "boolean",
                                       "default": false
@@ -42517,7 +42868,7 @@
                                         {
                                           "type": "integer",
                                           "minimum": 0,
-                                          "maximum": 4
+                                          "maximum": 5
                                         },
                                         {
                                           "type": "null"
@@ -42575,6 +42926,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -42756,6 +43135,34 @@
                                         }
                                       ]
                                     },
+                                    "weaponSt": {
+                                      "anyOf": [
+                                        {
+                                          "type": "integer",
+                                          "minimum": 1,
+                                          "maximum": 999
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "strengthKind": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "ordinary",
+                                            "bow",
+                                            "crossbow",
+                                            "natural"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
                                     "skill": {
                                       "anyOf": [
                                         {
@@ -42905,6 +43312,34 @@
                                                 "type": "integer",
                                                 "minimum": 0,
                                                 "maximum": 99
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "weaponSt": {
+                                            "anyOf": [
+                                              {
+                                                "type": "integer",
+                                                "minimum": 1,
+                                                "maximum": 999
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          },
+                                          "strengthKind": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "enum": [
+                                                  "ordinary",
+                                                  "bow",
+                                                  "crossbow",
+                                                  "natural"
+                                                ]
                                               },
                                               {
                                                 "type": "null"
@@ -43106,6 +43541,10 @@
                                   },
                                   "active": {
                                     "type": "boolean"
+                                  },
+                                  "inactiveReason": {
+                                    "type": "string",
+                                    "maxLength": 240
                                   },
                                   "stackingKey": {
                                     "anyOf": [
@@ -48456,6 +48895,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -48530,6 +48972,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -48711,6 +49181,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -48859,6 +49357,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -49561,6 +50087,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -49574,7 +50103,7 @@
                               {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 4
+                                "maximum": 5
                               },
                               {
                                 "type": "null"
@@ -49632,6 +50161,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -49813,6 +50370,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -49962,6 +50547,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -50163,6 +50776,10 @@
                         },
                         "active": {
                           "type": "boolean"
+                        },
+                        "inactiveReason": {
+                          "type": "string",
+                          "maxLength": 240
                         },
                         "stackingKey": {
                           "anyOf": [
@@ -50478,6 +51095,9 @@
                               "type": "boolean",
                               "default": false
                             },
+                            "concealable": {
+                              "type": "boolean"
+                            },
                             "frontOnly": {
                               "type": "boolean",
                               "default": false
@@ -50552,6 +51172,34 @@
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 99
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "weaponSt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 999
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strengthKind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "ordinary",
+                                          "bow",
+                                          "crossbow",
+                                          "natural"
+                                        ]
                                       },
                                       {
                                         "type": "null"
@@ -50733,6 +51381,34 @@
                                 }
                               ]
                             },
+                            "weaponSt": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 999
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "strengthKind": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "ordinary",
+                                    "bow",
+                                    "crossbow",
+                                    "natural"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "skill": {
                               "anyOf": [
                                 {
@@ -50881,6 +51557,34 @@
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 99
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "weaponSt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 999
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strengthKind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "ordinary",
+                                          "bow",
+                                          "crossbow",
+                                          "natural"
+                                        ]
                                       },
                                       {
                                         "type": "null"
@@ -51583,6 +52287,9 @@
                               "type": "boolean",
                               "default": false
                             },
+                            "concealable": {
+                              "type": "boolean"
+                            },
                             "frontOnly": {
                               "type": "boolean",
                               "default": false
@@ -51596,7 +52303,7 @@
                                 {
                                   "type": "integer",
                                   "minimum": 0,
-                                  "maximum": 4
+                                  "maximum": 5
                                 },
                                 {
                                   "type": "null"
@@ -51654,6 +52361,34 @@
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 99
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "weaponSt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 999
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strengthKind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "ordinary",
+                                          "bow",
+                                          "crossbow",
+                                          "natural"
+                                        ]
                                       },
                                       {
                                         "type": "null"
@@ -51835,6 +52570,34 @@
                                 }
                               ]
                             },
+                            "weaponSt": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 999
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "strengthKind": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "ordinary",
+                                    "bow",
+                                    "crossbow",
+                                    "natural"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "skill": {
                               "anyOf": [
                                 {
@@ -51984,6 +52747,34 @@
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 99
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "weaponSt": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 999
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "strengthKind": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "enum": [
+                                          "ordinary",
+                                          "bow",
+                                          "crossbow",
+                                          "natural"
+                                        ]
                                       },
                                       {
                                         "type": "null"
@@ -52185,6 +52976,10 @@
                           },
                           "active": {
                             "type": "boolean"
+                          },
+                          "inactiveReason": {
+                            "type": "string",
+                            "maxLength": 240
                           },
                           "stackingKey": {
                             "anyOf": [
@@ -57261,6 +58056,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -57274,7 +58072,7 @@
                               {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 4
+                                "maximum": 5
                               },
                               {
                                 "type": "null"
@@ -57332,6 +58130,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -57513,6 +58339,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -57662,6 +58516,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -58547,6 +59429,9 @@
                             "type": "boolean",
                             "default": false
                           },
+                          "concealable": {
+                            "type": "boolean"
+                          },
                           "frontOnly": {
                             "type": "boolean",
                             "default": false
@@ -58560,7 +59445,7 @@
                               {
                                 "type": "integer",
                                 "minimum": 0,
-                                "maximum": 4
+                                "maximum": 5
                               },
                               {
                                 "type": "null"
@@ -58618,6 +59503,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"
@@ -58799,6 +59712,34 @@
                               }
                             ]
                           },
+                          "weaponSt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "strengthKind": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "ordinary",
+                                  "bow",
+                                  "crossbow",
+                                  "natural"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "skill": {
                             "anyOf": [
                               {
@@ -58948,6 +59889,34 @@
                                       "type": "integer",
                                       "minimum": 0,
                                       "maximum": 99
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "weaponSt": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 999
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "strengthKind": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "ordinary",
+                                        "bow",
+                                        "crossbow",
+                                        "natural"
+                                      ]
                                     },
                                     {
                                       "type": "null"

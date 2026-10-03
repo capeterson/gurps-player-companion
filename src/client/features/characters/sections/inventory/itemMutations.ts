@@ -1,4 +1,5 @@
 import { buildInventoryItemOut } from '../../../../../shared/domain/characterDetail.ts';
+import { inventoryAvailability } from '../../../../../shared/domain/inventoryAvailability.ts';
 import { normalizeWeaponData } from '../../../../../shared/domain/weaponModes.ts';
 import {
   type InventoryItemOut,
@@ -67,6 +68,20 @@ export async function mutateItem(
       weaponData: displayed.baseWeaponData,
     });
     const patch = inventoryItemUpdate.parse(update(current));
+    if (patch.equipped === true) {
+      const items = await db.characterInventory
+        .where('characterId')
+        .equals(current.characterId)
+        .toArray();
+      const availability = inventoryAvailability(
+        items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+      );
+      if (!availability.get(id)?.carried)
+        throw new Error(
+          'Move the item on the player and set a positive quantity before equipping it',
+        );
+    }
+    if (patch.quantity === 0) patch.equipped = false;
     if (patch.weaponData !== undefined) patch.weaponData = normalizeWeaponData(patch.weaponData);
     if (
       patch.isContainer === false &&
@@ -137,9 +152,17 @@ export function writeItemPath(id: string, path: string, value: unknown, label: s
         const primaryField = keys[0];
         if (
           primaryField &&
-          ['damage', 'reach', 'parry', 'skill', 'stRequired', 'ranged', 'notes'].includes(
-            primaryField,
-          )
+          [
+            'damage',
+            'reach',
+            'parry',
+            'skill',
+            'stRequired',
+            'weaponSt',
+            'strengthKind',
+            'ranged',
+            'notes',
+          ].includes(primaryField)
         )
           primary[primaryField] = structuredClone(weapon[primaryField]);
       }

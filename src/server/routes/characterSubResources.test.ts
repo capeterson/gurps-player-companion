@@ -636,6 +636,126 @@ describe('inventory sub-resource CRUD', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects nesting under a non-container through REST', async () => {
+    const { accessToken } = await registerUser('inv-noncontainer-parent');
+    const character = await createCharacter(accessToken);
+    const parentRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Ordinary item', isContainer: false }),
+    });
+    const { item: parent } = (await parentRes.json()) as { item: { id: string } };
+    const childRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Hidden child', parentId: parent.id }),
+    });
+    expect(childRes.status).toBe(400);
+  });
+
+  it('rejects clearing container status while children remain through REST', async () => {
+    const { accessToken } = await registerUser('inv-clear-container');
+    const character = await createCharacter(accessToken);
+    const parentRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Container', isContainer: true }),
+    });
+    const { item: parent } = (await parentRes.json()) as { item: { id: string } };
+    const childRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Nested item', parentId: parent.id }),
+    });
+    expect(childRes.status).toBe(201);
+    const patchRes = await app.request(
+      `/api/v1/characters/${character.id}/inventory/${parent.id}`,
+      {
+        method: 'PATCH',
+        headers: jsonHeaders(accessToken),
+        body: JSON.stringify({ isContainer: false }),
+      },
+    );
+    expect(patchRes.status).toBe(400);
+  });
+
+  it('promotes children on container deletion with inherited root location', async () => {
+    const { accessToken } = await registerUser('inv-delete-location');
+    const character = await createCharacter(accessToken);
+    const rootRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Carried pack', isContainer: true, worn: true }),
+    });
+    const { item: root } = (await rootRes.json()) as { item: { id: string } };
+    const childRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Nested pouch',
+        isContainer: true,
+        parentId: root.id,
+        worn: false,
+      }),
+    });
+    const { item: child } = (await childRes.json()) as { item: { id: string } };
+    const leafRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Coin', parentId: child.id, worn: false }),
+    });
+    const { item: leaf } = (await leafRes.json()) as { item: { id: string } };
+    const delRes = await app.request(`/api/v1/characters/${character.id}/inventory/${root.id}`, {
+      method: 'DELETE',
+      headers: bearer(accessToken),
+    });
+    expect(delRes.status).toBe(200);
+    const body = (await delRes.json()) as {
+      inventory: Array<{ id: string; parentId: string | null; worn: boolean }>;
+    };
+    expect(body.inventory.find((item) => item.id === child.id)).toMatchObject({
+      parentId: null,
+      worn: true,
+    });
+    expect(body.inventory.find((item) => item.id === leaf.id)).toMatchObject({
+      parentId: child.id,
+      worn: false,
+    });
+  });
+
+  it('preserves an external stash label when deleting a stashed container', async () => {
+    const { accessToken } = await registerUser('inv-delete-external-location');
+    const character = await createCharacter(accessToken);
+    const rootRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({
+        name: 'Stored case',
+        isContainer: true,
+        worn: false,
+        externalLocation: 'At home',
+      }),
+    });
+    const { item: root } = (await rootRes.json()) as { item: { id: string } };
+    const childRes = await app.request(`/api/v1/characters/${character.id}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ name: 'Stored ring', parentId: root.id, worn: true }),
+    });
+    const { item: child } = (await childRes.json()) as { item: { id: string } };
+    const deleted = await app.request(`/api/v1/characters/${character.id}/inventory/${root.id}`, {
+      method: 'DELETE',
+      headers: bearer(accessToken),
+    });
+    expect(deleted.status).toBe(200);
+    const body = (await deleted.json()) as { inventory: Array<Record<string, unknown>> };
+    expect(body.inventory.find((item) => item.id === child.id)).toMatchObject({
+      parentId: null,
+      worn: false,
+      externalLocation: 'At home',
+    });
+  });
+
   it('DELETE reparents children to the deleted item’s own parent', async () => {
     const { accessToken } = await registerUser('inv-delete-reparent');
     const character = await createCharacter(accessToken);

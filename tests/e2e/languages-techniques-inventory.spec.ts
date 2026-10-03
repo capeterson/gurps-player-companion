@@ -377,7 +377,7 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   }
 
   await selectCharacterSection(page, 'Inventory');
-  const inventory = page.getByRole('table', { name: 'Worn inventory', exact: true });
+  const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
   const pack = page.locator(`#inventory-${fixture.pack.id}`);
   const pouch = page.locator(`#inventory-${fixture.pouch.id}`);
   const nested = page.locator(`#inventory-${fixture.nested.id}`);
@@ -455,20 +455,19 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   const itemEditor = page.getByRole('region', { name: 'Broadsword: Item details', exact: true });
   await itemEditor.getByLabel('Equipped', { exact: true }).check();
   await itemEditor.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(sword.getByText('Equipped', { exact: true })).toBeVisible();
+  await expect(
+    sword.getByRole('button', { name: 'Equipped: Broadsword', exact: true }).locator('svg'),
+  ).toBeVisible();
   await sword.getByRole('button', { name: 'Weapon settings for Broadsword', exact: true }).click();
   const weaponEditor = page.getByRole('region', { name: 'Broadsword: Weapon', exact: true });
   await expect(weaponEditor.getByLabel('Damage', { exact: true })).toHaveValue('sw+1 cut');
   await weaponEditor.getByRole('button', { name: 'Done', exact: true }).click();
-  const tip = page.getByText('tip: shift-click to select a range; ⌘/ctrl-click to toggle', {
-    exact: true,
-  });
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await inside(page, inventory);
     await expect(sword.getByText('Broadsword', { exact: true })).toBeVisible();
     await expect(sword.locator('[data-label="Qty"]')).toHaveText('1');
-    await expect(sword.locator('[data-label="Weight (lb)"]')).toHaveText('3.0');
+    await expect(sword.locator('[data-label="Weight (lb)"]')).toHaveText('3');
     await expect(sword.locator('[data-label="Cost"]')).toHaveText('500');
     await inside(
       page,
@@ -482,7 +481,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
       await inside(page, row.locator('.inventory-item-name'));
     }
     if (width < 640) {
-      await expect(tip).toBeHidden();
       // Two-line rows: name and chips on the left; weight above quantity and
       // cost on the right. Quantity 1 is implied rather than repeated.
       await expect(sword.locator('[data-label="Qty"]')).toBeHidden();
@@ -524,7 +522,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
         expect(hit).toBe('Collapse contents');
       }
     } else {
-      await expect(tip).toBeVisible();
       await expect(inventory.getByRole('columnheader', { name: 'Qty', exact: true })).toBeVisible();
     }
     if (width === 375 || width === 1280) {

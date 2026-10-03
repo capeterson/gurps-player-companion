@@ -1,4 +1,4 @@
-import { type Locator, expect, test } from '@playwright/test';
+import { type Locator, type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
@@ -36,6 +36,44 @@ async function geometry(locator: Locator) {
       height: rect.height,
     };
   });
+}
+
+async function expectTooltipPainted(page: Page, tooltip: Locator) {
+  await expect(tooltip).toBeInViewport({ ratio: 1 });
+  const box = await geometry(tooltip);
+  const id = await tooltip.getAttribute('id');
+  expect(id).toBeTruthy();
+  const points = [
+    { x: box.x + 3, y: box.y + box.height / 2 },
+    { x: box.right - 3, y: box.y + box.height / 2 },
+    { x: box.x + box.width / 2, y: box.y + 3 },
+    { x: box.x + box.width / 2, y: box.bottom - 3 },
+  ];
+  const hits = await page.evaluate(
+    ({ tooltipId, samples }) =>
+      samples.map(({ x, y }) => {
+        const tooltip = document.getElementById(tooltipId ?? '');
+        const target = document.elementFromPoint(x, y);
+        return Boolean(tooltip && target && (target === tooltip || tooltip.contains(target)));
+      }),
+    { tooltipId: id, samples: points },
+  );
+  expect(hits).toEqual([true, true, true, true]);
+}
+
+async function verifyTooltipPointerAndFocus(page: Page, trigger: Locator, tooltip: Locator) {
+  const box = await geometry(tooltip);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(tooltip).toBeVisible();
+  await trigger.focus();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(tooltip).toBeFocused();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await page.mouse.move(2, (page.viewportSize()?.height ?? 568) / 2);
 }
 
 test('nested inventory names and expanded item controls stay in view at supported widths', async ({
@@ -112,7 +150,18 @@ test('nested inventory names and expanded item controls stay in view at supporte
 
     await page.goto(characterPath);
     await selectCharacterSection(page, 'Inventory');
-    const inventory = page.getByRole('table', { name: 'Worn inventory', exact: true });
+    const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
+    await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
+    const location = page.getByLabel('Location');
+    await expect(location).toHaveValue('');
+    await expect(location.locator('option', { hasText: 'On the player' })).toHaveAttribute(
+      'value',
+      '',
+    );
+    await expect(location.locator('option', { hasText: 'Stashed' })).toHaveAttribute(
+      'value',
+      'stashed',
+    );
     const rows = [pack, pouch, caseItem, item].map(({ item: row }) =>
       page.locator(`#inventory-${row.id}`),
     );
@@ -169,7 +218,8 @@ test('nested inventory names and expanded item controls stay in view at supporte
             chipBox.height,
             `container label stays legible at ${viewport.width}`,
           ).toBeLessThanOrEqual(48);
-          await expect(settingsButton).toContainText('Container');
+          await expect(settingsButton).toHaveAccessibleName(/Container settings for /);
+          await expect(settingsButton.locator('svg')).toBeVisible();
         }
         await expect
           .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
@@ -182,6 +232,77 @@ test('nested inventory names and expanded item controls stay in view at supporte
             { fullPage: true, animations: 'disabled' },
           );
         }
+      });
+    }
+
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    const stashedName = `Stashed item ${runId}`;
+    await page.getByLabel('Item name').fill(stashedName);
+    await location.selectOption('stashed');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    const stashedInventory = page.getByRole('table', { name: 'Stashed inventory', exact: true });
+    await expect(stashedInventory).toContainText(stashedName, { timeout: 15_000 });
+    await expect(inventory).not.toContainText(stashedName);
+
+    const createdName = `Carried and equipped ${runId}`;
+    const addForm = location.locator('xpath=ancestor::form');
+    await addForm.getByLabel('Item name').fill(createdName);
+    await expect(location).toHaveValue('');
+    await addForm.getByRole('button', { name: 'More options' }).click();
+    const equipped = addForm.getByLabel('Equipped', { exact: true });
+    await equipped.check();
+    await addForm.getByRole('button', { name: 'Add', exact: true }).click();
+    const createdRow = inventory.getByRole('row').filter({ hasText: createdName });
+    await expect(createdRow).toBeVisible({ timeout: 15_000 });
+    await expect(inventory).toContainText(createdName);
+    await expect(stashedInventory).not.toContainText(createdName);
+    await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
+    await createdRow.locator('.inventory-item-title').click();
+    await expect(page.getByText('1 selected')).toBeVisible();
+
+    const moveDropdown = page.getByRole('button', { name: 'Move to ▾' }).locator('xpath=..');
+    const moveMenu = moveDropdown.locator('ul.dropdown-content');
+    for (const viewport of VIEWPORTS) {
+      await test.step(`Move menu at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await moveDropdown.getByRole('button', { name: 'Move to ▾' }).click();
+        await expect(moveMenu).toBeVisible();
+        await moveMenu.evaluate((element) => {
+          element.scrollTop = 0;
+        });
+        await expect(moveMenu.getByRole('button', { name: 'On the player' })).toBeVisible();
+        const longContainerOption = moveMenu.getByRole('button', {
+          name: PACK_NAME,
+          exact: true,
+        });
+        await longContainerOption.scrollIntoViewIfNeeded();
+        await expect(longContainerOption).toBeVisible();
+        const box = await geometry(moveMenu);
+        expect(box.x).toBeGreaterThanOrEqual(-1);
+        expect(box.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(box.height).toBeGreaterThan(0);
+        const optionBox = await geometry(longContainerOption);
+        expect(optionBox.x).toBeGreaterThanOrEqual(-1);
+        expect(optionBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(optionBox.scrollWidth).toBeLessThanOrEqual(optionBox.clientWidth + 1);
+        const vertical = await moveMenu.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, bottom: rect.bottom };
+        });
+        const banner = await page.getByRole('banner').boundingBox();
+        expect(banner).not.toBeNull();
+        expect(vertical.top).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(vertical.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        if ([320, 568, 639, 640, 641, 768, 1440].includes(viewport.width)) {
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `inventory-move-menu-${viewport.width}x${viewport.height}`,
+            { fullPage: true, animations: 'disabled' },
+          );
+        }
+        await page.mouse.click(2, viewport.height / 2);
+        await expect(moveMenu).not.toBeVisible();
       });
     }
 
@@ -247,6 +368,74 @@ test('nested inventory names and expanded item controls stay in view at supporte
     await selectCharacterSection(page, 'Inventory');
     const multiCategoryRow = page.locator(`#inventory-${multiCategoryItem.item.id}`);
     await expect(multiCategoryRow).toBeVisible();
+
+    const armorIcon = multiCategoryRow.getByRole('button', {
+      name: `Armor settings for ${LANGUAGE_ITEM}`,
+    });
+    const equippedIcon = multiCategoryRow.getByRole('button', {
+      name: `Equipped: ${LANGUAGE_ITEM}`,
+    });
+    await expect(armorIcon.locator('svg')).toBeVisible();
+    await expect(equippedIcon.locator('svg')).toBeVisible();
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 812 },
+      { width: 639, height: 800 },
+      { width: 640, height: 800 },
+      { width: 641, height: 800 },
+      { width: 1440, height: 900 },
+    ]) {
+      await test.step(`inventory icon tooltips at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await armorIcon.scrollIntoViewIfNeeded();
+        await armorIcon.hover();
+        let tooltip = page.getByRole('tooltip');
+        await expect(tooltip).toContainText('Armor');
+        let tooltipBox = await geometry(tooltip);
+        await expectTooltipPainted(page, tooltip);
+        const banner = await page.getByRole('banner').boundingBox();
+        expect(banner).not.toBeNull();
+        expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
+        expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        await attachReviewScreenshot(
+          page,
+          testInfo,
+          `inventory-armor-tooltip-${viewport.width}x${viewport.height}`,
+          {
+            path: testInfo.outputPath(
+              `inventory-armor-tooltip-${viewport.width}x${viewport.height}.png`,
+            ),
+            animations: 'disabled',
+          },
+        );
+        await verifyTooltipPointerAndFocus(page, armorIcon, tooltip);
+
+        await equippedIcon.scrollIntoViewIfNeeded();
+        await equippedIcon.hover();
+        tooltip = page.getByRole('tooltip');
+        await expect(tooltip).toContainText('Equipped');
+        tooltipBox = await geometry(tooltip);
+        await expectTooltipPainted(page, tooltip);
+        expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
+        expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        await attachReviewScreenshot(
+          page,
+          testInfo,
+          `inventory-equipped-tooltip-${viewport.width}x${viewport.height}`,
+          {
+            path: testInfo.outputPath(
+              `inventory-equipped-tooltip-${viewport.width}x${viewport.height}.png`,
+            ),
+            animations: 'disabled',
+          },
+        );
+        await verifyTooltipPointerAndFocus(page, equippedIcon, tooltip);
+      });
+    }
 
     await multiCategoryRow
       .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
@@ -317,9 +506,21 @@ test('nested inventory names and expanded item controls stay in view at supporte
       page
         .getByRole('region', { name: `${LANGUAGE_ITEM}: Container` })
         .getByLabel('Weight reduction (%)'),
-    ).toHaveValue('5');
+    ).toHaveCount(0);
     await multiCategoryRow
       .getByRole('button', { name: `Container settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
+      .click();
+    await expect(
+      page
+        .getByRole('region', { name: `${LANGUAGE_ITEM}: Armor` })
+        .getByLabel('Weight reduction (%)'),
+    ).toHaveValue('5');
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
       .click();
 
     await multiCategoryRow

@@ -1,15 +1,17 @@
+import { inventoryAvailability } from '../../../../shared/domain/inventoryAvailability.ts';
+import { formatEquipmentNumber } from '../../../../shared/format/number.ts';
 import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
 import { Table, TableHeader } from '../../../components/ui/Table.tsx';
 import { PricingResolver } from '../../library/PricingResolver.tsx';
 import { pricingDisplayValue } from '../../library/pricingDisplay.ts';
 /**
- * Literal port of the gurps-player-web (archived) inventory UI:
- *  - "On the player" / "Stashed" sections segregated by `worn` on root items
+ * Inventory location and equipment workspace:
+ *  - "On the player" / "Stashed" location uses the legacy `worn` root flag
  *  - Encumbrance + Basic Lift header with InfoTooltip explainers
- *  - Selection-driven bulk toolbar (worn / equipped majority toggles +
- *    move-to-container dropdown + bulk delete)
- *  - Add form with library autocomplete and a "More options" expander
- *    (container / armor / worn / equipped flags at create time)
+ *  - Selection-driven bulk toolbar (equipped majority toggle +
+ *    location dropdown + bulk delete)
+ *  - Add form with location, library autocomplete and a "More options" expander
+ *    (container / armor / equipped flags at create time)
  *  - Per-row inline category editors, with autosaved fields and optional details
  *  - DnD between rows / character / stashed targets, with valid/invalid
  *    visual feedback
@@ -33,6 +35,7 @@ import type {
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
+import { useAppHeaderBottom } from '../../../hooks/useAppHeaderBottom.ts';
 import { useRangeSelect } from '../../../hooks/useRangeSelect.ts';
 import { useViewportBoundedOverlay } from '../../../hooks/useViewportBoundedOverlay.ts';
 import { useToasts } from '../../../lib/toast.tsx';
@@ -87,7 +90,11 @@ export function InventoryPanel({
   const encumbrance = character.encumbrance;
   const items = character.inventory;
   const toasts = useToasts();
-  const bulkMoveMenuRef = useViewportBoundedOverlay<HTMLUListElement>();
+  const headerBottom = useAppHeaderBottom();
+  const bulkMoveMenuRef = useViewportBoundedOverlay<HTMLUListElement>(true, undefined, {
+    shiftVertically: true,
+    minimumTop: headerBottom,
+  });
 
   const [filterText, setFilterText] = useState('');
   const [filterTag, setFilterTag] = useState<InventoryFilterTag>('all');
@@ -123,12 +130,12 @@ export function InventoryPanel({
     return ancestors;
   }, [items, anchorItemId]);
   const roots = filteredTree.byParent.get(null) ?? [];
-  const wornRoots = roots.filter((r) => r.worn);
-  const carriedRoots = roots.filter((r) => !r.worn);
+  const carriedRoots = roots.filter((r) => r.worn);
+  const stashedRoots = roots.filter((r) => !r.worn);
 
   const orderedIds = useMemo(
-    () => flattenDFS([...wornRoots, ...carriedRoots], filteredTree.byParent).map((i) => i.id),
-    [wornRoots, carriedRoots, filteredTree.byParent],
+    () => flattenDFS([...carriedRoots, ...stashedRoots], filteredTree.byParent).map((i) => i.id),
+    [carriedRoots, stashedRoots, filteredTree.byParent],
   );
   const { selectedIds, isSelected, handleClick, clear, count } = useRangeSelect(orderedIds);
 
@@ -137,12 +144,11 @@ export function InventoryPanel({
   const [qty, setQty] = useState('1');
   const [weight, setWeight] = useState('');
   const [cost, setCost] = useState('');
-  const [parentId, setParentId] = useState<string>('');
+  const [newLocation, setNewLocation] = useState<string>('');
   const [moreOpen, setMoreOpen] = useState(false);
   const [newIsContainer, setNewIsContainer] = useState(false);
   const [newIsArmor, setNewIsArmor] = useState(false);
   const [newIsWeapon, setNewIsWeapon] = useState(false);
-  const [newWorn, setNewWorn] = useState(false);
   const [newEquipped, setNewEquipped] = useState(false);
   const [newEnchantmentQuery, setNewEnchantmentQuery] = useState('');
   const [newEnchantments, setNewEnchantments] = useState<InventoryItemOut['enchantments']>([]);
@@ -188,9 +194,29 @@ export function InventoryPanel({
     setNewIsContainer(opt.isContainer);
   }
 
+  function clearUnavailableEquipment(ids: readonly string[], patch: InventoryItemUpdate) {
+    const before = inventoryAvailability(items);
+    const after = inventoryAvailability(
+      items.map((item) => (ids.includes(item.id) ? { ...item, ...patch } : item)),
+    );
+    return items
+      .filter(
+        (item) => item.equipped && before.get(item.id)?.equipped && !after.get(item.id)?.equipped,
+      )
+      .map((item) => ({
+        entityClass: 'character_inventory' as const,
+        entityId: item.id,
+        characterId,
+        fieldPath: 'equipped',
+        attemptedValue: false,
+        humanName: 'Equipped',
+        flashKey: makeFlashKey('character_inventory', item.id, 'equipped'),
+      }));
+  }
+
   async function patchMany(id: string, patch: InventoryItemUpdate, label: string): Promise<void> {
-    await enqueueFieldPatches(
-      Object.entries(patch).map(([field, value]) => ({
+    await enqueueFieldPatches([
+      ...Object.entries(patch).map(([field, value]) => ({
         entityClass: 'character_inventory' as const,
         entityId: id,
         fieldPath: field,
@@ -199,14 +225,22 @@ export function InventoryPanel({
         flashKey: makeFlashKey('character_inventory', id, field),
         characterId,
       })),
-    );
+      ...clearUnavailableEquipment([id], patch),
+    ]);
   }
 
   async function bulkPatch(patch: InventoryItemUpdate, label: string): Promise<void> {
     const ids = Array.from(selectedIds);
     try {
-      await enqueueFieldPatches(
-        ids.flatMap((id) =>
+      if (
+        patch.equipped === true &&
+        ids.some((id) => !inventoryAvailability(items).get(id)?.carried)
+      )
+        throw new Error(
+          'Move selected items on the player and set positive quantities before equipping them',
+        );
+      await enqueueFieldPatches([
+        ...ids.flatMap((id) =>
           Object.entries(patch).map(([field, value]) => ({
             entityClass: 'character_inventory' as const,
             entityId: id,
@@ -217,7 +251,8 @@ export function InventoryPanel({
             characterId,
           })),
         ),
-      );
+        ...clearUnavailableEquipment(ids, patch),
+      ]);
       toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
     } catch (err) {
       toasts.push(`Couldn't ${label.toLowerCase()} — ${(err as Error).message}`, { kind: 'error' });
@@ -276,7 +311,7 @@ export function InventoryPanel({
       toasts.push('Cost must be a number', { kind: 'error' });
       return;
     }
-    const parent = parentId === '' ? null : parentId;
+    const parent = newLocation === '' || newLocation === 'stashed' ? null : newLocation;
     // If a library item was picked AND the user hasn't deviated from the
     // pick's name, link the new row back to the library entry.
     const linkedLibraryId =
@@ -335,11 +370,11 @@ export function InventoryPanel({
         notes: null,
         parentId: parent,
         externalLocation: null,
-        worn: parent === null && newWorn,
+        worn: newLocation === '',
         equipped: newEquipped,
         isContainer: newIsContainer,
         // Gated on the facet, not just the pick: encumbrance applies
-        // these to worn root items regardless of isContainer, so a pick
+        // these to carried root items regardless of isContainer, so a pick
         // whose Container chip was toggled off must not smuggle in an
         // invisible weight reduction.
         hideawayCapacityLbs: newIsContainer ? (containerFromLibrary?.hideawayCapacityLbs ?? 0) : 0,
@@ -377,11 +412,10 @@ export function InventoryPanel({
         setQty('1');
         setWeight('');
         setCost('');
-        setParentId('');
+        setNewLocation('');
         setNewIsContainer(false);
         setNewIsArmor(false);
         setNewIsWeapon(false);
-        setNewWorn(false);
         setNewEquipped(false);
         setNewEnchantmentQuery('');
         setNewEnchantments([]);
@@ -472,8 +506,10 @@ export function InventoryPanel({
         return;
       }
       let patch: InventoryItemUpdate;
-      if (target.kind === 'container') patch = { parentId: target.id, worn: false };
-      else if (target.kind === 'character') patch = { parentId: null, worn: true };
+      if (target.kind === 'container')
+        patch = { parentId: target.id, worn: false, externalLocation: null };
+      else if (target.kind === 'character')
+        patch = { parentId: null, worn: true, externalLocation: null };
       else patch = { parentId: null, worn: false };
       void patchMany(draggedId, patch, 'Moved').catch((err) => {
         toasts.push(`Couldn't move item — ${(err as Error).message}`, { kind: 'error' });
@@ -482,14 +518,11 @@ export function InventoryPanel({
   };
 
   // Selected items, used to drive the "majority" pressed state of the
-  // Worn/Equipped toggles in the bulk header.
+  // Equipped toggle in the bulk header; location changes use the move menu.
   const selectedItems = useMemo(
     () => items.filter((i) => selectedIds.has(i.id)),
     [items, selectedIds],
   );
-  const majorityWorn =
-    selectedItems.length > 0 &&
-    selectedItems.filter((i) => i.worn).length * 2 >= selectedItems.length;
   const majorityEquipped =
     selectedItems.length > 0 &&
     selectedItems.filter((i) => i.equipped).length * 2 >= selectedItems.length;
@@ -499,8 +532,8 @@ export function InventoryPanel({
 
   // Aggregate counts/weight/cost for items in the Stashed section.
   const stashedSubtree = useMemo(
-    () => flattenDFS(carriedRoots, tree.byParent),
-    [carriedRoots, tree.byParent],
+    () => flattenDFS(stashedRoots, tree.byParent),
+    [stashedRoots, tree.byParent],
   );
   const stashedCount = stashedSubtree.reduce((acc, i) => acc + i.quantity, 0);
   const stashedWeight = stashedSubtree.reduce((acc, i) => acc + i.weightLbs * i.quantity, 0);
@@ -513,6 +546,7 @@ export function InventoryPanel({
         item={r}
         depth={0}
         byParent={filteredTree.byParent}
+        equipmentAvailability={inventoryAvailability(items)}
         isSelected={isSelected}
         onRowClick={handleClick}
         canEdit={canWrite}
@@ -547,7 +581,7 @@ export function InventoryPanel({
       {character.libraryEffectsKnown !== false && (
         <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-2 py-2 sm:px-5 sm:py-3 text-sm">
           <span className="num text-base-content/60">
-            {encumbrance.playerWeightLbs.toFixed(1)} lbs
+            {formatEquipmentNumber(encumbrance.playerWeightLbs)} lbs
           </span>
           <span className="text-base-content/40">·</span>
           <InfoTooltip
@@ -560,13 +594,15 @@ export function InventoryPanel({
                 </div>
                 <div className="num text-base-content/60">
                   BL = ST² ÷ 5 ={' '}
-                  <span className="text-base-content">{encumbrance.basicLift.toFixed(1)} lbs</span>
+                  <span className="text-base-content">
+                    {formatEquipmentNumber(encumbrance.basicLift)} lbs
+                  </span>
                 </div>
               </div>
             }
           >
             <span className="num text-base-content/60">
-              BL {encumbrance.basicLift.toFixed(1)} lbs
+              BL {formatEquipmentNumber(encumbrance.basicLift)} lbs
             </span>
           </InfoTooltip>
           <span className="text-base-content/40">·</span>
@@ -662,7 +698,6 @@ export function InventoryPanel({
             <option value="powerstone">Powerstone</option>
             <option value="magicItem">Magic item</option>
             <option value="enchanted">Enchanted</option>
-            <option value="worn">Worn</option>
             <option value="equipped">Equipped</option>
           </select>
           {filterActive && (
@@ -695,53 +730,45 @@ export function InventoryPanel({
             Clear
           </button>
           <span className="grow" />
-          <div className="join">
-            <button
-              type="button"
-              aria-pressed={majorityWorn}
-              onClick={() =>
-                void bulkPatch(
-                  majorityWorn ? { worn: false } : { worn: true, parentId: null },
-                  majorityWorn ? 'Unwore' : 'Wore',
-                )
-              }
-              className={`btn btn-sm join-item ${majorityWorn ? 'btn-primary' : ''}`}
-            >
-              Worn
-            </button>
-            <button
-              type="button"
-              aria-pressed={majorityEquipped}
-              onClick={() =>
-                void bulkPatch(
-                  { equipped: !majorityEquipped },
-                  majorityEquipped ? 'Unequipped' : 'Equipped',
-                )
-              }
-              className={`btn btn-sm join-item ${majorityEquipped ? 'btn-primary' : ''}`}
-            >
-              Equipped
-            </button>
-          </div>
+          <button
+            type="button"
+            aria-pressed={majorityEquipped}
+            onClick={() =>
+              void bulkPatch(
+                { equipped: !majorityEquipped },
+                majorityEquipped ? 'Unequipped' : 'Equipped',
+              )
+            }
+            className={`btn btn-sm ${majorityEquipped ? 'btn-primary' : ''}`}
+          >
+            Equipped
+          </button>
           <div className="dropdown dropdown-end">
             <button type="button" className="btn btn-sm">
-              Move to container ▾
+              Move to ▾
             </button>
             <ul
               ref={bulkMoveMenuRef}
-              style={{ marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))' }}
-              className="dropdown-content menu menu-sm z-30 max-h-72 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300/60 bg-base-100 shadow-lg"
+              style={{
+                marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
+                marginTop: 'var(--viewport-overlay-shift-y, 0px)',
+                maxHeight:
+                  'min(18rem, calc(100dvh - 1rem), var(--viewport-overlay-available-height, 100dvh))',
+              }}
+              className="dropdown-content menu menu-sm z-30 flex-nowrap [&>li]:shrink-0 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] overflow-y-auto rounded-box border border-base-300/60 bg-base-100 shadow-lg"
             >
               <li>
                 <button
                   type="button"
                   className="text-primary font-medium"
                   onClick={() =>
-                    void bulkPatch({ parentId: null, worn: true }, 'Moved to Character:')
+                    void bulkPatch(
+                      { parentId: null, worn: true, externalLocation: null },
+                      'Moved on the player:',
+                    )
                   }
                 >
-                  Character
-                  <span className="text-base-content/40 text-[10px]">worn</span>
+                  On the player
                 </button>
               </li>
               <li>
@@ -765,7 +792,10 @@ export function InventoryPanel({
                   <button
                     type="button"
                     onClick={() =>
-                      void bulkPatch({ parentId: c.id, worn: false }, `Moved to ${c.name}:`)
+                      void bulkPatch(
+                        { parentId: c.id, worn: false, externalLocation: null },
+                        `Moved to ${c.name}:`,
+                      )
                     }
                   >
                     {c.name}
@@ -835,14 +865,14 @@ export function InventoryPanel({
             <div className="flex items-baseline justify-between mb-2">
               <h3 className="font-display text-lg">On the player</h3>
               <span className="label-eyebrow">
-                {wornRoots.length} worn item{wornRoots.length === 1 ? '' : 's'}
+                {carriedRoots.length} item{carriedRoots.length === 1 ? '' : 's'}
               </span>
             </div>
-            {wornRoots.length === 0 ? (
+            {carriedRoots.length === 0 ? (
               <p className="text-base-content/60 text-sm">
                 {filterActive
                   ? 'No matching items on the player.'
-                  : 'Nothing worn — encumbrance is 0. Drop items here to wear them.'}
+                  : 'Nothing on the player. Drop items here to carry them.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-base-300/60">
@@ -854,14 +884,14 @@ export function InventoryPanel({
                   ).map((item) => ({
                     item: item.name,
                     qty: item.quantity,
-                    wt: item.effectiveWeightLbs.toFixed(1),
-                    cost: item.cost.toFixed(0),
+                    wt: formatEquipmentNumber(item.effectiveWeightLbs),
+                    cost: formatEquipmentNumber(item.cost),
                   }))}
-                  aria-label="Worn inventory"
+                  aria-label="Carried inventory"
                   className="table table-zebra inventory-table"
                 >
                   {tableHead}
-                  <tbody>{renderRows(wornRoots)}</tbody>
+                  <tbody>{renderRows(carriedRoots)}</tbody>
                 </Table>
               </div>
             )}
@@ -919,16 +949,18 @@ export function InventoryPanel({
                 <span>
                   <span className="text-base-content/40">wt </span>
                   <span className="font-semibold text-base-content">
-                    {stashedWeight.toFixed(1)} lb
+                    {formatEquipmentNumber(stashedWeight)} lb
                   </span>
                 </span>
                 <span>
                   <span className="text-base-content/40">cost </span>
-                  <span className="font-semibold text-base-content">{stashedCost.toFixed(0)}</span>
+                  <span className="font-semibold text-base-content">
+                    {formatEquipmentNumber(stashedCost)}
+                  </span>
                 </span>
               </span>
             </div>
-            {carriedRoots.length === 0 ? (
+            {stashedRoots.length === 0 ? (
               <p className="text-base-content/60 text-sm">
                 {filterActive
                   ? 'No matching stashed items.'
@@ -944,14 +976,14 @@ export function InventoryPanel({
                   ).map((item) => ({
                     item: item.name,
                     qty: item.quantity,
-                    wt: (item.weightLbs * item.quantity).toFixed(1),
-                    cost: item.cost.toFixed(0),
+                    wt: formatEquipmentNumber(item.weightLbs * item.quantity),
+                    cost: formatEquipmentNumber(item.cost),
                   }))}
                   aria-label="Stashed inventory"
                   className="table table-zebra inventory-table"
                 >
                   {tableHead}
-                  <tbody>{renderRows(carriedRoots, { inStashed: true })}</tbody>
+                  <tbody>{renderRows(stashedRoots, { inStashed: true })}</tbody>
                 </Table>
               </div>
             )}
@@ -964,20 +996,21 @@ export function InventoryPanel({
               <span className="font-semibold text-base-content">
                 {character.libraryEffectsKnown === false
                   ? 'unavailable'
-                  : `${encumbrance.playerWeightLbs.toFixed(1)} lb`}
+                  : `${formatEquipmentNumber(encumbrance.playerWeightLbs)} lb`}
               </span>
             </span>
             <span className="num">
               <span className="text-base-content/40">raw </span>
-              {sumRaw.toFixed(1)} lb
+              {formatEquipmentNumber(sumRaw)} lb
             </span>
             <span className="num">
               <span className="text-base-content/40">cost </span>
-              {totalCost.toFixed(0)}
+              {formatEquipmentNumber(totalCost)}
             </span>
             {character.libraryEffectsKnown !== false && (
               <span className="num text-base-content/40">
-                BL {encumbrance.basicLift.toFixed(0)} → {LEVEL_LABELS[encumbrance.level]}
+                BL {formatEquipmentNumber(encumbrance.basicLift)} →{' '}
+                {LEVEL_LABELS[encumbrance.level]}
               </span>
             )}
           </div>
@@ -1083,12 +1116,13 @@ export function InventoryPanel({
               aria-label="Cost"
             />
             <select
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
+              value={newLocation}
+              onChange={(e) => setNewLocation(e.target.value)}
               className="select select-sm select-bordered max-w-full min-w-0"
-              aria-label="Parent container"
+              aria-label="Location"
             >
-              <option value="">— No parent —</option>
+              <option value="">On the player</option>
+              <option value="stashed">Stashed</option>
               {containers.map((c) => (
                 <option key={c.id} value={c.id}>
                   in {c.name}
@@ -1128,17 +1162,6 @@ export function InventoryPanel({
                   else if (facet === 'weapon') setNewIsWeapon(next);
                 }}
               />
-              {parentId === '' && (
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-sm"
-                    checked={newWorn}
-                    onChange={(e) => setNewWorn(e.target.checked)}
-                  />
-                  <span>Worn</span>
-                </label>
-              )}
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"

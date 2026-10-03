@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MANA_LEVEL_LABELS } from '../../../../shared/constants/magic.ts';
 import { applyFatigueLoss } from '../../../../shared/domain/fatigue.ts';
+import { inventoryAvailability } from '../../../../shared/domain/inventoryAvailability.ts';
 import {
   characterMagicTraits,
   hasMagery,
@@ -45,7 +46,7 @@ function totalAllocation(a: Allocation): number {
 /**
  * Auto-pick a sensible default allocation: FP first, then a powerstone,
  * HP only as last resort.  A single casting may draw from at most ONE
- * powerstone (B481 / M69), so the suggestion picks the fullest stone
+ * powerstone (M69), so the suggestion picks the fullest stone
  * rather than splitting across several.  The player can redistribute by
  * editing the per-source numbers.
  */
@@ -107,15 +108,20 @@ export function CastSpellDialog({
   const [energyRaw, setEnergyRaw] = useState(String(seedCost));
   const cost = clamp(Number(energyRaw), 0, 999);
   // A powerstone only powers a spell if the caster is touching it
-  // (B481), so stones stored elsewhere (external location) don't count.
-  const stones = useMemo(
-    () =>
-      character.inventory.filter(
-        (i): i is InventoryItemOut & { powerstoneData: PowerstoneData } =>
-          i.powerstoneData != null && i.externalLocation == null,
-      ),
-    [character.inventory],
-  );
+  // (M69). Carried stones are candidates; the player confirms physical touch.
+  const casterHasMagery = hasMagery(characterMagicTraits(character));
+  const inventory = character.inventory;
+  const manaLevel = character.manaLevel;
+  const stones = useMemo(() => {
+    const availability = inventoryAvailability(inventory);
+    return inventory.filter(
+      (i): i is InventoryItemOut & { powerstoneData: PowerstoneData } =>
+        i.powerstoneData != null &&
+        availability.get(i.id)?.carried === true &&
+        manaLevel !== 'none' &&
+        casterHasMagery,
+    );
+  }, [inventory, manaLevel, casterHasMagery]);
   const fpAvailable = character.combat?.currentFp ?? character.derived.fp;
   const hpAvailable = character.combat?.currentHp ?? character.derived.hp;
 
@@ -147,8 +153,7 @@ export function CastSpellDialog({
       : 0;
   const remaining = cost - allocated;
   const overspent = allocated > cost;
-  // One casting can draw from at most one powerstone (B481 / M69).
-  // Warn-don't-block, matching the app's rules philosophy.
+  // One casting can draw from at most one powerstone (M69).
   const stonesUsed = [...alloc.fromStones.values()].filter((v) => v > 0).length;
 
   function setFp(next: number) {
@@ -168,6 +173,10 @@ export function CastSpellDialog({
   }
 
   async function performCast() {
+    if (stonesUsed > 1) {
+      toasts.push('Use only one powerstone per casting (M69).', { kind: 'error' });
+      return;
+    }
     if (allocated !== cost) {
       toasts.push(`Allocate exactly ${cost} energy (currently ${allocated}).`, { kind: 'error' });
       return;
@@ -338,6 +347,7 @@ export function CastSpellDialog({
               value={alloc.fromFp}
               onChange={setFp}
             />
+
             {stones.map((stone) => (
               <SourceRow
                 key={stone.id}
@@ -356,10 +366,15 @@ export function CastSpellDialog({
             />
           </TableBody>
         </Table>
+        {stones.length > 0 && (
+          <p className="text-xs text-base-content/60">
+            Use a carried powerstone only while touching it (M69).
+          </p>
+        )}
 
         {stonesUsed > 1 && (
           <p className="mt-2 text-xs text-warning">
-            A single casting can draw energy from only one powerstone (B481) — you&apos;ve allocated
+            A single casting can draw energy from only one powerstone (M69) — you&apos;ve allocated
             from {stonesUsed}.
           </p>
         )}

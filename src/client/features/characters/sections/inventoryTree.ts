@@ -26,7 +26,6 @@ export const INVENTORY_FILTER_TAGS = [
   'powerstone',
   'magicItem',
   'enchanted',
-  'worn',
   'equipped',
 ] as const;
 
@@ -53,8 +52,6 @@ function hasFilterTag(item: InventoryItemOut, tag: InventoryFilterTag): boolean 
       return item.magicItemData != null;
     case 'enchanted':
       return (item.enchantments?.length ?? 0) > 0;
-    case 'worn':
-      return item.worn;
     case 'equipped':
       return item.equipped;
   }

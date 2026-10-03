@@ -171,12 +171,14 @@ test('Current Status stays available and combat stays compact across mobile and 
     });
     await api(page, `/characters/${character.id}/inventory`, {
       name: 'Deflect vest',
+      worn: true,
       equipped: true,
       isArmor: true,
       armor: { locations: ['torso'], dr: 4, db: 2, frontOnly: true },
     });
     await api(page, `/characters/${character.id}/inventory`, {
       name: 'Buckler',
+      worn: true,
       equipped: true,
       weaponData: { db: 1, skill: 'Shield', wieldedSide: 'left' },
     });
@@ -284,7 +286,7 @@ test('Current Status stays available and combat stays compact across mobile and 
         await incomingAttack.getByRole('button', { name: /^Dodge \d+$/ }).getAttribute('aria-label')
       )?.match(/\d+$/)?.[0],
     );
-    expect(frontDodge - backDodge).toBe(3);
+    expect(frontDodge - backDodge).toBe(1);
     await incomingAttack.getByRole('button', { name: /Incoming damage…/ }).click();
     const damageDialog = page.getByRole('dialog', { name: 'Incoming damage' });
     await expect(damageDialog.getByLabel('Incoming attack context')).toContainText(
@@ -336,11 +338,7 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(damageDialog.getByLabel('Incoming attack context')).toContainText(
       'Torso · back · Crushing (cr) · Normal DR',
     );
-    await expect(
-      damageDialog.getByText(
-        `Selected defense: Dodge ${backDodge}. Confirm the hit before applying injury.`,
-      ),
-    ).toBeVisible();
+    await expect(damageDialog.getByText(`Selected defense: Dodge ${backDodge}.`)).toBeVisible();
     await expect(damageDialog.getByLabel('Basic damage')).toBeVisible();
     await damageDialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('rowgroup', { name: 'Move' })).toHaveCount(0);

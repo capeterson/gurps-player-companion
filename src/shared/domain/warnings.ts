@@ -110,7 +110,9 @@ rule('encumbrance.over_carry_cap', 'Carry limit exceeded', ({ encumbrance }) =>
         code: 'encumbrance.over_carry_cap',
         severity: 'warn',
         message:
-          'Carried weight exceeds 10× Basic Lift — beyond the X-Heavy carry limit, the character cannot move (B17).',
+          encumbrance.ratio <= 15
+            ? 'Above 10× Basic Lift: carrying on the back allows X-Heavy Move, costing 1 FP per second (B353, B426). Confirm the load can be carried on the back.'
+            : 'Above 15× Basic Lift: exceeds carrying-on-back capacity. Reduce the load or adjudicate hauling (B353).',
       }
     : null,
 );

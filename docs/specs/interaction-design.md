@@ -362,15 +362,31 @@ shrinking (`min-w-0`, `w-full`) and summary text allows word wrapping. Use the
 app's existing daisyUI components and semantic theme colors; avoid bespoke
 palettes, nested decorative cards, and additional display fonts.
 
+Inventory location uses the existing move/drop interaction, with On the player,
+Stashed and nested containers. Quick-add has one Location selector with those
+choices and defaults to On the player. Carried contents inherit their root's
+location. Equipped means worn or wielded for use; there is no additional Worn
+control, filter or status badge. The stored/API `worn` field remains a legacy
+root-location flag for compatibility, not an equipment status. Every applied
+category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
+Magic item, Enchantments); no category is hidden by a priority icon. Category
+icons open the existing editor and reveal names/details on hover or focus through
+`InfoTooltip`, portaled above the table so clipping ancestors cannot hide content.
+Equipped uses a separate check-circle icon with a tooltip.
+Read-only category icons retain labels and tooltips, with the existing Details action.
+The move menu
+wraps long container names, scrolls internally, and uses shared viewport collision
+handling to stay below the sticky app header and within the visible viewport.
+
 Inventory preserves its desktop columns and uses a compact two-line item row
-below 640px: name and chips on the left, weight over quantity and cost on the
+below 640px: name and category icons on the left, weight over quantity and cost on the
 right, then the edit action. Quantity 1 is implied rather than repeated, and
-the units (`lb`, `$`, `×`) replace per-row column labels. Long names and chip
-text wrap at every width so the table also fits at the desktop breakpoint.
+the units (`lb`, `$`, `×`) replace per-row column labels. Long names and icon
+groups wrap at every width so the table also fits at the desktop breakpoint.
 Expanded inventory editors use the summary row for the item name and keep
 the **+ Category** and **Done** actions inside the viewport. At the
-desktop-table breakpoint, item names and category chips may flow onto separate
-lines so a narrow item column does not compress a chip into one letter per line.
+desktop-table breakpoint, item names and category icons may flow onto separate
+lines so a narrow item column does not compress an icon group into one icon per line.
 Expanded editors contain their intrinsic inline size so their input grids do not
 force a wider table; nested fieldsets and enchantment pickers can shrink within
 the available editor width, including the 640px breakpoint. Long enchantment

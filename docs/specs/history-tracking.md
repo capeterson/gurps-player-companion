@@ -166,10 +166,14 @@ New module `src/shared/history/summarize.ts` — pure functions, unit-testable, 
   - **Temporary effects** (`characters.temp_effects`, a JSONB list since migration 0017): `"Temporary effect added: Might (ST +2, HT +1)"`, `"Temporary effect removed: Might"`, `"Temporary effects cleared"`, `"Temporary adjustment: ST +2"` (the reserved `manual` sentinel entry the ✦ popovers write to). Pre-migration history rows still carry the old per-stat scalar columns (`tempSt`, `tempDx`, …) in their jsonb snapshot forever — `TEMP_ATTR_LABELS` keeps those readable as `"Temp DX +2"` / `"Temp DX boost cleared"`.
   - Skill/spell/trait: `"Added skill Broadsword (DX/A)"`, `"Removed spell Fireball"`, `"Acrobatics points 2 → 4"`. Character-owned trait mechanics summarize as `"Weapon Mastery: 2 custom effects saved"` rather than dumping JSON.
   - Inventory: `"Added Torch ×2"`, `"Moved Sword into Backpack"`, `"Removed Rations"`.
+    Changes to the legacy `worn` location flag show `"Carrying <item>"` or
+    `"Stashed <item>"`; equipment changes show `"Equipped <item>"` or
+    `"Unequipped <item>"`.
   - Campaign: `"Point target 100 → 125"`, `"Disadvantage cap changed"`.
   - Membership: `"Promoted Alice to manager"`, `"Removed Bob from campaign"`.
   - Library: `"Added library item Fine Sword"`.
   - Adventure log: `"Posted session log: The Caves of Chaos"`.
+
 - `groupIntoBatches(events): HistoryGroup[]` — folds consecutive events sharing a **real** (multi-member) `batchId` into one group with a synthesized header line (`"Moved 4 items into Backpack"` when uniform, else `"4 changes"`), exposing children for the expand panel. A batchId counts as "real" when it has more than one member either in the loaded events **or in the server-provided `batchSize`**; every sync-backed write gets a non-null `batchId` (`dispatchOperation` falls back to `op.clientOpId` when the client didn't set one), so a lone field patch's singleton batchId does not, by itself, make it a batch. `batchSize` preserves the identity of explicit batches when pagination splits their members. Separately, consecutive plain-`update` events on the **same entity** by the **same actor**, neither carrying a real batchId, that land within 60 seconds of each other also fold into one collapsed group (a burst of quick unbatched edits to one item) — its header is a generic `"N updates to this item"` rather than the uniform-batch wording. Standalone events become single-item groups (rendered without a fold arrow).
 
 Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision`/`updatedAt`/`createdAt`).

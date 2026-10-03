@@ -85,12 +85,14 @@ test('Combat keeps extreme pools and long equipment names reachable across viewp
     expect(combatResponse.ok(), await combatResponse.text()).toBeTruthy();
     const weapon = await post(`/characters/${characterId}/inventory`, {
       name: weaponName,
+      worn: true,
       equipped: true,
       weaponData: { damage: 'sw+1 cut', skill: null },
     });
     inventoryIds.push(weapon.id);
     const armor = await post(`/characters/${characterId}/inventory`, {
       name: armorName,
+      worn: true,
       equipped: true,
       isArmor: true,
       armor: { locations: ['torso'], dr: 3 },

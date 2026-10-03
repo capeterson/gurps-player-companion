@@ -432,7 +432,7 @@ function summarizeInventory(
     return `Moved ${name} into container`;
   }
   if (c.field === 'quantity') return `${name} qty ${c.oldValue} → ${c.newValue}`;
-  if (c.field === 'worn') return c.newValue ? `Wearing ${name}` : `Removed ${name} (worn)`;
+  if (c.field === 'worn') return c.newValue ? `Carrying ${name}` : `Stashed ${name}`;
   if (c.field === 'equipped') return c.newValue ? `Equipped ${name}` : `Unequipped ${name}`;
   if (c.field === 'isArmor') return `${name}: ${c.newValue ? 'set' : 'unset'} as armor`;
   if (c.field === 'isContainer') return `${name}: ${c.newValue ? 'set' : 'unset'} as container`;

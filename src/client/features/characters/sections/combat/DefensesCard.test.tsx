@@ -82,7 +82,7 @@ function makeCharacter(
   return {
     id: 'char-1',
     derived: { dodge: 9, basicMove: 5, effectiveSt: 10 },
-    encumbrance: { dodgePenalty: 0, moveMultiplier: 1, label: 'None', ratio: 1 },
+    encumbrance: { level: 0, dodgePenalty: 0, moveMultiplier: 1, label: 'None', ratio: 1 },
     skills: skills.map((s, i) => ({ id: `s${i}`, name: s.name, level: s.level })),
     inventory: [...weaponRows, ...armorRows],
   } as unknown as CharacterDetail;
@@ -113,6 +113,79 @@ describe('DefensesCard', () => {
       'href',
       '#inventory-coat',
     );
+  });
+
+  it('applies a fencing encumbrance penalty directly to Parry after skill division', () => {
+    const character = makeCharacter(
+      [{ id: 'rapier', name: 'Rapier', parry: '0F', skill: 'Rapier' }],
+      [{ name: 'Rapier', level: 14 }],
+    );
+    character.encumbrance = {
+      ...character.encumbrance,
+      level: 3,
+      dodgePenalty: -3,
+      moveMultiplier: 0.4,
+      label: 'Heavy',
+      ratio: 4,
+    };
+    const openRoll = vi.fn();
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Parry \(Rapier\)/ }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(7);
+    expect(screen.getByText(/3 fencing encumbrance/)).toBeInTheDocument();
+  });
+
+  it('applies Deflect DB to defenses from a sword without creating Block', () => {
+    const character = makeCharacter(
+      [{ id: 'sword', name: 'Sword', parry: '0', skill: 'Broadsword' }],
+      [{ name: 'Broadsword', level: 14 }],
+    );
+    const sword = character.inventory[0];
+    if (!sword) throw new Error('Missing sword fixture');
+    sword.enchantmentBreakdown = [
+      {
+        instanceKey: 'Deflect:0',
+        sourceName: 'Sword: Deflect',
+        target: 'db',
+        value: 1,
+        active: true,
+        stackingKey: null,
+        suppressedByStacking: false,
+      },
+    ];
+    const openRoll = vi.fn();
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Dodge/ }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(10);
+    fireEvent.click(screen.getByRole('button', { name: /^Parry \(Sword\)/ }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(11);
+    expect(screen.queryByRole('button', { name: /^Block/ })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/1 enchanted DB/).length).toBeGreaterThan(0);
+  });
+
+  it('shows a negative enchanted DB and applies it to active defenses', () => {
+    const character = makeCharacter(
+      [{ id: 'sword', name: 'Cursed sword', parry: '0', skill: 'Broadsword' }],
+      [{ name: 'Broadsword', level: 14 }],
+    );
+    const sword = character.inventory[0];
+    if (!sword) throw new Error('missing sword fixture');
+    sword.enchantmentBreakdown = [
+      {
+        instanceKey: 'curse',
+        sourceName: 'Cursed sword: Deflect',
+        target: 'db',
+        value: -2,
+        active: true,
+        stackingKey: null,
+        suppressedByStacking: false,
+      },
+    ];
+    const openRoll = vi.fn();
+    render(<DefensesCard character={character} openRoll={openRoll} />);
+    expect(screen.getByRole('rowgroup', { name: 'Dodge' })).toHaveTextContent('-2 enchanted DB');
+    fireEvent.click(screen.getByRole('button', { name: 'Dodge 7' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].baseTarget).toBe(7);
   });
 
   function withMultipleDefenses(): CharacterDetail {
@@ -653,12 +726,12 @@ describe('DefensesCard', () => {
     expect(targetFor(openRoll, 0)).toBe(12); // 9 + max(1, 3), never +4
     view.rerender(<DefensesCard character={character} openRoll={openRoll} hitLocation="skull" />);
     fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
-    expect(targetFor(openRoll, 1)).toBe(11);
+    expect(targetFor(openRoll, 1)).toBe(12);
     view.rerender(
       <DefensesCard character={character} openRoll={openRoll} hitLocation="torso" facing="back" />,
     );
     fireEvent.click(screen.getByRole('button', { name: /Dodge/ }));
-    expect(targetFor(openRoll, 2)).toBe(10);
+    expect(targetFor(openRoll, 2)).toBe(12);
   });
 
   it('ignores armor DB on unequipped armor', () => {

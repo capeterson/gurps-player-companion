@@ -19,6 +19,8 @@ function makeCharacter(
     inventory: armor.map((a, i) => ({
       id: `a${i}`,
       name: `Armor ${i}`,
+      worn: true,
+      quantity: 1,
       equipped: true,
       isArmor: true,
       armor: {
@@ -26,7 +28,8 @@ function makeCharacter(
         dr: a.dr,
         drCrushing: null,
         typedDr: a.typedDr ?? {},
-        flexible: false,
+        flexible: true,
+        concealable: true,
         frontOnly: false,
         backOnly: false,
         db: null,
@@ -156,6 +159,7 @@ describe('DrSummaryCard', () => {
       effectiveSt: 10,
     } as CharacterDetail['derived'];
     character.encumbrance = {
+      level: 0,
       dodgePenalty: 0,
       moveMultiplier: 1,
       label: 'None',
@@ -196,7 +200,7 @@ describe('DrSummaryCard', () => {
     ).toBeVisible();
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'back' } });
     expect(screen.queryByText(/Selected defense: Dodge/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Dodge 9' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Dodge 11' })).toBeVisible();
     expect(onFacingChange).toHaveBeenCalledWith('back');
   });
 
@@ -218,7 +222,9 @@ describe('DrSummaryCard', () => {
 
     fireEvent.change(screen.getByLabelText('Armor facing'), { target: { value: 'left' } });
     expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('4');
-    expect(screen.getByText(/No armor DB for this location and facing/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Front plate' })[0]?.closest('p')).toHaveTextContent(
+      'Armor DB +1 from Front plate',
+    );
   });
 
   it('clears a selected defense when its score changes and after injury is applied', async () => {
@@ -345,6 +351,29 @@ describe('DrSummaryCard', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Apply −7 HP' }));
     expect(bumpHp).toHaveBeenCalledWith(-7);
+  });
+
+  it('marks illegal armor overlap unavailable and disables incoming injury until the layers are fixed', () => {
+    const bumpHp = vi.fn();
+    const character = makeCharacter([
+      { dr: 4, locations: ['torso'] },
+      { dr: 3, locations: ['torso'] },
+    ]);
+    for (const layer of character.inventory) {
+      if (layer.armor) layer.armor = { ...layer.armor, flexible: false, concealable: false };
+    }
+    render(<DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />);
+    expect(screen.getByText(/DR unavailable/)).toHaveTextContent('DR unavailable');
+    expect(screen.getByText(/DR unavailable/)).toHaveTextContent('overlapping armor layers');
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '12' } });
+    const apply = screen.getByRole('button', { name: 'Damage unavailable' });
+    expect(apply).toBeDisabled();
+    expect(
+      screen.getByText(/Resolve overlapping armor layers in Inventory before applying damage/),
+    ).toBeVisible();
+    fireEvent.submit(apply.closest('form') as HTMLFormElement);
+    expect(bumpHp).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -659,7 +688,7 @@ describe('DrSummaryCard', () => {
     const second = character.inventory[1];
     if (!first?.armor || !second?.armor) throw new Error('missing armor fixture');
     first.name = 'Deflect Coat';
-    first.armor = { ...first.armor, db: 1 };
+    first.armor = { ...first.armor, db: 1, flexible: true, concealable: true };
     second.name = 'Deflect Plate';
     second.armor = { ...second.armor, db: 3 };
     render(<DrSummaryCard character={character} canWrite hpMax={20} bumpHp={bumpHp} />);

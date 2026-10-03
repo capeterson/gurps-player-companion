@@ -4,21 +4,18 @@
  *   - Dodge = floor(Basic Speed) + 3 (B17), then encumbrance applies a
  *     penalty (B17). `encumbrance.ts`'s `dodgePenalty` is stored as a
  *     negative or zero number (e.g. -2 for Medium encumbrance), so
- *     it's simply added here. RAW gives no floor for encumbered Dodge —
- *     the min-1 rules in the book apply to Move under encumbrance (B17)
- *     and to Move/Dodge halved by low FP/HP (B426/B419), not to
- *     encumbrance's effect on Dodge itself — so this does not clamp the
- *     result.
+ *     added here, with the encumbered score floored at 1 (B17).
  *   - Parry = floor(skill/2) + 3 + weapon parry modifier (B376).
  *   - Block = floor(skill/2) + 3 (B375).
  */
 
 import type { WeaponData } from '../schemas/inventory.ts';
 import type { ArmorFacing } from './armorDr.ts';
+import { type AvailabilityItem, availableEquipment } from './inventoryAvailability.ts';
 
 /** Dodge after encumbrance (B17). `encumbrancePenalty` must be <= 0. */
 export function effectiveDodge(dodge: number, encumbrancePenalty: number): number {
-  return dodge + encumbrancePenalty;
+  return Math.max(1, dodge + encumbrancePenalty);
 }
 
 /** Parry score from a weapon skill level and the weapon's parry modifier (B376). */
@@ -239,7 +236,7 @@ export function stShortfallPenalty(
   return Math.max(0, stRequired - effectiveSt);
 }
 
-export interface ShieldItemRow {
+export interface ShieldItemRow extends AvailabilityItem {
   readonly id?: string;
   readonly equipped: boolean;
   readonly name: string;
@@ -267,7 +264,7 @@ export function pickShield(
   facing?: ArmorFacing,
 ): PickedShield | null {
   let best: PickedShield | null = null;
-  for (const item of items) {
+  for (const item of availableEquipment(items)) {
     const db = item.weaponData?.db;
     if (!item.equipped || item.weaponData == null || db == null) continue;
     const side = item.weaponData.wieldedSide;

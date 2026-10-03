@@ -229,10 +229,9 @@ library:
       category: general
       weightLbs: 3
       cost: 60
-      description: Sturdy backpack worn on the shoulders.  20 lb capacity.
+      description: Small backpack with 40 lb ordinary storage capacity.
       source: B-288
       isContainer: true
-      hideawayCapacityLbs: 20
     - name: Broadsword
       category: weapon
       weightLbs: 3

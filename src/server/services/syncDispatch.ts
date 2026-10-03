@@ -1,5 +1,7 @@
+import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailability.ts';
 import { campaignMediaPatch } from '../../shared/schemas/media.ts';
 import { prepareActiveEffects } from './activeEffects.ts';
+import { assertEmptyInventoryContainer, assertInventoryContainer } from './inventoryContainment.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 import { prepareMediaAttachment } from './media/service.ts';
 import { prepareRace } from './races.ts';
@@ -872,19 +874,7 @@ async function dispatchInventory(
     // Lock the character row to prevent race conditions on inventory parent
     // validation, then validate the parent item if specified.
     await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-    if (body.parentId) {
-      const [parent] = await tx
-        .select({ id: inventoryItems.id })
-        .from(inventoryItems)
-        .where(
-          and(eq(inventoryItems.id, body.parentId), eq(inventoryItems.characterId, characterId)),
-        );
-      if (!parent) {
-        throw new HTTPException(400, {
-          message: 'parentId must reference an item on this character',
-        });
-      }
-    }
+    if (body.parentId) await assertInventoryContainer(tx, body.parentId, characterId);
     const [created] = await tx
       .insert(inventoryItems)
       .values(
@@ -920,7 +910,7 @@ async function dispatchInventory(
     }
     await tx
       .update(inventoryItems)
-      .set({ parentId: doomed.parentId, updatedAt: new Date() })
+      .set({ ...promotedInventoryLocation(doomed), updatedAt: new Date() })
       .where(
         and(eq(inventoryItems.parentId, op.entityId), eq(inventoryItems.characterId, characterId)),
       );
@@ -955,6 +945,8 @@ async function dispatchInventory(
       return value;
     },
     extraValidate: async (field, value) => {
+      if (field === 'isContainer' && value === false)
+        await assertEmptyInventoryContainer(tx, op.entityId, characterId);
       if (field === 'parentId') {
         // PostgreSQL accepts uppercase UUID literals but normalizes stored UUIDs
         // to lowercase. Compare canonical strings so a crafted case variant
@@ -974,17 +966,7 @@ async function dispatchInventory(
           // silently creating a cross-character containment link (the
           // REST patch route checks this via
           // assertParentBelongsToCharacter; mirror it here).
-          const [parent] = await tx
-            .select({ id: inventoryItems.id })
-            .from(inventoryItems)
-            .where(
-              and(eq(inventoryItems.id, parentId), eq(inventoryItems.characterId, characterId)),
-            );
-          if (!parent) {
-            throw new HTTPException(400, {
-              message: 'parentId must reference an item on this character',
-            });
-          }
+          await assertInventoryContainer(tx, parentId, characterId);
           await assertNoCycle(tx, itemId, parentId, characterId);
         }
       }

@@ -167,6 +167,110 @@ describe('very high mana spending', () => {
     expect(screen.getByText('15 more needed')).toBeInTheDocument();
   });
 
+  it('offers only carried powerstones, following the container root location and quantity', () => {
+    const props = fixture(true, 20, 0, 10);
+    const stone = (id: string, name: string, overrides: Record<string, unknown> = {}) => ({
+      id,
+      name,
+      characterId: id,
+      quantity: 1,
+      weightLbs: 0,
+      cost: 0,
+      notes: null,
+      parentId: null,
+      externalLocation: null,
+      worn: true,
+      equipped: false,
+      isContainer: false,
+      hideawayCapacityLbs: 0,
+      weightReductionPercent: 0,
+      isArmor: false,
+      armor: null,
+      weaponData: null,
+      powerstoneData: { currentEnergy: 3, maxEnergy: 5 },
+      magicItemData: null,
+      enchantments: [],
+      libraryItemId: null,
+      effectiveWeightLbs: 0,
+      createdAt: '',
+      updatedAt: '',
+      ...overrides,
+    });
+    props.character.manaLevel = 'normal';
+    props.character.inventory = [
+      stone('carried', 'Carried Ruby'),
+      stone('stashed', 'Stashed Ruby', { worn: false }),
+      stone('zero', 'Empty Ruby', { quantity: 0 }),
+      stone('external', 'Distant Ruby', { externalLocation: 'At home' }),
+      stone('nested', 'Nested Ruby', { parentId: 'pack', worn: false }),
+      stone('pack', 'Carried pack', { isContainer: true, powerstoneData: null }),
+    ] as unknown as CharacterDetail['inventory'];
+    const view = render(<CastSpellDialog {...props} onClose={() => {}} />);
+    expect(screen.getByText('Carried Ruby (powerstone)')).toBeInTheDocument();
+    expect(screen.getByText('Nested Ruby (powerstone)')).toBeInTheDocument();
+    expect(screen.queryByText('Stashed Ruby (powerstone)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Empty Ruby (powerstone)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Distant Ruby (powerstone)')).not.toBeInTheDocument();
+    view.rerender(
+      <CastSpellDialog
+        {...props}
+        character={{ ...props.character, manaLevel: 'none' }}
+        onClose={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByRole('row', { name: /Carried Ruby \(powerstone\)/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('blocks a casting split across multiple powerstones with a rules-based error', async () => {
+    const props = fixture(true, 6, 0, 10);
+    props.character.manaLevel = 'normal';
+    const makeStone = (stoneId: string, name: string) => ({
+      id: stoneId,
+      characterId: id,
+      name,
+      quantity: 1,
+      weightLbs: 0,
+      cost: 0,
+      notes: null,
+      parentId: null,
+      externalLocation: null,
+      worn: true,
+      equipped: false,
+      isContainer: false,
+      hideawayCapacityLbs: 0,
+      weightReductionPercent: 0,
+      isArmor: false,
+      armor: null,
+      weaponData: null,
+      powerstoneData: { currentEnergy: 3, maxEnergy: 3 },
+      magicItemData: null,
+      enchantments: [],
+      libraryItemId: null,
+      effectiveWeightLbs: 0,
+      createdAt: '',
+      updatedAt: '',
+    });
+    props.character.inventory = [
+      makeStone('ruby', 'Ruby'),
+      makeStone('opal', 'Opal'),
+    ] as unknown as CharacterDetail['inventory'];
+    const close = vi.fn();
+    render(<CastSpellDialog {...props} onClose={close} />);
+    fireEvent.change(screen.getByLabelText('Ruby (powerstone)'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Opal (powerstone)'), { target: { value: '3' } });
+    fireEvent.change(screen.getByLabelText('Hit Points (HP) — risky'), { target: { value: '0' } });
+    expect(screen.getByLabelText('Ruby (powerstone)')).toHaveValue(3);
+    expect(screen.getByLabelText('Opal (powerstone)')).toHaveValue(3);
+    expect(screen.getByText(/you've allocated from 2/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 6 energy' }));
+    expect(close).not.toHaveBeenCalled();
+    expect(push).toHaveBeenCalledWith('Use only one powerstone per casting (M69).', {
+      kind: 'error',
+    });
+  });
+
   it.each(['cast', 'maintain'] as const)(
     'groups mixed-resource %s and limits recovery to personal FP',
     async (mode) => {

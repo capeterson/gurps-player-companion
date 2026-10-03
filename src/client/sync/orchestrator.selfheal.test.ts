@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from './orchestrator.ts';
-import { enqueueFieldPatch } from './outbox.ts';
+import { enqueueDelete, enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
 
 function jwtForUser(userId: string): string {
@@ -52,6 +52,73 @@ afterEach(async () => {
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000c001';
 
 describe('applyServerRow local-intent preservation (rule S4)', () => {
+  it('does not overwrite child location fields while a parent delete promotion is pending', async () => {
+    const db = getLocalDb();
+    const rootId = '0193b3c0-f1f0-7000-8000-00000000d401';
+    const childId = '0193b3c0-f1f0-7000-8000-00000000d402';
+    await db.characterInventory.bulkPut([
+      {
+        id: rootId,
+        characterId: CHAR_ID,
+        name: 'Carried pack',
+        parentId: null,
+        worn: true,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: true,
+        revision: 1,
+      },
+      {
+        id: childId,
+        characterId: CHAR_ID,
+        name: 'Nested item',
+        parentId: rootId,
+        worn: false,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: false,
+        revision: 1,
+      },
+    ] as never[]);
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: rootId,
+      characterId: CHAR_ID,
+    });
+    expect(await db.characterInventory.get(childId)).toMatchObject({ parentId: null, worn: true });
+    loginAs('user-1');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        cursorResponse([
+          {
+            entityClass: 'character_inventory',
+            entityId: childId,
+            command: 'update',
+            revision: 2,
+            data: {
+              id: childId,
+              characterId: CHAR_ID,
+              name: 'Nested item',
+              parentId: rootId,
+              worn: false,
+              externalLocation: null,
+              quantity: 1,
+              isContainer: false,
+              revision: 2,
+            },
+          },
+        ]),
+      ),
+    );
+    await getSyncOrchestrator().triggerCursorPull();
+    expect(await db.characterInventory.get(childId)).toMatchObject({
+      parentId: null,
+      worn: true,
+      revision: 2,
+    });
+  });
+
   it('ignores a cursor row older than the locally acknowledged revision', async () => {
     const db = getLocalDb();
     await db.characterCombat.put({

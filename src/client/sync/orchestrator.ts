@@ -3,6 +3,7 @@ import {
   activeEffectDefinitionOut,
   activeEffectsField,
 } from '../../shared/schemas/activeEffects.ts';
+import { localInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
 import { characterRace } from '../../shared/schemas/race.ts';
 import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { drainOneImage, warmMediaManifests } from './mediaUploads.ts';
@@ -748,7 +749,11 @@ class SyncOrchestrator {
       } else if (op.command === 'create') {
         await this.discardSpeculativeCreate(op);
       } else if (op.command === 'delete') {
-        await this.reinsertLocal(op.entityClass, op.prevValue);
+        await db.transaction('rw', ALL_STORE_NAMES, async () => {
+          await this.restoreInventoryPromotions(op);
+          await this.reinsertLocal(op.entityClass, op.prevValue);
+          await db.outbox.delete(op.clientOpId);
+        });
       }
       await db.outbox.delete(op.clientOpId);
       await appendSyncLog({
@@ -1411,9 +1416,12 @@ class SyncOrchestrator {
    * stale_base / conflict); prefer that since it's more recent.
    */
   private async revertLocal(
-    op: OutboxEntry,
+    originalOp: OutboxEntry,
     outcome: OperationOutcome,
   ): Promise<{ preservedValue: unknown } | undefined> {
+    // Earlier outcomes in a batch can repair this operation's baseline
+    // while retaining its intent (for example nested container deletions).
+    const op = (await getLocalDb().outbox.get(originalOp.clientOpId)) ?? originalOp;
     if (op.command === 'patch' && op.fieldPath !== undefined) {
       const fieldPath = op.fieldPath;
       const db = getLocalDb();
@@ -1471,6 +1479,7 @@ class SyncOrchestrator {
       });
     }
     if (isEntityPatch(op)) return this.revertEntityPatch(op, outcome);
+    if (op.command === 'delete') await this.restoreInventoryPromotions(op);
     if (outcome.latestEntity && typeof outcome.latestEntity === 'object') {
       await this.applyServerRow(op.entityClass, outcome.latestEntity as Record<string, unknown>, {
         ignoreOutboxConflict: true,
@@ -2032,6 +2041,74 @@ class SyncOrchestrator {
     await db.outbox.bulkDelete(discardedOpIds);
   }
 
+  private async restoreInventoryPromotions(op: OutboxEntry): Promise<void> {
+    const db = getLocalDb();
+    for (const undo of localInventoryPromotionUndo.parse(op.localInventoryPromotionUndo ?? [])) {
+      // Compose undo through later optimistic deletes/edits. The affected
+      // child may no longer exist locally, but its recovery baseline must
+      // still point to the original container if both deletes are rejected.
+      const unsettled = await db.outbox
+        .filter(
+          (entry) =>
+            entry.clientOpId !== op.clientOpId &&
+            entry.entityClass === 'character_inventory' &&
+            ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+        )
+        .toArray();
+      for (const entry of unsettled) {
+        const previous = asRecord(entry.prevValue);
+        let changed = false;
+        const nextPrevious = previous ? { ...previous } : undefined;
+        let nextPrimitive = entry.prevValue;
+        const nextUndo = structuredClone(entry.localInventoryPromotionUndo);
+        for (const key of Object.keys(undo.after) as (keyof typeof undo.after)[]) {
+          if (entry.entityId === undo.id) {
+            if (entry.fieldPath === key && entry.prevValue === undo.after[key]) {
+              nextPrimitive = undo.before[key];
+              changed = true;
+            } else if (!entry.fieldPath && nextPrevious && nextPrevious[key] === undo.after[key]) {
+              nextPrevious[key] = undo.before[key];
+              changed = true;
+            }
+          }
+          for (const later of nextUndo ?? []) {
+            if (later.id === undo.id && later.before[key] === undo.after[key]) {
+              // Restore only the baseline, preserving the later promotion.
+              Object.assign(later.before, { [key]: undo.before[key] });
+              changed = true;
+            }
+          }
+        }
+        if (changed)
+          await db.outbox.update(entry.clientOpId, {
+            prevValue: entry.fieldPath ? nextPrimitive : (nextPrevious ?? entry.prevValue),
+            ...(nextUndo
+              ? { localInventoryPromotionUndo: localInventoryPromotionUndo.parse(nextUndo) }
+              : {}),
+          });
+      }
+      const current = await db.characterInventory.get(undo.id);
+      if (!current) continue;
+      const dirty = await db.outbox
+        .where('entityId')
+        .equals(undo.id)
+        .filter((entry) => ['pending', 'in_flight', 'transient_retry'].includes(entry.status))
+        .toArray();
+      const patch: Record<string, unknown> = {};
+      for (const key of Object.keys(undo.after) as (keyof typeof undo.after)[]) {
+        if (dirty.some((entry) => patchKeys(entry).includes(key))) continue;
+        if (current[key] === undo.after[key]) patch[key] = undo.before[key];
+      }
+      if (Object.keys(patch).length) {
+        await db.characterInventory.update(undo.id, patch);
+        flashBus.emit({
+          key: makeFlashKey('character_inventory', undo.id, 'entry'),
+          reason: 'Container deletion reverted; contents location restored',
+        });
+      }
+    }
+  }
+
   private async reinsertLocal(entityClass: EntityClass, prevValue: unknown): Promise<void> {
     if (!prevValue || typeof prevValue !== 'object') return;
     await this.applyServerRow(entityClass, prevValue as Record<string, unknown>, {
@@ -2130,6 +2207,23 @@ class SyncOrchestrator {
         }
         // A whole-entry patch owns every key of its body (S13).
         for (const key of entityPatchKeys(op)) delete merged[key];
+      }
+    }
+    if (!opts.ignoreOutboxConflict && entityClass === 'character_inventory') {
+      const deletes = await db.outbox
+        .filter(
+          (op) =>
+            op.entityClass === 'character_inventory' &&
+            op.command === 'delete' &&
+            ['pending', 'in_flight', 'transient_retry'].includes(op.status) &&
+            op.localInventoryPromotionUndo?.some((undo) => undo.id === id) === true,
+        )
+        .toArray();
+      for (const op of deletes) {
+        const undo = localInventoryPromotionUndo
+          .parse(op.localInventoryPromotionUndo ?? [])
+          .find((entry) => entry.id === id);
+        if (undo) for (const key of Object.keys(undo.after)) delete merged[key];
       }
     }
     // Campaign moves also change child links locally. Cursor rows must not

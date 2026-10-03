@@ -17,10 +17,10 @@ describe('effectiveDodge', () => {
     expect(effectiveDodge(9, 0)).toBe(9);
   });
 
-  it('does not floor at 1 — RAW has no min-1 rule for encumbered Dodge', () => {
-    expect(effectiveDodge(2, -4)).toBe(-2);
-    expect(effectiveDodge(1, -1)).toBe(0);
-    expect(effectiveDodge(3, -3)).toBe(0);
+  it('floors encumbered Dodge at 1 before subsequent situational modifiers', () => {
+    expect(effectiveDodge(2, -4)).toBe(1);
+    expect(effectiveDodge(1, -1)).toBe(1);
+    expect(effectiveDodge(3, -3)).toBe(1);
   });
 });
 
@@ -275,6 +275,15 @@ describe('pickShield', () => {
   it('ignores unequipped shields and non-weapons', () => {
     expect(pickShield([shield('Large Shield', 3, false)])).toBeNull();
     expect(pickShield([{ equipped: true, name: 'Rock', weaponData: null }])).toBeNull();
+  });
+
+  it('ignores stashed and zero-quantity shields even if their equipped toggle remains set', () => {
+    expect(
+      pickShield([
+        { ...shield('Stashed shield', 3), id: 'stashed', worn: false, quantity: 1, parentId: null },
+        { ...shield('Empty shield', 2), id: 'empty', worn: true, quantity: 0, parentId: null },
+      ]),
+    ).toBeNull();
   });
 
   it('prefers the highest DB, ties broken by name', () => {

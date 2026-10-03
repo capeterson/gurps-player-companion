@@ -1,3 +1,8 @@
+import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailability.ts';
+import {
+  assertEmptyInventoryContainer,
+  assertInventoryContainer,
+} from '../services/inventoryContainment.ts';
 /**
  * Sub-resource CRUD for a character: traits, skills, inventory, combat.
  *
@@ -696,13 +701,7 @@ async function assertParentBelongsToCharacter(
   parentId: string,
   characterId: string,
 ): Promise<void> {
-  const [parent] = await tx
-    .select({ id: inventoryItems.id })
-    .from(inventoryItems)
-    .where(and(eq(inventoryItems.id, parentId), eq(inventoryItems.characterId, characterId)));
-  if (!parent) {
-    throw new HTTPException(400, { message: 'parentId must reference an item on this character' });
-  }
+  await assertInventoryContainer(tx, parentId, characterId);
 }
 
 /**
@@ -766,6 +765,7 @@ router.openapi(
           },
         },
       },
+      400: errorResponse('Invalid inventory containment'),
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
       503: errorResponse('Character campaign changed; retry this edit'),
@@ -832,6 +832,7 @@ router.openapi(
           },
         },
       },
+      400: errorResponse('Invalid inventory containment'),
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
       503: errorResponse('Character campaign changed; retry this edit'),
@@ -860,6 +861,7 @@ router.openapi(
         await assertParentBelongsToCharacter(tx, body.parentId, id);
         await assertNoParentCycle(tx, body.parentId, itemId, id);
       }
+      if (body.isContainer === false) await assertEmptyInventoryContainer(tx, itemId, id);
       const [row] = await tx
         .update(inventoryItems)
         .set(await prepareLibraryReference(tx, user.id, id, 'items', updates, itemId))
@@ -917,7 +919,7 @@ router.openapi(
       if (!doomed) throw new HTTPException(404, { message: 'item not found' });
       await tx
         .update(inventoryItems)
-        .set({ parentId: doomed.parentId, updatedAt: new Date() })
+        .set({ ...promotedInventoryLocation(doomed), updatedAt: new Date() })
         .where(and(eq(inventoryItems.parentId, itemId), eq(inventoryItems.characterId, id)));
       await tx
         .delete(inventoryItems)

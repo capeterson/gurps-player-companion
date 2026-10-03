@@ -6,6 +6,7 @@ import {
   aggregateDrByLocation,
   armorAppliesToFacing,
   armorCoversLocation,
+  armorLayering,
   effectiveDrByLocation,
   innateDrCoversLocation,
   layeredArmorDrContributions,
@@ -19,6 +20,8 @@ import {
   parseArmorDivisor,
   woundingMultiplier,
 } from '../../../../../shared/domain/injuryCalc.ts';
+import { availableEquipment } from '../../../../../shared/domain/inventoryAvailability.ts';
+import { magicalDefenseBonus } from '../../../../../shared/domain/inventoryDefenseBonus.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
@@ -117,7 +120,11 @@ export function DrSummaryCard({
     setSelectedDefense(null);
     onFacingChange?.(next);
   };
-  const known = character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
+  const invalidLayers = armorLayering(character.inventory, selectedFacing).invalidLocations;
+  const known =
+    character.libraryEffectsKnown !== false &&
+    character.houseRulesKnown !== false &&
+    !invalidLayers.includes(location);
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
   const validDivisor = !divisor.trim() || parseArmorDivisor(divisor) != null;
   const fatigueType = type.trim().toLowerCase() === 'fat';
@@ -128,15 +135,13 @@ export function DrSummaryCard({
   const dr = resolveDr(type, map.get(location));
   const effective = effectiveDrAgainstAttack(type, map.get(location), divisor, protectNaturalDr);
   const multiplier = woundingMultiplier(type, location);
-  const shield = pickShield(
-    character.inventory.filter((item) => item.equipped),
-    selectedFacing,
-  );
+  const shield = pickShield(character.inventory, selectedFacing);
   const shieldDb = shield?.db ?? 0;
   const armorDb = resolveArmorDb(character.inventory, location, selectedFacing);
-  const totalDb = shieldDb + (armorDb?.db ?? 0);
+  const magicalDb = magicalDefenseBonus(character.inventory);
+  const totalDb = shieldDb + (armorDb?.db ?? 0) + magicalDb;
   const layers = known
-    ? character.inventory.filter(
+    ? availableEquipment(character.inventory).filter(
         (item) =>
           item.equipped &&
           item.isArmor &&
@@ -169,7 +174,9 @@ export function DrSummaryCard({
         <section className="space-y-4" aria-label="Incoming attack">
           {!known && (
             <output className="text-sm text-warning">
-              DR unavailable: linked library effects or campaign house rules have not loaded.
+              {invalidLayers.includes(location)
+                ? 'DR unavailable: resolve overlapping armor layers in Inventory (B286).'
+                : 'DR unavailable: linked library effects or campaign house rules have not loaded.'}
             </output>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -351,8 +358,15 @@ export function DrSummaryCard({
                 <div className="mt-3 border-t border-base-300 pt-3">
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="text-sm font-medium">Defense bonus</span>
-                    <strong className="num text-lg">{totalDb > 0 ? `+${totalDb}` : '—'}</strong>
+                    <strong className="num text-lg">
+                      {totalDb !== 0 ? formatSigned(totalDb) : '—'}
+                    </strong>
                   </div>
+                  {magicalDb !== 0 && (
+                    <p className="text-xs text-muted">
+                      Enchanted DB {formatSigned(magicalDb)} (M67)
+                    </p>
+                  )}
                   <p className="text-xs text-muted">
                     {armorDb ? (
                       <>
@@ -362,7 +376,7 @@ export function DrSummaryCard({
                         </InventoryAnchorLink>
                       </>
                     ) : (
-                      'No armor DB for this location and facing'
+                      'No manual armor Deflect DB'
                     )}
                     {shieldDb > 0 && shield ? (
                       <>
@@ -388,7 +402,11 @@ export function DrSummaryCard({
                   <h3 className="label-eyebrow mb-2">Protection before penetration</h3>
                   <ul className="divide-y divide-base-300 text-sm" aria-label="Protection layers">
                     {layers.map((item) => {
-                      const enchantments = armorDrEnchantmentLines(item, layers, location);
+                      const enchantments = armorDrEnchantmentLines(
+                        item,
+                        character.inventory,
+                        location,
+                      );
                       const baseArmor =
                         item.enchantmentBreakdown !== undefined ? item.baseArmor : undefined;
                       const baseDr = baseArmor

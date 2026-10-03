@@ -83,7 +83,6 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
         number('weightLbs', 'Weight (lb)'),
         number('cost', 'Cost'),
         check('equipped', 'Equipped'),
-        ...(item.parentId === null ? [check('worn', 'Worn')] : []),
         ...(item.parentId === null && !item.worn
           ? [text('externalLocation', 'External location', true)]
           : []),
@@ -93,6 +92,8 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
       return [
         number('armor.dr', 'DR'),
         check('armor.flexible', 'Flexible armor'),
+        number('weightReductionPercent', 'Lighten weight reduction (%)', true),
+        check('armor.concealable', 'Concealable inner layer', true),
         number('armor.drCrushing', 'Crushing DR', true, true),
         number('armor.db', 'Armor defense bonus', true, true),
         ...Object.entries(DR_TYPES).map(([key, label]) =>
@@ -111,7 +112,18 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
         text('weaponData.reach', 'Reach'),
         text('weaponData.parry', 'Parry'),
         number('weaponData.stRequired', 'ST required', true, true),
+        number('weaponData.weaponSt', 'Purchased weapon ST', true, true),
+        {
+          path: 'weaponData.strengthKind',
+          label: 'Damage strength rule',
+          choices: ['ordinary', 'bow', 'crossbow', 'natural'],
+          optional: true,
+          advanced: true,
+        },
         number('weaponData.db', 'Shield defense bonus', true, true),
+        ...(item.weaponData?.db != null
+          ? [number('weightReductionPercent', 'Lighten weight reduction (%)', true)]
+          : []),
         {
           path: 'weaponData.wieldedSide',
           label: 'Shield side',
@@ -129,10 +141,7 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
         text('weaponData.notes', 'Weapon notes', true),
       ];
     case 'container':
-      return [
-        number('hideawayCapacityLbs', 'Hideaway capacity (lb)'),
-        number('weightReductionPercent', 'Weight reduction (%)'),
-      ];
+      return [number('hideawayCapacityLbs', 'Hideaway capacity (lb)')];
     case 'powerstone':
       return [
         number('powerstoneData.currentEnergy', 'Current energy'),
@@ -318,7 +327,7 @@ function ItemListEditor({
         const specs: ItemFieldSpec[] = enchantments
           ? [
               { path: `${prefix}.spellName`, label: 'Spell name' },
-              number(`${prefix}.spellLevel`, 'Enchanter skill level', true, true),
+              number(`${prefix}.spellLevel`, 'Item Power', true, true),
               number(`${prefix}.level`, 'Enchantment level', true, true),
               text(`${prefix}.category`, 'Enchantment label', true),
               text(`${prefix}.notes`, 'Enchantment notes', true),
@@ -327,6 +336,14 @@ function ItemListEditor({
               { path: `${prefix}.name`, label: 'Attack name' },
               text(`${prefix}.skill`, 'Governing skill', true),
               number(`${prefix}.stRequired`, 'ST required', true, true),
+              number(`${prefix}.weaponSt`, 'Purchased weapon ST', true, true),
+              {
+                path: `${prefix}.strengthKind`,
+                label: 'Damage strength rule',
+                choices: ['ordinary', 'bow', 'crossbow', 'natural'],
+                optional: true,
+                advanced: true,
+              },
               number(`${prefix}.ranged.acc`, 'Accuracy', true, true),
               { path: `${prefix}.ranged.range`, label: 'Range', kind: 'range' },
               text(`${prefix}.ranged.rof`, 'Rate of fire', true),

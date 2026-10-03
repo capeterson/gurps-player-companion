@@ -6,21 +6,11 @@
  *
  *   1. Each inventory item has weightLbs * quantity raw weight.
  *   2. Items live in a tree of containers via parentId.
- *   3. A "worn root" is a container whose parentId is null and worn=true.
- *   4. For a worn root, the *outermost* worn container's enchantments
- *      apply to the entire subtree:
- *        - hideawayCapacityLbs is deducted from the contents subtotal
- *          first (down to zero, never negative);
- *        - the remaining subtotal is multiplied by
- *          (1 - weightReductionPercent / 100).
- *      Inner-container enchantments are ignored when nested inside
- *      another worn container.
- *   5. Items at the root with parentId=null and worn=false do not
- *      contribute to encumbrance ("off-player" stash).
- *
- * Per-item "effective weight" (what the UI shows next to a row) is the
- * raw weight for non-worn items, and a proportional share of the worn
- * root's reduced weight for items inside a worn root.
+ *   3. A carried root has parentId=null and the legacy worn=true location flag.
+ *   4. Hideaway removes only contents weight (M61), recursively, including
+ *      nested enchanted containers. Lighten reduces an equipped armor/shield's
+ *      own weight (M67), never its contents or armor stowed in a pack.
+ *   5. Root worn=false items are stashed and do not add to the carried load.
  */
 
 export interface InventoryItemRow {
@@ -29,13 +19,17 @@ export interface InventoryItemRow {
   readonly weightLbs: number;
   readonly quantity: number;
   readonly worn: boolean;
+  readonly equipped?: boolean;
+  readonly isArmor?: boolean;
+  readonly weaponData?: { db?: number | null | undefined } | null;
+  readonly externalLocation?: string | null;
   readonly isContainer: boolean;
   readonly hideawayCapacityLbs: number;
   readonly weightReductionPercent: number;
 }
 
 export interface WeightContribution {
-  /** Total worn weight (used for encumbrance level). */
+  /** Total carried weight (used for encumbrance level). */
   readonly playerWeightLbs: number;
   /** Per-item effective weight, keyed by item id. */
   readonly perItem: Map<string, number>;
@@ -68,65 +62,35 @@ function buildTree(items: readonly InventoryItemRow[]): TreeNode[] {
   return roots;
 }
 
-function rawSubtotal(node: TreeNode): number {
-  let sum = node.item.weightLbs * node.item.quantity;
-  for (const child of node.children) sum += rawSubtotal(child);
-  return sum;
-}
-
-function applyWornEnchantments(
-  rawSubtree: number,
-  hideaway: number,
-  reductionPercent: number,
-): number {
-  const afterHideaway = Math.max(rawSubtree - hideaway, 0);
-  const reductionMultiplier = 1 - reductionPercent / 100;
-  return afterHideaway * reductionMultiplier;
-}
-
-function distributePerItem(
-  node: TreeNode,
-  effectiveTotal: number,
-  rawTotal: number,
-  out: Map<string, number>,
-): void {
-  // Distribute the worn root's reduced total proportionally to each
-  // descendant's raw share so the UI's per-item weights still sum to the
-  // root's effective weight.
-  const ratio = rawTotal === 0 ? 0 : effectiveTotal / rawTotal;
-  function visit(n: TreeNode): void {
-    const raw = n.item.weightLbs * n.item.quantity;
-    out.set(n.item.id, raw * ratio);
-    for (const c of n.children) visit(c);
-  }
-  visit(node);
-}
-
 export function computeWeights(items: readonly InventoryItemRow[]): WeightContribution {
   const roots = buildTree(items);
   const perItem = new Map<string, number>();
   let playerWeight = 0;
-
-  function visitNonWornRoot(node: TreeNode): void {
-    perItem.set(node.item.id, node.item.weightLbs * node.item.quantity);
-    for (const child of node.children) visitNonWornRoot(child);
-  }
-
-  for (const root of roots) {
-    if (root.item.worn) {
-      const raw = rawSubtotal(root);
-      const effective = applyWornEnchantments(
-        raw,
-        root.item.hideawayCapacityLbs,
-        root.item.weightReductionPercent,
-      );
-      distributePerItem(root, effective, raw, perItem);
-      playerWeight += effective;
-    } else {
-      visitNonWornRoot(root);
+  function visit(node: TreeNode, carried: boolean, available: boolean): number {
+    const item = node.item;
+    const present = available && item.quantity > 0;
+    const own = carried && !present ? 0 : item.weightLbs * item.quantity;
+    const lighten =
+      carried && present && item.equipped && (item.isArmor || item.weaponData?.db != null);
+    perItem.set(item.id, own * (lighten ? 1 - item.weightReductionPercent / 100 : 1));
+    let contents = 0;
+    for (const child of node.children) contents += visit(child, carried, present);
+    if (carried && present && item.isContainer && item.hideawayCapacityLbs > 0 && contents > 0) {
+      const ratio = Math.max(0, contents - item.hideawayCapacityLbs) / contents;
+      function reduce(child: TreeNode): void {
+        perItem.set(child.item.id, (perItem.get(child.item.id) ?? 0) * ratio);
+        for (const descendant of child.children) reduce(descendant);
+      }
+      for (const child of node.children) reduce(child);
+      contents *= ratio;
     }
+    return (perItem.get(item.id) ?? 0) + contents;
   }
-
+  for (const root of roots) {
+    const carried = root.item.worn && !root.item.externalLocation;
+    const total = visit(root, carried, true);
+    if (carried) playerWeight += total;
+  }
   return { playerWeightLbs: playerWeight, perItem };
 }
 
@@ -200,6 +164,6 @@ export function effectiveMove(
   basicMove: number,
   encumbrance: Pick<EncumbranceResult, 'ratio' | 'moveMultiplier'>,
 ): number {
-  if (encumbrance.ratio > 10) return 0;
+  if (encumbrance.ratio > 15) return 0;
   return Math.max(basicMove > 0 ? 1 : 0, Math.floor(basicMove * encumbrance.moveMultiplier));
 }

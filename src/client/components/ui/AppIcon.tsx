@@ -4,10 +4,12 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  CircleCheck,
   Compass,
   Dice6,
   Feather,
   Fingerprint,
+  Gem,
   GripVertical,
   History,
   Map as MapIcon,
@@ -23,11 +25,15 @@ import {
   Target,
   Trash2,
   UserRound,
+  WandSparkles,
   X,
 } from 'lucide-react';
 
 const ICONS = {
   combat: Swords,
+  equipped: CircleCheck,
+  powerstone: Gem,
+  magicItem: WandSparkles,
   identity: UserRound,
   traits: Fingerprint,
   skills: Target,

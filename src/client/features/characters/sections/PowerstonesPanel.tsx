@@ -106,7 +106,7 @@ export function PowerstonesPanel({
   character: CharacterDetail;
   canWrite: boolean;
 }) {
-  const stones = character.inventory.filter((i) => i.powerstoneData != null);
+  const stones = character.inventory.filter((i) => i.powerstoneData != null && i.quantity > 0);
   const total = totalPowerstoneEnergy(stones);
 
   return (
@@ -116,7 +116,7 @@ export function PowerstonesPanel({
         <p className="num text-xs text-base-content/60">{total} stored energy</p>
       </header>
       {stones.length === 0 ? (
-        <p className="text-sm text-base-content/60">No powerstones carried.</p>
+        <p className="text-sm text-base-content/60">No powerstones owned.</p>
       ) : (
         <Table
           preferenceKey={`${character.id}:powerstones`}

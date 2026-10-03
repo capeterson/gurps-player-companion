@@ -3,6 +3,7 @@ import type {
   ActiveEffectInstance,
 } from '../../shared/schemas/activeEffects.ts';
 import type { PricingResolution } from '../../shared/schemas/calculation.ts';
+import type { LocalInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
 import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
 import type { CharacterRace, LibraryRaceOut } from '../../shared/schemas/race.ts';
@@ -356,6 +357,8 @@ export interface LocalCampaignTransferUndo {
 }
 
 export interface OutboxEntry {
+  localInventoryPromotionUndo?: LocalInventoryPromotionUndo[];
+
   /** Unresolved legacy source reference; preserved locally and never sent. */
   localSourceMigrationUnknown?: boolean;
   localSourceMigrationIntent?: { attemptedValue: unknown; prevValue: unknown };

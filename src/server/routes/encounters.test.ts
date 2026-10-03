@@ -473,7 +473,7 @@ describe('encounter member projection', () => {
     });
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({
-      combatants: [expect.objectContaining({ move: 0, dodge: 4 })],
+      combatants: [expect.objectContaining({ move: 1, dodge: 4 })],
     });
   });
 

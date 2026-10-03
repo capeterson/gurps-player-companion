@@ -581,10 +581,14 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
 - **Inventory**: nested containers (drag-and-drop, touch-enabled),
-  encumbrance, armor and weapon data, cost/weight rollups. Both encumbrance summaries
+  encumbrance, armor and weapon data, cost/weight rollups. Location determines what is carried:
+  On the player, Stashed, or inside a container; nested contents inherit their
+  root's carried/stashed location. Equipped means worn or wielded for use and
+  is the only equipment status; there is no separate Worn toggle or badge.
+  Quick-add defaults to On the player. Both encumbrance summaries
   use player-carried weight, excluding stashed items; the raw weight total covers all items. A compact filter
   combines case-insensitive item-name substring matching with a category/status
-  tag (weapon, armor, container, powerstone, magic item, enchanted, worn, or
+  tag (weapon, armor, container, powerstone, magic item, enchanted, or
   equipped). Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Containers
   start collapsed; their expanded/collapsed choice is remembered per character and
@@ -599,9 +603,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Non-overlapping armor
   resolves independently, so a stronger coif enchantment does not suppress boots.
   **Inline inventory editors** replace the item edit modal. Clicking a
-  category chip (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
+  category icon (Armor, Weapon/Shield, Container, Powerstone, Magic item, or
   Enchantments) opens its editor immediately below the row; clicking that same
-  chip again collapses it. The pencil opens basic item details in the same
+  icon again collapses it. The pencil opens basic item details in the same
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
   Attack IDs stay internal; editors show **Attack name**, **Source reference**,
@@ -611,8 +615,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   opens the existing pricing dialog with labeled cost/weight results and units;
   trait pricing similarly uses **Recalculate points**.
   **+ Category**, in the pencil's item-details editor, adds another role
-  without changing siblings or equipped/worn state. Category removal has a separate inline confirmation; containers with
-  contents must be emptied first. Read-only viewers see summary badges only.
+  without changing siblings, location or equipped state. Category removal has a separate inline confirmation; containers with
+  contents must be emptied first. Read-only viewers see labeled category-icon tooltips and the existing Details action.
   Fields save on blur through `useDraftField` and the local outbox. JSON leaf
   edits merge with the latest stored item inside a Dexie transaction so rapid
   edits to different armor/weapon properties cannot overwrite each other.
@@ -629,15 +633,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   and shared validation. Legacy enchantment rows remain display metadata, while
   typed campaign or character-local enchantments contribute attack, damage, Accuracy,
   Parry/Block/DB, DR, armor divisor, weight reduction, or skill modifiers only under
-  their equipped/worn rule. Rows show the base-to-effective contribution breakdown,
+  their activation rule: equipment bonuses require available Equipped gear and
+  sufficient per-spell Item Power under campaign mana. Unknown Power is inactive.
+  Lighten affects equipped armor/shields; Hideaway removes contents weight only. Rows show the base-to-effective contribution breakdown,
   including inactive and highest-policy-suppressed effects.
   Library templates still populate the quick-add form, and its small optional
-  category/equipped/worn controls remain available; detailed editing uses the
-  new item's category chips.
-  Every row leads with a container chevron or an item-type icon, and each
+  category/equipped controls and location selector remain available; detailed editing uses the
+  new item's category icons.
+  Every category has its own icon; Equipped uses a separate check-circle tooltip.
+  Container expansion keeps its chevron, and each
   nesting level indents one step with a faint guide line under its parent's
   chevron; a collapsed container shows its contained-item count. Below 640px
-  each item is a compact two-line row: name and chips on the left, weight over
+  each item is a compact two-line row: name and category icons on the left, weight over
   quantity (shown only when above 1) and cost on the right, then the edit
   action. Indentation is bounded so deep trees keep room for names. Filtering
   retains matching items' ancestor context; closing containers preserves editor
@@ -648,8 +655,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   `itemMutations`), with regression tests for disclosure, local saves, rollback,
   category changes, and structured-data preservation.
   Encumbered Move
-  floors at 1 while the load is legal and reads 0 past the 10×BL carry
-  cap (B17).
+  floors at 1 through 15×BL; loads above 10×BL explicitly require carrying on
+  the back and cost 1 FP/second (B353, B426). Above 15×BL ordinary carrying
+  gives Move 0; hauling needs adjudication. Encumbered Dodge also floors at 1 (B17).
+  The shared `inventoryAvailability` follows quantities and ancestor locations.
+  `inventoryContainment` enforces container parents and prevents removing a
+  populated Container category through REST or sync. Deleting a container
+  promotes children while preserving root carrying and external location,
+  including atomic local promotion and rejection recovery.
+  `weaponDamage` caps ordinary melee ST at 3× MinST and uses purchased bow/
+  crossbow ST; fencing Parry subtracts encumbrance. `armorLayering` checks
+  flexible/concealable inner layers and applies the non-head DX penalty.
+  Invalid layering makes automatic DR and injury application unavailable.
 - **Balanced Overview cards.** The sheet uses one column on phones and two
   columns from 768px, including wide desktops. Attributes and Secondary attributes
   align at both edges; Status starts immediately below Attributes. Secondary
@@ -772,11 +789,11 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     damage type's multiplier rather than multiplying it twice. Invalid damage
     and divisor inputs cannot be applied; fatigue damage is directed to FP.
     Hardened must be accounted for in the chosen effective divisor, and
-    armor DR and DB both follow the selected incoming facing. Facing defaults to
+    armor DR follows the selected incoming facing; Deflect DB applies to all defenses (M67). Facing defaults to
     **Front** and offers Front, Back, Left, and Right; there is no unknown state.
     Front-only/back-only layers do not protect either side. The shared hit-location
-    and facing controls also resolve the highest applicable
-    armor DB plus shield DB. A shield with an optional left/right side protects
+    and facing controls resolve physical shield DB; magical Deflect is
+    independent of hit location and facing. A shield with an optional left/right side protects
     the front and its matching side; an unspecified legacy shield retains its
     prior behavior. That defense-only context feeds Dodge, Parry, and
     Block while remaining explicitly separate from damage resistance.
@@ -825,7 +842,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     set, picked by `pickShield` — not merely the presence of a
     "Shield"-named skill; that shield's DB then adds to Dodge, every
     Parry, and Block (B287), along with the single highest **armor DB** from
-    equipped armor that covers the selected hit location and facing
+    available equipped armor (Deflect has no location/facing restriction, M67)
     (`armorData.db`, resolved by `resolveArmorDb`) — the captions identify the
     winning source. Armor DB is defense-only; the incoming-damage dialog shows
     it for context but never subtracts it as DR. Every numeric
@@ -899,7 +916,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 - **Warnings**: derived rule-violation banners the user can dismiss.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
-  and carried weight past the 10×BL carry cap.
+  and exceptional carrying above 10×BL (back carrying through 15×BL costs 1 FP/second).
 - **History tab**: defaults to the per-character server audit log (see
   history-tracking.md) and provides a second **Roll history** sub-tab for browsing
   this character's rolls. Roll history is newest first and capped at 250 entries
@@ -1429,7 +1446,8 @@ src/
                    aggregation per hit location + per-damage-type DR
                    resolution via `resolveDr` with typed → crushing →
                    default fallback, facing-aware DR aggregation, and the
-                   location/facing-aware maximum armor DB via `resolveArmorDb`),
+                   maximum manual armor DB via `resolveArmorDb`, inventoryAvailability,
+                   inventoryDefenseBonus, weaponDamage and armorLayering),
                    conditions (snake_case
                    condition normalization, tolerant of legacy Capitalized
                    entries))
