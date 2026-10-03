@@ -1,3 +1,4 @@
+import { locationLabel } from '../../../../../shared/constants/hitLocations.ts';
 import { formatRangedRange } from '../../../../../shared/domain/rangedRange.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.ts';
@@ -24,7 +25,8 @@ export function InventoryItemDetails({ item }: { item: InventoryItemOut }) {
         <div>
           <h3 className="font-semibold">Armor</h3>
           <p>
-            DR {item.armor.dr} · Locations: {item.armor.locations.join(', ') || '—'}
+            DR {item.armor.dr} · Locations:{' '}
+            {item.armor.locations.map(locationLabel).join(', ') || '—'}
             {item.armor.db != null && ` · DB ${item.armor.db}`}
           </p>
           {item.armor.drCrushing != null && <p>Crushing DR: {item.armor.drCrushing}</p>}

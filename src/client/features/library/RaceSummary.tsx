@@ -1,3 +1,4 @@
+import { locationLabel } from '../../../shared/constants/hitLocations.ts';
 import { raceName } from '../../../shared/domain/race.ts';
 import { formatSigned } from '../../../shared/format/number.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
@@ -27,7 +28,8 @@ export function RaceSummary({
   const profile = race.snapshot;
   const describeEffect = (effect: TraitEffect, level: number | null) => {
     let text = effectPreview(effect);
-    if (effect.target === 'dr' && effect.hitLocation) text += ` at ${effect.hitLocation}`;
+    if (effect.target === 'dr' && effect.hitLocation)
+      text += ` at ${locationLabel(effect.hitLocation)}`;
     if (effect.scaling === 'per_level') {
       const appliedLevel = level ?? 1;
       text += ` (level ${appliedLevel}: ${formatSigned(effect.value * appliedLevel)} total)`;

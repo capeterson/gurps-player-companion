@@ -27,6 +27,15 @@ export const HIT_LOCATIONS = [
 
 export type HitLocation = (typeof HIT_LOCATIONS)[number];
 
+/** Friendly labels shared by sheet warnings, armor inspection and attack rolls. */
+export function locationLabel(location: string): string {
+  if (location === 'eye') return 'Eyes';
+  const parts = location.split('_');
+  const words =
+    parts.length === 2 && ['left', 'right'].includes(parts[1] ?? '') ? [parts[1], parts[0]] : parts;
+  return words.map((word) => (word ? word[0]?.toUpperCase() + word.slice(1) : '')).join(' ');
+}
+
 /** Negative aim modifier per Basic Set p. B398-399 (used by combat UI). */
 export const HIT_LOCATION_AIM_PENALTY: Record<HitLocation, number> = {
   skull: -7,

@@ -39,7 +39,7 @@ export function WarningBanner({
             background: severity === 'warn' ? 'var(--color-warning)' : 'var(--color-info)',
           }}
         />
-        <span className="text-sm">
+        <span className="min-w-0 max-w-full break-words text-sm">
           <span className="font-semibold mr-2">{title}</span>
           <span className="text-base-content">{children}</span>
         </span>

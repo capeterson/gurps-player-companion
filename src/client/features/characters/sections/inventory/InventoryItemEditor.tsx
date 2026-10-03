@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react';
-import { HIT_LOCATIONS } from '../../../../../shared/constants/hitLocations.ts';
+import { HIT_LOCATIONS, locationLabel } from '../../../../../shared/constants/hitLocations.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import type { LibraryEnchantmentOut } from '../../../../../shared/schemas/campaignLibrary.ts';
 import type {
@@ -244,7 +244,7 @@ function ArmorLocations({ item, more }: { item: InventoryItemOut; more: boolean 
             onClick={() => toggle(location)}
             className={`btn btn-sm ${locations.includes(location) ? 'btn-primary' : 'btn-ghost border-base-300'}`}
           >
-            {location.replaceAll('_', ' ')}
+            {locationLabel(location)}
           </button>
         ))}
       </div>

@@ -212,7 +212,7 @@ export function PricingResolver({
   const modifiers: TraitModifier[] = [];
   let points: number | undefined;
   try {
-    if (!library || !rule) throw new Error('The library price is unavailable');
+    if (!library || !rule) throw new Error(`The library price for “${entry.name}” is unavailable`);
     const currentInputs = (rule: CalculationDefinitionV1, choices: CalculationInputs) =>
       Object.fromEntries(
         Object.entries(choices).filter(([key]) => rule.inputs.some((input) => input.key === key)),
@@ -251,9 +251,18 @@ export function PricingResolver({
       ...initialModifiers.filter((m) => !m.pricingResolution),
       ...modifiers,
     ];
-    const groups = appliedModifiers.map((m) => m.group).filter(Boolean);
-    if (new Set(groups).size !== groups.length)
-      throw new Error('Choose only one modifier from each group');
+    const byGroup = new Map<string, string[]>();
+    for (const modifier of appliedModifiers) {
+      if (!modifier.group) continue;
+      const names = byGroup.get(modifier.group) ?? [];
+      names.push(modifier.name);
+      byGroup.set(modifier.group, names);
+    }
+    const conflicts = [...byGroup].filter(([, names]) => names.length > 1);
+    if (conflicts.length)
+      throw new Error(
+        `Choose only one modifier from each group: ${conflicts.map(([group, names]) => `${group} (${names.join(', ')})`).join('; ')}`,
+      );
     if (section === 'traits')
       points = computeLeveledTraitCost({
         basePoints: resolved.outputs.points ?? 0,

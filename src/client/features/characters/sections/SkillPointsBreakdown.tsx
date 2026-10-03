@@ -3,6 +3,7 @@ import { raceName, racialProfile } from '../../../../shared/domain/race.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import type { ResolvedEffectOut } from '../../../../shared/schemas/character.ts';
 import { SheetAnchorLink } from '../SheetAnchorLink.tsx';
+import { mechanicsUnavailableReason } from '../mechanicsUnavailableReason.ts';
 import { useCharacterDetail } from '../useCharacterDetail.ts';
 import { skillEffectsForRow } from './combat/weaponEffectView.tsx';
 
@@ -41,7 +42,12 @@ export function SkillPointsBreakdown({
   if (!detail || !skill || !breakdown || skill.points !== points)
     return <p>Calculating skill level…</p>;
   if (detail.libraryEffectsKnown === false)
-    return <p>The skill breakdown is unavailable until its rules are downloaded.</p>;
+    return (
+      <p>
+        The skill breakdown is unavailable. {mechanicsUnavailableReason(detail)} Reconnect to load
+        the missing rules.
+      </p>
+    );
   const attribute = skill.attribute;
   const axis = attribute.toLowerCase();
   const axes = attribute === 'Will' || attribute === 'Per' ? ['iq', axis] : [axis];

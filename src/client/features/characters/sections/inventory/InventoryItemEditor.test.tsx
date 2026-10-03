@@ -127,6 +127,21 @@ afterEach(() => {
 });
 
 describe('inline inventory editing', () => {
+  it('uses readable names for standard and custom protected locations', async () => {
+    const user = await setup({
+      armor: armorData.parse({
+        dr: 2,
+        locations: ['arm_left', 'leg_right', 'eye', 'tail_feathers'],
+      }),
+    });
+    const editor = await armorEditor(user);
+
+    for (const label of ['Left Arm', 'Right Leg', 'Eyes', 'Tail Feathers']) {
+      expect(editor.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true');
+    }
+    expect(editor.queryByRole('button', { name: 'arm_left' })).not.toBeInTheDocument();
+  });
+
   it('keeps Equipped in item details without exposing a duplicate Worn field', async () => {
     const user = await setup();
     await user.click(screen.getByRole('button', { name: 'Edit Coat' }));
