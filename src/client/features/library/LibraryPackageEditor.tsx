@@ -20,7 +20,7 @@ import { LibraryAuthoringContext } from './LibraryAuthoringContext.tsx';
 import { LibraryEntryFields } from './LibraryEntryFields.tsx';
 import { SourcebooksContext, sourcebookLabel } from './SourcebooksContext.tsx';
 import { StructuredFields } from './StructuredFields.tsx';
-import { objectShape, seedSchema, unwrapSchema } from './editorSchema.ts';
+import { editorLabel, objectShape, seedSchema, unwrapSchema } from './editorSchema.ts';
 import {
   type LibraryEditorSection,
   libraryEditorNouns,
@@ -54,6 +54,34 @@ const labels: Record<LibraryEditorSection, string> = {
   enchantments: 'Enchantments',
   activeEffects: 'Active effects',
 };
+
+/** Schema paths point into the emitted package, which may have a source-filtered row order. */
+function packageIssueLabel(doc: LibraryYamlDoc, path: readonly PropertyKey[]): string {
+  const [root, section, index, ...fields] = path;
+  const fieldLabel = (parts: readonly PropertyKey[]) =>
+    parts
+      .map((part) => (typeof part === 'number' ? `Entry ${part + 1}` : editorLabel(String(part))))
+      .join(' → ');
+  if (
+    root === 'library' &&
+    typeof section === 'string' &&
+    SECTIONS.includes(section as LibraryEditorSection)
+  ) {
+    const category = section as LibraryEditorSection;
+    if (typeof index === 'number') {
+      const row = doc.library[category]?.[index];
+      const name =
+        row && 'name' in row && typeof row.name === 'string' && row.name.trim()
+          ? row.name
+          : `Entry ${index + 1}`;
+      return `${labels[category]}: ${name}${fields.length ? ` — ${fieldLabel(fields)}` : ''}`;
+    }
+    return labels[category];
+  }
+  if (root === 'campaign')
+    return `Campaign settings${path.length > 1 ? ` — ${fieldLabel(path.slice(1))}` : ''}`;
+  return fieldLabel(path) || 'Package';
+}
 
 /** Discard row transport fields while preserving every writable definition field. */
 export function packageEntryBody(section: LibraryEditorSection, row: Record<string, unknown>) {
@@ -246,7 +274,7 @@ export function LibraryPackageEditor({
         error: validated.success
           ? null
           : validated.error.issues
-              .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+              .map((issue) => `${packageIssueLabel(doc, issue.path)}: ${issue.message}`)
               .join('; '),
       };
     } catch (cause) {
@@ -258,6 +286,27 @@ export function LibraryPackageEditor({
     () => ({ campaignId: campaign.id, library: draft as unknown as LocalLibrary }),
     [campaign.id, draft],
   );
+  const invalidEntryLabels = SECTIONS.flatMap((section) =>
+    draft[section]
+      .filter((row) => invalidEntries.has(row.id))
+      .map(
+        (row) => `${labels[section]}: ${String(row.name || `New ${libraryEditorNouns[section]}`)}`,
+      ),
+  );
+  const includedInvalidEntryLabels = SECTIONS.filter((section) => included.has(section)).flatMap(
+    (section) =>
+      draft[section]
+        .filter((row) => invalidEntries.has(row.id))
+        .map(
+          (row) =>
+            `${labels[section]}: ${String(row.name || `New ${libraryEditorNouns[section]}`)}`,
+        ),
+  );
+  const invalidReviewMessage = includedInvalidEntryLabels.length
+    ? `Correct invalid fields before reviewing this package: ${includedInvalidEntryLabels.join('; ')}.`
+    : null;
+  const validationMessage =
+    [invalidReviewMessage, generated.error].filter(Boolean).join(' ') || null;
 
   function changeDraft(next: DraftLibrary) {
     setDraft(next);
@@ -340,12 +389,7 @@ export function LibraryPackageEditor({
   function review() {
     try {
       if (rawError) throw new Error(rawError);
-      if (
-        SECTIONS.some(
-          (key) => included.has(key) && draft[key].some((row) => invalidEntries.has(row.id)),
-        )
-      )
-        throw new Error('Correct the invalid entry fields before reviewing this package.');
+      if (invalidReviewMessage) throw new Error(invalidReviewMessage);
       buildLibraryPackage({
         draft,
         baseline,
@@ -635,8 +679,8 @@ export function LibraryPackageEditor({
               />
             </label>
             {invalidEntries.size > 0 && (
-              <p className="mt-2 text-sm text-warning">
-                Correct invalid entry fields before editing YAML.
+              <p className="mt-2 break-words text-sm text-warning">
+                Correct invalid fields before editing YAML: {invalidEntryLabels.join('; ')}.
               </p>
             )}
             {rawError && (
@@ -645,9 +689,9 @@ export function LibraryPackageEditor({
               </p>
             )}
           </details>
-          {(error || generated.error) && (
+          {(error || validationMessage) && (
             <p role="alert" className="break-words text-error">
-              {error ?? generated.error}
+              {error ?? validationMessage}
             </p>
           )}
           <div className="flex flex-wrap justify-end gap-2">

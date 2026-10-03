@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { parse, stringify } from 'yaml';
-import { HIT_LOCATIONS } from '../../../shared/constants/hitLocations.ts';
+import { HIT_LOCATIONS, locationLabel } from '../../../shared/constants/hitLocations.ts';
 import { type ArmorData, armorData } from '../../../shared/schemas/inventory.ts';
 import { StructuredFields } from './StructuredFields.tsx';
 import { libraryFormError } from './libraryFormErrors.ts';
@@ -193,7 +193,7 @@ export function ArmorFacetEditor({
                         })
                       }
                     >
-                      {location.replaceAll('_', ' ')}
+                      {locationLabel(location)}
                     </button>
                   ))}
                 </div>
@@ -204,7 +204,7 @@ export function ArmorFacetEditor({
                         key={location}
                         type="button"
                         className="btn btn-xs btn-ghost border-base-300"
-                        aria-label={`Remove location ${location}`}
+                        aria-label={`Remove location ${locationLabel(location)}`}
                         onClick={() =>
                           update({
                             ...data,
@@ -212,7 +212,7 @@ export function ArmorFacetEditor({
                           })
                         }
                       >
-                        {location} ×
+                        {locationLabel(location)} ×
                       </button>
                     ))}
                   </div>

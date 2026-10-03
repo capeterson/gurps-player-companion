@@ -15,7 +15,7 @@ export function GmCharacterCard({ character, lookup, campaignName }: Props) {
   if (character.libraryEffectsKnown === false)
     return (
       <CharacterCard character={{ ...character, campaignName }} hideAttributes openInNewTab>
-        <MechanicsUnavailable />
+        <MechanicsUnavailable character={character} />
       </CharacterCard>
     );
   const { derived, combat, encumbrance } = character;

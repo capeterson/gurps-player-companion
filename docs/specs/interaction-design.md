@@ -169,6 +169,17 @@ content wrapping at mobile, desktop and short landscape sizes. It uses the
 clearer space above or below the points input and avoids the fixed sheet
 navigation, keeping the draft value and contributor links reachable.
 
+## Calculation blockers
+
+Calculation warnings identify the entries that require attention and the result
+held unavailable. Armor-layer warnings group the overlapping inventory pieces
+with their body parts, using the same friendly location labels as combat,
+inventory and DR effect summaries. Missing linked-rule notices list the affected
+owned traits and skills (including skill specializations) on sheets, GM cards,
+encounter quick actions and calculation previews. Campaign house-rule failures
+are identified separately. Modifier-group conflicts name the group and selected
+modifiers; staged package blockers list the invalid entries by category.
+
 ## Named protection sources
 
 Incoming attack's **Protection before penetration** lists eligible innate DR by

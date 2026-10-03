@@ -25,6 +25,7 @@ import { GmCampaignDashboardPage } from '../campaigns/GmCampaignDashboardPage.ts
 import { GmCharacterCard } from '../campaigns/GmCharacterCard.tsx';
 import { useCampaignCharacterDetails } from '../campaigns/useCampaignCharacterDetails.ts';
 import { CharacterSheetPage } from './CharacterSheetPage.tsx';
+import { MechanicsUnavailable } from './MechanicsUnavailable.tsx';
 import { LibraryMechanicsNote } from './sections/LibraryMechanicsNote.tsx';
 import { SkillPointsBreakdown } from './sections/SkillPointsBreakdown.tsx';
 import { DefensesCard } from './sections/combat/DefensesCard.tsx';
@@ -162,6 +163,54 @@ describe('durable character mechanics', () => {
       screen.getByText(known ? /Saved rules retained/ : /Library rules unresolved/),
     ).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+  it('names unresolved owned traits and specialized skills consistently for players and GMs', async () => {
+    await seed({ ...snapshot, effects: null });
+    await getLocalDb().characterSkills.update(SKILL, {
+      specialization: 'Pistol',
+      librarySkillId: null,
+      libraryMechanics: { ...snapshot, detached: true, effects: null },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Offline')));
+
+    const player = renderHook(() => useCharacterDetail(CID));
+    const gm = renderHook(() => useCampaignCharacterDetails(CAMPAIGN));
+    await waitFor(() => expect(player.result.current?.libraryEffectsKnown).toBe(false));
+    await waitFor(() => expect(gm.result.current?.[0]?.libraryEffectsKnown).toBe(false));
+
+    const playerUnavailable = player.result.current?.unavailableMechanics;
+    const gmUnavailable = gm.result.current?.[0]?.unavailableMechanics;
+    expect(playerUnavailable).toEqual([
+      { id: TRAIT, name: 'Reflexes', kind: 'trait' },
+      { id: SKILL, name: 'Sword (Pistol)', kind: 'skill' },
+    ]);
+    expect(gmUnavailable).toEqual(playerUnavailable);
+    expect(player.result.current?.derived).toEqual(gm.result.current?.[0]?.derived);
+
+    const detail = player.result.current;
+    if (!detail) throw new Error('player detail did not load');
+    const bannerView = render(<MechanicsUnavailable character={detail} />);
+    const banner = screen.getByRole('alert');
+    expect(banner).toHaveTextContent(
+      'Linked rules are unavailable for trait “Reflexes”, skill “Sword (Pistol)”.',
+    );
+    expect(banner).toHaveTextContent(
+      'Calculated stats and rolls are paused until their definitions sync.',
+    );
+    expect(banner).toHaveTextContent("a missing library entry may need the GM's attention");
+    bannerView.rerender(
+      <MechanicsUnavailable
+        character={{
+          ...detail,
+          libraryEffectsKnown: true,
+          unavailableMechanics: [],
+          houseRulesKnown: false,
+        }}
+      />,
+    );
+    const houseRulesBanner = screen.getByRole('alert');
+    expect(houseRulesBanner).toHaveTextContent('Campaign house rules are unavailable.');
+    expect(houseRulesBanner).not.toHaveTextContent('Linked rules are unavailable');
   });
   it('updates open player and GM readers after a same-length library edit and a dropped-WS reconnect', async () => {
     await seed();
@@ -669,6 +718,50 @@ describe('durable character mechanics', () => {
   it('renders human labels for active and legacy dismissed warning codes', async () => {
     await seed();
     const db = getLocalDb();
+    await db.characterInventory.bulkPut(
+      (
+        [
+          ['armor-outer', 'Brigandine vest'],
+          ['armor-inner', 'Mail shirt'],
+        ] as const
+      ).map(([id, name]) => ({
+        id: `${CID}-${id}`,
+        characterId: CID,
+        name,
+        quantity: 1,
+        weightLbs: 1,
+        cost: 1,
+        notes: null,
+        parentId: null,
+        externalLocation: null,
+        worn: true,
+        equipped: true,
+        isContainer: false,
+        hideawayCapacityLbs: 0,
+        weightReductionPercent: 0,
+        isArmor: true,
+        armor: {
+          locations: ['torso'],
+          dr: 3,
+          drCrushing: null,
+          typedDr: {},
+          flexible: false,
+          concealable: false,
+          frontOnly: false,
+          backOnly: false,
+          db: null,
+          notes: null,
+        },
+        weaponData: null,
+        powerstoneData: null,
+        magicItemData: null,
+        enchantments: [],
+        libraryItemId: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        revision: 1,
+      })),
+    );
     await db.characters.update(CID, {
       dismissedWarnings: ['legacy.some_old-warning'],
     });
@@ -705,6 +798,7 @@ describe('durable character mechanics', () => {
     );
 
     await waitFor(() => expect(screen.getByText('Point target exceeded')).toBeInTheDocument());
+    expect(screen.getByText(/“Brigandine vest”, “Mail shirt” at Torso, Vitals/)).toBeVisible();
     expect(screen.getByText('Legacy: Some old warning')).toBeInTheDocument();
     expect(screen.queryByText('points.over_target')).not.toBeInTheDocument();
     expect(screen.queryByText('legacy.some_old-warning')).not.toBeInTheDocument();

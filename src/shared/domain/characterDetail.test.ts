@@ -198,12 +198,7 @@ it('warns on illegal torso layers, applies valid torso DX penalty, and exempts h
     createdAt: timestamp,
     updatedAt: timestamp,
   };
-  const armor = (
-    id: string,
-    location: 'torso' | 'skull',
-    flexible: boolean,
-    concealable = false,
-  ) => ({
+  const armor = (id: string, location: string, flexible: boolean, concealable = false) => ({
     id,
     characterId: character.id,
     name: id,
@@ -240,14 +235,32 @@ it('warns on illegal torso layers, applies valid torso DX penalty, and exempts h
       combat: null,
       campaign: null,
     });
-  const invalid = build([armor('outer', 'torso', false), armor('inner', 'torso', false)]);
-  expect(invalid.warnings).toContainEqual(
-    expect.objectContaining({
-      code: 'inventory.armor_layers',
-      severity: 'warn',
-    }),
+  const invalid = build([
+    armor('Brigandine vest', 'torso', false),
+    armor('Mail shirt', 'torso', false),
+  ]);
+  const layerWarning = invalid.warnings.find(
+    (warning) => warning.code === 'inventory.armor_layers',
   );
+  expect(layerWarning).toMatchObject({ severity: 'warn' });
+  expect(layerWarning?.message).toContain('“Brigandine vest”, “Mail shirt” at Torso, Vitals');
+  expect(layerWarning?.message).toContain('inner layer must be flexible and concealable');
   expect(aggregateDrByLocation(invalid.inventory).has('torso')).toBe(false);
+
+  const dismissed = buildCharacterDetail({
+    character: { ...character, dismissedWarnings: ['inventory.armor_layers'] },
+    traits: [],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: invalid.inventory,
+    combat: null,
+    campaign: null,
+  });
+  expect(dismissed.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layers' }),
+  );
 
   const validHead = build([
     armor('outer-helm', 'skull', false),
@@ -260,11 +273,48 @@ it('warns on illegal torso layers, applies valid torso DX penalty, and exempts h
 
   const unarmored = build([]);
   const validTorso = build([
-    armor('outer-coat', 'torso', false),
-    armor('inner-shirt', 'torso', true, true),
+    armor('Outer coat', 'torso', false),
+    armor('Concealable undershirt', 'torso', true, true),
   ]);
   expect(validTorso.derived.effectiveDx).toBe(character.dx - 1);
   expect(validTorso.derived.basicSpeed).toBe(unarmored.derived.basicSpeed);
+  const dxWarning = validTorso.warnings.find(
+    (warning) => warning.code === 'inventory.armor_layer_dx',
+  );
+  expect(dxWarning?.message).toContain('−1 DX');
+  expect(dxWarning?.message).toContain('“Outer coat”, “Concealable undershirt” at Torso, Vitals');
+  const dismissedDx = buildCharacterDetail({
+    character: { ...character, dismissedWarnings: ['inventory.armor_layer_dx'] },
+    traits: [],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: validTorso.inventory,
+    combat: null,
+    campaign: null,
+  });
+  expect(dismissedDx.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layer_dx' }),
+  );
+
+  const friendlyLabels = build([
+    armor('Arm shell', 'arm_left', false),
+    armor('Arm liner', 'arm_left', false),
+    armor('Leg shell', 'leg_right', false),
+    armor('Leg liner', 'leg_right', false),
+    armor('Eye guard', 'eye', false),
+    armor('Eye liner', 'eye', false),
+    armor('Tail shell', 'tail_feathers', false),
+    armor('Tail liner', 'tail_feathers', false),
+  ]);
+  const friendlyWarning = friendlyLabels.warnings.find(
+    (warning) => warning.code === 'inventory.armor_layers',
+  );
+  expect(friendlyWarning?.message).toContain('Left Arm');
+  expect(friendlyWarning?.message).toContain('Right Leg');
+  expect(friendlyWarning?.message).toContain('Eyes');
+  expect(friendlyWarning?.message).toContain('Tail Feathers');
 });
 
 it('keeps nested carried armor enchantments and shields available through the full builder', () => {

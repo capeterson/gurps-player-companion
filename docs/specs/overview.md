@@ -666,7 +666,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   `weaponDamage` caps ordinary melee ST at 3× MinST and uses purchased bow/
   crossbow ST; fencing Parry subtracts encumbrance. `armorLayering` checks
   flexible/concealable inner layers and applies the non-head DX penalty.
-  Invalid layering makes automatic DR and injury application unavailable.
+  Invalid layering makes automatic DR and injury application unavailable;
+  warnings name the overlapping pieces and use friendly body-part labels.
 - **Balanced Overview cards.** The sheet uses one column on phones and two
   columns from 768px, including wide desktops. Attributes and Secondary attributes
   align at both edges; Status starts immediately below Attributes. Secondary
@@ -914,6 +915,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     tapping a skill/spell level in those tables opens the identical
     roller.
 - **Warnings**: derived rule-violation banners the user can dismiss.
+  Armor-layer warnings identify the conflicting items and affected body parts.
+  Missing linked-rule notices name the owned traits and skills that pause
+  calculations on player sheets, GM cards and encounter quick actions.
   Beyond the attribute-range and campaign-cap rules, this includes HP
   modifiers beyond ±30% of ST, FP modifiers beyond ±30% of HT (B16),
   and exceptional carrying above 10×BL (back carrying through 15×BL costs 1 FP/second).
@@ -1346,6 +1350,7 @@ src/
       help/      CampaignLibraryHelpPage and campaign-library.md (in-app authoring guide)
       characters/CharacterCard.tsx  Shared character cards for home, listing, campaign roster and GM dashboard
       characters/SheetNavigation.tsx  Responsive desktop dock/mobile flower navigation
+      characters/joinCharacterMechanics.ts, mechanicsUnavailableReason.ts and MechanicsUnavailable.tsx  Owned rule joins and named calculation blockers shared by player and GM views
       characters/sheetAnchors.ts, SheetAnchorLink.tsx and InventoryAnchorLink.tsx  Stable entry hashes and routed source/equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       structured Range inputs and transactional JSON-property mutations
