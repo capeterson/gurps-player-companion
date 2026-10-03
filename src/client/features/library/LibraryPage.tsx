@@ -580,14 +580,10 @@ export function LibraryPage({
       <div className="mx-auto max-w-5xl space-y-6">
         <header>
           <h2 className="font-display text-2xl font-semibold">Import &amp; export</h2>
-          <p className="mt-1 text-sm text-base-content/60">
-            Move a whole campaign library or selected sourcebooks between campaigns.
-          </p>
         </header>
         <section className="card card-border bg-base-100">
           <div className="card-body gap-4">
             <h3 className="card-title">Export YAML</h3>
-            <p>Choose sourcebooks for a portable package, or export the entire library.</p>
             <SourcebookSelection
               sources={library.sources.map((source) => ({ ...source, key: source.id }))}
               selected={selectedExportIds}
@@ -634,10 +630,6 @@ export function LibraryPage({
             <section className="card card-border bg-base-100">
               <div className="card-body gap-3">
                 <h3 className="card-title">Edit a library package</h3>
-                <p>
-                  Stage related entries and campaign settings together, then review a merge or
-                  replacement.
-                </p>
                 <div className="card-actions justify-end">
                   <button type="button" className="btn btn-sm" onClick={() => setPackageOpen(true)}>
                     Edit package

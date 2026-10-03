@@ -26,9 +26,6 @@ export function UsersPage() {
       <header>
         <p className="label-eyebrow">Admin</p>
         <h1 className="font-display text-3xl">Users</h1>
-        <p className="text-sm text-base-content/60">
-          Search by email or display name. Click a row for suspend / purge controls.
-        </p>
       </header>
 
       <input

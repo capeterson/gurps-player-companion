@@ -336,10 +336,6 @@ export function CampaignSettingsDialog({
                     <h3 id="settings-cover-title" className="text-lg font-semibold">
                       Campaign cover
                     </h3>
-                    <p className="text-sm text-base-content/60">
-                      Set the scene for your campaign. Image changes save separately from these
-                      settings, including while offline.
-                    </p>
                   </div>
                   <MediaImage
                     targetType="campaign"

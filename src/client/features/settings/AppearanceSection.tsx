@@ -14,7 +14,6 @@ import { themePreferenceFlashKey } from '../../lib/themeSync.ts';
 interface ThemePickerProps<F extends ThemePreferenceField> {
   readonly field: F;
   readonly label: string;
-  readonly description: string;
   readonly options: readonly ThemePreferences[F][];
   readonly value: ThemePreferences[F];
 }
@@ -22,7 +21,6 @@ interface ThemePickerProps<F extends ThemePreferenceField> {
 function ThemePicker<F extends ThemePreferenceField>({
   field,
   label,
-  description,
   options,
   value,
 }: ThemePickerProps<F>) {
@@ -34,7 +32,6 @@ function ThemePicker<F extends ThemePreferenceField>({
         <label htmlFor={id} className="block font-medium">
           {label}
         </label>
-        <span className="text-xs text-muted">{description}</span>
       </span>
       <select
         id={id}
@@ -61,22 +58,16 @@ export function AppearanceSection() {
         <div>
           <p className="label-eyebrow">Preferences</p>
           <h2 className="font-display text-2xl">Appearance</h2>
-          <p className="text-sm text-muted">
-            Choose the theme used in each mode. Saved to your account and used on all your devices;
-            switch between dark and light mode from the header.
-          </p>
         </div>
         <ThemePicker
           field="darkTheme"
           label="Dark theme"
-          description="Used in dark mode."
           options={DARK_THEMES}
           value={preferences.darkTheme}
         />
         <ThemePicker
           field="lightTheme"
           label="Light theme"
-          description="Used in light mode."
           options={LIGHT_THEMES}
           value={preferences.lightTheme}
         />

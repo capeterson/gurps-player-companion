@@ -20,7 +20,7 @@ function PreferenceToggle({
   onSave,
 }: {
   label: string;
-  description: string;
+  description?: string;
   value: boolean;
   onSave: (value: boolean) => Promise<unknown>;
 }) {
@@ -29,7 +29,7 @@ function PreferenceToggle({
     <label className="flex items-center justify-between gap-4 py-3">
       <span className="min-w-0">
         <span className="block font-medium">{label}</span>
-        <span className="block text-xs text-muted">{description}</span>
+        {description && <span className="block text-xs text-muted">{description}</span>}
       </span>
       <input
         type="checkbox"
@@ -59,10 +59,6 @@ function DesktopToggle({ userId }: { userId: string }) {
       <label className="flex items-center justify-between gap-4 py-3">
         <span className="min-w-0">
           <span className="block font-medium">Desktop notifications</span>
-          <span className="block text-xs text-muted">
-            Off by default. Enable on this browser to receive alerts while the app is open in the
-            background.
-          </span>
         </span>
         <input
           type="checkbox"
@@ -81,7 +77,7 @@ function DesktopToggle({ userId }: { userId: string }) {
             ? 'Blocked by your browser. Allow notifications in browser settings to enable them here.'
             : enabled
               ? 'Enabled on this browser. Your in-app topic choices also apply to desktop alerts.'
-              : 'Disabled. We will only ask for browser permission when you enable this setting.'}
+              : null}
       </output>
     </div>
   );
@@ -108,7 +104,6 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
       <div>
         <p className="label-eyebrow">Preferences</p>
         <h2 className="font-display text-2xl">Notifications</h2>
-        <p className="mt-1 text-sm text-muted">Choose how Player Companion keeps you up to date.</p>
       </div>
       {userId && <DesktopToggle key={userId} userId={userId} />}
       {preferences.isError && (
@@ -131,13 +126,11 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
             <div className="divide-y divide-base-300/60">
               <PreferenceToggle
                 label="Campaign invitations"
-                description="Email me when someone invites me to a campaign."
                 value={preferences.data.emailInvitations}
                 onSave={(v) => save('emailInvitations', v)}
               />
               <PreferenceToggle
                 label="Invitation accepted"
-                description="Email me when someone accepts an invitation I sent."
                 value={preferences.data.emailInvitationAccepted}
                 onSave={(v) => save('emailInvitationAccepted', v)}
               />
@@ -154,9 +147,6 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
           </div>
           <div className="min-w-0">
             <h3 className="font-display text-lg">In-app inbox</h3>
-            <p className="mt-1 text-xs text-muted">
-              Choose the topics that appear in your notification bell.
-            </p>
             <div className="divide-y divide-base-300/60">
               {NOTIFICATION_TOPICS.map((topic) => (
                 <PreferenceToggle
@@ -171,10 +161,6 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
           </div>
         </div>
       )}
-      <p className="text-xs text-muted">
-        Email and inbox preferences follow your account. Desktop notifications are saved for this
-        account on this browser.
-      </p>
     </section>
   );
 }

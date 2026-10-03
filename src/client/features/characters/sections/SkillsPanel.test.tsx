@@ -387,7 +387,7 @@ describe('SkillsPanel', () => {
     const specialization = screen.getByLabelText('Current Affairs/Popular Culture specialization');
     expect(name).toHaveValue('Current Affairs');
     expect(specialization).toHaveValue('Popular Culture');
-    expect(screen.getByText('Edit Current Affairs/Popular Culture')).toBeInTheDocument();
+    expect(screen.queryByText('Edit Current Affairs/Popular Culture')).not.toBeInTheDocument();
     expect(screen.getByText('Source & rules')).toBeInTheDocument();
   });
 

@@ -95,11 +95,6 @@ describe('NotificationsSection', () => {
       screen.getByText(/Password changes and passkey or API key changes always trigger an email/),
     ).toBeVisible();
     expect(FakeNotification.requestPermission).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(
-        /Disabled\. We will only ask for browser permission when you enable this setting\./,
-      ),
-    ).toBeVisible();
   });
 
   it('requests browser permission only after an explicit desktop toggle and saves per account on this browser', async () => {

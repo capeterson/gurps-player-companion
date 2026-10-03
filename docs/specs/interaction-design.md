@@ -6,6 +6,26 @@ character sheet. It is a companion to [architecture.md](architecture.md) and
 data, while the local mirror and outbox remain the data path. Languages and
 Techniques apply these patterns alongside the Skills and Traits tables.
 
+UI implementation and review starts with the project-local
+[gpc-ui-design skill](../../.agents/skills/gpc-ui-design/SKILL.md), which records
+the user's established expectations and lessons from observed regressions.
+
+## Product copy
+
+Labels, table headings and named controls supply routine interaction context.
+Sheet editors and collection tables omit captions explaining clicks, sorting,
+reordering, field-by-field saving or closing with Done. The same rule applies to
+inventory, combat, settings, campaign pages and library authoring: omit filler
+introductions and descriptions that repeat an adjacent label or control.
+
+Keep actionable errors, permission and destructive-action warnings, rule limits,
+and consequences not apparent from controls, such as replacing a pricing rule.
+Routine captions about local storage, condition sources, category behavior,
+spell/skill preview workflows and separate cover saves are omitted as well.
+Help pages retain substantive guidance without generic introductory filler. Saving indicators,
+accessible labels, keyboard shortcut titles, and calculation/source breakdowns
+remain available where relevant.
+
 ## Character cards
 
 Home, the Characters listing, campaign overview roster, and GM dashboard use
@@ -35,7 +55,10 @@ Readers see the image or silhouette without editing controls. Shared notificatio
 portal into the active native dialog so rejection toasts remain visible and
 dismissible above its backdrop; they return to the page when the dialog closes.
 The notification stack is bounded by the dynamic viewport and scrolls internally
-when multiple messages exceed its height.
+when multiple messages exceed its height. Toast messages wrap in a flexible
+column, while an optional action (including the app-update **Reload** button)
+and Dismiss each have their own content-sized column. Button labels stay on
+one line and inside the toast at narrow widths.
 
 Campaign settings uses a centered, wide native dialog with wrapping Campaign,
 Rules, and Members section buttons. The header, section buttons and Save/Cancel
@@ -60,8 +83,11 @@ empty state names the missing collection and leaves that same Add action
 available, rather than adding another creation control.
 
 Each editable row has an **Edit** action that opens labeled fields below its
-summary. **Done** closes the editor. These are presentation actions: existing
-fields commit on blur, or on change for a select, through `useDraftField`.
+summary. The row supplies the entry name; inline editors do not repeat it
+in an “Edit …” heading. Inventory editors likewise omit the repeated item name
+while retaining their category title. **Done** closes the editor. These are
+presentation actions: existing fields commit on blur, or on change for a select,
+through `useDraftField`.
 Done is not an atomic Save button. Deletion lives inside the editor and uses
 the shared confirmation dialog. Canceling deletion preserves the entry and
 its drafts. A read-only viewer sees summaries and may roll resolved technique
@@ -123,6 +149,24 @@ horizontally inside the log body or raw-Markdown preview. This local scroller
 keeps the final columns reachable on narrow screens without imposing wide
 tables on other Markdown surfaces.
 
+## Skill points preview
+
+Hovering or focusing an owned skill's points input opens a scrollable tooltip.
+While points are being typed, it previews the net skill level using the local
+sheet builder without committing the draft. It lists the governing attribute
+and its contributors, personal/racial training, the difficulty ladder, the
+winning declared default (including TL penalties and virtual buy-up credit),
+and active skill modifiers. An invalid draft shows the permitted points range.
+The existing draft save, queue, rejection toast and flash remain on the input.
+
+Contributing attributes, skills, traits, equipment, racial training and active
+instances link to their sheet controls. Links select the matching destination
+and reveal folded content; entry links retain the existing filter reveal.
+The tooltip uses shared viewport collision handling, vertical scrolling and
+content wrapping at mobile, desktop and short landscape sizes. It uses the
+clearer space above or below the points input and avoids the fixed sheet
+navigation, keeping the draft value and contributor links reachable.
+
 ## Named protection sources
 
 Incoming attack's **Protection before penetration** lists eligible innate DR by
@@ -141,12 +185,17 @@ existing equipment links and supports ordinary anchors outside a router.
 
 Overview's Attributes, Secondary attributes, and Status cards are always visible
 inside the outer Sheet overview disclosure. Each owns one heading without an
-individual fold. The adjacent utility column sizes to its content: folded Point
+individual fold. Overview uses one column below 768px and two equal columns
+from 768px, retaining two columns on wide desktops. Paired stat cards share top
+and bottom edges, with Status starting one standard gap below Attributes.
+Secondary attributes use three columns from 640–767px and from 1024px upward,
+so wide paired cards display their values in two rows rather than leaving a hole
+below Attributes. Numeric value/modifier groups can wrap within their cells.
+The utility column keeps its own folded panels at content height: folded Point
 ledger, Encumbrance, and Conditional effects show only their headings rather
 than stretching to the stat cards' height. Conditional effects owns its fold and
 is absent unless the campaign active-effects experiment is enabled and condition
-groups are declared. Its explanation identifies trait
-effects and Combat → Active Effects as the sources of those optional modifiers.
+groups are declared. The controls omit explanatory source captions.
 Campaign settings has the owner-only **Enable active effects** experiment, off by
 default. Disabled campaigns hide character activation/conditional tools and experimental
 guide sections. Owners retain archived library definition authoring and conditional
@@ -274,6 +323,12 @@ when the text contains no spaces.
 Long account names remain width-bounded in the shared header at all breakpoints;
 opening the account menu must not horizontally scroll the page. The home welcome
 heading wraps unbroken account names within its card.
+The compact character navigation menu starts with the signed-in user's name and
+email, followed by destinations and Logout. It does not repeat the character name
+from the header breadcrumb. The dark/light toggle is a 44px icon button at the
+upper right, beside sync and notifications, rather than a navigation menu item.
+Large current/maximum HP and FP values may wrap between the two numbers, and
+warnings wrap within their pool button so the adjacent header controls stay clear.
 
 Detailed encounter NPC and effect forms open in the native dialog top layer, above the
 sticky app header. Their height stays within the dynamic viewport, with internal
@@ -291,8 +346,8 @@ the whole page to scroll horizontally. At narrow widths, secondary metadata
 can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
-Expanded trait and skill editors also wrap their complete **Edit** headings,
-including long unspaced names, within the editor's content width. Trait modifier
+Expanded editors begin with labeled fields, using the summary row for context.
+Saving feedback appears only while a field is being saved. Trait modifier
 names and descriptions wrap inside the expanded editor when they contain long
 unbroken text.
 
@@ -407,7 +462,7 @@ are inspected alongside bounding-box and overlap assertions.
 | Character cards across home, listing and campaign views | `src/client/features/characters/CharacterCard.tsx`, `src/client/features/campaigns/GmCharacterCard.tsx` |
 | Sheet composition and panel folds | `src/client/features/characters/CharacterSheetPage.tsx`, `src/client/components/ui/FoldSection.tsx` |
 | Table filters and grouped row lifetime | `src/client/components/ui/Table.tsx` |
-| Skill/trait summary and editor references | `src/client/features/characters/sections/SkillsPanel.tsx`, `TraitsPanel.tsx` |
+| Skill/trait summary and editor references | `src/client/features/characters/sections/SkillsPanel.tsx`, `SkillPointsBreakdown.tsx`, `TraitsPanel.tsx` |
 | Spells, reference and energy payment | `src/client/features/characters/sections/SpellsPanel.tsx`, `CastSpellDialog.tsx`, `spellTablePreferences.ts` |
 | Stored energy and magic items | `src/client/features/characters/sections/PowerstonesPanel.tsx` |
 | Languages and techniques | `src/client/features/characters/sections/LanguagesPanel.tsx`, `TechniquesPanel.tsx` |

@@ -50,9 +50,6 @@ export function ExperimentalFeaturesSection({ userId }: { userId: string | undef
       <div>
         <p className="label-eyebrow">Preferences</p>
         <h2 className="font-display text-2xl">Experimental Features</h2>
-        <p className="mt-1 text-sm text-muted">
-          Try optional features that are still in development. Off by default.
-        </p>
       </div>
       {preferences.isError && (
         <QueryReadError

@@ -14,10 +14,7 @@ export function CampaignHistoryPage() {
     <div className="mx-auto max-w-[96rem] space-y-6">
       <CampaignWorkspaceHeader campaignId={id} workspace={workspace} />
       <section className="max-w-5xl space-y-3">
-        <CampaignPageHeading
-          title="History"
-          description="Review campaign and character changes in chronological order."
-        />
+        <CampaignPageHeading title="History" />
         <CampaignHistoryPanel campaignId={id} isOwner={workspace.viewerRole === 'owner'} />
       </section>
     </div>

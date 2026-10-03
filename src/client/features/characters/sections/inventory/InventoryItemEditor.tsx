@@ -286,12 +286,6 @@ function ItemListEditor({
       {...flash.flashProps}
     >
       <h4 className="label-eyebrow">{enchantments ? 'Enchantments' : 'Alternate attacks'}</h4>
-      {enchantments && (
-        <p className="text-xs text-base-content/60">
-          Campaign definitions and custom typed effects change stats while this item is equipped or
-          worn. Older note-only records remain non-mechanical.
-        </p>
-      )}
       {list.map((listEntry, index) => {
         const prefix = enchantments
           ? `enchantments.${index}`
@@ -610,9 +604,6 @@ export function InventoryItemEditor({
   if (section === 'add') {
     content = (
       <div className="space-y-3">
-        <p className="text-sm text-base-content/60">
-          An item can have several categories. Adding one keeps its other settings.
-        </p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(CATEGORY_LABELS) as ItemCategory[])
             .filter((candidate) => !active.includes(candidate))
@@ -715,9 +706,6 @@ export function InventoryItemEditor({
             {more ? 'Fewer options' : 'More options'}
           </button>
         )}
-        <p className="text-xs text-base-content/50">
-          Changes save as you leave each field. Filled options stay visible.
-        </p>
         {category &&
           (removing ? (
             <div className="border border-error/40 rounded-lg p-3 flex flex-wrap items-center gap-2">
@@ -773,7 +761,6 @@ export function InventoryItemEditor({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="label-eyebrow [overflow-wrap:anywhere]">{item.name}</div>
           <h3 className="font-display text-lg">
             {section === 'basics'
               ? 'Item details'

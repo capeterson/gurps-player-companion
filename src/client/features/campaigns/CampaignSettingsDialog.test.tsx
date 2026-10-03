@@ -231,7 +231,6 @@ it('does not let managers enable active effects', () => {
 it('groups settings and preserves form drafts across sections', () => {
   setup();
   expect(screen.getByLabelText('Upload campaign cover')).toBeVisible();
-  expect(screen.getByText(/Image changes save separately/)).toBeVisible();
   fireEvent.change(screen.getByRole('textbox', { name: 'Point target' }), {
     target: { value: '275' },
   });

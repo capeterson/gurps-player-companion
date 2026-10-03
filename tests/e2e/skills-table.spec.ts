@@ -119,8 +119,9 @@ test('skill table and inline editor stay compact across mobile and desktop break
 
       const edit = table.getByRole('button', { name: /^Edit / }).first();
       await edit.click();
-      const editorHeading = page.getByRole('heading', { name: /^Edit / }).first();
-      await expect(editorHeading).toBeVisible();
+      await expect(page.getByRole('heading', { name: /^Edit / })).toHaveCount(0);
+      const editorName = table.getByRole('textbox', { name: / name$/ }).first();
+      await expect(editorName).toBeVisible();
       const pointsAfter = await page.getByRole('button', { name: 'Sort by Points' }).boundingBox();
       const levelAfter = await page.getByRole('button', { name: 'Sort by Level' }).boundingBox();
       expect(pointsBefore).not.toBeNull();
@@ -131,7 +132,7 @@ test('skill table and inline editor stay compact across mobile and desktop break
         expect(pointsAfter.x).toBeCloseTo(pointsBefore.x, 0);
         expect(levelAfter.x).toBeCloseTo(levelBefore.x, 0);
       }
-      const editor = editorHeading.locator('xpath=../..');
+      const editor = editorName.locator('xpath=ancestor::tr');
       await expectInsideViewport(page, editor);
       const name = editor.getByLabel(/ name$/);
       await expect(name).toBeVisible();

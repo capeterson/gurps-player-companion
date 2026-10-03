@@ -1,187 +1,138 @@
-import { type Page, expect, test } from '@playwright/test';
+import { type Locator, type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
 
-async function register(page: Page) {
-  await page.goto('/register');
-  await page.getByLabel(/email/i).fill(`trait-editor-${Date.now()}@example.com`);
-  await page.getByLabel(/display name/i).fill('Trait Editor QA');
-  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
-  await page.getByRole('button', { name: /create account/i }).click();
+async function signIn(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel(/email/i).fill('rowan@example.invalid');
+  await page.getByLabel(/^password\b/i).fill('change-me-please-this-is-a-seed-account');
+  await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
   return page.evaluate(
     () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
   );
 }
 
-test('expanded Traits and Skills editor headings wrap long names at mobile breakpoints', async ({
+async function expectHorizontalBounds(locator: Locator, width: number) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box?.x).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width + 1);
+}
+
+test('inline sheet editors use their summary rows for context at responsive widths', async ({
   page,
 }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(150_000);
   await page.setViewportSize({ width: 1280, height: 800 });
-  const token = await register(page);
+  const token = await signIn(page);
+  const headers = { Authorization: `Bearer ${token}` };
   async function create(path: string, data: object) {
-    const response = await page.request.post(`/api/v1${path}`, {
-      data,
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await page.request.post(`/api/v1${path}`, { data, headers });
     expect(response.ok(), await response.text()).toBeTruthy();
     return response.json();
   }
-
-  const campaign = await create('/campaigns', { name: 'Trait heading layout' });
-  const character = await create('/characters', {
-    name: 'Responsive Surveyor',
-    campaignId: campaign.id,
-  });
-  await page.goto(`/characters/${character.id}`);
-  await selectCharacterSection(page, 'Traits');
-
-  const longTrait =
-    'PneumonoultramicroscopicsilicovolcanoconiosisResponsiveSurveyorTraitWithAnUnusuallyLongName';
-  await page.getByRole('button', { name: '+ Add trait' }).click();
-  await page.getByLabel('Trait name').fill(longTrait);
-  await page.getByRole('button', { name: /^add$/i }).click();
-  const editButton = page.getByRole('button', { name: `Edit ${longTrait}`, exact: true });
-  await expect(editButton).toBeVisible();
-  await editButton.click();
-
-  const heading = page.getByRole('heading', { name: `Edit ${longTrait}`, exact: true });
-  const nameInput = page.getByRole('textbox', { name: `${longTrait} name`, exact: true });
-  const pointsInput = page.getByRole('textbox', { name: `${longTrait} points`, exact: true });
-  for (const viewport of [
-    { name: '320x568', width: 320, height: 568 },
-    { name: '568x320', width: 568, height: 320 },
-    { name: '639x800', width: 639, height: 800 },
-    { name: '640x800', width: 640, height: 800 },
-    { name: '641x800', width: 641, height: 800 },
-  ]) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await heading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    await expect(heading).toBeVisible();
-    await expect(heading).toHaveText(`Edit ${longTrait}`);
-    await expect(heading).toBeInViewport();
-    const renderedHeading = await heading.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return {
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-        height: element.getBoundingClientRect().height,
-        lineHeight: Number.parseFloat(style.lineHeight),
-      };
-    });
-    expect(renderedHeading.scrollWidth).toBeLessThanOrEqual(renderedHeading.clientWidth);
-    expect(renderedHeading.height).toBeGreaterThan(renderedHeading.lineHeight);
-    const box = await heading.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box?.x).toBeGreaterThanOrEqual(0);
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-    expect(box?.y).toBeGreaterThanOrEqual(0);
-    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      viewport.width,
-    );
-    if (viewport.width < 640) {
-      expect(box?.height ?? 0).toBeGreaterThan(20);
-    }
-
-    await nameInput.scrollIntoViewIfNeeded();
-    await expect(nameInput).toHaveValue(longTrait);
-    await nameInput.focus();
-    await nameInput.press('End');
-    await expect(nameInput).toHaveValue(longTrait);
-    const [nameBox, pointsBox] = await Promise.all([
-      nameInput.boundingBox(),
-      pointsInput.boundingBox(),
-    ]);
-    expect(nameBox).not.toBeNull();
-    expect(pointsBox).not.toBeNull();
-    expect(nameBox?.x).toBeGreaterThanOrEqual(0);
-    expect((nameBox?.x ?? 0) + (nameBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-    expect(pointsBox?.x).toBeGreaterThanOrEqual(0);
-    expect((pointsBox?.x ?? 0) + (pointsBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-
-    if (viewport.width === 320 || viewport.name === '568x320') {
-      await heading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await attachReviewScreenshot(page, testInfo, `trait-editor-heading-${viewport.name}`, {
-        animations: 'disabled',
-        path: testInfo.outputPath(`trait-editor-heading-${viewport.name}.png`),
+  const character = await create('/characters', { name: 'Inline Editor Surveyor' });
+  const longName =
+    'PneumonoultramicroscopicsilicovolcanoconiosisResponsiveSurveyorWithAnUnusuallyLongName';
+  const skillName = `${longName}Skill`;
+  const entries = [
+    {
+      section: 'Traits',
+      collection: 'traits',
+      name: `${longName}Trait`,
+      data: { kind: 'advantage', points: 5 },
+    },
+    {
+      section: 'Skills',
+      collection: 'skills',
+      name: skillName,
+      data: { attribute: 'DX', difficulty: 'A', points: 1 },
+    },
+    {
+      section: 'Magic',
+      collection: 'spells',
+      name: `${longName}Spell`,
+      data: { college: 'Air', points: 1 },
+    },
+    {
+      section: 'Skills',
+      collection: 'languages',
+      name: `${longName}Language`,
+      data: { spokenFluency: 'accented', writtenFluency: 'none', points: 2 },
+    },
+    {
+      section: 'Skills',
+      collection: 'techniques',
+      name: `${longName}Technique`,
+      data: { defaultSkillName: skillName, defaultModifier: -2, points: 1 },
+    },
+  ];
+  try {
+    for (const entry of entries)
+      await create(`/characters/${character.id}/${entry.collection}`, {
+        name: entry.name,
+        ...entry.data,
       });
+    await page.goto(`/characters/${character.id}`);
+    for (const entry of entries) {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await selectCharacterSection(page, entry.section);
+      const edit = page.getByRole('button', { name: `Edit ${entry.name}`, exact: true });
+      await edit.click();
+      const summary = page.getByRole('row').filter({ hasText: entry.name }).first();
+      const nameInput = page.getByRole('textbox', { name: `${entry.name} name`, exact: true });
+      const editor = nameInput.locator('xpath=ancestor::tr');
+      await expect(nameInput).toBeVisible();
+      for (const viewport of [
+        { width: 320, height: 568 },
+        { width: 568, height: 320 },
+        { width: 639, height: 800 },
+        { width: 640, height: 800 },
+        { width: 641, height: 800 },
+        { width: 767, height: 800 },
+        { width: 768, height: 800 },
+        { width: 769, height: 800 },
+        { width: 1023, height: 800 },
+        { width: 1024, height: 800 },
+        { width: 1025, height: 800 },
+        { width: 1280, height: 800 },
+      ]) {
+        await page.setViewportSize(viewport);
+        await expect(summary).toContainText(entry.name);
+        await expect(page.getByText(`Edit ${entry.name}`, { exact: true })).toHaveCount(0);
+        await nameInput.scrollIntoViewIfNeeded();
+        await nameInput.focus();
+        await expect(nameInput).toHaveValue(entry.name);
+        await expectHorizontalBounds(summary, viewport.width);
+        await expectHorizontalBounds(editor, viewport.width);
+        await expectHorizontalBounds(nameInput, viewport.width);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          viewport.width,
+        );
+        if (viewport.width === 320 || viewport.height === 320 || viewport.width === 1280) {
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `${entry.collection}-editor-${viewport.width}x${viewport.height}`,
+            {
+              animations: 'disabled',
+              path: testInfo.outputPath(
+                `${entry.collection}-editor-${viewport.width}x${viewport.height}.png`,
+              ),
+            },
+          );
+        }
+      }
+      await page
+        .getByRole('button', {
+          name: `${entry.collection === 'spells' ? 'Done editing' : 'Close'} ${entry.name}`,
+          exact: true,
+        })
+        .click();
+      await expect(nameInput).not.toBeVisible();
     }
-  }
-
-  await selectCharacterSection(page, 'Skills');
-  const longSkill =
-    'PneumonoultramicroscopicsilicovolcanoconiosisResponsiveSurveyorSkillWithAnUnusuallyLongName';
-  await page.getByRole('button', { name: '+ Add skill' }).click();
-  const skillForm = page.getByLabel(/^skill$/i).locator('xpath=ancestor::form');
-  await page.getByLabel(/^skill$/i).fill(longSkill);
-  await skillForm.getByRole('button', { name: /^add$/i }).click();
-  const skillEditButton = page.getByRole('button', { name: `Edit ${longSkill}`, exact: true });
-  await expect(skillEditButton).toBeVisible();
-  await skillEditButton.click();
-
-  const skillHeading = page.getByRole('heading', { name: `Edit ${longSkill}`, exact: true });
-  const skillNameInput = page.getByRole('textbox', { name: `${longSkill} name`, exact: true });
-  const skillPointsInput = page.getByRole('textbox', {
-    name: `${longSkill} points`,
-    exact: true,
-  });
-  for (const viewport of [
-    { name: '320x568', width: 320, height: 568 },
-    { name: '568x320', width: 568, height: 320 },
-    { name: '639x800', width: 639, height: 800 },
-    { name: '640x800', width: 640, height: 800 },
-    { name: '641x800', width: 641, height: 800 },
-  ]) {
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await skillHeading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    await expect(skillHeading).toBeVisible();
-    await expect(skillHeading).toHaveText(`Edit ${longSkill}`);
-    await expect(skillHeading).toBeInViewport();
-    const renderedHeading = await skillHeading.evaluate((element) => {
-      const style = getComputedStyle(element);
-      return {
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-        height: element.getBoundingClientRect().height,
-        lineHeight: Number.parseFloat(style.lineHeight),
-      };
-    });
-    expect(renderedHeading.scrollWidth).toBeLessThanOrEqual(renderedHeading.clientWidth);
-    expect(renderedHeading.height).toBeGreaterThan(renderedHeading.lineHeight);
-    const box = await skillHeading.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box?.x).toBeGreaterThanOrEqual(0);
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-    expect(box?.y).toBeGreaterThanOrEqual(0);
-    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      viewport.width,
-    );
-
-    await skillNameInput.scrollIntoViewIfNeeded();
-    await expect(skillNameInput).toHaveValue(longSkill);
-    await skillNameInput.focus();
-    await skillNameInput.press('End');
-    await expect(skillNameInput).toHaveValue(longSkill);
-    const [nameBox, pointsBox] = await Promise.all([
-      skillNameInput.boundingBox(),
-      skillPointsInput.boundingBox(),
-    ]);
-    expect(nameBox).not.toBeNull();
-    expect(pointsBox).not.toBeNull();
-    expect(nameBox?.x).toBeGreaterThanOrEqual(0);
-    expect((nameBox?.x ?? 0) + (nameBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-    expect(pointsBox?.x).toBeGreaterThanOrEqual(0);
-    expect((pointsBox?.x ?? 0) + (pointsBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
-
-    if (viewport.width === 320 || viewport.name === '568x320') {
-      await skillHeading.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      await attachReviewScreenshot(page, testInfo, `skills-editor-heading-${viewport.name}`, {
-        animations: 'disabled',
-        path: testInfo.outputPath(`skills-editor-heading-${viewport.name}.png`),
-      });
-    }
+  } finally {
+    await page.request.delete(`/api/v1/characters/${character.id}`, { headers });
   }
 });

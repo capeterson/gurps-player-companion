@@ -630,10 +630,6 @@ export function InventoryPanel({
               </span>
             </span>
           </InfoTooltip>
-          <span className="grow" />
-          <span className="num hidden text-base-content/40 text-xs sm:inline">
-            tip: shift-click to select a range; ⌘/ctrl-click to toggle
-          </span>
         </header>
       )}
 
@@ -789,9 +785,7 @@ export function InventoryPanel({
       )}
 
       {items.length === 0 && (
-        <div className="p-8 text-center text-base-content/60 text-sm">
-          No items yet. Add your first below.
-        </div>
+        <div className="p-8 text-center text-base-content/60 text-sm">No items yet.</div>
       )}
 
       {items.length > 0 && (
@@ -1215,11 +1209,6 @@ export function InventoryPanel({
                   </button>
                 </span>
               ))}
-              {(newIsContainer || newIsArmor || newIsWeapon) && (
-                <span className="text-base-content/40">
-                  Add the item, then click a category on its row to edit its settings.
-                </span>
-              )}
             </div>
           )}
         </form>

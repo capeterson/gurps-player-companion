@@ -131,9 +131,6 @@ export function CampaignsPage() {
       {campaigns.data && campaigns.data.length === 0 && !showCreate && (
         <div className="card p-card text-center text-muted">
           <p>No campaigns yet.</p>
-          <p className="text-sm">
-            Create one to share characters and an adventure log with your table.
-          </p>
         </div>
       )}
 

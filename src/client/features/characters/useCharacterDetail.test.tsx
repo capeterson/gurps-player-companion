@@ -26,6 +26,7 @@ import { GmCharacterCard } from '../campaigns/GmCharacterCard.tsx';
 import { useCampaignCharacterDetails } from '../campaigns/useCampaignCharacterDetails.ts';
 import { CharacterSheetPage } from './CharacterSheetPage.tsx';
 import { LibraryMechanicsNote } from './sections/LibraryMechanicsNote.tsx';
+import { SkillPointsBreakdown } from './sections/SkillPointsBreakdown.tsx';
 import { DefensesCard } from './sections/combat/DefensesCard.tsx';
 import { useCharacterDetail } from './useCharacterDetail.ts';
 
@@ -881,4 +882,51 @@ it('loads campaign house rules from Dexie, preserves them offline, and reacts to
   });
   await waitFor(() => expect(offline.result.current?.houseRules.protectNaturalDr).toBe(true));
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it('previews draft skill points from local mechanics without changing purchases or the outbox', async () => {
+  await seed();
+  const db = getLocalDb();
+  const before = await db.outbox.count();
+  const { result, rerender } = renderHook(
+    ({ points }) =>
+      useCharacterDetail(CID, {
+        skillPointPreview: { skillId: SKILL, points },
+      }),
+    { initialProps: { points: 4 } },
+  );
+  await waitFor(() =>
+    expect(result.current?.skills.find((skill) => skill.id === SKILL)?.effectiveLevel).toBe(14),
+  );
+  expect(result.current?.skillLevelBreakdowns?.get(SKILL)).toMatchObject({
+    level: 13,
+    purchasedLevel: 13,
+    points: 4,
+    attributeLevel: 12,
+  });
+  rerender({ points: 8 });
+  await waitFor(() =>
+    expect(result.current?.skills.find((skill) => skill.id === SKILL)?.effectiveLevel).toBe(15),
+  );
+  expect((await db.characterSkills.get(SKILL))?.points).toBe(2);
+  expect(await db.outbox.count()).toBe(before);
+});
+
+it('shows draft net levels and links both attribute and skill contributors', async () => {
+  await seed();
+  const view = render(<SkillPointsBreakdown characterId={CID} skillId={SKILL} draftPoints="4" />);
+  await screen.findByText('Net skill level: 14');
+  expect(screen.getByRole('link', { name: 'Reflexes' })).toHaveAttribute('href', `#trait-${TRAIT}`);
+  expect(
+    screen
+      .getAllByRole('link', { name: 'Sword' })
+      .every((link) => link.getAttribute('href') === `#skill-${SKILL}`),
+  ).toBe(true);
+  expect(screen.getAllByRole('link', { name: 'DX' })[0]).toHaveAttribute('href', '#attribute-DX');
+  view.rerender(<SkillPointsBreakdown characterId={CID} skillId={SKILL} draftPoints="0" />);
+  await screen.findByText('Net skill level: Unavailable');
+  expect(screen.getByText('No purchased level')).toBeVisible();
+  view.rerender(<SkillPointsBreakdown characterId={CID} skillId={SKILL} draftPoints="-1" />);
+  expect(screen.getByText(/Enter whole points/)).toBeVisible();
+  expect((await getLocalDb().characterSkills.get(SKILL))?.points).toBe(2);
 });

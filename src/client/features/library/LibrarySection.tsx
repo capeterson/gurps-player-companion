@@ -288,7 +288,7 @@ export function LibrarySection<R extends LibraryListRow>({
         </output>
       )}
       {active && entries.length > 0 && searching && matchCount === 0 && (
-        <p className="text-sm text-muted">No matches. Try another search or category.</p>
+        <p className="text-sm text-muted">No matches.</p>
       )}
 
       {groups.length > 0 && (

@@ -292,11 +292,7 @@ it('retains a visible rollback event when an owned-effects save fails', async ()
   addDxEffect();
   fireEvent.click(screen.getByRole('button', { name: 'Save effects' }));
   await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/);
-  expect(
-    await screen.findByText(
-      'No mechanical effects. Add one for stat, skill, defense, DR, damage, or weapon bonuses.',
-    ),
-  ).toBeInTheDocument();
+  expect(await screen.findByText('No mechanical effects.')).toBeInTheDocument();
   expect(screen.getByText('Effects').closest('details')).toHaveAttribute('data-flashing', 'true');
 });
 
@@ -388,7 +384,7 @@ it('opens one full-width trait editor and keeps unset advanced details out of th
   renderOwnedTrait();
   expect(screen.queryByRole('heading', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
-  expect(screen.getByRole('heading', { name: 'Edit Weapon Mastery' })).toBeVisible();
+  expect(screen.queryByRole('heading', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Weapon Mastery name')).toBeVisible();
   expect(screen.getByLabelText('Weapon Mastery points')).toBeVisible();
   expect(screen.getByLabelText('Weapon Mastery description and notes')).toBeVisible();

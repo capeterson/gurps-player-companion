@@ -85,7 +85,7 @@ export function CharacterRaceControl({
   const conflict = baseline !== null && baseline !== JSON.stringify(current);
   const choose = (patch: Partial<RaceSelection>) => setSelection({ ...selected, ...patch });
   return (
-    <div className="form-control min-w-0">
+    <div id={`race-${character.id}`} className="form-control min-w-0">
       <span className="label-text-alt label-eyebrow">Race</span>
       <button
         type="button"
