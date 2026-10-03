@@ -365,8 +365,8 @@ below 640px: name and chips on the left, weight over quantity and cost on the
 right, then the edit action. Quantity 1 is implied rather than repeated, and
 the units (`lb`, `$`, `×`) replace per-row column labels. Long names and chip
 text wrap at every width so the table also fits at the desktop breakpoint.
-Expanded inventory editors wrap long unspaced item names in the header while
-keeping the **+ Category** and **Done** actions inside the viewport. At the
+Expanded inventory editors use the summary row for the item name and keep
+the **+ Category** and **Done** actions inside the viewport. At the
 desktop-table breakpoint, item names and category chips may flow onto separate
 lines so a narrow item column does not compress a chip into one letter per line.
 Expanded editors contain their intrinsic inline size so their input grids do not
