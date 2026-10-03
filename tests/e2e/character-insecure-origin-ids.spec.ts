@@ -53,11 +53,15 @@ test('character inventory and solo tracker create IDs on an insecure HTTP origin
   await page.getByRole('button', { name: 'Weapon settings for Practice sword' }).click();
   const weaponEditor = page.getByRole('region', { name: 'Practice sword: Weapon' });
   await weaponEditor.getByRole('button', { name: 'More options' }).click();
-  await weaponEditor.getByRole('textbox', { name: 'New attack mode name' }).fill('Thrust');
-  await weaponEditor.getByRole('button', { name: 'Add attack mode' }).click();
-  await expect(weaponEditor.getByRole('textbox', { name: 'Mode name', exact: true })).toHaveValue(
-    'Thrust',
-  );
+  await expect(
+    weaponEditor.getByRole('textbox', { name: 'Attack name', exact: true }).first(),
+  ).toBeVisible();
+  await expect(weaponEditor.getByLabel('Mode key')).toHaveCount(0);
+  await weaponEditor.getByRole('textbox', { name: 'New alternate attack name' }).fill('Thrust');
+  await weaponEditor.getByRole('button', { name: 'Add alternate attack' }).click();
+  await expect(
+    weaponEditor.getByRole('textbox', { name: 'Attack name', exact: true }).last(),
+  ).toHaveValue('Thrust');
 
   await selectCharacterSection(page, 'Combat');
   const tracker = page.locator('.fold-section').filter({ hasText: 'Turn tracker' });

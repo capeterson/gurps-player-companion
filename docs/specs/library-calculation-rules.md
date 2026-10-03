@@ -154,10 +154,15 @@ automatic linkage or repricing.
 
 The resolver previews live results and modifiers. The server recalculates through
 the same pure engine, authorizes all source access, rejects changed revisions, and
-does not trust client-computed totals on resolved purchases. Legacy manual-price API calls without a pricing resolution retain their explicit paid values and remain without a new pricing snapshot; required unresolved inputs still reject adoption. Re-resolve pricing lives in the existing
-trait/inventory editor. Definition or dependency changes produce a changed-source
-state; prices stay saved until explicit acceptance. A deleted/detached source
-leaves a retained snapshot.
+does not trust client-computed totals on resolved purchases. Legacy manual-price
+API calls without a pricing resolution retain their explicit paid values and
+remain without a new pricing snapshot; required unresolved inputs still reject
+adoption. Recalculation lives in the existing trait/inventory editor, labeled
+**Recalculate points** / **Recalculate price**.
+The dialog identifies cost, weight and base points with player-facing labels and
+units in both saved and previewed results. Definition or dependency changes
+produce a changed-source state; prices stay saved until explicit acceptance. A
+deleted/detached source leaves a retained snapshot.
 
 Re-resolution uses one whole-entry character outbox patch containing values and
 snapshots together. Library authoring uses the same whole-entry outbox path.
@@ -182,6 +187,11 @@ resolved once during conversion. Modes in the new shape do not inherit omitted
 values from each other. A compatibility primary projection remains for old
 consumers. Weapon effects select stable `modeKey`; legacy mode names remain
 accepted. Item-level Parry/Block effects do not accept an attack-mode restriction.
+The character inventory editor preserves these stable keys internally and never
+exposes them as editable fields. It edits **Attack name** and **Source reference**
+instead, with automatic keys for newly added alternate attacks. Linked enchantment
+IDs/revisions likewise remain stored while the character editor shows source
+references and readable effect choices.
 
 Weapon, armor, shield, container, powerstone, magic-item and enchantment facets
 coexist on one physical item. The library editor offers visual attack modes and a
