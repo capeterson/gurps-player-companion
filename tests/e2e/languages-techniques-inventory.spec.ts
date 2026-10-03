@@ -455,7 +455,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   const itemEditor = page.getByRole('region', { name: 'Broadsword: Item details', exact: true });
   await itemEditor.getByLabel('Equipped', { exact: true }).check();
   await itemEditor.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(sword.getByText('Equipped', { exact: true })).toBeVisible();
+  await expect(
+    sword.getByRole('button', { name: 'Equipped: Broadsword', exact: true }).locator('svg'),
+  ).toBeVisible();
   await sword.getByRole('button', { name: 'Weapon settings for Broadsword', exact: true }).click();
   const weaponEditor = page.getByRole('region', { name: 'Broadsword: Weapon', exact: true });
   await expect(weaponEditor.getByLabel('Damage', { exact: true })).toHaveValue('sw+1 cut');
@@ -468,7 +470,7 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     await inside(page, inventory);
     await expect(sword.getByText('Broadsword', { exact: true })).toBeVisible();
     await expect(sword.locator('[data-label="Qty"]')).toHaveText('1');
-    await expect(sword.locator('[data-label="Weight (lb)"]')).toHaveText('3.0');
+    await expect(sword.locator('[data-label="Weight (lb)"]')).toHaveText('3');
     await expect(sword.locator('[data-label="Cost"]')).toHaveText('500');
     await inside(
       page,

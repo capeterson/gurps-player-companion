@@ -16,10 +16,16 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
-import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
+import {
+  VIEWPORT_OVERLAY_SHIFT_PROPERTY,
+  horizontalViewportShift,
+  useViewportBoundedOverlay,
+} from '../../hooks/useViewportBoundedOverlay.ts';
 
 interface InfoTooltipProps {
   children: ReactNode;
@@ -33,6 +39,8 @@ interface InfoTooltipProps {
   contentClassName?: string;
   /** Keep long lists reachable by pointer and keyboard inside the viewport. */
   scrollable?: boolean;
+  /** Escape clipping ancestors such as inventory tables. */
+  portal?: boolean;
 }
 
 export function InfoTooltip({
@@ -46,8 +54,10 @@ export function InfoTooltip({
   ariaControls,
   contentClassName = 'w-64',
   scrollable = false,
+  portal = false,
 }: InfoTooltipProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useViewportBoundedOverlay<HTMLDivElement>(open);
   const headerBottom = useAppHeaderBottom();
   const id = useId();
@@ -56,14 +66,18 @@ export function InfoTooltip({
   useEffect(() => {
     if (!open) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') {
+        if (portal && tooltipRef.current?.contains(document.activeElement))
+          triggerRef.current?.focus();
+        setOpen(false);
+      }
     };
     window.addEventListener('keydown', dismiss);
     return () => window.removeEventListener('keydown', dismiss);
-  }, [open]);
+  }, [open, portal, tooltipRef]);
 
   useLayoutEffect(() => {
-    if (!open || !scrollable) return;
+    if (!open || (!scrollable && !portal)) return;
     const update = () => {
       const element = tooltipRef.current;
       if (!element) return;
@@ -74,6 +88,18 @@ export function InfoTooltip({
       const top = Math.max(viewportTop, headerBottom) + 8;
       const bottom = viewportTop + (viewport?.height ?? window.innerHeight) - 8;
       element.style.maxHeight = `${Math.max(0, bottom - top)}px`;
+      if (portal) {
+        const anchor = triggerRef.current?.getBoundingClientRect();
+        if (!anchor) return;
+        element.style.left = `${anchor.left + anchor.width / 2}px`;
+        element.style.top = `${side === 'top' ? anchor.top - element.offsetHeight : anchor.bottom}px`;
+        const currentX =
+          Number.parseFloat(element.style.getPropertyValue(VIEWPORT_OVERLAY_SHIFT_PROPERTY)) || 0;
+        element.style.setProperty(
+          VIEWPORT_OVERLAY_SHIFT_PROPERTY,
+          `${horizontalViewportShift(element.getBoundingClientRect(), { left: viewport?.offsetLeft ?? 0, width: viewport?.width ?? window.innerWidth }, currentX)}px`,
+        );
+      }
       const currentShift =
         Number.parseFloat(element.style.getPropertyValue('--tooltip-shift-y')) || 0;
       const rect = element.getBoundingClientRect();
@@ -95,24 +121,72 @@ export function InfoTooltip({
       window.visualViewport?.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [open, scrollable, tooltipRef, headerBottom]);
+  }, [open, scrollable, portal, side, tooltipRef, headerBottom]);
 
   const positionClass =
     side === 'top' ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top';
 
+  const tooltip = open && (
+    <Container
+      ref={tooltipRef}
+      id={id}
+      role="tooltip"
+      tabIndex={scrollable ? 0 : undefined}
+      onClick={portal ? (event) => event.stopPropagation() : undefined}
+      onMouseLeave={
+        portal && scrollable
+          ? (event) => {
+              if (
+                !(
+                  event.relatedTarget instanceof Node &&
+                  triggerRef.current?.contains(event.relatedTarget)
+                )
+              )
+                setOpen(false);
+            }
+          : undefined
+      }
+      style={{
+        transform:
+          'translate(calc(-50% + var(--viewport-overlay-shift-x, 0px)), var(--tooltip-shift-y, 0px))',
+      }}
+      className={`${portal ? 'fixed z-[100]' : `absolute left-1/2 z-50 ${scrollable ? (side === 'top' ? 'bottom-full' : 'top-full') : positionClass}`} ${contentClassName} max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] rounded-lg border border-base-300 bg-base-100 p-3 text-xs text-base-content shadow-lg ${scrollable ? 'overflow-y-auto' : 'pointer-events-none'}`}
+    >
+      {content}
+    </Container>
+  );
+
   return (
     <Container
       className="relative inline-flex items-baseline"
-      onMouseLeave={scrollable ? () => setOpen(false) : undefined}
+      onMouseLeave={
+        scrollable
+          ? (event) => {
+              if (
+                !(
+                  event.relatedTarget instanceof Node &&
+                  (event.currentTarget.contains(event.relatedTarget) ||
+                    tooltipRef.current?.contains(event.relatedTarget))
+                )
+              )
+                setOpen(false);
+            }
+          : undefined
+      }
       onBlur={
         scrollable
           ? (event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+              if (
+                !event.currentTarget.contains(event.relatedTarget) &&
+                !tooltipRef.current?.contains(event.relatedTarget)
+              )
+                setOpen(false);
             }
           : undefined
       }
     >
       <button
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
         aria-expanded={ariaExpanded}
@@ -121,6 +195,12 @@ export function InfoTooltip({
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={scrollable ? undefined : () => setOpen(false)}
         onFocus={() => setOpen(true)}
+        onKeyDown={(event) => {
+          if (portal && scrollable && open && event.key === 'ArrowDown') {
+            event.preventDefault();
+            tooltipRef.current?.focus();
+          }
+        }}
         onBlur={scrollable ? undefined : () => setOpen(false)}
         onClick={(event) => {
           event.stopPropagation();
@@ -140,21 +220,7 @@ export function InfoTooltip({
       >
         {children}
       </button>
-      {open && (
-        <Container
-          ref={tooltipRef}
-          id={id}
-          role="tooltip"
-          tabIndex={scrollable ? 0 : undefined}
-          style={{
-            transform:
-              'translate(calc(-50% + var(--viewport-overlay-shift-x, 0px)), var(--tooltip-shift-y, 0px))',
-          }}
-          className={`absolute left-1/2 z-50 ${scrollable ? (side === 'top' ? 'bottom-full' : 'top-full') : positionClass} ${contentClassName} max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] [overflow-wrap:anywhere] rounded-lg border border-base-300 bg-base-100 p-3 text-xs text-base-content shadow-lg ${scrollable ? 'overflow-y-auto' : 'pointer-events-none'}`}
-        >
-          {content}
-        </Container>
-      )}
+      {tooltip && (portal ? createPortal(tooltip, document.body) : tooltip)}
     </Container>
   );
 }

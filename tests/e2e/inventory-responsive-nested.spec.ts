@@ -1,4 +1,4 @@
-import { type Locator, expect, test } from '@playwright/test';
+import { type Locator, type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
 import { selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
@@ -36,6 +36,44 @@ async function geometry(locator: Locator) {
       height: rect.height,
     };
   });
+}
+
+async function expectTooltipPainted(page: Page, tooltip: Locator) {
+  await expect(tooltip).toBeInViewport({ ratio: 1 });
+  const box = await geometry(tooltip);
+  const id = await tooltip.getAttribute('id');
+  expect(id).toBeTruthy();
+  const points = [
+    { x: box.x + 3, y: box.y + box.height / 2 },
+    { x: box.right - 3, y: box.y + box.height / 2 },
+    { x: box.x + box.width / 2, y: box.y + 3 },
+    { x: box.x + box.width / 2, y: box.bottom - 3 },
+  ];
+  const hits = await page.evaluate(
+    ({ tooltipId, samples }) =>
+      samples.map(({ x, y }) => {
+        const tooltip = document.getElementById(tooltipId ?? '');
+        const target = document.elementFromPoint(x, y);
+        return Boolean(tooltip && target && (target === tooltip || tooltip.contains(target)));
+      }),
+    { tooltipId: id, samples: points },
+  );
+  expect(hits).toEqual([true, true, true, true]);
+}
+
+async function verifyTooltipPointerAndFocus(page: Page, trigger: Locator, tooltip: Locator) {
+  const box = await geometry(tooltip);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(tooltip).toBeVisible();
+  await trigger.focus();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(tooltip).toBeFocused();
+  await expect(tooltip).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await page.mouse.move(2, (page.viewportSize()?.height ?? 568) / 2);
 }
 
 test('nested inventory names and expanded item controls stay in view at supported widths', async ({
@@ -180,7 +218,8 @@ test('nested inventory names and expanded item controls stay in view at supporte
             chipBox.height,
             `container label stays legible at ${viewport.width}`,
           ).toBeLessThanOrEqual(48);
-          await expect(settingsButton).toContainText('Container');
+          await expect(settingsButton).toHaveAccessibleName(/Container settings for /);
+          await expect(settingsButton.locator('svg')).toBeVisible();
         }
         await expect
           .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
@@ -344,6 +383,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
       { width: 639, height: 800 },
       { width: 640, height: 800 },
       { width: 641, height: 800 },
+      { width: 1440, height: 900 },
     ]) {
       await test.step(`inventory icon tooltips at ${viewport.width}×${viewport.height}`, async () => {
         await page.setViewportSize(viewport);
@@ -352,24 +392,48 @@ test('nested inventory names and expanded item controls stay in view at supporte
         let tooltip = page.getByRole('tooltip');
         await expect(tooltip).toContainText('Armor');
         let tooltipBox = await geometry(tooltip);
+        await expectTooltipPainted(page, tooltip);
         const banner = await page.getByRole('banner').boundingBox();
         expect(banner).not.toBeNull();
         expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
         expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
         expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
         expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
-        await page.mouse.move(2, viewport.height / 2);
+        await attachReviewScreenshot(
+          page,
+          testInfo,
+          `inventory-armor-tooltip-${viewport.width}x${viewport.height}`,
+          {
+            path: testInfo.outputPath(
+              `inventory-armor-tooltip-${viewport.width}x${viewport.height}.png`,
+            ),
+            animations: 'disabled',
+          },
+        );
+        await verifyTooltipPointerAndFocus(page, armorIcon, tooltip);
 
         await equippedIcon.scrollIntoViewIfNeeded();
         await equippedIcon.hover();
         tooltip = page.getByRole('tooltip');
         await expect(tooltip).toContainText('Equipped');
         tooltipBox = await geometry(tooltip);
+        await expectTooltipPainted(page, tooltip);
         expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
         expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
         expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
         expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
-        await page.mouse.move(2, viewport.height / 2);
+        await attachReviewScreenshot(
+          page,
+          testInfo,
+          `inventory-equipped-tooltip-${viewport.width}x${viewport.height}`,
+          {
+            path: testInfo.outputPath(
+              `inventory-equipped-tooltip-${viewport.width}x${viewport.height}.png`,
+            ),
+            animations: 'disabled',
+          },
+        );
+        await verifyTooltipPointerAndFocus(page, equippedIcon, tooltip);
       });
     }
 
@@ -442,9 +506,21 @@ test('nested inventory names and expanded item controls stay in view at supporte
       page
         .getByRole('region', { name: `${LANGUAGE_ITEM}: Container` })
         .getByLabel('Weight reduction (%)'),
-    ).toHaveValue('5');
+    ).toHaveCount(0);
     await multiCategoryRow
       .getByRole('button', { name: `Container settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
+      .click();
+    await expect(
+      page
+        .getByRole('region', { name: `${LANGUAGE_ITEM}: Armor` })
+        .getByLabel('Weight reduction (%)'),
+    ).toHaveValue('5');
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
       .click();
 
     await multiCategoryRow

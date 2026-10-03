@@ -147,6 +147,7 @@ export function InventoryRow(props: InventoryRowProps) {
         triggerClassName={`inventory-category-icon btn btn-ghost btn-sm ${section === category ? 'text-primary bg-primary/10' : 'text-base-content/65'}`}
         contentClassName="w-64"
         scrollable
+        portal
         {...(canEdit
           ? {
               onTriggerClick: (event: MouseEvent<HTMLButtonElement>) =>
@@ -301,6 +302,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   triggerClassName="inventory-equipped-icon btn btn-ghost btn-sm text-secondary"
                   contentClassName="w-52"
                   scrollable
+                  portal
                   content={
                     <>
                       <strong className="block">Equipped</strong>

@@ -312,7 +312,8 @@ root-location flag for compatibility, not an equipment status. Every applied
 category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
 Magic item, Enchantments); no category is hidden by a priority icon. Category
 icons open the existing editor and reveal names/details on hover or focus through
-`InfoTooltip`. Equipped uses a separate check-circle icon with a tooltip.
+`InfoTooltip`, portaled above the table so clipping ancestors cannot hide content.
+Equipped uses a separate check-circle icon with a tooltip.
 Read-only category icons retain labels and tooltips, with the existing Details action.
 The move menu
 wraps long container names, scrolls internally, and uses shared viewport collision
