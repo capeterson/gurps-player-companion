@@ -19,13 +19,17 @@ const PACK_NAME = 'UnbrokenTrailPackName'.repeat(4);
 const POUCH_NAME = 'UnbrokenInnerPouchName'.repeat(3);
 const CASE_NAME = 'UnbrokenSmallCaseName'.repeat(3);
 const ITEM_NAME = 'UnbrokenInventoryItemName'.repeat(4);
+const LANGUAGE_ITEM = 'Long name inventory editor test item '.repeat(3).trim();
+const ENCHANTMENT_NAME = 'LongNameCampaignEnchantmentForReadableOption '.repeat(3).trim();
 
 async function geometry(locator: Locator) {
   return locator.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     return {
       x: rect.x,
+      y: rect.y,
       right: rect.right,
+      bottom: rect.bottom,
       width: rect.width,
       clientWidth: element.clientWidth,
       scrollWidth: element.scrollWidth,
@@ -260,6 +264,216 @@ test('nested inventory names and expanded item controls stay in view at supporte
         }
         await page.mouse.click(2, viewport.height / 2);
         await expect(moveMenu).not.toBeVisible();
+      });
+    }
+
+    const enchantment = await create<{ id: string; revision: number }>(
+      `/campaigns/${campaignId}/library/enchantments`,
+      {
+        name: ENCHANTMENT_NAME,
+        source: 'M66',
+        tags: ['weapon'],
+        applicability: 'weapon',
+        effects: [{ target: 'weapon_attack', value: 1 }],
+        levels: [],
+        stackingPolicy: { kind: 'stack' },
+      },
+    );
+    const multiCategoryItem = await create<{ item: { id: string } }>(
+      `/characters/${character.id}/inventory`,
+      {
+        name: LANGUAGE_ITEM,
+        worn: true,
+        equipped: true,
+        isContainer: true,
+        hideawayCapacityLbs: 2,
+        weightReductionPercent: 5,
+        isArmor: true,
+        armor: { dr: 2, locations: ['torso'] },
+        weaponData: {
+          damage: 'sw cut',
+          modes: [
+            { key: 'primary-stable-id', name: 'Swing', sourceRow: 'B404', damage: 'sw cut' },
+            {
+              key: 'alternate-stable-id',
+              name: 'Thrust',
+              sourceRow: 'B405',
+              damage: 'thr imp',
+            },
+          ],
+        },
+        powerstoneData: { currentEnergy: 3, maxEnergy: 10 },
+        magicItemData: {
+          spellName: 'Light',
+          spellSkillLevel: 12,
+          mode: 'continuous',
+        },
+        enchantments: [
+          {
+            spellName: ENCHANTMENT_NAME,
+            level: 2,
+            definitionId: enchantment.id,
+            definitionRevision: enchantment.revision,
+            definitionSource: 'M66',
+            mechanics: {
+              applicability: 'weapon',
+              effects: [{ target: 'weapon_attack', value: 1 }],
+              levels: [],
+              stackingPolicy: { kind: 'stack' },
+            },
+          },
+        ],
+      },
+    );
+    await page.goto(`/characters/${character.id}`);
+    await selectCharacterSection(page, 'Inventory');
+    const multiCategoryRow = page.locator(`#inventory-${multiCategoryItem.item.id}`);
+    await expect(multiCategoryRow).toBeVisible();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
+      .click();
+    const armor = page.getByRole('region', { name: `${LANGUAGE_ITEM}: Armor` });
+    await expect(armor.getByRole('textbox', { name: 'DR' })).toHaveValue('2');
+    await multiCategoryRow
+      .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Weapon settings for ${LANGUAGE_ITEM}` })
+      .click();
+    const weapon = page.getByRole('region', { name: `${LANGUAGE_ITEM}: Weapon` });
+    await expect(weapon.getByRole('textbox', { name: 'Attack name' }).first()).toHaveValue('Swing');
+    await expect(weapon.getByRole('textbox', { name: 'Source reference' }).first()).toHaveValue(
+      'B404',
+    );
+    await expect(weapon.getByRole('group', { name: 'Alternate attack 1' })).toBeVisible();
+    await expect(weapon.getByLabel(/(mode|attack).*key/i)).toHaveCount(0);
+    const editorScroller = weapon.locator(
+      'xpath=ancestor::div[contains(@class, "overflow-x-auto")][1]',
+    );
+    const primaryName = weapon.getByRole('textbox', { name: 'Attack name' }).first();
+    const primarySource = weapon.getByRole('textbox', { name: 'Source reference' }).first();
+    const alternateAttack = weapon.getByRole('group', { name: 'Alternate attack 1' });
+    for (const viewport of [
+      { width: 320, height: 800 },
+      { width: 639, height: 800 },
+      { width: 640, height: 800 },
+      { width: 641, height: 800 },
+      { width: 1280, height: 800 },
+    ]) {
+      await test.step(`weapon editor at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await weapon.scrollIntoViewIfNeeded();
+        const editorBox = await geometry(weapon);
+        const scrollerBox = await geometry(editorScroller);
+        expect(editorBox.x).toBeGreaterThanOrEqual(scrollerBox.x);
+        expect(editorBox.right).toBeLessThanOrEqual(scrollerBox.right);
+        for (const control of [primaryName, primarySource, alternateAttack]) {
+          await expect(control).toBeVisible();
+          const controlBox = await geometry(control);
+          expect(controlBox.x).toBeGreaterThanOrEqual(editorBox.x);
+          expect(controlBox.right).toBeLessThanOrEqual(editorBox.right);
+        }
+        if ([320, 640, 1280].includes(viewport.width)) {
+          await attachReviewScreenshot(
+            weapon,
+            testInfo,
+            `inventory-weapon-editor-${viewport.width}`,
+            {
+              path: testInfo.outputPath(`inventory-weapon-editor-${viewport.width}.png`),
+              animations: 'disabled',
+            },
+          );
+        }
+      });
+    }
+    await multiCategoryRow
+      .getByRole('button', { name: `Weapon settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Container settings for ${LANGUAGE_ITEM}` })
+      .click();
+    await expect(
+      page
+        .getByRole('region', { name: `${LANGUAGE_ITEM}: Container` })
+        .getByLabel('Weight reduction (%)'),
+    ).toHaveValue('5');
+    await multiCategoryRow
+      .getByRole('button', { name: `Container settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Powerstone settings for ${LANGUAGE_ITEM}` })
+      .click();
+    await expect(
+      page
+        .getByRole('region', { name: `${LANGUAGE_ITEM}: Powerstone` })
+        .getByLabel('Current energy'),
+    ).toHaveValue('3');
+    await multiCategoryRow
+      .getByRole('button', { name: `Powerstone settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Magic item settings for ${LANGUAGE_ITEM}` })
+      .click();
+    const magicItem = page.getByRole('region', { name: `${LANGUAGE_ITEM}: Magic item` });
+    await expect(magicItem.getByLabel('Activation').locator('option')).toHaveText([
+      'Uses charges',
+      'Uses energy',
+      'Always on',
+    ]);
+    await expect(magicItem.getByRole('combobox', { name: 'Activation' })).toHaveValue('continuous');
+    await multiCategoryRow
+      .getByRole('button', { name: `Magic item settings for ${LANGUAGE_ITEM}` })
+      .click();
+
+    await multiCategoryRow
+      .getByRole('button', { name: `Enchantments settings for ${LANGUAGE_ITEM}` })
+      .click();
+    const enchantments = page.getByRole('region', { name: `${LANGUAGE_ITEM}: Enchantments` });
+    await expect(enchantments.getByLabel('Enchantment level')).toHaveValue('2');
+    await expect(enchantments.getByText('Source: M66')).toBeVisible();
+    await expect(enchantments).not.toContainText(/revision|snapshot|follows library|retained/i);
+    await enchantments.getByText('Source: M66').scrollIntoViewIfNeeded();
+    const newEnchantment = enchantments.getByLabel('New enchantment name');
+    await newEnchantment.fill(ENCHANTMENT_NAME.slice(0, 28));
+    const optionList = page.getByRole('listbox');
+    await expect(optionList).toBeVisible({ timeout: 20_000 });
+    for (const viewport of [
+      { width: 320, height: 800 },
+      { width: 639, height: 800 },
+      { width: 640, height: 800 },
+      { width: 641, height: 800 },
+      { width: 1280, height: 800 },
+    ]) {
+      await test.step(`enchantment option at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        const box = await geometry(optionList);
+        expect(box.x, `option starts onscreen at ${viewport.width}`).toBeGreaterThanOrEqual(0);
+        expect(box.right, `option ends onscreen at ${viewport.width}`).toBeLessThanOrEqual(
+          viewport.width,
+        );
+        expect(box.y, `option starts onscreen at ${viewport.height}`).toBeGreaterThanOrEqual(0);
+        expect(box.bottom, `option ends onscreen at ${viewport.height}`).toBeLessThanOrEqual(
+          viewport.height,
+        );
+        expect(box.width).toBeGreaterThan(0);
+        await expect(optionList).toContainText('Weapons');
+        if ([320, 640, 1280].includes(viewport.width)) {
+          await attachReviewScreenshot(
+            page,
+            testInfo,
+            `inventory-enchantment-options-${viewport.width}`,
+            {
+              path: testInfo.outputPath(`inventory-enchantment-options-${viewport.width}.png`),
+              fullPage: false,
+              animations: 'disabled',
+            },
+          );
+        }
       });
     }
   } finally {

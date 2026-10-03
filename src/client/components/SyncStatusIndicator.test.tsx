@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe('SyncStatusIndicator recovery action', () => {
-  it('shows a filled green gem only when synced and the WebSocket is connected', async () => {
+  it('shows a filled green gem when synced and the WebSocket is connected', async () => {
     websocket.state = 'connected';
     const user = userEvent.setup();
     const view = renderIndicator();
@@ -78,19 +78,50 @@ describe('SyncStatusIndicator recovery action', () => {
     }
   });
 
-  it('prioritizes syncing, offline, and errors over a connected socket', async () => {
+  it('keeps the connected gem green while syncing and removes the fill on disconnect', async () => {
+    websocket.state = 'connected';
+    const view = renderIndicator();
+    syncStateStore.reset('syncing');
+    const syncing = await screen.findByRole('button', { name: 'Syncing changes' });
+    expect(syncing).toHaveClass('text-primary');
+    expect(syncing.querySelector('svg > g')).toHaveClass('sync-symbol-orbit');
+    expect(syncing.querySelector('svg > path')).toHaveAttribute('fill', 'currentColor');
+    expect(syncing.querySelector('svg > path')).toHaveClass('text-success');
+
+    websocket.state = 'reconnecting';
+    view.rerender(<SyncStatusIndicator />);
+    expect(syncing.querySelector('svg > path')).toHaveAttribute('fill', 'none');
+    expect(syncing.querySelector('svg > path')).not.toHaveClass('text-success');
+    expect(syncing.querySelector('svg > g')).toHaveClass('sync-symbol-orbit');
+
+    websocket.state = 'connected';
+    view.rerender(<SyncStatusIndicator />);
+    expect(syncing.querySelector('svg > path')).toHaveAttribute('fill', 'currentColor');
+    syncStateStore.reset('synced');
+    const saved = await screen.findByRole('button', {
+      name: 'All changes saved — live updates connected',
+    });
+    expect(saved.querySelector('svg > path')).toHaveClass('text-success');
+    expect(saved.querySelector('svg > g')).not.toHaveClass('sync-symbol-orbit');
+  });
+
+  it('prioritizes offline and error symbols over a connected socket', async () => {
     websocket.state = 'connected';
     renderIndicator();
     syncStateStore.reset('syncing');
     expect(await screen.findByRole('button', { name: 'Syncing changes' })).toBeVisible();
     window.dispatchEvent(new Event('offline'));
-    expect(
-      await screen.findByRole('button', { name: 'Offline — changes saved on this device' }),
-    ).toBeVisible();
+    const offline = await screen.findByRole('button', {
+      name: 'Offline — changes saved on this device',
+    });
+    expect(offline).toBeVisible();
+    expect(offline.querySelector('svg > path')).not.toHaveClass('text-success');
     syncStateStore.setError('Server unavailable');
-    expect(
-      await screen.findByRole('button', { name: 'Some changes failed to sync (offline)' }),
-    ).toBeVisible();
+    const failed = await screen.findByRole('button', {
+      name: 'Some changes failed to sync (offline)',
+    });
+    expect(failed).toBeVisible();
+    expect(failed.querySelector('svg > path')).not.toHaveClass('text-success');
   });
 
   it('opens the sync log from the normal synced state', async () => {

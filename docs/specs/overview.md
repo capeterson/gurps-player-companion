@@ -600,6 +600,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   chip again collapses it. The pencil opens basic item details in the same
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
+  Attack IDs stay internal; editors show **Attack name**, **Source reference**,
+  and ordinary stat labels for each alternate attack. Enchantments identify their
+  source and use readable stat-effect choices without revision/snapshot text.
+  Range and magic activation choices use player-facing labels. **Recalculate price**
+  opens the existing pricing dialog with labeled cost/weight results and units;
+  trait pricing similarly uses **Recalculate points**.
   **+ Category**, in the pencil's item-details editor, adds another role
   without changing siblings, location or equipped state. Category removal has a separate inline confirmation; containers with
   contents must be emptied first. Read-only viewers see summary badges only.
@@ -1099,7 +1105,8 @@ settings sections; switching sections retains drafts.
 - **Sync status indicator and log** (header): a quiet etched arrow orbit replaces
   filled success/warning badges. Synced uses a still outline gem and muted ink;
   a connected WebSocket fills the gem with success green while the orbit stays muted.
-  Syncing rotates primary-colored arrows around the gem; offline uses a neutral pause mark; errors
+  Syncing rotates primary-colored arrows around the gem, which stays green while
+  the WebSocket is connected; offline uses a neutral pause mark; errors
   use a copper exclamation and take precedence if the browser is also offline.
   Hover/focus text and the accessible name describe the state. An error always
   names its reason (in the tooltip and in a banner at the top of the log) rather than pointing at a toast that may never

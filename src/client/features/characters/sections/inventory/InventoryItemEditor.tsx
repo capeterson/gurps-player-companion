@@ -54,6 +54,26 @@ const DR_TYPES = {
   tox: 'Toxic',
 };
 
+const ENCHANTMENT_EFFECT_LABELS: Record<EnchantmentEffectTarget, string> = {
+  weapon_attack: 'Attack roll bonus',
+  weapon_damage: 'Weapon damage bonus',
+  weapon_accuracy: 'Accuracy bonus',
+  weapon_parry: 'Parry bonus',
+  weapon_block: 'Block bonus',
+  armor_divisor: 'Armor divisor',
+  dr: 'Damage resistance (DR)',
+  db: 'Defense bonus (DB)',
+  weight_reduction_percent: 'Weight reduction (%)',
+  skill: 'Skill bonus',
+};
+
+const ENCHANTMENT_APPLICABILITY_LABELS = {
+  any: 'Any item',
+  weapon: 'Weapons',
+  armor: 'Armor',
+  shield: 'Shields',
+} as const;
+
 function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec[] {
   switch (section) {
     case 'basics':
@@ -84,9 +104,8 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
     case 'weapon':
       return [
         { path: 'weaponData.damage', label: 'Damage' },
-        { path: 'weaponData.modes.0.key', label: 'Primary mode key', advanced: true },
-        { path: 'weaponData.modes.0.name', label: 'Primary mode name', advanced: true },
-        text('weaponData.modes.0.sourceRow', 'Primary source row', true),
+        { path: 'weaponData.modes.0.name', label: 'Attack name', advanced: true },
+        text('weaponData.modes.0.sourceRow', 'Source reference', true),
         text('weaponData.skill', 'Governing skill'),
         text('weaponData.reach', 'Reach'),
         text('weaponData.parry', 'Parry'),
@@ -96,6 +115,7 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
           path: 'weaponData.wieldedSide',
           label: 'Shield side',
           choices: ['left', 'right'],
+          emptyChoiceLabel: 'All directions',
           optional: true,
           advanced: true,
         },
@@ -126,6 +146,11 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
           path: 'magicItemData.mode',
           label: 'Activation',
           choices: ['charged', 'powered', 'continuous'],
+          choiceLabels: {
+            charged: 'Uses charges',
+            powered: 'Uses energy',
+            continuous: 'Always on',
+          },
         },
         // Keep populated fields visible even after the activation mode changes.
         number(
@@ -276,7 +301,7 @@ function ItemListEditor({
   const enchantments = kind === 'enchantments';
   const list = enchantments ? item.enchantments : (item.weaponData?.alternateModes ?? []);
   const limit = enchantments ? 50 : 19;
-  const title = enchantments ? 'Enchantment' : 'Attack mode';
+  const title = enchantments ? 'Enchantment' : 'Alternate attack';
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   return (
     <div
@@ -287,8 +312,8 @@ function ItemListEditor({
       <h4 className="label-eyebrow">{enchantments ? 'Enchantments' : 'Alternate attacks'}</h4>
       {enchantments && (
         <p className="text-xs text-base-content/60">
-          Equipment bonuses apply while this item is equipped. Weight reductions apply to carried
-          weight. Older note-only records remain non-mechanical.
+            Choose an effect to change stats while this item is equipped. Choose Note only to
+            record an enchantment without changing stats.
         </p>
       )}
       {list.map((listEntry, index) => {
@@ -299,46 +324,43 @@ function ItemListEditor({
           ? [
               { path: `${prefix}.spellName`, label: 'Spell name' },
               number(`${prefix}.spellLevel`, 'Enchanter skill level', true, true),
-              number(`${prefix}.level`, 'Mechanical level', true, true),
+              number(`${prefix}.level`, 'Enchantment level', true, true),
               text(`${prefix}.category`, 'Enchantment label', true),
               text(`${prefix}.notes`, 'Enchantment notes', true),
             ]
           : [
-              { path: `${prefix}.name`, label: 'Mode name' },
-              { path: `${prefix}.key`, label: 'Mode key', advanced: true },
-              text(`${prefix}.skill`, 'Mode governing skill', true),
-              number(`${prefix}.stRequired`, 'Mode ST required', true, true),
-              number(`${prefix}.ranged.acc`, 'Mode accuracy', true, true),
-              { path: `${prefix}.ranged.range`, label: 'Mode range', kind: 'range' },
-              text(`${prefix}.ranged.rof`, 'Mode rate of fire', true),
-              text(`${prefix}.ranged.shots`, 'Mode shots', true),
-              number(`${prefix}.ranged.bulk`, 'Mode bulk', true, true),
-              number(`${prefix}.ranged.recoil`, 'Mode recoil', true, true),
-              text(`${prefix}.sourceRow`, 'Mode source row', true),
-              { path: `${prefix}.damage`, label: 'Mode damage' },
-              text(`${prefix}.reach`, 'Mode reach', true),
-              text(`${prefix}.parry`, 'Mode parry', true),
-              text(`${prefix}.notes`, 'Mode notes', true),
+              { path: `${prefix}.name`, label: 'Attack name' },
+              text(`${prefix}.skill`, 'Governing skill', true),
+              number(`${prefix}.stRequired`, 'ST required', true, true),
+              number(`${prefix}.ranged.acc`, 'Accuracy', true, true),
+              { path: `${prefix}.ranged.range`, label: 'Range', kind: 'range' },
+              text(`${prefix}.ranged.rof`, 'Rate of fire', true),
+              text(`${prefix}.ranged.shots`, 'Shots', true),
+              number(`${prefix}.ranged.bulk`, 'Bulk', true, true),
+              number(`${prefix}.ranged.recoil`, 'Recoil', true, true),
+              text(`${prefix}.sourceRow`, 'Source reference', true),
+              { path: `${prefix}.damage`, label: 'Damage' },
+              text(`${prefix}.reach`, 'Reach', true),
+              text(`${prefix}.parry`, 'Parry', true),
+              text(`${prefix}.notes`, 'Notes', true),
             ];
         // Commits start a storage transaction on blur, before structural buttons
         // run. The list version key prevents a removed row's hooks moving to its successor.
         return (
           <fieldset
             key={`${list.length}:${index}`}
-            className="border border-base-300 rounded-lg p-3 space-y-3"
+            className="min-w-0 border border-base-300 rounded-lg p-3 space-y-3"
           >
             <legend className="text-xs px-2">
               {title} {index + 1}
             </legend>
-            {enchantments &&
-              'definitionRevision' in listEntry &&
-              listEntry.definitionRevision != null && (
-                <p className="text-xs text-base-content/60">
-                  Campaign snapshot revision {listEntry.definitionRevision}
-                  {listEntry.definitionSource ? ` · ${listEntry.definitionSource}` : ''}
-                  {listEntry.definitionId == null ? ' · retained' : ' · follows library'}
-                </p>
-              )}
+            {enchantments && 'spellName' in listEntry && (
+              <p className="text-xs text-base-content/60">
+                Source:{' '}
+                {listEntry.definitionSource ||
+                  (listEntry.definitionId ? 'Campaign library' : 'Character sheet')}
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {specs.map((spec) => (
                 <ItemField
@@ -491,12 +513,14 @@ function ItemListEditor({
             renderOption={(definition) => (
               <div className="flex items-baseline justify-between gap-2">
                 <span>{definition.name}</span>
-                <span className="text-xs text-base-content/60">{definition.applicability}</span>
+                <span className="text-xs text-base-content/60">
+                  {ENCHANTMENT_APPLICABILITY_LABELS[definition.applicability]}
+                </span>
               </div>
             )}
             placeholder="Campaign enchantment or custom name"
             aria-label="New enchantment name"
-            className="min-w-[15rem] flex-1"
+            className="min-w-0 flex-[1_1_15rem]"
           />
         ) : (
           <input
@@ -519,20 +543,9 @@ function ItemListEditor({
               className="select select-sm select-bordered"
             >
               <option value="">Note only</option>
-              {[
-                'weapon_attack',
-                'weapon_damage',
-                'weapon_accuracy',
-                'weapon_parry',
-                'weapon_block',
-                'armor_divisor',
-                'dr',
-                'db',
-                'weight_reduction_percent',
-                'skill',
-              ].map((target) => (
+              {Object.entries(ENCHANTMENT_EFFECT_LABELS).map(([target, label]) => (
                 <option key={target} value={target}>
-                  {target.replaceAll('_', ' ')}
+                  {label}
                 </option>
               ))}
             </select>
@@ -714,9 +727,6 @@ export function InventoryItemEditor({
             {more ? 'Fewer options' : 'More options'}
           </button>
         )}
-        <p className="text-xs text-base-content/50">
-          Changes save as you leave each field. Filled options stay visible.
-        </p>
         {category &&
           (removing ? (
             <div className="border border-error/40 rounded-lg p-3 flex flex-wrap items-center gap-2">
@@ -767,7 +777,8 @@ export function InventoryItemEditor({
   return (
     <section
       aria-label={`${item.name}: ${section === 'basics' ? 'Item details' : section === 'add' ? 'Add category' : CATEGORY_LABELS[section]}`}
-      className="field-rollback-flash rounded-xl border border-base-300 bg-base-200/60 p-3 sm:p-5 space-y-4"
+      // The spanning editor must not set the table's intrinsic column widths.
+      className="field-rollback-flash min-w-0 [contain:inline-size] rounded-xl border border-base-300 bg-base-200/60 p-3 sm:p-5 space-y-4"
       {...flash.flashProps}
     >
       <div className="flex items-start justify-between gap-3">

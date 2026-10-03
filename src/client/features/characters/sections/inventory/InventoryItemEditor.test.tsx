@@ -294,11 +294,13 @@ describe('inline inventory editing', () => {
     expect((await stored()).armor?.dr).toBe(2);
   });
 
-  it('adds an alternate attack mode when randomUUID is unavailable', async () => {
+  it('adds an alternate attack when randomUUID is unavailable', async () => {
     const user = await setup({ weaponData: weaponData.parse({ damage: 'sw cut' }) });
     await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
     await user.click(screen.getByRole('button', { name: 'More options' }));
-    await user.type(screen.getByRole('textbox', { name: 'New attack mode name' }), 'Thrust');
+    expect(screen.getByRole('textbox', { name: 'Attack name' })).toBeVisible();
+    expect(screen.queryAllByLabelText(/(mode|attack).*key/i)).toHaveLength(0);
+    await user.type(screen.getByRole('textbox', { name: 'New alternate attack name' }), 'Thrust');
     vi.stubGlobal('crypto', {
       getRandomValues: (bytes: Uint8Array) => {
         bytes.fill(7);
@@ -306,7 +308,7 @@ describe('inline inventory editing', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Add attack mode' }));
+    await user.click(screen.getByRole('button', { name: 'Add alternate attack' }));
 
     await waitFor(async () => {
       const modes = (await stored()).weaponData?.modes;
@@ -315,6 +317,85 @@ describe('inline inventory editing', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       );
     });
+  });
+
+  it('keeps stable attack keys and source references while renaming, editing, adding, and removing attacks', async () => {
+    const user = await setup({
+      weaponData: weaponData.parse({
+        modes: [
+          { key: 'primary-stable-id', name: 'Swing', damage: 'sw cut', sourceRow: 'B404' },
+          { key: 'alternate-stable-id', name: 'Thrust', damage: 'thr imp', sourceRow: 'B405' },
+        ],
+        damage: 'sw cut',
+      }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+
+    const weapon = screen.getByRole('region', { name: 'Coat: Weapon' });
+    const primaryName = within(weapon).getAllByRole('textbox', { name: 'Attack name' })[0];
+    const primarySource = within(weapon).getAllByRole('textbox', { name: 'Source reference' })[0];
+    if (!primaryName || !primarySource) {
+      throw new Error('Expected primary attack fields');
+    }
+    expect(primaryName).toHaveValue('Swing');
+    expect(primarySource).toHaveValue('B404');
+    expect(screen.queryAllByLabelText(/(mode|attack).*key/i)).toHaveLength(0);
+
+    await user.clear(primaryName);
+    await user.type(primaryName, 'Heavy swing');
+    fireEvent.blur(primaryName);
+    await user.clear(primarySource);
+    await user.type(primarySource, 'B404, p. 4');
+    fireEvent.blur(primarySource);
+
+    const alternate = screen.getByRole('group', { name: 'Alternate attack 1' });
+    const alternateName = within(alternate).getByRole('textbox', { name: 'Attack name' });
+    await user.clear(alternateName);
+    await user.type(alternateName, 'Quick thrust');
+    fireEvent.blur(alternateName);
+    const alternateSource = within(alternate).getByRole('textbox', { name: 'Source reference' });
+    await user.clear(alternateSource);
+    await user.type(alternateSource, 'B405, p. 12');
+    fireEvent.blur(alternateSource);
+    const alternateDamage = within(alternate).getByRole('textbox', { name: 'Damage' });
+    await user.clear(alternateDamage);
+    await user.type(alternateDamage, 'thr+1 imp');
+    fireEvent.blur(alternateDamage);
+    await waitFor(async () => {
+      expect((await stored()).weaponData?.modes?.[0]).toMatchObject({
+        key: 'primary-stable-id',
+        name: 'Heavy swing',
+        sourceRow: 'B404, p. 4',
+      });
+      expect((await stored()).weaponData?.modes?.[1]).toMatchObject({
+        key: 'alternate-stable-id',
+        name: 'Quick thrust',
+        sourceRow: 'B405, p. 12',
+        damage: 'thr+1 imp',
+      });
+    });
+
+    await user.type(screen.getByRole('textbox', { name: 'New alternate attack name' }), 'Pommel');
+    await user.click(screen.getByRole('button', { name: 'Add alternate attack' }));
+    await waitFor(async () => expect((await stored()).weaponData?.modes).toHaveLength(3));
+    const afterAdd = (await stored()).weaponData?.modes ?? [];
+    expect(afterAdd[0]).toMatchObject({
+      key: 'primary-stable-id',
+      name: 'Heavy swing',
+      sourceRow: 'B404, p. 4',
+    });
+    expect(afterAdd[1]).toMatchObject({ key: 'alternate-stable-id', name: 'Quick thrust' });
+    expect(afterAdd[2]).toMatchObject({ name: 'Pommel' });
+    expect(afterAdd[2]?.key).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Remove alternate attack 1' }));
+    await user.click(screen.getByRole('button', { name: /^Remove$/ }));
+    await waitFor(async () => expect((await stored()).weaponData?.modes).toHaveLength(2));
+    expect((await stored()).weaponData?.modes).toMatchObject([
+      { key: 'primary-stable-id', name: 'Heavy swing', sourceRow: 'B404, p. 4' },
+      { name: 'Pommel' },
+    ]);
   });
 
   it('shows populated ranged fields, shield side, DB zero and alternate modes without More options', async () => {
@@ -330,12 +411,19 @@ describe('inline inventory editing', () => {
     await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
     expect(screen.getByRole('textbox', { name: 'Shield defense bonus' })).toHaveValue('0');
     expect(screen.getByRole('combobox', { name: 'Shield side' })).toHaveValue('left');
-    expect(screen.getByRole('textbox', { name: 'Accuracy' })).toHaveValue('0');
+    expect(screen.getAllByRole('textbox', { name: 'Accuracy' })[0]).toHaveValue('0');
     expect(screen.getAllByRole('combobox', { name: 'Range' })[0]).toHaveValue('fixed');
     expect(screen.getAllByRole('spinbutton', { name: '1/2D (yd)' })[0]).toHaveValue(100);
     expect(screen.getAllByRole('spinbutton', { name: 'Max (yd)' })[0]).toHaveValue(150);
-    expect(screen.getByRole('textbox', { name: 'Mode reach' })).toHaveValue('1');
-    await change('Governing skill', 'Broadsword');
+    expect(screen.getAllByRole('textbox', { name: 'Reach' }).at(-1)).toHaveValue('1');
+    const governingSkill = within(
+      screen.getByRole('region', { name: 'Coat: Weapon' }),
+    ).getAllByLabelText('Governing skill')[0];
+    if (!governingSkill) {
+      throw new Error('Expected primary governing skill field');
+    }
+    fireEvent.change(governingSkill, { target: { value: 'Broadsword' } });
+    fireEvent.blur(governingSkill);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Shield side' }), 'right');
     await waitFor(async () => expect((await stored()).weaponData?.skill).toBe('Broadsword'));
     await waitFor(async () => expect((await stored()).weaponData?.wieldedSide).toBe('right'));
@@ -403,22 +491,39 @@ describe('inline inventory editing', () => {
     await waitFor(() =>
       expect(screen.getByRole('spinbutton', { name: 'Max (yd)' })).toHaveValue(200),
     );
-    expect(screen.getByRole('textbox', { name: 'Accuracy' })).toHaveValue('3');
+    expect(screen.getAllByRole('textbox', { name: 'Accuracy' })[0]).toHaveValue('3');
   });
 
   it('retains existing enchantments and exposes their populated optional fields', async () => {
     const user = await setup({
-      enchantments: [{ spellName: 'Fortify', spellLevel: 0, category: '+3', notes: 'Old runes' }],
+      enchantments: [
+        {
+          spellName: 'Fortify',
+          spellLevel: 0,
+          level: 2,
+          category: '+3',
+          notes: 'Old runes',
+          definitionId: '0193b3c0-f1f0-7000-8000-00000000e002',
+          definitionRevision: 7,
+          definitionSource: 'M66',
+        },
+      ],
     });
     await user.click(screen.getByRole('button', { name: 'Enchantments settings for Coat' }));
     expect(screen.getByRole('textbox', { name: 'Enchanter skill level' })).toHaveValue('0');
+    expect(screen.getByRole('textbox', { name: 'Enchantment level' })).toHaveValue('2');
     expect(screen.getByRole('textbox', { name: 'Enchantment label' })).toHaveValue('+3');
+    expect(screen.getByText('Source: M66')).toBeVisible();
+    expect(screen.queryByText(/revision|snapshot|follows library|retained/i)).toBeNull();
     await change('Spell name', 'Deflect');
     await waitFor(async () => expect((await stored()).enchantments[0]?.spellName).toBe('Deflect'));
     expect((await stored()).enchantments[0]).toMatchObject({
       spellLevel: 0,
       category: '+3',
       notes: 'Old runes',
+      definitionId: '0193b3c0-f1f0-7000-8000-00000000e002',
+      definitionRevision: 7,
+      definitionSource: 'M66',
     });
   });
 
@@ -441,9 +546,12 @@ describe('inline inventory editing', () => {
     const fetchOptions = vi.fn(async () => [definition]);
     const user = await setup({ enchantments: [{ spellName: 'Legacy note' }] }, true, fetchOptions);
     await user.click(screen.getByRole('button', { name: 'Enchantments settings for Coat' }));
+    expect(screen.getByText('Source: Character sheet')).toBeVisible();
     const name = screen.getByLabelText('New enchantment name');
     await user.type(name, 'Fort');
-    await user.click(await screen.findByRole('option', { name: /Fortify/ }));
+    const definitionOption = await screen.findByRole('option', { name: /Fortify/ });
+    expect(definitionOption).toHaveTextContent('Armor');
+    await user.click(definitionOption);
     await user.click(screen.getByRole('button', { name: 'Add enchantment' }));
     await waitFor(async () =>
       expect((await stored()).enchantments[1]).toMatchObject({
@@ -456,8 +564,13 @@ describe('inline inventory editing', () => {
         },
       }),
     );
+    expect(screen.getByText('Source: M66')).toBeVisible();
+    expect(screen.queryByText(/revision|snapshot|follows library|retained/i)).toBeNull();
 
     await user.type(screen.getByLabelText('New enchantment name'), 'Local ward');
+    expect(screen.getByLabelText('Custom enchantment effect')).toHaveTextContent(
+      'Damage resistance (DR)',
+    );
     await user.selectOptions(screen.getByLabelText('Custom enchantment effect'), 'dr');
     const value = screen.getByLabelText('Custom enchantment value');
     await user.clear(value);
@@ -477,5 +590,23 @@ describe('inline inventory editing', () => {
     expect(
       screen.queryByRole('button', { name: /settings for|Add category|Edit Coat/ }),
     ).toBeNull();
+  });
+
+  it('shows plain language activation choices and shield direction', async () => {
+    const user = await setup({
+      magicItemData: {
+        spellName: 'Light',
+        spellSkillLevel: 12,
+        mode: 'powered',
+        energyCost: 1,
+      },
+      weaponData: weaponData.parse({ db: 1, wieldedSide: null }),
+    });
+    await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
+    expect(screen.getByLabelText('Shield side')).toHaveTextContent('All directions');
+    await user.click(screen.getByRole('button', { name: 'Magic item settings for Coat' }));
+    expect(screen.getByLabelText('Activation')).toHaveTextContent(
+      'Uses chargesUses energyAlways on',
+    );
   });
 });

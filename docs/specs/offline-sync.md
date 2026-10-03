@@ -744,11 +744,13 @@ count, and the failure reason. The summary line stays a scannable one-liner.
 
 **Indicator presentation.** The header uses one outline arrow-orbit control:
 muted outline gem when synced with no connected socket, a filled green gem when
-synced with the WebSocket connected, primary-colored rotating arrows while syncing,
+synced with the WebSocket connected, primary-colored rotating arrows while syncing
+around a gem that stays green while the socket is connected,
 a neutral pause mark when offline, and a copper exclamation for an error. Socket
 connecting/reconnecting/stopped states retain the ordinary synced gem; HTTP sync
 does not depend on socket connectivity. Only the gem gains success ink when connected;
-the orbit stays muted and still. Syncing and offline take priority over connected.
+the orbit stays muted and still when synced and rotates in primary ink while syncing.
+Offline and error states replace the gem with their respective symbols.
 A known error retains
 priority while offline; its tooltip includes the reason and offline context.
 The offline presentation changes no outbox/replay behavior. The control opens
