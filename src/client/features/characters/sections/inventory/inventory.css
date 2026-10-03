@@ -89,6 +89,7 @@
 
 .inventory-item-detail {
   padding-left: calc(var(--inventory-indent) + var(--inventory-slot) + 0.5rem);
+  overflow-wrap: anywhere;
 }
 
 /* Below the sheet's small breakpoint each item is a compact two-line row:

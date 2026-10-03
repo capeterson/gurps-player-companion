@@ -369,6 +369,10 @@ Expanded inventory editors wrap long unspaced item names in the header while
 keeping the **+ Category** and **Done** actions inside the viewport. At the
 desktop-table breakpoint, item names and category chips may flow onto separate
 lines so a narrow item column does not compress a chip into one letter per line.
+Expanded editors contain their intrinsic inline size so their input grids do not
+force a wider table; nested fieldsets and enchantment pickers can shrink within
+the available editor width, including the 640px breakpoint. Long enchantment
+references in row summaries also wrap without setting a minimum column width.
 
 Each row leads with a 20px slot holding the container chevron (whose hit area
 extends to a touch-sized target) or an item-type icon. Each nesting level
@@ -392,6 +396,17 @@ Search and column filters retain the ancestors of matching entries, and hide
 excluded rows without unmounting their editors. Category chips remain the
 route to category editors. **+ Category** lives in the item-details editor the
 pencil opens, rather than repeating on every row.
+
+Inventory editor copy uses player-facing attack names and source references.
+Primary and alternate attack IDs remain internal, are generated for new attacks,
+and are preserved when names or stats change. Alternate attacks use plain stat
+labels within numbered **Alternate attack** groups. Enchantments show their source
+reference (or Campaign library/Character sheet origin), not snapshot revisions;
+effect choices describe the affected stat. Magic activation and range choices use
+readable labels while retaining their stored enum values. Item pricing uses
+**Recalculate price**, saved price/weight summaries, and labeled costs/weights with
+units in the existing dialog; trait pricing uses **Recalculate points**. Editors
+omit generic save/persistence explanations.
 
 Disclosures expose `aria-expanded` and `aria-controls`; row actions include
 the entry name in their accessible label. Tables have accessible collection

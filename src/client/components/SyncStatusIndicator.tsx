@@ -88,7 +88,7 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
         triggerClassName={`btn btn-ghost btn-sm btn-square ${meta.colorClass} ${triggerClassName}`}
         onTriggerClick={() => setLogOpen(true)}
       >
-        <SyncSymbol state={visualState} />
+        <SyncSymbol state={visualState} connected={websocket.state === 'connected'} />
       </InfoTooltip>
       {/* Mounted only while open: the log's live queries scan the whole
           outbox and sync log, so keeping it mounted closed re-ran them on
@@ -134,7 +134,7 @@ const STATE_META = {
 } as const;
 
 /** The same etched orbit in every state; only the center and motion change. */
-function SyncSymbol({ state }: { state: keyof typeof STATE_META }) {
+function SyncSymbol({ state, connected }: { state: keyof typeof STATE_META; connected: boolean }) {
   return (
     <svg
       width="20"
@@ -157,8 +157,8 @@ function SyncSymbol({ state }: { state: keyof typeof STATE_META }) {
       ) : (
         <path
           d="m12 8 3 4-3 4-3-4Z"
-          className={state === 'connected' ? 'text-success' : undefined}
-          fill={state === 'connected' ? 'currentColor' : 'none'}
+          className={connected ? 'text-success' : undefined}
+          fill={connected ? 'currentColor' : 'none'}
         />
       )}
     </svg>

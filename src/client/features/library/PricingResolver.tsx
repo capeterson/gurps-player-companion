@@ -22,6 +22,32 @@ import type { TraitModifier, TraitVariant } from '../../../shared/schemas/trait.
 import { useDialogState } from '../../hooks/useDialogState.ts';
 import { useLocalLibrary } from './useLocalLibrary.ts';
 
+/** Saved and previewed results share player-facing labels and units. */
+function pricingOutput(key: string, value: number, definition: CalculationDefinitionV1): string {
+  const labels: Record<string, string> = {
+    cost: 'Cost',
+    weightLbs: 'Weight',
+    points: 'Base points',
+    modifier: 'Modifier',
+  };
+  const words = key.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ');
+  const label = Object.hasOwn(labels, key)
+    ? labels[key]
+    : words.charAt(0).toUpperCase() + words.slice(1);
+  const unit = definition.outputs.find((output) => output.key === key)?.unit;
+  const amount =
+    unit === 'currency'
+      ? `$${value}`
+      : unit === 'pounds'
+        ? `${value} lb`
+        : unit === 'percentage'
+          ? `${value}%`
+          : unit === 'points' && key !== 'points'
+            ? `${value} points`
+            : String(value);
+  return `${label}: ${amount}`;
+}
+
 export function CalculationInputsEditor({
   rule,
   values,
@@ -186,7 +212,7 @@ export function PricingResolver({
   const modifiers: TraitModifier[] = [];
   let points: number | undefined;
   try {
-    if (!library || !rule) throw new Error('Pricing definition is unavailable');
+    if (!library || !rule) throw new Error('The library price is unavailable');
     const currentInputs = (rule: CalculationDefinitionV1, choices: CalculationInputs) =>
       Object.fromEntries(
         Object.entries(choices).filter(([key]) => rule.inputs.some((input) => input.key === key)),
@@ -227,7 +253,7 @@ export function PricingResolver({
     ];
     const groups = appliedModifiers.map((m) => m.group).filter(Boolean);
     if (new Set(groups).size !== groups.length)
-      throw new Error('Choose only one modifier from each mutually exclusive group');
+      throw new Error('Choose only one modifier from each group');
     if (section === 'traits')
       points = computeLeveledTraitCost({
         basePoints: resolved.outputs.points ?? 0,
@@ -255,13 +281,13 @@ export function PricingResolver({
     >
       <div className="modal-box max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] w-[48rem] max-w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] overflow-y-auto break-words">
         <h2 id={titleId} className="font-display text-xl">
-          Resolve {entry.name}
+          {section === 'items' ? 'Price for' : 'Point cost for'} {entry.name}
         </h2>
         {initial && (
           <p className="text-sm">
             Previously saved:{' '}
             {Object.entries(initial.outputs)
-              .map(([key, value]) => `${key}: ${value}`)
+              .map(([key, value]) => pricingOutput(key, value, initial.definition))
               .join(' · ')}
           </p>
         )}
@@ -282,7 +308,12 @@ export function PricingResolver({
             <div key={id} className="alert alert-warning">
               <span>
                 Selected modifier unavailable:{' '}
-                {initialModifiers.find((m) => m.pricingResolution?.definitionId === id)?.name ?? id}
+                {initialModifiers.find(
+                  (m) =>
+                    m.pricingResolution?.definitionId === id ||
+                    (m.pricingResolution?.localModifier &&
+                      `local:${m.pricingResolution.localModifier}` === id),
+                )?.name ?? 'Unknown modifier'}
               </span>
               <button
                 type="button"
@@ -335,11 +366,10 @@ export function PricingResolver({
           </p>
         ) : (
           <div aria-label="Calculation breakdown" className="my-3 space-y-1">
-            {Object.entries(resolved?.outputs ?? {}).map(([key, value]) => (
-              <p key={key}>
-                {key}: {value}
-              </p>
-            ))}
+            {resolved &&
+              Object.entries(resolved.outputs).map(([key, value]) => (
+                <p key={key}>{pricingOutput(key, value, resolved.definition)}</p>
+              ))}
             {[...initialModifiers.filter((m) => !m.pricingResolution), ...modifiers].map((m) => (
               <p key={m.name}>
                 {m.name}: {m.costValue}

@@ -330,7 +330,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   const traitName = page.getByRole('textbox', { name: 'Trait name' });
   await traitName.fill('Variable Focus');
   await page.getByRole('option', { name: /Variable Focus/ }).click();
-  const traitDialog = page.getByRole('dialog', { name: 'Resolve Variable Focus' });
+  const traitDialog = page.getByRole('dialog', { name: 'Point cost for Variable Focus' });
   await expect(traitDialog).toBeVisible();
   await traitDialog.getByRole('checkbox', { name: modifierName, exact: true }).check();
   await expect(traitDialog).not.toContainText('pricing-rules');
@@ -360,6 +360,9 @@ test('resolves and reopens an item price without clipping the modal at supported
   await traitDialog.getByRole('button', { name: 'Use these values' }).click();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('Variable Focus', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Variable Focus' }).click();
+  await expect(page.getByText('Saved point cost')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Recalculate points' })).toBeVisible();
   await selectCharacterSection(page, 'Inventory');
   const itemName = page.getByLabel('Item name');
   await itemName.fill('Priced spear');
@@ -395,7 +398,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   }
   await editionOptions.nth(0).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Resolve Priced spear' });
+  const dialog = page.getByRole('dialog', { name: 'Price for Priced spear' });
   await expect(dialog).toBeVisible();
   for (const width of [320, 639, 640, 641, 1280]) {
     await page.setViewportSize({ width, height: 800 });
@@ -419,19 +422,19 @@ test('resolves and reopens an item price without clipping the modal at supported
       .toBeLessThanOrEqual(width);
   }
 
-  await expect(dialog.getByText('cost: 12', { exact: true })).toBeVisible();
-  await expect(dialog.getByText('weightLbs: 2.25', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Cost: $12', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Weight: 2.25 lb', { exact: true })).toBeVisible();
   await dialog.getByLabel('Quantity').fill('3');
-  await expect(dialog.getByText('cost: 18', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Cost: $18', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Use these values' }).click();
   await page.getByRole('button', { name: 'Change pricing choices' }).click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('Previously saved: cost: 18 · weightLbs: 2.25')).toBeVisible();
+  await expect(dialog.getByText('Previously saved: Cost: $18 · Weight: 2.25 lb')).toBeVisible();
   await dialog.getByRole('button', { name: 'Use these values' }).click();
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Priced spear', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Edit Priced spear' }).click();
-  await expect(page.getByText('Saved pricing values')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Saved price and weight')).toBeVisible({ timeout: 20_000 });
   const itemRow = page.locator('.inventory-item-row').filter({ hasText: 'Priced spear' });
   await expect(itemRow).toContainText('18');
   await expect(page.getByRole('button', { name: 'Armor settings for Priced spear' })).toBeVisible();
@@ -440,8 +443,8 @@ test('resolves and reopens an item price without clipping the modal at supported
   ).toBeVisible();
   await page.getByRole('button', { name: /Weapon settings for Priced spear/ }).click();
   const weaponEditor = page.getByRole('region', { name: 'Priced spear: Weapon' });
-  const rangedMode = weaponEditor.getByRole('group', { name: 'Attack mode 1' });
-  await expect(rangedMode.getByLabel('Mode name')).toHaveValue('Bow shot');
+  const rangedMode = weaponEditor.getByRole('group', { name: 'Alternate attack 1' });
+  await expect(rangedMode.getByLabel('Attack name')).toHaveValue('Bow shot');
   await expect(rangedMode.getByRole('combobox', { name: 'Range', exact: true })).toHaveValue(
     'fixed',
   );
@@ -455,15 +458,17 @@ test('resolves and reopens an item price without clipping the modal at supported
   await api(page, 'PATCH', `/campaigns/${campaign.id}/library/items/${pricedItem.id}`, {
     calculation: itemRule(9),
   });
-  await expect(page.getByText('Pricing source changed — saved values retained')).toBeVisible({
+  await expect(
+    page.getByText('Library price changed — using your saved price and weight'),
+  ).toBeVisible({
     timeout: 20_000,
   });
   await expect(itemRow).toContainText('18');
-  await page.getByRole('button', { name: 'Re-resolve pricing' }).click();
+  await page.getByRole('button', { name: 'Recalculate price' }).click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('Previously saved: cost: 18 · weightLbs: 2.25')).toBeVisible();
-  await expect(dialog.getByText('cost: 27', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('Previously saved: Cost: $18 · Weight: 2.25 lb')).toBeVisible();
+  await expect(dialog.getByText('Cost: $27', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Use these values' }).click();
-  await expect(page.getByText('Saved pricing values')).toBeVisible();
+  await expect(page.getByText('Saved price and weight')).toBeVisible();
   await expect(itemRow).toContainText('27');
 });

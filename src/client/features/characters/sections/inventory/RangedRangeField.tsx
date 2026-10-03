@@ -70,9 +70,9 @@ export function RangedRangeInputs({
         onBlur={onBlur}
       >
         <option value="none">No range</option>
-        <option value="fixed">Fixed yards</option>
-        <option value="st_multiplier">ST multiplier</option>
-        {kind === 'legacy' && <option value="legacy">Legacy notation: needs review</option>}
+        <option value="fixed">Fixed distance (yards)</option>
+        <option value="st_multiplier">Based on ST</option>
+        {kind === 'legacy' && <option value="legacy">Unrecognized range — choose a type</option>}
       </select>
       {value?.kind === 'legacy' && (
         <p className="text-xs text-warning">
@@ -112,7 +112,7 @@ export function RangedRangeInputs({
             )}
           </div>
           <label className="flex flex-col gap-1 text-xs">
-            Strength source
+            Use ST from
             <select
               className="select select-sm select-bordered w-full"
               value={value.strengthSource}
