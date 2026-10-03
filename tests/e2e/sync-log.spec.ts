@@ -92,7 +92,8 @@ test('a synced edit and its revision response share one item with Request and Re
     }
   } finally {
     releaseUpload();
-    await page.unroute(uploadRoute);
+    // Let the held handler finish continuing the request before removing it.
+    await page.unrouteAll({ behavior: 'wait' });
   }
   await expect(saved()).toBeVisible({ timeout: 15_000 });
   await expect(saved().locator('svg > path')).toHaveAttribute('fill', 'currentColor');
