@@ -155,6 +155,9 @@ showing a key input; **Match another edition** chooses an existing named
 definition's stable key. Portable YAML labels translate to/from
 UUIDs at import/export, including nested pricing references. Migration 0068
 backfills existing links; Dexie v17 upgrades cached and queued edits.
+The Sources table includes a sortable **Entries** column counting accessible
+library entries linked to each book across all categories. Counts update with
+local edits and remain independent of search and source filters.
 
 ### Library selection
 

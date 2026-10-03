@@ -101,6 +101,67 @@ test('new campaigns show revised sources and citations on collapsed library rows
     });
     expect(saved.status(), await saved.text()).toBe(201);
   }
+  await page.goto(`/campaigns/${id}/library?section=sources`);
+  const sourceTable = page.getByRole('table', { name: 'sources' });
+  const sourceRow = (name: string) =>
+    sourceTable.getByRole('button', { name, exact: true }).locator('xpath=ancestor::tr');
+  const revisedSourceRow = sourceRow('GURPS Basic Set, Fourth Edition Revised');
+  const magicSourceRow = sourceRow('GURPS Magic');
+  await expect(revisedSourceRow.locator('td').nth(1)).toHaveText('2');
+  await expect(magicSourceRow.locator('td').nth(1)).toHaveText('0');
+  await expect(sourceTable.getByRole('button', { name: 'Sort by Entries' })).toBeVisible();
+  for (const width of [320, 639, 640, 641, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const entriesHeader = sourceTable.getByRole('button', { name: 'Sort by Entries' });
+    if (width === 320) {
+      await entriesHeader.click({ button: 'right' });
+      const filter = page.getByRole('dialog', { name: 'Filter Entries' });
+      await expect(filter).toBeVisible();
+      const filterBox = await filter.boundingBox();
+      if (!filterBox) throw new Error('Entries filter is not visible');
+      expect(filterBox.x).toBeGreaterThanOrEqual(0);
+      expect(filterBox.y).toBeGreaterThanOrEqual(0);
+      expect(filterBox.x + filterBox.width).toBeLessThanOrEqual(width);
+      expect(filterBox.y + filterBox.height).toBeLessThanOrEqual(800);
+      await captureReviewScreenshot(page, {
+        path: testInfo.outputPath('source-entry-filter-320.png'),
+        fullPage: false,
+      });
+      await page.keyboard.press('Escape');
+      await expect(filter).toHaveCount(0);
+      await entriesHeader.click({ button: 'right' });
+      const reopenedFilter = page.getByRole('dialog', { name: 'Filter Entries' });
+      await reopenedFilter.getByLabel('2', { exact: true }).check();
+      await reopenedFilter.getByRole('button', { name: 'Close filter' }).click();
+      await expect(revisedSourceRow).toBeVisible();
+      await expect(magicSourceRow).toHaveCount(0);
+      await expect(revisedSourceRow.locator('td').nth(1)).toHaveText('2');
+      await page.getByRole('button', { name: 'Clear all filters' }).click();
+      await expect(magicSourceRow.locator('td').nth(1)).toHaveText('0');
+    }
+    const headerBox = await entriesHeader.boundingBox();
+    const actionHeader = sourceTable.locator('thead tr th').last();
+    const actionBox = await actionHeader.boundingBox();
+    const countCell = revisedSourceRow.locator('td').nth(1);
+    const countBox = await countCell.boundingBox();
+    if (!headerBox || !actionBox || !countBox) throw new Error('source counts are not visible');
+    expect(headerBox.x).toBeGreaterThanOrEqual(0);
+    expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(width);
+    expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(actionBox.x);
+    expect(countBox.x).toBeGreaterThanOrEqual(0);
+    expect(countBox.x + countBox.width).toBeLessThanOrEqual(width);
+    expect(countCell).toBeVisible();
+    await expect(countCell).toHaveText('2');
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(width);
+    if (width === 320 || width === 640 || width === 1280) {
+      await captureReviewScreenshot(page, {
+        path: testInfo.outputPath(`source-entry-counts-${width}.png`),
+        fullPage: true,
+      });
+    }
+  }
   await page.goto(`/campaigns/${id}/library?section=traits`);
   for (const entry of entries) {
     const button = page.getByRole('button', { name: entry.name, exact: true });
@@ -189,4 +250,19 @@ test('new campaigns show revised sources and citations on collapsed library rows
         ?.sourceId;
     })
     .toBe(magicId);
+  await page.goto(`/campaigns/${id}/library?section=sources`);
+  await expect(
+    sourceTable
+      .getByRole('button', { name: 'GURPS Basic Set, Fourth Edition Revised', exact: true })
+      .locator('xpath=ancestor::tr')
+      .locator('td')
+      .nth(1),
+  ).toHaveText('1');
+  await expect(
+    sourceTable
+      .getByRole('button', { name: 'GURPS Magic', exact: true })
+      .locator('xpath=ancestor::tr')
+      .locator('td')
+      .nth(1),
+  ).toHaveText('1');
 });

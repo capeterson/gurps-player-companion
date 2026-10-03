@@ -250,7 +250,9 @@ Library group labels and row summaries wrap long unspaced categories. Citations
 sit beside the type/points summary under each name at every width, visible while
 collapsed, and wrap within the name cell on narrow screens.
 The Sources list has no category heading or group folding; its sourcebook rows
-appear directly below the column heading.
+appear directly below the column heading. A numeric **Entries** column remains
+visible at every width and uses the shared heading interactions for sorting and
+filtering the linked-entry totals.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
 Help and About prose wraps long external links inside its content column.
 Focused library form fields retain their draft and stay below the sticky toolbar
