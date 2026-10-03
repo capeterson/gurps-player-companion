@@ -85,6 +85,42 @@ describe('inline inventory local mutations', () => {
     expect(ops.every((op) => op.status === 'pending' && op.parentId === CHARACTER)).toBe(true);
   });
 
+  it('rejects equipping stashed or zero-quantity items and clears equipment at zero quantity', async () => {
+    const item = await seed();
+    await expect(mutateItem(ID, 'Equipped', () => ({ equipped: true }))).rejects.toThrow(
+      'Move the item on the player',
+    );
+    expect((await read()).equipped).toBe(false);
+    expect(await getLocalDb().outbox.count()).toBe(0);
+
+    await getLocalDb().characterInventory.update(ID, {
+      worn: true,
+      externalLocation: null,
+      equipped: true,
+    });
+    await mutateItem(ID, 'Quantity', () => ({ quantity: 0 }));
+    expect((await read()).equipped).toBe(false);
+    expect(
+      (await getLocalDb().outbox.toArray())
+        .map((op) => [op.fieldPath, op.attemptedValue])
+        .sort(([left], [right]) => String(left).localeCompare(String(right))),
+    ).toEqual([
+      ['equipped', false],
+      ['quantity', 0],
+    ]);
+
+    await getLocalDb().characterInventory.update(ID, {
+      ...item,
+      worn: true,
+      externalLocation: null,
+      quantity: 0,
+      equipped: false,
+    });
+    await expect(mutateItem(ID, 'Equipped', () => ({ equipped: true }))).rejects.toThrow(
+      'Move the item on the player',
+    );
+  });
+
   it('rolls back both fields if queueing category creation fails', async () => {
     await seed();
     const db = getLocalDb();

@@ -13,10 +13,11 @@ import {
   useRef,
   useState,
 } from 'react';
-import { formatSigned } from '../../../../shared/format/number.ts';
+import { formatEquipmentNumber, formatSigned } from '../../../../shared/format/number.ts';
 import type { LibraryEnchantmentOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
-import { AppIcon } from '../../../components/ui/AppIcon.tsx';
+import { AppIcon, type AppIconName } from '../../../components/ui/AppIcon.tsx';
+import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { useFlashState } from '../../../hooks/useFlashState.ts';
 import { sheetAnchor } from '../sheetAnchors.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
@@ -47,6 +48,7 @@ export interface InventoryRowProps {
   // raw weight directly instead of the encumbrance-effective number plus a
   // confusing -100% reduction breakdown.
   inStashed?: boolean;
+  equipmentAvailability?: ReadonlyMap<string | undefined, { carried: boolean; equipped: boolean }>;
 }
 
 function locationSummary(locations: string[]): string {
@@ -74,6 +76,7 @@ export function InventoryRow(props: InventoryRowProps) {
     highlightItemId,
     drag,
     inStashed,
+    equipmentAvailability,
   } = props;
   const children = byParent.get(item.id) ?? [];
   const isRoot = item.parentId === null;
@@ -84,8 +87,10 @@ export function InventoryRow(props: InventoryRowProps) {
   const filterValues = (entry: InventoryItemOut) => ({
     item: entry.name,
     qty: entry.quantity,
-    wt: (inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs).toFixed(1),
-    cost: entry.cost.toFixed(0),
+    wt: formatEquipmentNumber(
+      inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs,
+    ),
+    cost: formatEquipmentNumber(entry.cost),
   });
   // Retain a matching descendant's ancestry. Hidden rows remain mounted to
   // preserve open editor drafts.
@@ -99,17 +104,6 @@ export function InventoryRow(props: InventoryRowProps) {
   // Indent guides are drawn in CSS from the depth, so they need no per-row
   // sibling bookkeeping and stay correct while filtering or collapsing.
   const rowStyle = { '--inventory-depth': depth } as CSSProperties;
-  const itemIcon = item.isContainer
-    ? 'inventory'
-    : item.isArmor || item.weaponData?.db != null
-      ? 'defense'
-      : item.weaponData != null
-        ? 'combat'
-        : item.powerstoneData != null ||
-            item.magicItemData != null ||
-            (item.enchantments?.length ?? 0) > 0
-          ? 'modifier'
-          : 'notes';
   const contentsForcedOpen =
     columnFiltersActive || expandContainers || Boolean(revealContainers?.has(item.id));
   const contentsOpen = contentsForcedOpen || open;
@@ -136,23 +130,42 @@ export function InventoryRow(props: InventoryRowProps) {
     setSection(null);
     triggerRef.current?.focus();
   }
-  function categoryChip(category: ItemCategory, children: ReactNode) {
-    if (!canEdit)
-      return <span className="inventory-chip badge badge-sm badge-ghost">{children}</span>;
+  function categoryIcon(category: ItemCategory, children: ReactNode) {
+    const icons: Record<ItemCategory, AppIconName> = {
+      armor: 'defense',
+      weapon: 'combat',
+      container: 'inventory',
+      powerstone: 'powerstone',
+      magicItem: 'magicItem',
+      enchantments: 'modifier',
+    };
     return (
-      <button
-        type="button"
-        aria-label={`${CATEGORY_LABELS[category]} settings for ${item.name}`}
-        aria-expanded={section === category}
-        aria-controls={editorId}
-        className={`inventory-chip badge badge-sm min-h-8 h-auto py-1 ${section === category ? 'badge-primary' : 'badge-ghost'}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          toggleSection(category, event.currentTarget);
-        }}
+      <InfoTooltip
+        ariaLabel={`${CATEGORY_LABELS[category]}${canEdit ? ' settings' : ''} for ${item.name}`}
+        ariaExpanded={canEdit ? section === category : undefined}
+        ariaControls={canEdit ? editorId : undefined}
+        triggerClassName={`inventory-category-icon btn btn-ghost btn-sm ${section === category ? 'text-primary bg-primary/10' : 'text-base-content/65'}`}
+        contentClassName="w-64"
+        scrollable
+        {...(canEdit
+          ? {
+              onTriggerClick: (event: MouseEvent<HTMLButtonElement>) =>
+                toggleSection(category, event.currentTarget),
+            }
+          : {})}
+        content={
+          <>
+            <strong className="block">{children}</strong>
+            {canEdit && (
+              <span className="block mt-1 text-base-content/65">
+                Open {CATEGORY_LABELS[category].toLowerCase()} settings
+              </span>
+            )}
+          </>
+        }
       >
-        {children}
-      </button>
+        <AppIcon name={icons[category]} size={16} />
+      </InfoTooltip>
     );
   }
 
@@ -212,17 +225,16 @@ export function InventoryRow(props: InventoryRowProps) {
 
   const reductionLabel = (() => {
     const parts: string[] = [];
-    if (item.weightReductionPercent > 0) parts.push(`-${item.weightReductionPercent}%`);
     const hide = item.hideawayCapacityLbs;
-    if (hide > 0) parts.push(`hide ${hide.toFixed(0)} lb`);
+    if (hide > 0) parts.push(`Hideaway capacity ${formatEquipmentNumber(hide)} lb`);
     return parts.join(' · ');
   })();
 
   const grossWeight = item.weightLbs * item.quantity;
   const netWeight = inStashed ? grossWeight : item.effectiveWeightLbs;
   const weightDelta = netWeight - grossWeight;
-  // Tolerate float rounding — anything under 0.05 lb shouldn't render as a "modified" weight.
-  const weightModified = !inStashed && Math.abs(weightDelta) >= 0.05;
+  // Ignore floating-point noise while retaining small, meaningful weight changes.
+  const weightModified = !inStashed && Math.abs(weightDelta) >= 0.00001;
 
   return (
     <Fragment>
@@ -278,20 +290,39 @@ export function InventoryRow(props: InventoryRowProps) {
                   <AppIcon name="chevronDown" size={15} />
                 </span>
               ) : (
-                <span className="inventory-slot text-base-content/60" aria-hidden>
-                  <AppIcon name={itemIcon} size={15} />
-                </span>
+                <span className="inventory-slot text-base-content/60" aria-hidden />
               )}
               <span className="inventory-item-title font-medium">{item.name}</span>
             </span>
             <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
-              {item.equipped && <span className="badge badge-sm badge-secondary">Equipped</span>}
+              {item.equipped && (
+                <InfoTooltip
+                  ariaLabel={`Equipped: ${item.name}`}
+                  triggerClassName="inventory-equipped-icon btn btn-ghost btn-sm text-secondary"
+                  contentClassName="w-52"
+                  scrollable
+                  content={
+                    <>
+                      <strong className="block">Equipped</strong>
+                      <span className="block mt-1">
+                        {inStashed ||
+                        item.quantity === 0 ||
+                        equipmentAvailability?.get(item.id)?.equipped === false
+                          ? 'Unavailable while stashed or at quantity zero.'
+                          : 'Worn or wielded for use.'}
+                      </span>
+                    </>
+                  }
+                >
+                  <AppIcon name="equipped" size={16} />
+                </InfoTooltip>
+              )}
               {item.isContainer &&
-                categoryChip(
+                categoryIcon(
                   'container',
                   <>
                     Container
-                    {isRoot && item.worn && reductionLabel && (
+                    {reductionLabel && (
                       <span className="text-base-content/70 text-[10px] ml-1">
                         {reductionLabel}
                       </span>
@@ -307,19 +338,20 @@ export function InventoryRow(props: InventoryRowProps) {
                 </span>
               )}
               {item.isArmor &&
-                item.armor &&
-                categoryChip(
+                categoryIcon(
                   'armor',
                   <>
-                    Armor DR {item.armor.dr}
-                    <span className="text-base-content/70 text-[10px] ml-1">
-                      {locationSummary(item.armor.locations)}
-                    </span>
+                    Armor{item.armor ? ` DR ${item.armor.dr}` : ''}
+                    {item.armor && (
+                      <span className="text-base-content/70 text-[10px] ml-1">
+                        {locationSummary(item.armor.locations)}
+                      </span>
+                    )}
                   </>,
                 )}
               {item.weaponData != null &&
                 (item.weaponData.db != null
-                  ? categoryChip(
+                  ? categoryIcon(
                       'weapon',
                       <>
                         Shield DB {item.weaponData.db}
@@ -330,7 +362,7 @@ export function InventoryRow(props: InventoryRowProps) {
                         )}
                       </>,
                     )
-                  : categoryChip(
+                  : categoryIcon(
                       'weapon',
                       <>
                         Weapon
@@ -350,7 +382,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       </>,
                     ))}
               {item.powerstoneData != null &&
-                categoryChip(
+                categoryIcon(
                   'powerstone',
                   <>
                     Powerstone
@@ -360,7 +392,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   </>,
                 )}
               {item.magicItemData != null &&
-                categoryChip(
+                categoryIcon(
                   'magicItem',
                   <>
                     Magic
@@ -373,7 +405,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   </>,
                 )}
               {(item.enchantments?.length ?? 0) > 0 &&
-                categoryChip('enchantments', <>Enchantments · {item.enchantments.length}</>)}
+                categoryIcon('enchantments', <>Enchantments · {item.enchantments.length}</>)}
             </span>
           </div>
           {isRoot && !item.worn && item.externalLocation && (
@@ -393,7 +425,7 @@ export function InventoryRow(props: InventoryRowProps) {
                   {effect.sourceName}: {effect.target.replaceAll('_', ' ')}{' '}
                   {formatSigned(effect.value)}
                   {!effect.active
-                    ? ' (inactive)'
+                    ? ` (${effect.inactiveReason ?? 'inactive'})`
                     : effect.suppressedByStacking
                       ? ' (suppressed)'
                       : ''}
@@ -423,25 +455,28 @@ export function InventoryRow(props: InventoryRowProps) {
             {weightModified &&
               (item.isContainer && weightDelta > 0 ? (
                 <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
-                  {grossWeight.toFixed(1)} <span className="italic text-info">+ contents</span>
+                  {formatEquipmentNumber(grossWeight)}{' '}
+                  <span className="italic text-info">+ contents</span>
                 </span>
               ) : (
                 <span className="inventory-weight-breakdown text-[11px] text-base-content/60">
-                  {grossWeight.toFixed(1)}{' '}
+                  {formatEquipmentNumber(grossWeight)}{' '}
                   <span className="text-success">
                     {weightDelta >= 0 ? '+' : '-'}
-                    {Math.abs(weightDelta).toFixed(1)}
+                    {formatEquipmentNumber(Math.abs(weightDelta))}
                   </span>
                 </span>
               ))}
-            <span className={weightModified ? 'font-semibold' : ''}>{netWeight.toFixed(1)}</span>
+            <span className={weightModified ? 'font-semibold' : ''}>
+              {formatEquipmentNumber(netWeight)}
+            </span>
           </span>
         </td>
         <td
           data-label="Cost"
           className="inventory-cost num text-right text-base-content/75 align-top sm:align-middle"
         >
-          {item.cost.toFixed(0)}
+          {formatEquipmentNumber(item.cost)}
         </td>
         {!canEdit && (
           <td className="text-right align-top sm:align-middle">

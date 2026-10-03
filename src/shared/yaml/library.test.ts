@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
 import {
   type LibraryYamlDoc,
@@ -23,6 +24,22 @@ import {
   sourceScopedLibrary,
 } from './library.ts';
 import { portableLibraryEntry } from './sourceReferences.ts';
+
+it('keeps the ordinary sample Backpack capacity separate from magical Hideaway weight reduction', () => {
+  const source = readFileSync(
+    new URL('../../../bootstrap/sample_library.yaml', import.meta.url),
+    'utf8',
+  );
+  const doc = parseLibraryYaml(source);
+  const backpack = doc.library.items.find((item) => item.name === 'Backpack');
+  expect(backpack).toMatchObject({
+    weightLbs: 3,
+    cost: 60,
+    isContainer: true,
+    hideawayCapacityLbs: 0,
+  });
+  expect(backpack?.description).toContain('40 lb ordinary storage capacity');
+});
 
 it('packages selected sourcebooks and retains explicit GM restrictions', () => {
   const doc = parseLibraryYaml(

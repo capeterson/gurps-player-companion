@@ -25,7 +25,14 @@ function character(): CharacterDetail {
         name: 'Padding',
         equipped: true,
         isArmor: true,
-        armor: { dr: 2, drCrushing: null, typedDr: {}, locations: ['torso', 'vitals'] },
+        armor: {
+          dr: 2,
+          drCrushing: null,
+          typedDr: {},
+          flexible: true,
+          concealable: true,
+          locations: ['torso', 'vitals'],
+        },
       },
     ],
   } as unknown as CharacterDetail;

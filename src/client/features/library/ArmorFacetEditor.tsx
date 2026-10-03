@@ -162,6 +162,15 @@ export function ArmorFacetEditor({
                   <span>Flexible armor</span>
                 </label>
               </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={data.concealable ?? false}
+                  onChange={(event) => update({ ...data, concealable: event.target.checked })}
+                />
+                <span>Concealable inner layer (B286)</span>
+              </label>
               <fieldset className="fieldset min-w-0">
                 <legend className="fieldset-legend">Protected locations</legend>
                 <p className="text-sm text-base-content/70">
@@ -293,7 +302,7 @@ export function ArmorFacetEditor({
                   <input
                     type="number"
                     min={0}
-                    max={4}
+                    max={5}
                     className="input input-sm input-bordered w-full"
                     aria-label="Defense Bonus"
                     value={data.db ?? ''}

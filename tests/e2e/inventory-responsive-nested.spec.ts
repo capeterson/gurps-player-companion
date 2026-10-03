@@ -330,6 +330,49 @@ test('nested inventory names and expanded item controls stay in view at supporte
     const multiCategoryRow = page.locator(`#inventory-${multiCategoryItem.item.id}`);
     await expect(multiCategoryRow).toBeVisible();
 
+    const armorIcon = multiCategoryRow.getByRole('button', {
+      name: `Armor settings for ${LANGUAGE_ITEM}`,
+    });
+    const equippedIcon = multiCategoryRow.getByRole('button', {
+      name: `Equipped: ${LANGUAGE_ITEM}`,
+    });
+    await expect(armorIcon.locator('svg')).toBeVisible();
+    await expect(equippedIcon.locator('svg')).toBeVisible();
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 375, height: 812 },
+      { width: 639, height: 800 },
+      { width: 640, height: 800 },
+      { width: 641, height: 800 },
+    ]) {
+      await test.step(`inventory icon tooltips at ${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await armorIcon.scrollIntoViewIfNeeded();
+        await armorIcon.hover();
+        let tooltip = page.getByRole('tooltip');
+        await expect(tooltip).toContainText('Armor');
+        let tooltipBox = await geometry(tooltip);
+        const banner = await page.getByRole('banner').boundingBox();
+        expect(banner).not.toBeNull();
+        expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
+        expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        await page.mouse.move(2, viewport.height / 2);
+
+        await equippedIcon.scrollIntoViewIfNeeded();
+        await equippedIcon.hover();
+        tooltip = page.getByRole('tooltip');
+        await expect(tooltip).toContainText('Equipped');
+        tooltipBox = await geometry(tooltip);
+        expect(tooltipBox.x).toBeGreaterThanOrEqual(-1);
+        expect(tooltipBox.right).toBeLessThanOrEqual(viewport.width + 1);
+        expect(tooltipBox.y).toBeGreaterThanOrEqual((banner?.y ?? 0) + (banner?.height ?? 0) - 1);
+        expect(tooltipBox.bottom).toBeLessThanOrEqual(viewport.height + 1);
+        await page.mouse.move(2, viewport.height / 2);
+      });
+    }
+
     await multiCategoryRow
       .getByRole('button', { name: `Armor settings for ${LANGUAGE_ITEM}` })
       .click();

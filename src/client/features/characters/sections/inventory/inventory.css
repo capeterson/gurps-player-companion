@@ -239,3 +239,12 @@
     display: none;
   }
 }
+
+.inventory-category-icon.btn,
+.inventory-equipped-icon.btn {
+  width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border-radius: 0.5rem;
+}

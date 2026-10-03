@@ -23,8 +23,9 @@
 import { HIT_LOCATIONS } from '../constants/hitLocations.ts';
 import type { ResolvedEffectOut } from '../schemas/character.ts';
 import type { ArmorData, InventoryItemOut } from '../schemas/inventory.ts';
+import { type AvailabilityItem, availableEquipment } from './inventoryAvailability.ts';
 
-export interface ArmorItemRow {
+export interface ArmorItemRow extends AvailabilityItem {
   readonly id?: string;
   readonly name?: string;
   readonly equipped: boolean;
@@ -151,6 +152,7 @@ export function layeredArmorDrContributions(
   location: string,
   facing?: ArmorFacing,
 ): LayeredArmorDrContribution[] {
+  const equippedItems = availableEquipment(items);
   const grouped = new Map<
     string,
     {
@@ -163,7 +165,7 @@ export function layeredArmorDrContributions(
       suppressedByItemStacking: boolean;
     }
   >();
-  for (const [index, item] of items.entries()) {
+  for (const [index, item] of equippedItems.entries()) {
     if (!item.equipped || !item.isArmor) continue;
     const coverage = armorForAggregation(item);
     if (
@@ -271,13 +273,51 @@ export function layeredArmorDrContributions(
   });
 }
 
+/** B286: at most an outer layer and a flexible, concealable inner layer.
+ * Layering on the head is exempt from the DX penalty. Ambiguous/illegal
+ * selections are flagged rather than counted as automatic protection. */
+export function armorLayering(
+  items: readonly ArmorItemRow[],
+  facing?: ArmorFacing,
+): { dxPenalty: number; invalidLocations: string[] } {
+  if (!facing) {
+    const facings = (['front', 'back', 'left', 'right'] as const).map((direction) =>
+      armorLayering(items, direction),
+    );
+    return {
+      dxPenalty: Math.max(...facings.map((entry) => entry.dxPenalty)),
+      invalidLocations: [...new Set(facings.flatMap((entry) => entry.invalidLocations))],
+    };
+  }
+  const equipped = availableEquipment(items).filter((item) => item.isArmor && item.armor);
+  const locations = new Set(equipped.flatMap((item) => item.armor?.locations ?? []));
+  if (locations.has('torso')) locations.add('vitals');
+  const invalidLocations: string[] = [];
+  let dxPenalty = 0;
+  for (const location of locations) {
+    const layers = equipped.filter(
+      (item) =>
+        item.armor &&
+        armorCoversLocation(item.armor, location) &&
+        armorAppliesToFacing(item.armor, facing),
+    );
+    if (layers.length <= 1) continue;
+    if (layers.length > 2 || !layers.some((item) => item.armor?.flexible && item.armor.concealable))
+      invalidLocations.push(location);
+    else if (!['skull', 'face', 'eye', 'eyes', 'head'].includes(location)) dxPenalty = 1;
+  }
+  return { dxPenalty, invalidLocations };
+}
+
 export function aggregateDrByLocation(
   items: readonly ArmorItemRow[],
   facing?: ArmorFacing,
 ): DrByLocationMap {
+  const equipped = availableEquipment(items);
+  const invalid = new Set(armorLayering(items, facing).invalidLocations);
   const map: DrByLocationMap = new Map();
   const locations = new Set<string>();
-  for (const item of items) {
+  for (const item of equipped) {
     if (!item.equipped || !item.isArmor) continue;
     const armor = armorForAggregation(item);
     if (!armor || !armorAppliesToFacing(armor, facing)) continue;
@@ -285,12 +325,13 @@ export function aggregateDrByLocation(
     if (armor.locations.includes('torso')) locations.add('vitals');
   }
   for (const location of locations) {
+    if (invalid.has(location)) continue;
     const appliedByItem = new Map<string, number>();
     for (const line of layeredArmorDrContributions(items, location, facing)) {
       if (line.status !== 'applied' && line.status !== 'winning') continue;
       appliedByItem.set(line.itemKey, (appliedByItem.get(line.itemKey) ?? 0) + line.value);
     }
-    for (const [index, item] of items.entries()) {
+    for (const [index, item] of equipped.entries()) {
       if (!item.equipped || !item.isArmor) continue;
       const hasDecomposition = canDecomposeArmor(item);
       const armor = armorForAggregation(item);
@@ -382,28 +423,17 @@ export interface ArmorDbResolution {
   readonly itemName: string;
 }
 
-/**
- * Resolve the one armor Defense Bonus that applies to an incoming hit.
- * Armor DB does not stack: filter by equipment, location, and known facing,
- * then choose the maximum. Empty `locations` means no coverage, matching
- * `aggregateDrByLocation`. Equal values use stable id/name ordering so the
- * displayed source never flickers or gets counted twice.
- */
+/** Resolve the highest legacy manual armor Deflect bonus (M67).
+ * Deflect has no location/facing restriction; typed declarations are resolved
+ * separately by magicalDefenseBonus and never become a physical shield. */
 export function resolveArmorDb(
   items: readonly ArmorItemRow[],
-  hitLocation: string,
-  facing?: ArmorFacing,
+  _hitLocation: string,
+  _facing?: ArmorFacing,
 ): ArmorDbResolution | null {
-  const candidates = items.flatMap((item, index) => {
+  const candidates = availableEquipment(items).flatMap((item, index) => {
     const armor = item.armor;
-    if (
-      !item.equipped ||
-      !item.isArmor ||
-      armor == null ||
-      !armorCoversLocation(armor, hitLocation)
-    )
-      return [];
-    if (!armorAppliesToFacing(armor, facing)) return [];
+    if (!item.equipped || !item.isArmor || armor == null) return [];
     const db = armor.db ?? 0;
     if (db <= 0) return [];
     return [

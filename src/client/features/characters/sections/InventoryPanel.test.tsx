@@ -14,7 +14,7 @@ function item(
   id: string,
   name: string,
   parentId: string | null,
-  options: { container?: boolean; weapon?: boolean; worn?: boolean } = {},
+  options: { container?: boolean; weapon?: boolean; worn?: boolean; equipped?: boolean } = {},
 ): InventoryItemOut {
   return {
     id,
@@ -27,7 +27,7 @@ function item(
     parentId,
     externalLocation: null,
     worn: options.worn ?? parentId === null,
-    equipped: false,
+    equipped: options.equipped ?? false,
     isContainer: options.container ?? false,
     hideawayCapacityLbs: 0,
     weightReductionPercent: 0,
@@ -99,6 +99,20 @@ afterEach(() => {
 });
 
 describe('Inventory location and equipment controls', () => {
+  it('shows the Armor category icon when armor details are incomplete', () => {
+    const incompleteArmor = {
+      ...item('incomplete-armor', 'Incomplete coat', null),
+      isArmor: true,
+    };
+    renderPanel(undefined, { inventory: [incompleteArmor] });
+
+    const armorIcon = screen.getByRole('button', { name: 'Armor for Incomplete coat' });
+    expect(armorIcon).toBeVisible();
+    fireEvent.mouseEnter(armorIcon);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Armor');
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent('DR');
+  });
+
   it('uses location instead of a Worn state and stores carried status from the selected location', async () => {
     const db = getLocalDb();
     await db.characterInventory.put({
@@ -181,6 +195,29 @@ describe('Inventory location and equipment controls', () => {
       equipped: false,
     });
   });
+
+  it('clears Equipped when a selected item moves to Stashed', async () => {
+    const sword = item('equipped-sword', 'Equipped sword', null, { weapon: true, equipped: true });
+    await getLocalDb().characterInventory.put({ ...sword, revision: 1 });
+    renderPanel(undefined, { canWrite: true, inventory: [sword] });
+    fireEvent.click(screen.getByText('Equipped sword'));
+    fireEvent.click(screen.getByRole('button', { name: 'Move to ▾' }));
+    fireEvent.click(screen.getByRole('button', { name: /Stashed/ }));
+    await waitFor(async () => {
+      expect(await getLocalDb().characterInventory.get(sword.id)).toMatchObject({
+        worn: false,
+        equipped: false,
+      });
+    });
+    expect(
+      (await getLocalDb().outbox.toArray()).map((op) => [op.fieldPath, op.attemptedValue]),
+    ).toEqual(
+      expect.arrayContaining([
+        ['worn', false],
+        ['equipped', false],
+      ]),
+    );
+  });
 });
 
 describe('Inventory container disclosure', () => {
@@ -203,14 +240,14 @@ describe('Inventory container disclosure', () => {
   it('excludes stashed equipment from the carried encumbrance total', () => {
     renderPanel();
 
-    expect(screen.getByText('0.0 lbs')).toBeVisible();
+    expect(screen.getByText(/^0 lbs$/)).toBeVisible();
     expect(screen.getByRole('table', { name: 'Carried inventory' })).toContainElement(
       screen.getByText('Backpack'),
     );
     expect(screen.getByRole('table', { name: 'Stashed inventory' })).toContainElement(
       screen.getByText('Tent'),
     );
-    expect(screen.getByText('1.0 lb')).toBeVisible();
+    expect(screen.getByText(/^1(?:\.0)? lb$/)).toBeVisible();
     expect(screen.queryByRole('table', { name: 'Worn inventory' })).not.toBeInTheDocument();
   });
 

@@ -175,6 +175,7 @@ describe('inline inventory editing', () => {
       enchantments: [
         {
           spellName: 'Fortify',
+          spellLevel: 15,
           mechanics: {
             applicability: 'armor',
             effects: [{ target: 'dr', value: 3 }],
@@ -191,7 +192,9 @@ describe('inline inventory editing', () => {
     await waitFor(async () => {
       expect((await stored()).armor).toMatchObject({ dr: 3, flexible: true });
     });
-    expect(screen.getByText('Armor DR 6')).toBeVisible();
+    const armorIcon = screen.getByRole('button', { name: 'Armor settings for Coat' });
+    await user.hover(armorIcon);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Armor DR 6');
   });
 
   it('promotes individual populated advanced fields, including zero; cleared fields can hide again', async () => {
@@ -510,7 +513,7 @@ describe('inline inventory editing', () => {
       ],
     });
     await user.click(screen.getByRole('button', { name: 'Enchantments settings for Coat' }));
-    expect(screen.getByRole('textbox', { name: 'Enchanter skill level' })).toHaveValue('0');
+    expect(screen.getByRole('textbox', { name: 'Item Power' })).toHaveValue('0');
     expect(screen.getByRole('textbox', { name: 'Enchantment level' })).toHaveValue('2');
     expect(screen.getByRole('textbox', { name: 'Enchantment label' })).toHaveValue('+3');
     expect(screen.getByText('Source: M66')).toBeVisible();
@@ -585,8 +588,11 @@ describe('inline inventory editing', () => {
   });
 
   it('renders category summaries without edit controls for read-only viewers', async () => {
-    await setup({}, false);
-    expect(screen.getByText('Armor DR 2')).toBeVisible();
+    const user = await setup({}, false);
+    const armorIcon = screen.getByRole('button', { name: 'Armor for Coat' });
+    expect(armorIcon).toBeVisible();
+    await user.hover(armorIcon);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Armor DR 2');
     expect(
       screen.queryByRole('button', { name: /settings for|Add category|Edit Coat/ }),
     ).toBeNull();

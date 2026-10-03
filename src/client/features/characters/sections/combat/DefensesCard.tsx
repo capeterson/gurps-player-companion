@@ -15,6 +15,8 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { availableEquipment } from '../../../../../shared/domain/inventoryAvailability.ts';
+import { magicalDefenseBonus } from '../../../../../shared/domain/inventoryDefenseBonus.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type {
@@ -151,12 +153,13 @@ function DefenseTable({
     conditions: character.combat?.conditions ?? [],
     maneuver: character.combat?.maneuver ?? null,
   });
-  const equippedItems = character.inventory.filter((item) => item.equipped);
+  const equippedItems = availableEquipment(character.inventory);
   const weapons = equippedItems.filter((item) => item.weaponData != null);
-  const shield = pickShield(equippedItems, facing);
+  const shield = pickShield(character.inventory, facing);
   const shieldDb = shield?.db ?? 0;
   const armorDbSource = resolveArmorDb(character.inventory, hitLocation, facing);
-  const armorDb = armorDbSource?.db ?? 0;
+  const magicalDb = magicalDefenseBonus(character.inventory);
+  const armorDb = (armorDbSource?.db ?? 0) + magicalDb;
   const db = shieldDb + armorDb;
   const dbCaption = (
     <>
@@ -172,6 +175,7 @@ function DefenseTable({
           )
         </>
       )}
+      {magicalDb !== 0 && <> {formatSigned(magicalDb)} enchanted DB (M67)</>}
       {armorDbSource && (
         <>
           {' '}
@@ -194,7 +198,7 @@ function DefenseTable({
     );
   }
   const dodgeCaption =
-    dodgeParts.length > 0 || shieldDb > 0 || armorDbSource ? (
+    dodgeParts.length > 0 || shieldDb > 0 || armorDb !== 0 ? (
       <>
         {dodgeParts.join(' ')}
         {dbCaption}
@@ -253,7 +257,8 @@ function DefenseTable({
           weaponData?.skill ?? null,
         );
         const skillEffects = skillEffectsForRow(effects, resolution.name);
-        const baseValue = parryFromSkill(adjusted, parsed.mod);
+        const fencingPenalty = parsed.fencing ? (character.encumbrance.level ?? 0) : 0;
+        const baseValue = parryFromSkill(adjusted, parsed.mod) - fencingPenalty;
         return {
           key: item.defenseKey,
           itemId: item.id,
@@ -262,9 +267,9 @@ function DefenseTable({
           value: parryFromSkill(
             adjusted,
             parsed.mod,
-            (character.derived.parryMod ?? 0) + effectTotal(weaponEffects),
+            (character.derived.parryMod ?? 0) + effectTotal(weaponEffects) - fencingPenalty,
           ),
-          caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}`,
+          caption: `via ${resolution.name}–${adjusted}${modifierCaption(character.derived.parryMod)}${fencingPenalty ? ` −${fencingPenalty} fencing encumbrance (B376)` : ''}`,
           raw,
           baseValue,
           skillEffects,

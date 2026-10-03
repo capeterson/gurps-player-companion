@@ -5,12 +5,13 @@ import { characterCreate } from '../schemas/character.ts';
 import { libraryRaceOut } from '../schemas/race.ts';
 import { emitLibraryYaml, parseLibraryYaml } from '../yaml/library.ts';
 import { instantiateEffect } from './activeEffects.ts';
+import { aggregateDrByLocation } from './armorDr.ts';
 import {
   type CharacterDetailInput,
   buildCharacterDetail,
   buildSpellOut,
 } from './characterDetail.ts';
-import { resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
+import { pickShield, resolveWeaponSkill, skillDisplayName } from './defenseCalc.ts';
 import { resolveRaceSelection } from './race.ts';
 import { characterCanCast, characterMagicTraits, hasMagery } from './spellCalc.ts';
 
@@ -178,6 +179,199 @@ it('carries YAML damage declarations through the full character builder', () => 
   expect(detail.derived.effectiveSt).toBe(15);
   expect(detail.derived.thrust).toBe('1d+2');
   expect(detail.derived.swing).toBe('2d+3');
+});
+
+it('warns on illegal torso layers, applies valid torso DX penalty, and exempts head armor', () => {
+  const timestamp = '2026-10-03T00:00:00.000Z';
+  const character = {
+    ...characterCreate.parse({ name: 'Layering audit' }),
+    id: 'layering-character',
+    ownerId: 'owner',
+    campaignId: null,
+    height: null,
+    weight: null,
+    age: null,
+    birthdate: null,
+    appearance: null,
+    dismissedWarnings: [],
+    revision: 1,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const armor = (
+    id: string,
+    location: 'torso' | 'skull',
+    flexible: boolean,
+    concealable = false,
+  ) => ({
+    id,
+    characterId: character.id,
+    name: id,
+    quantity: 1,
+    weightLbs: 1,
+    cost: 1,
+    notes: null,
+    parentId: null,
+    externalLocation: null,
+    worn: true,
+    equipped: true,
+    isContainer: false,
+    hideawayCapacityLbs: 0,
+    weightReductionPercent: 0,
+    isArmor: true,
+    armor: { locations: [location], dr: 4, flexible, concealable },
+    weaponData: null,
+    powerstoneData: null,
+    magicItemData: null,
+    enchantments: [],
+    libraryItemId: null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  });
+  const build = (inventory: CharacterDetailInput['inventory']) =>
+    buildCharacterDetail({
+      character,
+      traits: [],
+      skills: [],
+      spells: [],
+      languages: [],
+      techniques: [],
+      inventory,
+      combat: null,
+      campaign: null,
+    });
+  const invalid = build([armor('outer', 'torso', false), armor('inner', 'torso', false)]);
+  expect(invalid.warnings).toContainEqual(
+    expect.objectContaining({
+      code: 'inventory.armor_layers',
+      severity: 'warn',
+    }),
+  );
+  expect(aggregateDrByLocation(invalid.inventory).has('torso')).toBe(false);
+
+  const validHead = build([
+    armor('outer-helm', 'skull', false),
+    armor('inner-cap', 'skull', true, true),
+  ]);
+  expect(validHead.derived.effectiveDx).toBe(character.dx);
+  expect(validHead.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layers' }),
+  );
+
+  const unarmored = build([]);
+  const validTorso = build([
+    armor('outer-coat', 'torso', false),
+    armor('inner-shirt', 'torso', true, true),
+  ]);
+  expect(validTorso.derived.effectiveDx).toBe(character.dx - 1);
+  expect(validTorso.derived.basicSpeed).toBe(unarmored.derived.basicSpeed);
+});
+
+it('keeps nested carried armor enchantments and shields available through the full builder', () => {
+  const timestamp = '2026-10-03T00:00:00.000Z';
+  const character = {
+    ...characterCreate.parse({ name: 'Nested equipment' }),
+    id: 'nested-character',
+    ownerId: 'owner',
+    campaignId: null,
+    height: null,
+    weight: null,
+    age: null,
+    birthdate: null,
+    appearance: null,
+    dismissedWarnings: [],
+    revision: 1,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const base = {
+    characterId: character.id,
+    quantity: 1,
+    weightLbs: 1,
+    cost: 1,
+    notes: null,
+    externalLocation: null,
+    hideawayCapacityLbs: 0,
+    weightReductionPercent: 0,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const detail = buildCharacterDetail({
+    character,
+    traits: [],
+    skills: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    combat: null,
+    campaign: { pointTarget: null, disadvantageCap: null, quirkCap: null, manaLevel: 'normal' },
+    inventory: [
+      {
+        ...base,
+        id: 'pack',
+        name: 'Carried pack',
+        parentId: null,
+        worn: true,
+        equipped: false,
+        isContainer: true,
+        isArmor: false,
+        armor: null,
+        weaponData: null,
+        powerstoneData: null,
+        magicItemData: null,
+        enchantments: [],
+        libraryItemId: null,
+      },
+      {
+        ...base,
+        id: 'mail',
+        name: 'Nested mail',
+        parentId: 'pack',
+        worn: false,
+        equipped: true,
+        isContainer: false,
+        isArmor: true,
+        armor: { locations: ['torso'], dr: 4, flexible: false },
+        weaponData: null,
+        powerstoneData: null,
+        magicItemData: null,
+        enchantments: [
+          {
+            spellName: 'Fortify',
+            spellLevel: 15,
+            mechanics: {
+              applicability: 'armor',
+              effects: [{ target: 'dr', value: 1 }],
+              levels: [],
+              stackingPolicy: { kind: 'stack' },
+            },
+          },
+        ],
+        libraryItemId: null,
+      },
+      {
+        ...base,
+        id: 'shield',
+        name: 'Nested shield',
+        parentId: 'pack',
+        worn: false,
+        equipped: true,
+        isContainer: false,
+        isArmor: false,
+        armor: null,
+        weaponData: { damage: '1d cr', db: 1 },
+        powerstoneData: null,
+        magicItemData: null,
+        enchantments: [],
+        libraryItemId: null,
+      },
+    ],
+  });
+  const mail = detail.inventory.find((item) => item.id === 'mail');
+  expect(mail).toMatchObject({ equipped: true, armor: { dr: 5 } });
+  expect(mail?.enchantmentBreakdown).toMatchObject([{ target: 'dr', active: true }]);
+  expect(aggregateDrByLocation(detail.inventory).get('torso')?.dr).toBe(5);
+  expect(pickShield(detail.inventory)).toMatchObject({ name: 'Nested shield', db: 1 });
 });
 
 describe('very high mana up-front spell costs', () => {

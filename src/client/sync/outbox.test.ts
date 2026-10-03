@@ -18,6 +18,7 @@ import {
   backoffMs,
   claimDrainableOps,
   enqueueCreate,
+  enqueueDelete,
   enqueueDeletes,
   enqueueEntityPatch,
   enqueueFieldPatch,
@@ -1313,6 +1314,319 @@ describe('character_language / character_technique outbox lifecycle (S11)', () =
       off();
     }
   });
+});
+
+describe('inventory delete promotion outbox lifecycle', () => {
+  const rootId = '0193b3c0-f1f0-7000-8000-00000000d301';
+  const childId = '0193b3c0-f1f0-7000-8000-00000000d302';
+  const userId = '0193b3c0-f1f0-7000-8000-00000000d0aa';
+
+  async function seedTree() {
+    const db = getLocalDb();
+    await seedCharacter();
+    await db.characterInventory.bulkPut([
+      {
+        id: rootId,
+        characterId: CHAR_ID,
+        name: 'Carried pack',
+        parentId: null,
+        worn: true,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: true,
+        revision: 1,
+      },
+      {
+        id: childId,
+        characterId: CHAR_ID,
+        name: 'Nested item',
+        parentId: rootId,
+        worn: false,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: false,
+        notes: 'before',
+        revision: 1,
+      },
+    ] as never[]);
+  }
+
+  function login() {
+    tokenStore.write({
+      accessToken: jwtForUser(userId),
+      refreshToken: 'refresh',
+      accessTokenExpiresIn: 0,
+    });
+  }
+
+  function mockSync(deleteStatus: 'applied' | 'rejected') {
+    return vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/sync/operations')) {
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string; entityId: string }>;
+        };
+        const outcomes = body.operations.map((op) => ({
+          clientOpId: op.clientOpId,
+          status: op.entityId === rootId ? deleteStatus : 'applied',
+          ...(op.entityId === rootId && deleteStatus === 'rejected'
+            ? { reason: 'delete denied in test' }
+            : { newRevision: 2 }),
+        }));
+        return new Response(JSON.stringify({ outcomes }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/sync/cursor'))
+        return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+  }
+
+  it('promotes children locally and keeps their inherited location after the delete applies', async () => {
+    await seedTree();
+    login();
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: rootId,
+      characterId: CHAR_ID,
+    });
+    expect(await getLocalDb().characterInventory.get(childId)).toMatchObject({
+      parentId: null,
+      worn: true,
+    });
+    vi.stubGlobal('fetch', mockSync('applied'));
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () => expect(await getLocalDb().outbox.count()).toBe(0));
+      expect(await getLocalDb().characterInventory.get(rootId)).toBeUndefined();
+      expect(await getLocalDb().characterInventory.get(childId)).toMatchObject({
+        parentId: null,
+        worn: true,
+      });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('composes rollback journals when nested containers are both rejected', async () => {
+    await seedTree();
+    const innerId = '0193b3c0-f1f0-7000-8000-00000000d303';
+    const leafId = '0193b3c0-f1f0-7000-8000-00000000d304';
+    await getLocalDb().characterInventory.bulkPut([
+      {
+        id: innerId,
+        characterId: CHAR_ID,
+        name: 'Inner pack',
+        parentId: rootId,
+        worn: false,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: true,
+        revision: 1,
+      },
+      {
+        id: leafId,
+        characterId: CHAR_ID,
+        name: 'Leaf item',
+        parentId: innerId,
+        worn: false,
+        externalLocation: null,
+        quantity: 1,
+        isContainer: false,
+        revision: 1,
+      },
+    ] as never[]);
+    login();
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: rootId,
+      characterId: CHAR_ID,
+    });
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: innerId,
+      characterId: CHAR_ID,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.includes('/sync/operations')) {
+          const body = JSON.parse(String(init?.body)) as {
+            operations: Array<{ clientOpId: string }>;
+          };
+          return new Response(
+            JSON.stringify({
+              outcomes: body.operations.map((op) => ({
+                clientOpId: op.clientOpId,
+                status: 'rejected',
+                reason: 'nested deletion denied',
+              })),
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (url.includes('/sync/cursor'))
+          return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+      }),
+    );
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () =>
+        expect(await getLocalDb().outbox.where('status').equals('pending').count()).toBe(0),
+      );
+      expect(await getLocalDb().characterInventory.get(rootId)).toMatchObject({
+        parentId: null,
+        worn: true,
+      });
+      expect(await getLocalDb().characterInventory.get(innerId)).toMatchObject({
+        parentId: rootId,
+        worn: false,
+      });
+      expect(await getLocalDb().characterInventory.get(leafId)).toMatchObject({
+        parentId: innerId,
+        worn: false,
+      });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('restores a child patch baseline when both its patch and parent deletion are rejected', async () => {
+    await seedTree();
+    login();
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: rootId,
+      characterId: CHAR_ID,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character_inventory',
+      entityId: childId,
+      characterId: CHAR_ID,
+      fieldPath: 'notes',
+      attemptedValue: 'rejected child edit',
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.includes('/sync/operations')) {
+          const body = JSON.parse(String(init?.body)) as {
+            operations: Array<{ clientOpId: string; entityId: string }>;
+          };
+          return new Response(
+            JSON.stringify({
+              outcomes: body.operations.map((op) => ({
+                clientOpId: op.clientOpId,
+                status: 'rejected',
+                reason: 'write denied in test',
+              })),
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (url.includes('/sync/cursor'))
+          return new Response(JSON.stringify({ changes: [], nextCursor: {}, hasMore: {} }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+      }),
+    );
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () =>
+        expect(await getLocalDb().outbox.where('status').equals('pending').count()).toBe(0),
+      );
+      expect(await getLocalDb().characterInventory.get(rootId)).toBeDefined();
+      expect(await getLocalDb().characterInventory.get(childId)).toMatchObject({
+        parentId: rootId,
+        worn: false,
+        notes: 'before',
+      });
+    } finally {
+      getSyncOrchestrator().stop();
+    }
+  });
+
+  it('restores promoted location with a durable rejection and child-row flash', async () => {
+    await seedTree();
+    login();
+    await enqueueDelete({
+      entityClass: 'character_inventory',
+      entityId: rootId,
+      characterId: CHAR_ID,
+    });
+    const flash = vi.fn();
+    const off = flashBus.subscribe(`character_inventory:${childId}:entry`, flash);
+    vi.stubGlobal('fetch', mockSync('rejected'));
+    getSyncOrchestrator().start();
+    try {
+      await waitFor(async () =>
+        expect(await getLocalDb().characterInventory.get(rootId)).toBeDefined(),
+      );
+      expect(await getLocalDb().characterInventory.get(childId)).toMatchObject({
+        parentId: rootId,
+        worn: false,
+      });
+      expect(
+        (await getLocalDb().rejectionToasts.toArray()).some(
+          (record) => record.entityId === rootId && record.reason.includes('delete denied'),
+        ),
+      ).toBe(true);
+      await waitFor(() => expect(flash).toHaveBeenCalled());
+    } finally {
+      getSyncOrchestrator().stop();
+      off();
+    }
+  });
+
+  it.each([
+    { fieldPath: 'worn', attemptedValue: false, expected: { worn: false, notes: 'before' } },
+    {
+      fieldPath: 'notes',
+      attemptedValue: 'edited during deletion',
+      expected: { worn: false, notes: 'edited during deletion' },
+    },
+  ])(
+    'restores only clean promotion fields when a newer child $fieldPath edit is queued',
+    async ({ fieldPath, attemptedValue, expected }) => {
+      await seedTree();
+      login();
+      await enqueueDelete({
+        entityClass: 'character_inventory',
+        entityId: rootId,
+        characterId: CHAR_ID,
+      });
+      await enqueueFieldPatch({
+        entityClass: 'character_inventory',
+        entityId: childId,
+        characterId: CHAR_ID,
+        fieldPath,
+        attemptedValue,
+      });
+      vi.stubGlobal('fetch', mockSync('rejected'));
+      getSyncOrchestrator().start();
+      try {
+        await waitFor(async () =>
+          expect(await getLocalDb().characterInventory.get(rootId)).toBeDefined(),
+        );
+        expect(await getLocalDb().characterInventory.get(childId)).toMatchObject({
+          parentId: rootId,
+          ...expected,
+        });
+      } finally {
+        getSyncOrchestrator().stop();
+      }
+    },
+  );
 });
 
 // ---------- drain ordering / self-heal ----------

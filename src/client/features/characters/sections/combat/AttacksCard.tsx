@@ -11,7 +11,12 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import { availableEquipment } from '../../../../../shared/domain/inventoryAvailability.ts';
 import { formatRangedRange, resolveRangedRange } from '../../../../../shared/domain/rangedRange.ts';
+import {
+  weaponDamageBases,
+  weaponStrengthKind,
+} from '../../../../../shared/domain/weaponDamage.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
@@ -117,7 +122,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
     conditions: character.combat?.conditions ?? [],
     maneuver: character.combat?.maneuver ?? null,
   });
-  const weapons = character.inventory.filter((i) => i.equipped && i.weaponData != null);
+  const weapons = availableEquipment(character.inventory).filter((i) => i.weaponData != null);
   // Consume the shared derived result, which already includes damage effects.
   // Rebuilding from ST here would silently drop those flat adds.
   const effectsKnown = character.libraryEffectsKnown !== false;
@@ -308,7 +313,13 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     : ['—'],
                   damage: rows.map(({ line, mode }) => {
                     if (!mode) return line.damage ?? '—';
-                    const resolved = resolveDamage(mode, thrust, swing);
+                    const bases = weaponDamageBases(
+                      line.weaponMode,
+                      character.derived.effectiveSt,
+                      thrust,
+                      swing,
+                    );
+                    const resolved = resolveDamage(mode, bases.thrust, bases.swing);
                     if (!resolved) return line.damage ?? '—';
                     const damageEffects = weaponEffectsForRow(
                       effects,
@@ -359,7 +370,11 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     skillCandidates,
                   );
                   const stPenalty = stShortfallPenalty(
-                    currentMode?.stRequired,
+                    currentMode &&
+                      weaponStrengthKind(currentMode) === 'crossbow' &&
+                      currentMode.weaponSt == null
+                      ? null
+                      : currentMode?.stRequired,
                     state.strength(character.derived.effectiveSt),
                   );
                   const skillEffects =
@@ -397,11 +412,22 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     resolution.kind === 'matched'
                       ? `${resolution.name}${line.modeName ? ` · ${line.modeName}` : ''}`
                       : '';
+                  const bowTooStrong =
+                    currentMode &&
+                    weaponStrengthKind(currentMode) === 'bow' &&
+                    (currentMode.weaponSt ?? currentMode.stRequired ?? 0) >
+                      state.strength(character.derived.effectiveSt);
                   const finalTarget =
-                    resolution.kind === 'matched'
+                    resolution.kind === 'matched' && !bowTooStrong
                       ? resolution.level - stPenalty + effectTotal(attackEffects)
                       : 0;
-                  const resolved = mode ? resolveDamage(mode, thrust, swing) : null;
+                  const bases = weaponDamageBases(
+                    currentMode,
+                    character.derived.effectiveSt,
+                    thrust,
+                    swing,
+                  );
+                  const resolved = mode ? resolveDamage(mode, bases.thrust, bases.swing) : null;
                   const finalDice = resolved
                     ? { ...resolved.dice, adds: resolved.dice.adds + effectTotal(damageEffects) }
                     : null;
@@ -448,9 +474,15 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                         </th>
                       )}
                       <td className="align-top">
-                        {firstOfLine && stPenalty > 0 && (
+                        {firstOfLine && (stPenalty > 0 || bowTooStrong) && (
                           <span className="badge badge-warning badge-outline badge-xs">
-                            ST {currentMode?.stRequired} (−{stPenalty})
+                            {bowTooStrong ? (
+                              'Bow ST exceeds usable ST (B275)'
+                            ) : (
+                              <>
+                                ST {currentMode?.stRequired} (−{stPenalty})
+                              </>
+                            )}
                           </span>
                         )}
                         {showSkill &&
@@ -459,6 +491,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                               <button
                                 type="button"
                                 className="btn btn-sm h-auto min-h-8 gap-2 px-2 py-1 text-left font-normal"
+                                disabled={bowTooStrong}
                                 onClick={() =>
                                   openRoll({
                                     label: attackLabel,
@@ -468,7 +501,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                                       range: resolveRangedRange(
                                         ranged?.range,
                                         state.strength(character.derived.effectiveSt),
-                                        currentMode?.stRequired,
+                                        currentMode?.weaponSt ?? currentMode?.stRequired,
                                       ),
                                       accuracy,
                                       canTargetVitals: canHitVitals,

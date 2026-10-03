@@ -190,7 +190,7 @@ describe('evaluateWarnings', () => {
     expect(ws.find((w) => w.code === 'fp.mod_out_of_range')).toBeDefined();
   });
 
-  it('warns when carried weight exceeds the 10×BL carry cap', () => {
+  it('warns that an exceptional back load costs 1 FP/second between 10× and 15× BL', () => {
     const ws = evaluateWarnings({
       attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
       points: okPoints,
@@ -205,7 +205,29 @@ describe('evaluateWarnings', () => {
       },
       campaign: noCaps,
     });
-    expect(ws.find((w) => w.code === 'encumbrance.over_carry_cap')).toBeDefined();
+    expect(ws.find((w) => w.code === 'encumbrance.over_carry_cap')?.message).toContain(
+      'carrying on the back allows X-Heavy Move, costing 1 FP per second',
+    );
+  });
+
+  it('warns that loads above 15×BL exceed carrying-on-back capacity', () => {
+    const ws = evaluateWarnings({
+      attrs: { st: 10, dx: 10, iq: 10, ht: 10, hpMod: 0, fpMod: 0 },
+      points: okPoints,
+      encumbrance: {
+        ...okEnc,
+        level: 4,
+        label: 'X-Heavy',
+        moveMultiplier: 0.2,
+        dodgePenalty: -4,
+        playerWeightLbs: 301,
+        ratio: 15.05,
+      },
+      campaign: noCaps,
+    });
+    expect(ws.find((w) => w.code === 'encumbrance.over_carry_cap')?.message).toContain(
+      'exceeds carrying-on-back capacity',
+    );
   });
 
   it('skips dismissed codes', () => {

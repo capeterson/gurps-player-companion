@@ -12,12 +12,14 @@ export function InventoryItemDetails({ item }: { item: InventoryItemOut }) {
         Quantity {item.quantity} · {item.weightLbs} lb each · ${item.cost} each
       </p>
       {item.externalLocation && <p>Location: {item.externalLocation}</p>}
-      {item.isContainer && (
-        <p>
-          Weight reduction {item.effectiveWeightReductionPercent ?? item.weightReductionPercent}% ·
-          Hideaway capacity {item.hideawayCapacityLbs} lb
-        </p>
-      )}
+      {item.isContainer && <p>Hideaway capacity {item.hideawayCapacityLbs} lb</p>}
+      {(item.isArmor || item.weaponData?.db != null) &&
+        (item.effectiveWeightReductionPercent ?? item.weightReductionPercent) > 0 && (
+          <p>
+            Lighten: {item.effectiveWeightReductionPercent ?? item.weightReductionPercent}% of
+            equipped armor or shield weight (M67).
+          </p>
+        )}
       {item.armor && (
         <div>
           <h3 className="font-semibold">Armor</h3>
@@ -36,6 +38,7 @@ export function InventoryItemDetails({ item }: { item: InventoryItemOut }) {
           <p>
             {[
               item.armor.flexible && 'Flexible',
+              item.armor.concealable && 'Concealable inner layer',
               item.armor.frontOnly && 'Front only',
               item.armor.backOnly && 'Back only',
             ]
@@ -56,6 +59,8 @@ export function InventoryItemDetails({ item }: { item: InventoryItemOut }) {
                 · ST {mode.stRequired ?? '—'}
               </p>
               {mode.skill && <p>Skill: {mode.skill}</p>}
+              {mode.weaponSt != null && <p>Purchased weapon ST: {mode.weaponSt}</p>}
+              {mode.strengthKind && <p>Damage strength rule: {mode.strengthKind}</p>}
               {mode.ranged && (
                 <p>
                   Range {formatRangedRange(mode.ranged.range) ?? '—'} · Acc {mode.ranged.acc ?? '—'}{' '}
@@ -84,7 +89,11 @@ export function InventoryItemDetails({ item }: { item: InventoryItemOut }) {
       {item.enchantmentBreakdown?.map((effect, index) => (
         <p key={`${effect.sourceName}-${index}`}>
           {effect.sourceName}: {effect.target.replaceAll('_', ' ')} {effect.value}
-          {!effect.active ? ' (inactive)' : effect.suppressedByStacking ? ' (suppressed)' : ''}
+          {!effect.active
+            ? ` (${effect.inactiveReason ?? 'inactive'})`
+            : effect.suppressedByStacking
+              ? ' (suppressed)'
+              : ''}
         </p>
       ))}
     </div>

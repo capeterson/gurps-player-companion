@@ -10,7 +10,14 @@
  * "more info available" affordance) and is keyboard-focusable.
  */
 
-import { type ReactNode, useEffect, useId, useLayoutEffect, useState } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useState,
+} from 'react';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
 import { useViewportBoundedOverlay } from '../../hooks/useViewportBoundedOverlay.ts';
 
@@ -20,7 +27,9 @@ interface InfoTooltipProps {
   side?: 'top' | 'bottom';
   ariaLabel?: string;
   triggerClassName?: string;
-  onTriggerClick?: () => void;
+  onTriggerClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  ariaExpanded?: boolean | undefined;
+  ariaControls?: string | undefined;
   contentClassName?: string;
   /** Keep long lists reachable by pointer and keyboard inside the viewport. */
   scrollable?: boolean;
@@ -33,6 +42,8 @@ export function InfoTooltip({
   ariaLabel,
   triggerClassName,
   onTriggerClick,
+  ariaExpanded,
+  ariaControls,
   contentClassName = 'w-64',
   scrollable = false,
 }: InfoTooltipProps) {
@@ -104,15 +115,18 @@ export function InfoTooltip({
       <button
         type="button"
         aria-label={ariaLabel}
+        aria-expanded={ariaExpanded}
+        aria-controls={ariaControls}
         aria-describedby={open ? id : undefined}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={scrollable ? undefined : () => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={scrollable ? undefined : () => setOpen(false)}
-        onClick={() => {
+        onClick={(event) => {
+          event.stopPropagation();
           if (onTriggerClick) {
             setOpen(false);
-            onTriggerClick();
+            onTriggerClick(event);
           } else {
             // Focus/hover may already have opened a scrollable tooltip before
             // the click arrives. A tap must leave its recipient list open.

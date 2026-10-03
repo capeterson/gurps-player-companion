@@ -141,7 +141,7 @@ const LABELS: Record<string, string> = {
   chargesMax: 'Maximum charges',
   chargesCurrent: 'Starting charges',
   energyCost: 'Energy cost',
-  spellLevel: 'Enchanter skill',
+  spellLevel: 'Item Power',
   level: 'Level',
   category: 'Category',
   wieldedSide: 'Held side',

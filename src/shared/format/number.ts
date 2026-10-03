@@ -17,3 +17,9 @@ export function formatSigned(n: number, opts?: { zero?: 'plus' | 'plain' }): str
 export function formatScaled(n: number, scale: number): string {
   return scale !== 1 ? (n * scale).toFixed(2) : String(n);
 }
+
+/** Preserve cents and small equipment weights without trailing zeros. */
+export function formatEquipmentNumber(value: number): string {
+  if (value !== 0 && Math.abs(value) < 0.01) return String(Number(value.toPrecision(3)));
+  return String(Number(value.toFixed(2)));
+}

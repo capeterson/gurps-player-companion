@@ -78,6 +78,18 @@ beforeEach(() => {
 });
 
 describe('compact powerstone and magic-item summaries', () => {
+  it('describes the panel as an owned-items tracker, not a carried-only list', () => {
+    render(
+      <PowerstonesPanel
+        character={{ id: CHARACTER_ID, inventory: [] } as unknown as CharacterDetail}
+        canWrite={false}
+      />,
+    );
+    expect(
+      screen.getByText('No powerstones owned. Add one in Inventory to track its energy here.'),
+    ).toBeVisible();
+  });
+
   it('shows a compact powerstone summary and keeps its full-object outbox actions', () => {
     render(<PowerstonesPanel character={character} canWrite />);
     expect(screen.getByRole('table', { name: 'Powerstones' })).toBeVisible();

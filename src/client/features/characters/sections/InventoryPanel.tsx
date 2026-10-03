@@ -1,3 +1,5 @@
+import { inventoryAvailability } from '../../../../shared/domain/inventoryAvailability.ts';
+import { formatEquipmentNumber } from '../../../../shared/format/number.ts';
 import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
 import { Table, TableHeader } from '../../../components/ui/Table.tsx';
 import { PricingResolver } from '../../library/PricingResolver.tsx';
@@ -192,9 +194,29 @@ export function InventoryPanel({
     setNewIsContainer(opt.isContainer);
   }
 
+  function clearUnavailableEquipment(ids: readonly string[], patch: InventoryItemUpdate) {
+    const before = inventoryAvailability(items);
+    const after = inventoryAvailability(
+      items.map((item) => (ids.includes(item.id) ? { ...item, ...patch } : item)),
+    );
+    return items
+      .filter(
+        (item) => item.equipped && before.get(item.id)?.equipped && !after.get(item.id)?.equipped,
+      )
+      .map((item) => ({
+        entityClass: 'character_inventory' as const,
+        entityId: item.id,
+        characterId,
+        fieldPath: 'equipped',
+        attemptedValue: false,
+        humanName: 'Equipped',
+        flashKey: makeFlashKey('character_inventory', item.id, 'equipped'),
+      }));
+  }
+
   async function patchMany(id: string, patch: InventoryItemUpdate, label: string): Promise<void> {
-    await enqueueFieldPatches(
-      Object.entries(patch).map(([field, value]) => ({
+    await enqueueFieldPatches([
+      ...Object.entries(patch).map(([field, value]) => ({
         entityClass: 'character_inventory' as const,
         entityId: id,
         fieldPath: field,
@@ -203,14 +225,22 @@ export function InventoryPanel({
         flashKey: makeFlashKey('character_inventory', id, field),
         characterId,
       })),
-    );
+      ...clearUnavailableEquipment([id], patch),
+    ]);
   }
 
   async function bulkPatch(patch: InventoryItemUpdate, label: string): Promise<void> {
     const ids = Array.from(selectedIds);
     try {
-      await enqueueFieldPatches(
-        ids.flatMap((id) =>
+      if (
+        patch.equipped === true &&
+        ids.some((id) => !inventoryAvailability(items).get(id)?.carried)
+      )
+        throw new Error(
+          'Move selected items on the player and set positive quantities before equipping them',
+        );
+      await enqueueFieldPatches([
+        ...ids.flatMap((id) =>
           Object.entries(patch).map(([field, value]) => ({
             entityClass: 'character_inventory' as const,
             entityId: id,
@@ -221,7 +251,8 @@ export function InventoryPanel({
             characterId,
           })),
         ),
-      );
+        ...clearUnavailableEquipment(ids, patch),
+      ]);
       toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
     } catch (err) {
       toasts.push(`Couldn't ${label.toLowerCase()} — ${(err as Error).message}`, { kind: 'error' });
@@ -475,8 +506,10 @@ export function InventoryPanel({
         return;
       }
       let patch: InventoryItemUpdate;
-      if (target.kind === 'container') patch = { parentId: target.id, worn: false };
-      else if (target.kind === 'character') patch = { parentId: null, worn: true };
+      if (target.kind === 'container')
+        patch = { parentId: target.id, worn: false, externalLocation: null };
+      else if (target.kind === 'character')
+        patch = { parentId: null, worn: true, externalLocation: null };
       else patch = { parentId: null, worn: false };
       void patchMany(draggedId, patch, 'Moved').catch((err) => {
         toasts.push(`Couldn't move item — ${(err as Error).message}`, { kind: 'error' });
@@ -513,6 +546,7 @@ export function InventoryPanel({
         item={r}
         depth={0}
         byParent={filteredTree.byParent}
+        equipmentAvailability={inventoryAvailability(items)}
         isSelected={isSelected}
         onRowClick={handleClick}
         canEdit={canWrite}
@@ -547,7 +581,7 @@ export function InventoryPanel({
       {character.libraryEffectsKnown !== false && (
         <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-2 py-2 sm:px-5 sm:py-3 text-sm">
           <span className="num text-base-content/60">
-            {encumbrance.playerWeightLbs.toFixed(1)} lbs
+            {formatEquipmentNumber(encumbrance.playerWeightLbs)} lbs
           </span>
           <span className="text-base-content/40">·</span>
           <InfoTooltip
@@ -560,13 +594,15 @@ export function InventoryPanel({
                 </div>
                 <div className="num text-base-content/60">
                   BL = ST² ÷ 5 ={' '}
-                  <span className="text-base-content">{encumbrance.basicLift.toFixed(1)} lbs</span>
+                  <span className="text-base-content">
+                    {formatEquipmentNumber(encumbrance.basicLift)} lbs
+                  </span>
                 </div>
               </div>
             }
           >
             <span className="num text-base-content/60">
-              BL {encumbrance.basicLift.toFixed(1)} lbs
+              BL {formatEquipmentNumber(encumbrance.basicLift)} lbs
             </span>
           </InfoTooltip>
           <span className="text-base-content/40">·</span>
@@ -730,7 +766,10 @@ export function InventoryPanel({
                   type="button"
                   className="text-primary font-medium"
                   onClick={() =>
-                    void bulkPatch({ parentId: null, worn: true }, 'Moved on the player:')
+                    void bulkPatch(
+                      { parentId: null, worn: true, externalLocation: null },
+                      'Moved on the player:',
+                    )
                   }
                 >
                   On the player
@@ -757,7 +796,10 @@ export function InventoryPanel({
                   <button
                     type="button"
                     onClick={() =>
-                      void bulkPatch({ parentId: c.id, worn: false }, `Moved to ${c.name}:`)
+                      void bulkPatch(
+                        { parentId: c.id, worn: false, externalLocation: null },
+                        `Moved to ${c.name}:`,
+                      )
                     }
                   >
                     {c.name}
@@ -848,8 +890,8 @@ export function InventoryPanel({
                   ).map((item) => ({
                     item: item.name,
                     qty: item.quantity,
-                    wt: item.effectiveWeightLbs.toFixed(1),
-                    cost: item.cost.toFixed(0),
+                    wt: formatEquipmentNumber(item.effectiveWeightLbs),
+                    cost: formatEquipmentNumber(item.cost),
                   }))}
                   aria-label="Carried inventory"
                   className="table table-zebra inventory-table"
@@ -913,12 +955,14 @@ export function InventoryPanel({
                 <span>
                   <span className="text-base-content/40">wt </span>
                   <span className="font-semibold text-base-content">
-                    {stashedWeight.toFixed(1)} lb
+                    {formatEquipmentNumber(stashedWeight)} lb
                   </span>
                 </span>
                 <span>
                   <span className="text-base-content/40">cost </span>
-                  <span className="font-semibold text-base-content">{stashedCost.toFixed(0)}</span>
+                  <span className="font-semibold text-base-content">
+                    {formatEquipmentNumber(stashedCost)}
+                  </span>
                 </span>
               </span>
             </div>
@@ -938,8 +982,8 @@ export function InventoryPanel({
                   ).map((item) => ({
                     item: item.name,
                     qty: item.quantity,
-                    wt: (item.weightLbs * item.quantity).toFixed(1),
-                    cost: item.cost.toFixed(0),
+                    wt: formatEquipmentNumber(item.weightLbs * item.quantity),
+                    cost: formatEquipmentNumber(item.cost),
                   }))}
                   aria-label="Stashed inventory"
                   className="table table-zebra inventory-table"
@@ -958,20 +1002,21 @@ export function InventoryPanel({
               <span className="font-semibold text-base-content">
                 {character.libraryEffectsKnown === false
                   ? 'unavailable'
-                  : `${encumbrance.playerWeightLbs.toFixed(1)} lb`}
+                  : `${formatEquipmentNumber(encumbrance.playerWeightLbs)} lb`}
               </span>
             </span>
             <span className="num">
               <span className="text-base-content/40">raw </span>
-              {sumRaw.toFixed(1)} lb
+              {formatEquipmentNumber(sumRaw)} lb
             </span>
             <span className="num">
               <span className="text-base-content/40">cost </span>
-              {totalCost.toFixed(0)}
+              {formatEquipmentNumber(totalCost)}
             </span>
             {character.libraryEffectsKnown !== false && (
               <span className="num text-base-content/40">
-                BL {encumbrance.basicLift.toFixed(0)} → {LEVEL_LABELS[encumbrance.level]}
+                BL {formatEquipmentNumber(encumbrance.basicLift)} →{' '}
+                {LEVEL_LABELS[encumbrance.level]}
               </span>
             )}
           </div>

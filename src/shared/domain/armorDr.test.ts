@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
   aggregateDrByLocation,
+  armorLayering,
   effectiveDrByLocation,
   layeredArmorDrContributions,
   resolveArmorDb,
@@ -19,6 +20,8 @@ function item(
   return {
     id: `armor-${dr}-${locations.join('-')}`,
     name: `Armor ${dr}`,
+    worn: true,
+    quantity: 1,
     equipped: true,
     isArmor: true,
     armor: {
@@ -26,7 +29,8 @@ function item(
       dr,
       drCrushing: null,
       typedDr: {},
-      flexible: false,
+      flexible: true,
+      concealable: true,
       frontOnly: false,
       backOnly: false,
       db: null,
@@ -41,11 +45,10 @@ describe('aggregateDrByLocation', () => {
     const map = aggregateDrByLocation([
       item(4, ['torso'], { typedDr: { imp: 7 } }),
       item(2, ['torso', 'vitals', 'torso']),
-      item(1, ['vitals']),
     ]);
-    expect(resolveDr('imp', map.get('vitals'))).toBe(10);
+    expect(resolveDr('imp', map.get('vitals'))).toBe(9);
     expect(resolveDr('imp', map.get('torso'))).toBe(9);
-    expect(applyDamage(12, 'imp', 'vitals', map, '2', 10).injury).toBe(21);
+    expect(applyDamage(12, 'imp', 'vitals', map, '2', 10).injury).toBe(24);
   });
   it('sums DR across equipped armor covering the same location', () => {
     const result = aggregateDrByLocation([item(2, ['torso']), item(3, ['torso', 'arm_left'])]);
@@ -53,11 +56,49 @@ describe('aggregateDrByLocation', () => {
     expect(result.get('arm_left')?.dr).toBe(3);
   });
 
+  it('excludes stashed and zero-quantity armor even when the row remains equipped', () => {
+    const carried = { ...item(2, ['torso']), worn: true, quantity: 1 };
+    const stashed = { ...item(8, ['torso']), id: 'stashed', worn: false, quantity: 1 };
+    const depleted = { ...item(5, ['torso']), id: 'depleted', worn: true, quantity: 0 };
+    expect(aggregateDrByLocation([carried, stashed, depleted]).get('torso')?.dr).toBe(2);
+  });
+
+  it('allows one rigid outer layer over one flexible concealable inner layer and applies DX penalty', () => {
+    const outer = item(4, ['torso'], { flexible: false });
+    const inner = item(2, ['torso'], { flexible: true, concealable: true });
+    const result = armorLayering([outer, inner]);
+    expect(result).toEqual({ dxPenalty: 1, invalidLocations: [] });
+    expect(aggregateDrByLocation([outer, inner]).get('torso')?.dr).toBe(6);
+  });
+
+  it('flags illegal rigid overlap and excludes DR at the invalid location', () => {
+    const layers = [
+      item(4, ['torso'], { flexible: false }),
+      item(3, ['torso'], { flexible: false }),
+    ];
+    expect(armorLayering(layers).invalidLocations).toContain('torso');
+    expect(aggregateDrByLocation(layers).has('torso')).toBe(false);
+  });
+
+  it('flags a third layer and does not penalize valid head layering', () => {
+    const threeTorsoLayers = [
+      item(4, ['torso'], { flexible: false }),
+      item(3, ['torso'], { flexible: true, concealable: true }),
+      item(2, ['torso']),
+    ];
+    expect(armorLayering(threeTorsoLayers).invalidLocations).toContain('torso');
+    const headLayers = [
+      item(4, ['skull']),
+      item(2, ['skull'], { flexible: true, concealable: true }),
+    ];
+    expect(armorLayering(headLayers)).toEqual({ dxPenalty: 0, invalidLocations: [] });
+  });
+
   it('filters directional DR for front, back, and side facings', () => {
     const layers = [
-      item(2, ['torso'], { frontOnly: true }),
-      item(3, ['torso'], { backOnly: true }),
-      item(4, ['torso']),
+      item(2, ['torso'], { frontOnly: true, flexible: false }),
+      item(3, ['torso'], { backOnly: true, flexible: false }),
+      item(4, ['torso'], { flexible: true, concealable: true }),
     ];
 
     expect(aggregateDrByLocation(layers, 'front').get('torso')?.dr).toBe(6);
@@ -264,8 +305,8 @@ describe('aggregateDrByLocation', () => {
       weaponData: null,
       weightReductionPercent: 0,
       enchantments: [
-        { spellName: 'Fortify', mechanics },
-        { spellName: 'Fortify', mechanics },
+        { spellName: 'Fortify', spellLevel: 15, mechanics },
+        { spellName: 'Fortify', spellLevel: 15, mechanics },
       ],
     });
 
@@ -486,7 +527,7 @@ describe('resolveArmorDb', () => {
     expect(resolveArmorDb([{ equipped: true, isArmor: false, armor: null }], 'torso')).toBeNull();
   });
 
-  it('uses the maximum covering DB once and resolves by location', () => {
+  it('uses the highest equipped armor DB once, independently of location', () => {
     const torso1 = item(2, ['torso'], { db: 1 });
     const torso3 = { ...item(3, ['torso'], { db: 3 }), id: 'torso-3', name: 'Deflect Plate' };
     const head2 = { ...item(1, ['skull'], { db: 2 }), id: 'head-2', name: 'Deflect Helm' };
@@ -495,16 +536,17 @@ describe('resolveArmorDb', () => {
       itemId: 'torso-3',
       itemName: 'Deflect Plate',
     });
-    expect(resolveArmorDb([torso1, torso3, head2], 'skull')?.db).toBe(2);
+    expect(resolveArmorDb([torso1, torso3, head2], 'skull')?.db).toBe(3);
   });
 
-  it('skips unequipped, non-covering, empty-location, and zero DB armor', () => {
+  it('skips stashed, unequipped, zero-quantity, non-armor, and zero DB items', () => {
     const result = resolveArmorDb(
       [
         item(2, ['torso'], { db: 1 }),
         { equipped: false, isArmor: true, armor: item(2, ['torso'], { db: 5 }).armor },
-        item(2, ['skull'], { db: 4 }),
-        item(2, [], { db: 4 }),
+        { ...item(2, ['skull'], { db: 8 }), id: 'stashed', worn: false },
+        { ...item(2, ['skull'], { db: 7 }), id: 'zero', quantity: 0 },
+        { equipped: true, isArmor: false, armor: item(2, ['skull'], { db: 6 }).armor },
         item(2, ['torso'], { db: 0 }),
       ],
       'torso',
@@ -512,14 +554,13 @@ describe('resolveArmorDb', () => {
     expect(result?.db).toBe(1);
   });
 
-  it('respects known facing and deterministically breaks equal maxima', () => {
+  it('ignores hit location/facing and deterministically breaks equal maxima', () => {
     const back = { ...item(2, ['torso'], { db: 3, backOnly: true }), id: 'b', name: 'Back' };
     const frontZ = { ...item(2, ['torso'], { db: 3, frontOnly: true }), id: 'z', name: 'Front Z' };
     const frontA = { ...item(2, ['torso'], { db: 3, frontOnly: true }), id: 'a', name: 'Front A' };
-    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'front')?.itemId).toBe('a');
-    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'back')?.itemId).toBe('b');
-    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'left')).toBeNull();
-    expect(resolveArmorDb([frontZ, back, frontA], 'torso', 'right')).toBeNull();
+    for (const facing of ['front', 'back', 'left', 'right'] as const) {
+      expect(resolveArmorDb([frontZ, back, frontA], 'torso', facing)?.itemId).toBe('a');
+    }
   });
 });
 

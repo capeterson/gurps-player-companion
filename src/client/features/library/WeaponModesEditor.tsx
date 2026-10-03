@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { parse, stringify } from 'yaml';
 import { normalizeWeaponData } from '../../../shared/domain/weaponModes.ts';
-import { type WeaponData, weaponData } from '../../../shared/schemas/inventory.ts';
+import { type WeaponData, type WeaponMode, weaponData } from '../../../shared/schemas/inventory.ts';
 import { RangedRangeInputs } from '../characters/sections/inventory/RangedRangeField.tsx';
 import { StructuredFields } from './StructuredFields.tsx';
 import { newEditorId } from './editorId.ts';
@@ -180,6 +180,36 @@ export function WeaponModesEditor({
                         />
                       </label>
                     </div>
+                    <label>
+                      Purchased weapon ST
+                      <input
+                        className="input input-sm w-full"
+                        type="text"
+                        inputMode="numeric"
+                        value={mode.weaponSt ?? ''}
+                        onChange={(event) => change({ weaponSt: numberDraft(event.target.value) })}
+                      />
+                    </label>
+                    <label>
+                      Damage strength rule
+                      <select
+                        className="select select-sm w-full"
+                        value={mode.strengthKind ?? ''}
+                        onChange={(event) =>
+                          change({
+                            strengthKind: (event.target.value ||
+                              null) as WeaponMode['strengthKind'],
+                          })
+                        }
+                      >
+                        <option value="">Automatic from governing skill</option>
+                        {['ordinary', 'bow', 'crossbow', 'natural'].map((kind) => (
+                          <option key={kind} value={kind}>
+                            {kind}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <label>
                       <input
                         type="checkbox"

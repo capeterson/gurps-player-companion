@@ -1,3 +1,5 @@
+import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailability.ts';
+import { localInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
 import { HUMAN_RACE, characterRace } from '../../shared/schemas/race.ts';
 import { libraryDependencyHeld } from './libraryDependencies.ts';
 import { patchesOverlap, unsettledPatch } from './patchKeys.ts';
@@ -598,6 +600,29 @@ async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void
     humanName: args.humanName,
     batchId: args.batchId,
   };
+  if (args.entityClass === 'character_inventory') {
+    const doomed = await db.characterInventory.get(args.entityId);
+    if (doomed) {
+      const children = await db.characterInventory
+        .where('parentId')
+        .equals(args.entityId)
+        .filter((child) => child.characterId === doomed.characterId)
+        .toArray();
+      const after = promotedInventoryLocation(doomed);
+      op.localInventoryPromotionUndo = localInventoryPromotionUndo.parse(
+        children.map((child) => ({
+          id: child.id,
+          before: {
+            parentId: child.parentId,
+            worn: child.worn,
+            externalLocation: child.externalLocation,
+          },
+          after,
+        })),
+      );
+      for (const child of children) await db.characterInventory.update(child.id, after);
+    }
+  }
   await applyLocalDelete(args.entityClass, args.entityId);
   await db.outbox.add(op);
 }

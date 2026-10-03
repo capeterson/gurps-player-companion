@@ -896,6 +896,7 @@ describe('mechanical enchantment lifecycle', () => {
           {
             spellName: 'Forged client name',
             level: 2,
+            spellLevel: 15,
             definitionId: definition.id,
             mechanics: {
               applicability: 'armor',

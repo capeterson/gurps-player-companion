@@ -15,6 +15,7 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import {
   type ArmorFacing,
+  armorLayering,
   effectiveDrByLocation,
   resolveArmorDb,
 } from '../../../../../shared/domain/armorDr.ts';
@@ -54,8 +55,13 @@ export function IncomingDamageDialog({
 }: IncomingDamageDialogProps) {
   const ref = useDialogState(open);
   const [basicRaw, setBasicRaw] = useState('');
+  const invalidLayers = armorLayering(character.inventory, facing).invalidLocations.includes(
+    location,
+  );
   const effectsKnown =
-    character.libraryEffectsKnown !== false && character.houseRulesKnown !== false;
+    character.libraryEffectsKnown !== false &&
+    character.houseRulesKnown !== false &&
+    !invalidLayers;
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
 
   const drMap = useMemo(
@@ -103,7 +109,9 @@ export function IncomingDamageDialog({
             ? `/${divisor.trim()}`
             : '';
   const breakdown = !effectsKnown
-    ? 'Linked library effects or campaign house rules are unavailable. Reconnect and load them before applying damage.'
+    ? invalidLayers
+      ? 'Resolve overlapping armor layers in Inventory before applying damage (B286).'
+      : 'Linked library effects or campaign house rules are unavailable. Reconnect and load them before applying damage.'
     : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
           divisorText ? `=${result.effectiveDr}` : ''
@@ -166,7 +174,7 @@ export function IncomingDamageDialog({
           <p className="rounded-lg border border-base-300/60 px-3 py-2 text-xs text-base-content/80">
             {armorDb
               ? `Armor DB ${armorDb.db} (${armorDb.itemName}) applies to defense only; it is not DR and does not reduce damage.`
-              : 'Armor DB: none at this location. DB does not reduce damage.'}
+              : 'Manual armor Deflect DB: none. DB does not reduce damage.'}
           </p>
           {effectsKnown && cripplingHint && (
             <p className="text-[11px] text-warning">{cripplingHint}</p>

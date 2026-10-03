@@ -1105,3 +1105,15 @@ clients retain outbox IDs, ordering and delivery-uncertainty state.
 ## Racial templates
 
 `campaign_library_race` and Dexie v16 `campaignLibraryRaces` use the same cursor/outbox/whole-entry path as other library definitions. Character race is one root `race` patch. Race/campaign patches preserve enqueue order across one another, and race selections depend on speculative race/lens writes. Cursor and minimal-view sweeps validate/scrub the owned snapshot while retaining public raceName. See [races.md](races.md).
+
+### Inventory container deletion
+
+Deleting an inventory container atomically promotes its direct children locally
+and journals `localInventoryPromotionUndo` on the delete operation. Promotion
+copies the deleted root's carried flag and external label when children become
+roots; nested promotions retain ancestor location. REST and sync apply the same
+`promotedInventoryLocation` rule under the character tree lock. Cursor pulls
+preserve these local promotion fields while the delete is unsettled. Rejection
+or explicit discard restores unchanged fields, preserves newer child edits, and
+flashes affected rows alongside the deletion rollback notice. The client-only
+journal has a shared Zod schema and never enters a sync envelope.

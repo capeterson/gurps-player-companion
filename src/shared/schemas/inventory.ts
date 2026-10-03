@@ -35,15 +35,13 @@ export const armorData = z
     /** Per-damage-type DR overrides (cut/imp/pi/burn/corr/fat/tox). */
     typedDr: typedArmorDr.default({}),
     flexible: z.boolean().default(false),
+    /** Required for an inner armor layer (B286). */
+    concealable: z.boolean().optional(),
     frontOnly: z.boolean().default(false),
     backOnly: z.boolean().default(false),
-    /**
-     * Defense Bonus from Deflect enchantments (B287). Non-null marks the
-     * armor as granting DB. The highest equipped DB covering the defended
-     * location/facing stacks with shield DB and adds to Dodge, every Parry,
-     * and Block; overlapping armor DB does not add together.
-     */
-    db: z.number().int().min(0).max(4).nullable().optional(),
+    /** Legacy manual Deflect bonus; highest equipped armor value applies
+     * to all defenses (M67), independently of physical DR coverage. */
+    db: z.number().int().min(0).max(5).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
   })
   .strict();
@@ -142,6 +140,9 @@ export const weaponMode = z
     key: z.string().min(1).max(40).optional(),
     skill: z.string().max(160).nullable().optional(),
     stRequired: z.number().int().min(0).max(99).nullable().optional(),
+    /** Purchased ST for bows/crossbows, separate from minimum wielding ST. */
+    weaponSt: z.number().int().min(1).max(999).nullable().optional(),
+    strengthKind: z.enum(['ordinary', 'bow', 'crossbow', 'natural']).nullable().optional(),
     ranged: rangedData.nullable().optional(),
     sourceRow: z.string().max(2000).nullable().optional(),
     /** "Swing", "Thrust", "Thrown", ... */
@@ -168,6 +169,9 @@ export const weaponData = z
     reach: z.string().max(40).nullable().optional(),
     parry: z.string().max(40).nullable().optional(),
     stRequired: z.number().int().min(0).max(99).nullable().optional(),
+    /** Purchased ST for bows/crossbows, separate from minimum wielding ST. */
+    weaponSt: z.number().int().min(1).max(999).nullable().optional(),
+    strengthKind: z.enum(['ordinary', 'bow', 'crossbow', 'natural']).nullable().optional(),
     /**
      * Governing skill, matched by exact case-insensitive name against the
      * character's skills. A name string (not a skillId) because this same
@@ -351,8 +355,8 @@ export const enchantmentRef = z
   .object({
     /** The enchantment's spell name, e.g. "Fortify". */
     spellName: z.string().min(1).max(160),
-    /** Enchanter's skill when the item was made (GURPS item spells are
-     * cast at a fixed level); null = unknown/unrecorded. */
+    /** Per-spell item Power (B481, M17), the lower of Enchant and spell
+     * skill at creation; null means unrecorded and requires adjudication. */
     spellLevel: z.number().int().min(0).max(40).nullable().optional(),
     /** Free-text category label, e.g. "Fortify +3" or "Deflect +2". */
     category: z.string().max(80).nullable().optional(),
@@ -394,6 +398,7 @@ export const enchantmentContribution = z.object({
   target: enchantmentEffectTarget,
   value: z.number(),
   active: z.boolean(),
+  inactiveReason: z.string().max(240).optional(),
   stackingKey: z.string().max(80).nullable(),
   suppressedByStacking: z.boolean(),
 });
@@ -479,3 +484,27 @@ export type EnchantmentMechanics = z.infer<typeof enchantmentMechanics>;
 export type EnchantmentApplicability = z.infer<typeof enchantmentApplicability>;
 export type EnchantmentLevel = z.infer<typeof enchantmentLevel>;
 export type EnchantmentStackingPolicy = z.infer<typeof enchantmentStackingPolicy>;
+
+/** Client-only journal for atomic container deletion; never sent to REST/sync. */
+export const localInventoryPromotionUndo = z.array(
+  z
+    .object({
+      id: uuid,
+      before: z
+        .object({
+          parentId: uuid.nullable(),
+          worn: z.boolean(),
+          externalLocation: z.string().max(160).nullable(),
+        })
+        .strict(),
+      after: z
+        .object({
+          parentId: uuid.nullable(),
+          worn: z.boolean().optional(),
+          externalLocation: z.string().max(160).nullable().optional(),
+        })
+        .strict(),
+    })
+    .strict(),
+);
+export type LocalInventoryPromotionUndo = z.infer<typeof localInventoryPromotionUndo>[number];

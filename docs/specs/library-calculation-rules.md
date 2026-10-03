@@ -203,11 +203,52 @@ facets and container values; mode key and mode name restrictions are independent
 Ambiguous extraction belongs in evidence with incomplete status, not fabricated
 damage/skill/reach fields.
 
-Character item equipment bonuses, including typed skill enchantments, require
-`equipped`; merely carrying an item does not activate them. Physical weight
-reductions follow carried weight instead. The legacy inventory `worn` field
-marks a root as on the player, with nested contents inheriting that location.
-It does not represent wearing an item for use.
+Character equipment bonuses require an equipped, positive-quantity item on the
+player. `inventoryAvailability` follows the entire ancestor chain; a stashed,
+external, zero-quantity or cyclic ancestor makes descendants unavailable. The
+legacy `worn` field marks root carrying, not actual wearing.
+
+Typed enchantments use per-spell `spellLevel` as **Item Power** (B481, M17).
+Unknown Power is visibly inactive and requires GM confirmation; Power below 15
+is inactive, low mana subtracts 5, and no mana suspends effects. Inactive
+candidates cannot suppress an active highest-policy effect. Legacy note-only
+entries remain notes; manually resolved base values remain manual.
+Deflect declarations add magical DB independently of the shield marker and DR
+coverage (M67); highest-policy groups compete across equipped items, while
+stack-policy contributions remain additive. Manual armor DB is the highest
+equipped armor value and applies to all active defenses. Base DB authoring
+permits 5. Physical shield DB remains directional and Block still requires a shield.
+
+Lighten (`weightReductionPercent`, including typed effects) affects only equipped
+armor/shields' own weight (M67). Hideaway deducts only a container's contents,
+recursively after nested adjustments, never its own weight (M61). The resolved
+capacity field denotes the weightless variant; ordinary storage capacity and the
+weighted Hideaway variant belong in notes and do not remove load. These manual
+resolved fields do not infer an enchantment's Power; use typed effects for a
+Power/mana-gated Lighten declaration. No mana also suspends manual resolved
+Lighten, Hideaway and armor Deflect fields. Ordinary sample backpacks record 40 lb
+storage capacity in notes and have no Hideaway.
+
+Weapon modes optionally record `weaponSt` separately from `stRequired`, and
+`strengthKind` distinguishes ordinary, bow, crossbow and natural attacks.
+Ordinary melee ST-based damage caps ST at 3× MinST (B270); natural weapons are
+exempt. Bow/crossbow damage and range use purchased ST (B275), with legacy
+weapon-strength range records falling back to recorded ST. A bow above usable
+wielder ST cannot attack; crossbow reloading time remains manual. Flat character
+damage adds survive the ST cap. Fencing Parry subtracts encumbrance level after
+halving skill (B376).
+
+Armor records `concealable` for the inner-layer requirement (B286). At most two
+layers may overlap; one must be flexible and concealable. Invalid locations
+have no automatic armor DR, show an explicit unavailable state, and disable
+applying injury until corrected. Legal layering outside the head subtracts 1
+from effective DX and DX-based skills without altering Basic Speed/Move.
+
+Carried powerstones with positive quantities and available ancestors are casting
+candidates for mages, including Magery 0, except in no mana. The caster must
+confirm physical touch (M69); a casting uses at most one stone. Recharge,
+proximity sharing, dedicated/exclusive stones and destruction remain manual.
+The owned-stone panel includes stashed possessions and describes them as owned.
 
 ## Persistence, import and public access
 

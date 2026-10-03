@@ -1371,10 +1371,10 @@ describe('POST /api/v1/sync/operations -- inventory enchantments', () => {
         },
       ]);
 
-    const root = await create(rootId, character.id, { name: 'Root' });
+    const root = await create(rootId, character.id, { name: 'Root', isContainer: true });
     const child = await create(childId, character.id, { name: 'Child', parentId: rootId });
     await create(otherParentId, otherCharacter.id, { name: 'Foreign parent' });
-    await create(validParentId, character.id, { name: 'Valid parent' });
+    await create(validParentId, character.id, { name: 'Valid parent', isContainer: true });
     const childRevision = child.outcomes[0]?.newRevision as number;
     const rootRevision = root.outcomes[0]?.newRevision as number;
 
@@ -1455,6 +1455,156 @@ describe('POST /api/v1/sync/operations -- inventory enchantments', () => {
     };
     expect(detail.inventory.find((item) => item.id === childId)?.parentId).toBe(rootId);
     expect(root.outcomes[0]?.status).toBe('applied');
+  });
+});
+
+describe('POST /api/v1/sync/operations -- inventory containment rules', () => {
+  async function createInventory(
+    accessToken: string,
+    characterId: string,
+    value: Record<string, unknown>,
+  ) {
+    const id = crypto.randomUUID();
+    const result = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: id,
+        command: 'create' as const,
+        attemptedValue: value,
+        parentId: characterId,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    return { id, outcome: result.outcomes[0] };
+  }
+
+  it('rejects nesting under a non-container and clearing a populated container', async () => {
+    const { accessToken } = await registerUser('sync-containment');
+    const character = await createCharacter(accessToken);
+    const ordinary = await createInventory(accessToken, character.id, {
+      name: 'Ordinary item',
+      isContainer: false,
+    });
+    expect(ordinary.outcome?.status).toBe('applied');
+    const invalidChild = await createInventory(accessToken, character.id, {
+      name: 'Hidden child',
+      parentId: ordinary.id,
+    });
+    expect(invalidChild.outcome?.status).toBe('rejected');
+
+    const container = await createInventory(accessToken, character.id, {
+      name: 'Container',
+      isContainer: true,
+    });
+    expect(container.outcome?.status).toBe('applied');
+    const child = await createInventory(accessToken, character.id, {
+      name: 'Nested item',
+      parentId: container.id,
+    });
+    expect(child.outcome?.status).toBe('applied');
+    const patched = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: container.id,
+        command: 'patch' as const,
+        fieldPath: 'isContainer',
+        attemptedValue: false,
+        baseRevision: container.outcome?.newRevision as number,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(patched.outcomes[0]?.status).toBe('rejected');
+  });
+
+  it('preserves carried root location when deleting the carried container', async () => {
+    const { accessToken } = await registerUser('sync-delete-location');
+    const character = await createCharacter(accessToken);
+    const root = await createInventory(accessToken, character.id, {
+      name: 'Carried pack',
+      isContainer: true,
+      worn: true,
+    });
+    const nested = await createInventory(accessToken, character.id, {
+      name: 'Nested pouch',
+      parentId: root.id,
+      isContainer: true,
+      worn: false,
+    });
+    const leaf = await createInventory(accessToken, character.id, {
+      name: 'Coin',
+      parentId: nested.id,
+      worn: false,
+    });
+    expect([root.outcome?.status, nested.outcome?.status, leaf.outcome?.status]).toEqual([
+      'applied',
+      'applied',
+      'applied',
+    ]);
+    const deleted = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: root.id,
+        command: 'delete' as const,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(deleted.outcomes[0]?.status).toBe('applied');
+    const detail = (await getCharacter(accessToken, character.id)) as unknown as {
+      inventory: Array<{ id: string; parentId: string | null; worn: boolean }>;
+    };
+    expect(detail.inventory.find((item) => item.id === nested.id)).toMatchObject({
+      parentId: null,
+      worn: true,
+    });
+    expect(detail.inventory.find((item) => item.id === leaf.id)).toMatchObject({
+      parentId: nested.id,
+      worn: false,
+    });
+  });
+
+  it('preserves an external stash label when deleting a stashed container', async () => {
+    const { accessToken } = await registerUser('sync-delete-external');
+    const character = await createCharacter(accessToken);
+    const root = await createInventory(accessToken, character.id, {
+      name: 'Stored case',
+      isContainer: true,
+      worn: false,
+      externalLocation: 'At home',
+    });
+    const child = await createInventory(accessToken, character.id, {
+      name: 'Stored ring',
+      parentId: root.id,
+      worn: true,
+    });
+    expect([root.outcome?.status, child.outcome?.status]).toEqual(['applied', 'applied']);
+    const deleted = await postOperations(accessToken, [
+      {
+        clientOpId: crypto.randomUUID(),
+        entityClass: 'character_inventory' as const,
+        entityId: root.id,
+        command: 'delete' as const,
+        parentId: character.id,
+        validationVersion: 1,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    expect(deleted.outcomes[0]?.status).toBe('applied');
+    const detail = (await getCharacter(accessToken, character.id)) as unknown as {
+      inventory: Array<Record<string, unknown>>;
+    };
+    expect(detail.inventory.find((item) => item.id === child.id)).toMatchObject({
+      parentId: null,
+      worn: false,
+      externalLocation: 'At home',
+    });
   });
 });
 
