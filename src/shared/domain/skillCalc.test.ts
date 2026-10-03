@@ -4,6 +4,8 @@ import { type CharacterAttrs, computeDerived } from './characterCalc.ts';
 import {
   attributeLevelFor,
   computeSkillLevel,
+  computeSkillLevelBreakdown,
+  resolveSkillLevelBreakdowns,
   resolveSkillLevels,
   skillOffset,
   unresolvedDefaultConditionMessages,
@@ -445,5 +447,76 @@ describe('Rule of 20 (B173)', () => {
         [{ name: 'Source', specialization: null, level: 25 }],
       ),
     ).toBe(23);
+  });
+});
+
+describe('skill level explanations', () => {
+  const derived = computeDerived(baseAttrs);
+  it('explains the purchased ladder and an unavailable untrained skill', () => {
+    expect(computeSkillLevelBreakdown('DX', 'A', 4, derived)).toMatchObject({
+      level: 13,
+      attributeLevel: 12,
+      points: 4,
+      purchasedLevel: 13,
+      defaultSource: null,
+    });
+    expect(computeSkillLevelBreakdown('DX', 'A', 0, derived).level).toBeNull();
+  });
+  it('retains the linked learned source, TL penalty and virtual credit for buy-up', () => {
+    const breakdown = computeSkillLevelBreakdown(
+      'IQ',
+      'A',
+      4,
+      derived,
+      [{ kind: 'skill', name: 'Engineering', modifier: -2 }],
+      [{ id: 'source', name: 'Engineering', specialization: null, level: 23, techLevel: 8 }],
+      null,
+      undefined,
+      9,
+    );
+    expect(breakdown).toMatchObject({
+      level: 17,
+      points: 4,
+      purchasedLevel: 15,
+      defaultSource: {
+        id: 'source',
+        name: 'Engineering',
+        level: 23,
+        modifier: -2,
+        techLevelPenalty: -5,
+        defaultLevel: 16,
+        pointCredit: 8,
+        boughtIncrease: 1,
+      },
+    });
+  });
+  it('uses the same stable acyclic defaults for explanations and levels', () => {
+    const skills = [
+      {
+        id: 'a',
+        name: 'A',
+        specialization: null,
+        attribute: 'DX' as const,
+        difficulty: 'A' as const,
+        points: 8,
+        defaults: [{ kind: 'skill' as const, name: 'B', modifier: -1 }],
+      },
+      {
+        id: 'b',
+        name: 'B',
+        specialization: null,
+        attribute: 'DX' as const,
+        difficulty: 'A' as const,
+        points: 2,
+        defaults: [{ kind: 'skill' as const, name: 'A', modifier: -1 }],
+      },
+    ];
+    const details = resolveSkillLevelBreakdowns(skills, derived);
+    expect([...details].map(([id, row]) => [id, row.level])).toEqual([
+      ...resolveSkillLevels(skills, derived),
+    ]);
+    expect(details.get('b')?.defaultSource?.id).toBe('a');
+    expect(details.get('a')?.defaultSource).toBeNull();
+    expect(resolveSkillLevelBreakdowns([...skills].reverse(), derived)).toEqual(details);
   });
 });

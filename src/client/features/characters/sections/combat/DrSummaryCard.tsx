@@ -172,11 +172,6 @@ export function DrSummaryCard({
         icon="defense"
       >
         <section className="space-y-4" aria-label="Incoming attack">
-          <div>
-            <p className="text-xs text-muted mt-1">
-              Choose the target and facing, roll a defense, then resolve damage if the attack hits.
-            </p>
-          </div>
           {!known && (
             <output className="text-sm text-warning">
               {invalidLayers.includes(location)
@@ -242,7 +237,7 @@ export function DrSummaryCard({
                 />
                 {selectedDefense && (
                   <p aria-live="polite" className="text-xs text-muted">
-                    {`Selected defense: ${selectedDefense.label} ${selectedDefense.target} against ${locationLabel(location)} from the ${selectedFacing}. Resolve the roll and situational modifiers before deciding whether the attack hits.`}
+                    {`Selected defense: ${selectedDefense.label} ${selectedDefense.target} against ${locationLabel(location)} from the ${selectedFacing}.`}
                   </p>
                 )}
               </div>

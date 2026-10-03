@@ -424,12 +424,6 @@ test('overview stays compact and description and conditional effects work at sup
   await expect(
     page.getByRole('heading', { name: 'Conditional effects', exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText('Enable a condition to apply its modifiers.', { exact: false }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/Groups come from trait effects and Combat → Active Effects\./),
-  ).toBeVisible();
 
   const descriptionView = page.getByRole('group', { name: 'Character description' });
   await expect(descriptionView).toBeVisible();

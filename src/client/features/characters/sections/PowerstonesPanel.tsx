@@ -116,9 +116,7 @@ export function PowerstonesPanel({
         <p className="num text-xs text-base-content/60">{total} stored energy</p>
       </header>
       {stones.length === 0 ? (
-        <p className="text-sm text-base-content/60">
-          No powerstones owned. Add one in Inventory to track its energy here.
-        </p>
+        <p className="text-sm text-base-content/60">No powerstones owned.</p>
       ) : (
         <Table
           preferenceKey={`${character.id}:powerstones`}

@@ -92,6 +92,7 @@ test('user preferences control the Current Status height and visible controls at
           name: /All changes saved|Syncing changes|Some changes failed to sync|Offline/,
         }),
         bar.getByLabel(/Notifications/),
+        bar.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ }),
       ];
       for (const control of mobileControls) {
         const controlBox = await control.boundingBox();
@@ -117,7 +118,10 @@ test('user preferences control the Current Status height and visible controls at
       expect((await header.boundingBox())?.height).toBeLessThanOrEqual(64);
       await navigation.getByLabel('Open navigation for Kestrel Vale').click();
       const menu = navigation.getByRole('list');
-      await expect(menu.getByText('Kestrel Vale', { exact: true })).toBeVisible();
+      const identity = menu.locator(':scope > li').first();
+      await expect(identity).toContainText('rowan@example.invalid');
+      await expect(menu.getByText('Kestrel Vale', { exact: true })).toHaveCount(0);
+      await expect(menu.getByRole('button', { name: /^Switch to / })).toHaveCount(0);
       await expect(menu.getByRole('link', { name: 'Campaigns' })).toBeVisible();
       await expect(menu.getByRole('link', { name: 'Settings' })).toBeVisible();
       const menuBox = await menu.boundingBox();
@@ -127,7 +131,7 @@ test('user preferences control the Current Status height and visible controls at
         expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(width);
         expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(height);
       }
-      const menuTextBox = await menu.getByText('Kestrel Vale', { exact: true }).boundingBox();
+      const menuTextBox = await identity.locator('span').boundingBox();
       expect(menuTextBox).not.toBeNull();
       if (menuTextBox && menuBox) {
         expect(menuTextBox.x).toBeGreaterThanOrEqual(menuBox.x);
@@ -171,7 +175,9 @@ test('user preferences control the Current Status height and visible controls at
             bar.getByRole('button', { name: 'Adjust HP, current -1000 of 1000, Death checks' }),
           ).toBeVisible();
           await expect(
-            bar.getByRole('button', { name: 'Adjust FP, current -1000 of 1000, Exhausted' }),
+            // Campaign/racial modifiers still apply to the seeded HT. This
+            // assertion exercises extreme layout, rather than FP calculation.
+            bar.getByRole('button', { name: /^Adjust FP, current -1000 of \d+, Exhausted$/ }),
           ).toBeVisible();
           await captureReviewScreenshot(page, {
             path: 'test-results/status-bar-extreme-320.png',

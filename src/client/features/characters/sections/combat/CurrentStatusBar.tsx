@@ -85,7 +85,7 @@ function PoolTrigger({
     <button
       type="button"
       {...flashProps}
-      className={`field-rollback-flash btn btn-sm min-h-11 w-full min-w-0 px-1 ${compact ? 'btn-ghost flex-col justify-center gap-0 rounded-none px-0.5 text-center max-[1279px]:border-0! max-[1279px]:shadow-none! min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:gap-1 min-[1280px]:rounded-field min-[1280px]:px-2.5' : 'flex-wrap gap-0.5 gap-y-0 whitespace-normal min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:gap-1 min-[1280px]:px-2.5'}`}
+      className={`field-rollback-flash btn btn-sm min-h-11 w-full min-w-0 px-1 ${compact ? 'btn-ghost h-auto flex-col justify-center gap-0 rounded-none px-0.5 text-center max-[1279px]:border-0! max-[1279px]:shadow-none! min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:gap-1 min-[1280px]:rounded-field min-[1280px]:px-2.5' : 'flex-wrap gap-0.5 gap-y-0 whitespace-normal min-[1280px]:min-h-10 min-[1280px]:w-auto min-[1280px]:gap-1 min-[1280px]:px-2.5'}`}
       aria-label={`Adjust ${label}, current ${current} of ${max}${warning ? `, ${warning}` : ''}`}
       aria-expanded={open}
       aria-controls={panelId}
@@ -97,13 +97,14 @@ function PoolTrigger({
             className={`flex w-full min-w-0 justify-center leading-none min-[1280px]:hidden ${longCompactValue ? 'flex-col items-center gap-0' : 'items-baseline gap-1'}`}
           >
             <span className="shrink-0 text-[10px] font-semibold text-base-content/70">{label}</span>
-            <span className="num min-w-0 whitespace-nowrap text-[13px] font-bold tracking-tight">
-              {compactValue}
+            <span className="num flex min-w-0 max-w-full flex-wrap justify-center text-[13px] font-bold tracking-tight">
+              <span className="whitespace-nowrap">{current}</span>
+              <span className="whitespace-nowrap">/{max}</span>
             </span>
           </span>
           {warning && (
             <span
-              className={`w-full whitespace-nowrap text-center font-semibold leading-tight text-warning min-[1280px]:hidden ${warning.length > 10 ? 'text-[10px] tracking-tight' : 'text-[11px]'}`}
+              className={`w-full whitespace-normal text-center font-semibold leading-tight text-warning min-[1280px]:hidden ${warning.length > 10 ? 'text-[10px] tracking-tight' : 'text-[11px]'}`}
             >
               {warning}
             </span>
@@ -198,9 +199,6 @@ function PoolAdjustmentPanel({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="font-semibold">{label === 'HP' ? 'Hit Points' : 'Fatigue Points'}</p>
-            <p className="text-xs text-base-content/60">
-              {canWrite ? 'Drag or use the quick adjustments.' : 'Current value and thresholds.'}
-            </p>
           </div>
           {!canWrite && <strong className="num text-xl">{current}</strong>}
         </div>
@@ -587,7 +585,7 @@ export function CurrentStatusBar({
       aria-label="Current Status"
     >
       <div
-        className={`mx-auto grid max-w-[80rem] min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_5.5rem] gap-x-1 gap-y-0 px-0 py-0 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(5rem,max-content)_minmax(5rem,max-content)_5.5rem] min-[1280px]:px-4' : 'grid-cols-2 gap-1 px-2 py-1 min-[1280px]:px-7'} ${optionalCount > 0 ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}
+        className={`mx-auto grid max-w-[80rem] min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_8.25rem] gap-0 px-0 py-0 min-[480px]:gap-x-1 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(5rem,max-content)_minmax(5rem,max-content)_8.25rem] min-[1280px]:px-4' : 'grid-cols-2 gap-1 px-2 py-1 min-[1280px]:px-7'} ${optionalCount > 0 ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}
       >
         {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.menu}</div>}
         <div className="hidden min-[1280px]:block min-[1280px]:min-w-28">
@@ -760,13 +758,7 @@ export function CurrentStatusBar({
                   flat={embedded}
                 />
                 {openPanel === 'conditions' && (
-                  <ChoicePanel
-                    id={panelId}
-                    panelTop={panelTop}
-                    title="Conditions"
-                    description="Select every condition that applies. Automatic HP/FP thresholds stay beside their pools."
-                    alignEnd
-                  >
+                  <ChoicePanel id={panelId} panelTop={panelTop} title="Conditions" alignEnd>
                     <div className="flex flex-wrap gap-2">
                       {COMMON_CONDITIONS.map((entry) => (
                         <ConditionChip

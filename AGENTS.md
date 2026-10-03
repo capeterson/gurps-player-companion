@@ -93,6 +93,13 @@ across `gpc-*` projects; each belongs to a specific checkout.
 
 ## Interaction design rules
 
+### Start UI work with the project design skill
+
+Read [.agents/skills/gpc-ui-design/SKILL.md](.agents/skills/gpc-ui-design/SKILL.md)
+before implementing or reviewing UI changes. It records the user's established
+layout, copy, navigation and calculation expectations. Extend it with narrow
+lessons from demonstrated regressions or explicit user decisions.
+
 ### Use the official daisyUI skills for UI work
 
 For any UI work in this app, **strongly prefer installing and using the official

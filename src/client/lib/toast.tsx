@@ -176,19 +176,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           key={t.id}
           role="alert"
-          className={
+          className={`pointer-events-auto alert min-w-0 justify-items-start text-left shadow ${
+            t.action ? 'grid-cols-[minmax(0,1fr)_auto_auto]' : 'grid-cols-[minmax(0,1fr)_auto]'
+          } ${
             t.kind === 'error'
-              ? 'pointer-events-auto alert alert-error min-w-0 [overflow-wrap:anywhere] shadow'
+              ? 'alert-error'
               : t.kind === 'success'
-                ? 'pointer-events-auto alert alert-success min-w-0 [overflow-wrap:anywhere] shadow'
-                : 'pointer-events-auto alert alert-info min-w-0 [overflow-wrap:anywhere] shadow'
-          }
+                ? 'alert-success'
+                : 'alert-info'
+          }`}
         >
-          <span>{t.message}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{t.message}</span>
           {t.action && (
             <button
               type="button"
-              className="btn btn-sm ml-auto shrink-0"
+              className="btn btn-sm shrink-0 whitespace-nowrap"
               onClick={() => {
                 const { onClick, dismissOnClick } = t.action as ToastAction;
                 if (dismissOnClick !== false) dismiss(t.id);
@@ -200,7 +202,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           )}
           <button
             type="button"
-            className={`btn btn-ghost btn-xs shrink-0 ${t.action ? '' : 'ml-auto'}`}
+            className="btn btn-ghost btn-xs shrink-0 whitespace-nowrap"
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss notification"
           >

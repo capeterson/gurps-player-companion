@@ -68,10 +68,6 @@ export function CampaignLibraryHelpPage() {
         </Link>
         <p className="label-eyebrow">Library guide</p>
         <h1 className="font-display text-3xl sm:text-4xl">Building your campaign library</h1>
-        <p className="text-base leading-relaxed text-base-content/80">
-          Turn your campaign's rules and equipment into reusable entries, check them on a character,
-          and keep them accurate as your campaign grows.
-        </p>
       </header>
 
       <nav className="card border border-base-300 p-card" aria-label="In this guide">

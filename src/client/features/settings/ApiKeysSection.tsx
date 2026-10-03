@@ -65,9 +65,8 @@ export function ApiKeysSection() {
         <p className="label-eyebrow">Integrations</p>
         <h2 className="font-display text-2xl">API keys</h2>
         <p className="text-xs text-base-content/60 max-w-prose">
-          Mint a long-lived token to authenticate scripts or external tools against this account.
-          Tokens prefix <code>gpc_</code> and are shown in plaintext exactly once at creation —
-          revoke them here at any time.
+          API keys give scripts and external tools access to your account. The key is shown only
+          once, when created.
         </p>
       </div>
 

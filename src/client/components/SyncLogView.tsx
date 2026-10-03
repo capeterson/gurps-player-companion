@@ -390,8 +390,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 </h3>
                 <p className="mt-1 text-sm">{status.error.reason}</p>
                 <p className="mt-1 text-xs text-base-content/60">
-                  Last attempt {formatTime(status.error.at)}. Local changes are safe and will upload
-                  once this clears.
+                  Last attempt {formatTime(status.error.at)}.
                 </p>
               </section>
             )}

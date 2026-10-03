@@ -85,9 +85,7 @@ describe('compact powerstone and magic-item summaries', () => {
         canWrite={false}
       />,
     );
-    expect(
-      screen.getByText('No powerstones owned. Add one in Inventory to track its energy here.'),
-    ).toBeVisible();
+    expect(screen.getByText('No powerstones owned.')).toBeVisible();
   });
 
   it('shows a compact powerstone summary and keeps its full-object outbox actions', () => {

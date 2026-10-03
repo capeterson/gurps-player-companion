@@ -209,9 +209,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
   if (weapons.length === 0) {
     return (
       <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks" icon="combat">
-        <p className="text-sm text-base-content/60">
-          No equipped weapons — equip items in the Inventory tab.
-        </p>
+        <p className="text-sm text-base-content/60">No equipped weapons.</p>
       </FoldSection>
     );
   }
@@ -237,11 +235,6 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           </select>
         </label>
       </div>
-      <p className="text-xs text-base-content/50">
-        Tap a skill to attack or dice to roll damage.
-        {preferences.sort === 'custom' &&
-          ' Drag the handles to reorder; use ↑/↓ with a keyboard. Order is saved on this device.'}
-      </p>
       {saveFailed && (
         <output className="text-xs text-warning">
           This browser could not save the attack order. It will reset when you leave this page.
@@ -535,8 +528,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                             </>
                           ) : resolution.kind === 'missing' ? (
                             <p className="max-w-44 text-xs text-base-content/50">
-                              Skill '{resolution.skillName}' not on sheet — add it in the Skills
-                              tab.
+                              Skill '{resolution.skillName}' not on sheet.
                             </p>
                           ) : (
                             <p className="text-xs text-base-content/50">

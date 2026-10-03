@@ -462,9 +462,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   const weaponEditor = page.getByRole('region', { name: 'Broadsword: Weapon', exact: true });
   await expect(weaponEditor.getByLabel('Damage', { exact: true })).toHaveValue('sw+1 cut');
   await weaponEditor.getByRole('button', { name: 'Done', exact: true }).click();
-  const tip = page.getByText('tip: shift-click to select a range; ⌘/ctrl-click to toggle', {
-    exact: true,
-  });
   for (const width of WIDTHS) {
     await page.setViewportSize({ width, height: 900 });
     await inside(page, inventory);
@@ -484,7 +481,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
       await inside(page, row.locator('.inventory-item-name'));
     }
     if (width < 640) {
-      await expect(tip).toBeHidden();
       // Two-line rows: name and chips on the left; weight above quantity and
       // cost on the right. Quantity 1 is implied rather than repeated.
       await expect(sword.locator('[data-label="Qty"]')).toBeHidden();
@@ -526,7 +522,6 @@ test('languages, techniques and inventory retain edits and fit their responsive 
         expect(hit).toBe('Collapse contents');
       }
     } else {
-      await expect(tip).toBeVisible();
       await expect(inventory.getByRole('columnheader', { name: 'Qty', exact: true })).toBeVisible();
     }
     if (width === 375 || width === 1280) {

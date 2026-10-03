@@ -23,6 +23,7 @@ import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 export interface CombatTabProps {
   character: CharacterDetail;
   canWrite: boolean;
+  anchorActiveEffectId?: string | null;
   experimentalTurnTracker?: boolean;
   experimentalActiveEffects?: boolean;
 }
@@ -30,6 +31,7 @@ export interface CombatTabProps {
 export function CombatTab({
   character,
   canWrite,
+  anchorActiveEffectId = null,
   experimentalTurnTracker = false,
   experimentalActiveEffects = false,
 }: CombatTabProps) {
@@ -47,7 +49,11 @@ export function CombatTab({
         openRoll={openRoll}
       />
       {experimentalActiveEffects && (
-        <ActiveEffectsPanel character={character} canWrite={canWrite} />
+        <ActiveEffectsPanel
+          character={character}
+          canWrite={canWrite}
+          anchorActiveEffectId={anchorActiveEffectId}
+        />
       )}
       {experimentalTurnTracker && (
         <SoloTrackerCard characterId={character.id} canWrite={canWrite} />

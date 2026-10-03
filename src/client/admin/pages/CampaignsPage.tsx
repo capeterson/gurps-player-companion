@@ -27,9 +27,6 @@ export function CampaignsPage() {
       <header>
         <p className="label-eyebrow">Admin</p>
         <h1 className="font-display text-3xl">Campaigns</h1>
-        <p className="text-sm text-base-content/60">
-          Search by campaign name, owner display name, or owner email.
-        </p>
       </header>
 
       <input

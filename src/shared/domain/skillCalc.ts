@@ -84,6 +84,7 @@ function defaultAttributeLevel(attribute: SkillAttribute, derived: DerivedStats)
 }
 
 export interface TrainedSkillDefaultSource {
+  id?: string;
   name: string;
   specialization: string | null;
   groups?: readonly string[];
@@ -177,7 +178,28 @@ function defaultPointCredit(level: number, attribute: number, difficulty: SkillD
  * The whole-list resolver below supplies learned sources without cycles.
  * See official FAQ 3.3.1 for buy-up examples.
  */
-export function computeSkillLevel(
+export interface SkillLevelBreakdown {
+  level: number | null;
+  attribute: SkillAttribute;
+  attributeLevel: number;
+  points: number;
+  purchasedLevel: number | null;
+  defaultSource: {
+    kind: 'attribute' | 'skill';
+    id?: string;
+    name: string;
+    level: number;
+    modifier: number;
+    techLevelPenalty: number;
+    defaultLevel: number;
+    pointCredit: number;
+    boughtIncrease: number;
+  } | null;
+}
+
+/** The calculation and its winning source are returned together, including
+ * virtual default credit. The credit never changes actual points spent. */
+export function computeSkillLevelBreakdown(
   attribute: SkillAttribute,
   difficulty: SkillDifficulty,
   points: number,
@@ -187,14 +209,29 @@ export function computeSkillLevel(
   targetSpecialization?: string | null,
   conditionContext?: DefaultConditionContext,
   targetTechLevel?: number | null,
-): number | null {
+): SkillLevelBreakdown {
   const attr = attributeLevelFor(attribute, derived);
   let best = points > 0 ? attr + skillOffset(difficulty, points) : null;
+  const result: SkillLevelBreakdown = {
+    level: best,
+    attribute,
+    attributeLevel: attr,
+    points,
+    purchasedLevel: best,
+    defaultSource: null,
+  };
   for (const candidate of defaults ?? []) {
     const levels =
       candidate.kind === 'attribute'
         ? conditionsProven(candidate.conditions, conditionContext)
-          ? [defaultAttributeLevel(candidate.attribute, derived) + candidate.modifier]
+          ? [
+              {
+                kind: 'attribute' as const,
+                name: candidate.attribute,
+                level: defaultAttributeLevel(candidate.attribute, derived),
+                techLevelPenalty: 0,
+              },
+            ]
           : []
         : trainedSkills
             .filter((source) => skillDefaultMatches(candidate, source, targetSpecialization))
@@ -209,20 +246,44 @@ export function computeSkillLevel(
                 source.techLevel != null && targetTechLevel != null
                   ? crossTechLevelPenalty(attribute, source.techLevel, targetTechLevel)
                   : 0;
-              return tlPenalty === null ? [] : [source.level + candidate.modifier + tlPenalty];
+              return tlPenalty === null
+                ? []
+                : [
+                    {
+                      kind: 'skill' as const,
+                      ...(source.id ? { id: source.id } : {}),
+                      name: skillDisplayName(source.name, source.specialization),
+                      level: source.level,
+                      techLevelPenalty: tlPenalty,
+                    },
+                  ];
             });
-    for (const level of levels) {
+    for (const source of levels) {
+      const level = source.level + candidate.modifier + source.techLevelPenalty;
+      const pointCredit = points > 0 ? defaultPointCredit(level, attr, difficulty) : 0;
       let improved = level;
       if (points > 0) {
-        improved = Math.max(
-          level,
-          attr + skillOffset(difficulty, points + defaultPointCredit(level, attr, difficulty)),
-        );
+        improved = Math.max(level, attr + skillOffset(difficulty, points + pointCredit));
       }
-      best = best === null ? improved : Math.max(best, improved);
+      if (best === null || improved > best) {
+        best = improved;
+        result.defaultSource = {
+          ...source,
+          modifier: candidate.modifier,
+          defaultLevel: level,
+          pointCredit,
+          boughtIncrease: improved - level,
+        };
+      }
     }
   }
-  return best;
+  return { ...result, level: best };
+}
+
+export function computeSkillLevel(
+  ...args: Parameters<typeof computeSkillLevelBreakdown>
+): number | null {
+  return computeSkillLevelBreakdown(...args).level;
 }
 
 interface DefaultableSkill {
@@ -244,11 +305,11 @@ interface DefaultableSkill {
  * makes reciprocal choices independent of row ordering. Reversing a bought-up
  * pair requires redistributing actual points (B173), not claiming both discounts.
  */
-export function resolveSkillLevels(
+export function resolveSkillLevelBreakdowns(
   skills: readonly DefaultableSkill[],
   derived: DerivedStats,
   conditionContext?: DefaultConditionContext,
-): Map<string, number | null> {
+): Map<string, SkillLevelBreakdown> {
   const ordered = [...skills].sort((a, b) => a.id.localeCompare(b.id));
   type SkillSource = Extract<
     NonNullable<SkillDefaults>[number],
@@ -256,11 +317,12 @@ export function resolveSkillLevels(
   >;
   const selected = new Map<string, { source: DefaultableSkill; declaration: SkillSource }>();
   const levels = new Map<string, number | null>();
+  const breakdowns = new Map<string, SkillLevelBreakdown>();
   const levelFor = (skill: DefaultableSkill): number | null => {
     if (levels.has(skill.id)) return levels.get(skill.id) ?? null;
     const parent = selected.get(skill.id);
     const sourceLevel = parent ? levelFor(parent.source) : null;
-    const level = computeSkillLevel(
+    const breakdown = computeSkillLevelBreakdown(
       skill.attribute,
       skill.difficulty,
       skill.points,
@@ -269,6 +331,7 @@ export function resolveSkillLevels(
       parent && sourceLevel !== null
         ? [
             {
+              id: parent.source.id,
               name: parent.source.name,
               specialization: parent.source.specialization,
               level: sourceLevel,
@@ -282,8 +345,9 @@ export function resolveSkillLevels(
       conditionContext,
       skill.techLevel,
     );
-    levels.set(skill.id, level);
-    return level;
+    levels.set(skill.id, breakdown.level);
+    breakdowns.set(skill.id, breakdown);
+    return breakdown.level;
   };
   const wouldCycle = (target: string, source: string): boolean => {
     let cursor: string | undefined = source;
@@ -313,6 +377,7 @@ export function resolveSkillLevels(
             [declaration],
             [
               {
+                id: source.id,
                 name: source.name,
                 specialization: source.specialization,
                 level: sourceLevel,
@@ -334,12 +399,20 @@ export function resolveSkillLevels(
       if (choice && choice !== selected.get(skill.id)) {
         selected.set(skill.id, choice);
         levels.clear(); // Ancestor improvements also raise every dependent skill.
+        breakdowns.clear();
         changed = true;
       }
     }
   }
   for (const skill of ordered) levelFor(skill);
-  return levels;
+  return breakdowns;
+}
+
+/** Existing consumers need only levels; explanations share this exact resolver. */
+export function resolveSkillLevels(
+  ...args: Parameters<typeof resolveSkillLevelBreakdowns>
+): Map<string, number | null> {
+  return new Map([...resolveSkillLevelBreakdowns(...args)].map(([id, value]) => [id, value.level]));
 }
 
 /** Explain conditional candidates that cannot currently apply. Unknown context

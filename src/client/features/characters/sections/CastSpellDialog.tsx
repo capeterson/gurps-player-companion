@@ -281,10 +281,6 @@ export function CastSpellDialog({
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-base-content/60">
-          Rolling is separate. This dialog records energy spent; it does not determine spell
-          success.
-        </p>
         <div className="divider my-3" />
 
         <div className="mb-2 flex flex-col items-stretch gap-2 sm:flex-row sm:items-end sm:gap-3">

@@ -90,8 +90,12 @@ test('Skills and techniques keep long names and default references inside the sh
     await expect(skillsTable).toBeVisible();
     await expect(skillRow).toBeVisible();
     await skillEditorToggle.click();
-    const skillEditorHeading = page.getByRole('heading', { name: `Edit ${skillDisplayName}` });
-    await expect(skillEditorHeading).toBeVisible();
+    const skillEditorName = page.getByRole('textbox', {
+      name: `${skillDisplayName} name`,
+      exact: true,
+    });
+    await expect(page.getByRole('heading', { name: `Edit ${skillDisplayName}` })).toHaveCount(0);
+    await expect(skillEditorName).toBeVisible();
     await expect(
       page.getByRole('textbox', { name: `${skillDisplayName} description and notes` }),
     ).toHaveValue(notes);
@@ -108,8 +112,12 @@ test('Skills and techniques keep long names and default references inside the sh
     await expect(techniquesTable).toBeVisible();
     await expect(techniqueRow).toBeVisible();
     await techniqueEditorToggle.click();
-    const techniqueEditorHeading = page.getByText(`Edit ${techniqueName}`, { exact: true });
-    await expect(techniqueEditorHeading).toBeVisible();
+    const techniqueEditorName = page.getByRole('textbox', {
+      name: `${techniqueName} name`,
+      exact: true,
+    });
+    await expect(page.getByText(`Edit ${techniqueName}`, { exact: true })).toHaveCount(0);
+    await expect(techniqueEditorName).toBeVisible();
     await expect(
       page.getByRole('combobox', { name: `${techniqueName} default skill` }),
     ).toHaveValue(defaultSkillName);
@@ -126,8 +134,8 @@ test('Skills and techniques keep long names and default references inside the sh
     for (const viewport of viewports) {
       await test.step(`${viewport.width}×${viewport.height}`, async () => {
         await page.setViewportSize(viewport);
-        await expect(skillEditorHeading).toBeVisible();
-        await expect(techniqueEditorHeading).toBeVisible();
+        await expect(skillEditorName).toBeVisible();
+        await expect(techniqueEditorName).toBeVisible();
         await expect(page.getByRole('textbox', { name: `${skillDisplayName} name` })).toHaveValue(
           skillName,
         );
@@ -138,7 +146,7 @@ test('Skills and techniques keep long names and default references inside the sh
           techniqueName,
         );
         const geometry = await Promise.all(
-          [skillEditorHeading, techniqueEditorHeading, skillRow, techniqueRow].map((element) =>
+          [skillEditorName, techniqueEditorName, skillRow, techniqueRow].map((element) =>
             element.evaluate((node) => {
               const rect = node.getBoundingClientRect();
               return {

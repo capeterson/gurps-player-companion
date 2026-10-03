@@ -6,8 +6,8 @@
  * …" format we need on the sheet — so this is a hand-rolled popover
  * that takes ReactNode content and clamps to the viewport.
  *
- * The trigger renders as a button with a dotted underline (the
- * "more info available" affordance) and is keyboard-focusable.
+ * The default trigger is a keyboard-focusable button with a dotted underline.
+ * A custom trigger can reuse an existing editable input.
  */
 
 import {
@@ -28,7 +28,10 @@ import {
 } from '../../hooks/useViewportBoundedOverlay.ts';
 
 interface InfoTooltipProps {
-  children: ReactNode;
+  children?: ReactNode;
+  /** An existing input can open the tooltip without adding a second control. */
+  renderTrigger?: (descriptionId: string | undefined) => ReactNode;
+  containerClassName?: string;
   content: ReactNode;
   side?: 'top' | 'bottom';
   ariaLabel?: string;
@@ -45,6 +48,8 @@ interface InfoTooltipProps {
 
 export function InfoTooltip({
   children,
+  renderTrigger,
+  containerClassName = '',
   content,
   side = 'top',
   ariaLabel,
@@ -62,6 +67,7 @@ export function InfoTooltip({
   const headerBottom = useAppHeaderBottom();
   const id = useId();
   const Container = scrollable ? 'div' : 'span';
+  const hasCustomTrigger = Boolean(renderTrigger);
 
   useEffect(() => {
     if (!open) return;
@@ -86,8 +92,32 @@ export function InfoTooltip({
       // Page content sits below the sticky header's stacking context. Keeping
       // the list below it makes even the first recipient reachable.
       const top = Math.max(viewportTop, headerBottom) + 8;
-      const bottom = viewportTop + (viewport?.height ?? window.innerHeight) - 8;
-      element.style.maxHeight = `${Math.max(0, bottom - top)}px`;
+      let bottom = viewportTop + (viewport?.height ?? window.innerHeight) - 8;
+      if (hasCustomTrigger && !portal) {
+        // The sheet's fixed navigation must not obscure linked contributors.
+        // Measure the rendered controls instead of assuming a dock/FAB height.
+        for (const navigation of document.querySelectorAll('.sheet-dock, .sheet-nav-toggle')) {
+          const rect = navigation.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0 && rect.top > top) {
+            bottom = Math.min(bottom, rect.top - 8);
+          }
+        }
+        const trigger = element.parentElement?.getBoundingClientRect();
+        if (trigger) {
+          const above = Math.max(0, Math.min(trigger.top, bottom) - top - 8);
+          const below = Math.max(0, bottom - Math.max(trigger.bottom, top) - 8);
+          const upward = above > below;
+          // Keep the edited value visible. Long explanations scroll on the
+          // clearer side of the input instead of expanding across it.
+          element.style.top = upward ? 'auto' : '100%';
+          element.style.bottom = upward ? '100%' : 'auto';
+          element.style.marginTop = upward ? '0' : '8px';
+          element.style.marginBottom = upward ? '8px' : '0';
+          element.style.maxHeight = `${upward ? above : below}px`;
+        }
+      } else {
+        element.style.maxHeight = `${Math.max(0, bottom - top)}px`;
+      }
       if (portal) {
         const anchor = triggerRef.current?.getBoundingClientRect();
         if (!anchor) return;
@@ -113,7 +143,12 @@ export function InfoTooltip({
     window.visualViewport?.addEventListener('resize', update);
     window.visualViewport?.addEventListener('scroll', update);
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
-    if (tooltipRef.current) observer?.observe(tooltipRef.current);
+    if (tooltipRef.current) {
+      observer?.observe(tooltipRef.current);
+      if (hasCustomTrigger && tooltipRef.current.parentElement) {
+        observer?.observe(tooltipRef.current.parentElement);
+      }
+    }
     return () => {
       window.removeEventListener('resize', update);
       window.removeEventListener('scroll', update, true);
@@ -121,7 +156,7 @@ export function InfoTooltip({
       window.visualViewport?.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [open, scrollable, portal, side, tooltipRef, headerBottom]);
+  }, [open, scrollable, portal, side, tooltipRef, headerBottom, hasCustomTrigger]);
 
   const positionClass =
     side === 'top' ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top';
@@ -158,10 +193,13 @@ export function InfoTooltip({
 
   return (
     <Container
-      className="relative inline-flex items-baseline"
+      className={`relative inline-flex items-baseline ${containerClassName}`}
+      onMouseEnter={renderTrigger ? () => setOpen(true) : undefined}
+      onFocus={renderTrigger ? () => setOpen(true) : undefined}
       onMouseLeave={
         scrollable
           ? (event) => {
+              if (renderTrigger && event.currentTarget.contains(document.activeElement)) return;
               if (
                 !(
                   event.relatedTarget instanceof Node &&
@@ -185,41 +223,45 @@ export function InfoTooltip({
           : undefined
       }
     >
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={ariaLabel}
-        aria-expanded={ariaExpanded}
-        aria-controls={ariaControls}
-        aria-describedby={open ? id : undefined}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={scrollable ? undefined : () => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(event) => {
-          if (portal && scrollable && open && event.key === 'ArrowDown') {
-            event.preventDefault();
-            tooltipRef.current?.focus();
+      {renderTrigger ? (
+        renderTrigger(open ? id : undefined)
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          aria-label={ariaLabel}
+          aria-expanded={ariaExpanded}
+          aria-controls={ariaControls}
+          aria-describedby={open ? id : undefined}
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={scrollable ? undefined : () => setOpen(false)}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (portal && scrollable && open && event.key === 'ArrowDown') {
+              event.preventDefault();
+              tooltipRef.current?.focus();
+            }
+          }}
+          onBlur={scrollable ? undefined : () => setOpen(false)}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (onTriggerClick) {
+              setOpen(false);
+              onTriggerClick(event);
+            } else {
+              // Focus/hover may already have opened a scrollable tooltip before
+              // the click arrives. A tap must leave its recipient list open.
+              setOpen((value) => scrollable || !value);
+            }
+          }}
+          className={
+            triggerClassName ??
+            'cursor-help rounded-sm border-b border-dotted border-base-content/30 px-1 -mx-1 hover:bg-accent-soft hover:text-base-content hover:border-base-content/60 transition-colors focus-visible:outline-2 focus-visible:outline-primary'
           }
-        }}
-        onBlur={scrollable ? undefined : () => setOpen(false)}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (onTriggerClick) {
-            setOpen(false);
-            onTriggerClick(event);
-          } else {
-            // Focus/hover may already have opened a scrollable tooltip before
-            // the click arrives. A tap must leave its recipient list open.
-            setOpen((value) => scrollable || !value);
-          }
-        }}
-        className={
-          triggerClassName ??
-          'cursor-help rounded-sm border-b border-dotted border-base-content/30 px-1 -mx-1 hover:bg-accent-soft hover:text-base-content hover:border-base-content/60 transition-colors focus-visible:outline-2 focus-visible:outline-primary'
-        }
-      >
-        {children}
-      </button>
+        >
+          {children}
+        </button>
+      )}
       {tooltip && (portal ? createPortal(tooltip, document.body) : tooltip)}
     </Container>
   );

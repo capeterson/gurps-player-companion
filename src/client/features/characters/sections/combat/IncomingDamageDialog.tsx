@@ -138,11 +138,7 @@ export function IncomingDamageDialog({
             <strong>{locationLabel(location)}</strong> · {facing} ·{' '}
             {DAMAGE_TYPES.find(([value]) => value === type)?.[1] ?? type} ·{' '}
             {ARMOR_DIVISORS.find(([value]) => value === divisor)?.[1] ?? `Divisor ${divisor}`}
-            <span className="block mt-1">
-              {defenseUsed
-                ? `Selected defense: ${defenseUsed}. Confirm the hit before applying injury.`
-                : 'Confirm that the attack hits before applying injury.'}
-            </span>
+            {defenseUsed && <span className="block mt-1">Selected defense: {defenseUsed}.</span>}
           </p>
           <label className="flex flex-col gap-1">
             <span className="label-eyebrow">Basic damage</span>

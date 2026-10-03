@@ -190,9 +190,7 @@ export function SkillRequirementsEditor({
       </fieldset>
       <fieldset className="fieldset min-w-0">
         <legend className="fieldset-legend">Skill defaults</legend>
-        <p className="text-xs">
-          Add each allowed fallback. No defaults is different from an unspecified rule.
-        </p>
+        <p className="text-xs">No defaults is different from an unspecified rule.</p>
         {defaultRules === null ? (
           <p>Defaults not specified.</p>
         ) : defaultRules.length === 0 ? (

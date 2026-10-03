@@ -320,12 +320,6 @@ function ItemListEditor({
       {...flash.flashProps}
     >
       <h4 className="label-eyebrow">{enchantments ? 'Enchantments' : 'Alternate attacks'}</h4>
-      {enchantments && (
-        <p className="text-xs text-base-content/60">
-          Choose an effect to change stats while this item is equipped. Choose Note only to record
-          an enchantment without changing stats. Record Item Power to activate effects (M17).
-        </p>
-      )}
       {list.map((listEntry, index) => {
         const prefix = enchantments
           ? `enchantments.${index}`
@@ -640,9 +634,6 @@ export function InventoryItemEditor({
   if (section === 'add') {
     content = (
       <div className="space-y-3">
-        <p className="text-sm text-base-content/60">
-          An item can have several categories. Adding one keeps its other settings.
-        </p>
         <div className="flex flex-wrap gap-2">
           {(Object.keys(CATEGORY_LABELS) as ItemCategory[])
             .filter((candidate) => !active.includes(candidate))
@@ -801,7 +792,6 @@ export function InventoryItemEditor({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="label-eyebrow [overflow-wrap:anywhere]">{item.name}</div>
           <h3 className="font-display text-lg">
             {section === 'basics'
               ? 'Item details'

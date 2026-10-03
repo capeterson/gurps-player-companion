@@ -824,9 +824,6 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
           setRecipientDialog(false);
         }}
       >
-        <p className="mb-3 text-muted">
-          Leave out characters whose players missed the session or did not earn points.
-        </p>
         <div className="max-h-[50dvh] space-y-2 overflow-y-auto">
           {(roster ?? []).map((character) => (
             <label

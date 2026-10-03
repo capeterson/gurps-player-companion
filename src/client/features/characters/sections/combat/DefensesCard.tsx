@@ -462,8 +462,6 @@ function DefenseTable({
 
   return (
     <div className="space-y-3" aria-label="Active defenses">
-      <p className="text-xs text-muted">Scores include the selected hit location and facing.</p>
-
       <div className="overflow-x-auto rounded-xl border border-base-300">
         <Table
           preferenceKey={`${character.id}:defenses`}
@@ -649,21 +647,13 @@ function DefenseTable({
             : 'bind its skill in the Inventory tab.'}
         </p>
       )}
-      {parryRows.length === 0 && shield == null && (
-        <p className="text-xs text-base-content/60">
-          Equip a parryable weapon or shield to add those defenses.
-        </p>
-      )}
       <WeaponEffectDiagnostics
         effects={effects.filter((effect) =>
           ['weapon_parry', 'weapon_block'].includes(effect.target),
         )}
         inventory={character.inventory}
       />
-      <p className="text-[11px] text-base-content/50">
-        Active trait bonuses and recorded combat restrictions are included. Add situational
-        modifiers when rolling; shield DB assumes a covered attack.
-      </p>
+      <p className="text-[11px] text-base-content/50">Shield DB assumes a covered attack.</p>
     </div>
   );
 }

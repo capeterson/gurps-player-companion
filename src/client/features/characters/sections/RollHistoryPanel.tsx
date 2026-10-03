@@ -25,9 +25,6 @@ export function RollHistoryPanel({ characterId }: RollHistoryPanelProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-base-content/50">
-        Up to 250 rolls — saved on this device only and never synced.
-      </p>
       {rolls.length === 0 ? (
         <p className="p-4 text-center text-sm text-base-content/50">No rolls yet.</p>
       ) : (

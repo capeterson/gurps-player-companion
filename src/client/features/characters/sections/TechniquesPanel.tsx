@@ -402,14 +402,13 @@ function TechniqueRow({
       {canWrite && (
         <tr hidden={!expanded} id={editorId}>
           <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <p className="min-w-0 font-medium [overflow-wrap:anywhere]">Edit {technique.name}</p>
-              {(nameField.isSaving ||
-                defaultSkillField.isSaving ||
-                difficultyField.isSaving ||
-                defaultModifierField.isSaving ||
-                pointsField.isSaving) && <output className="text-xs text-warning">Saving…</output>}
-            </div>
+            {(nameField.isSaving ||
+              defaultSkillField.isSaving ||
+              difficultyField.isSaving ||
+              defaultModifierField.isSaving ||
+              pointsField.isSaving) && (
+              <output className="mb-3 block text-right text-xs text-warning">Saving…</output>
+            )}
             <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
               <div className="col-span-2 min-w-0">
                 <span className="label-eyebrow mb-1 block">Name</span>

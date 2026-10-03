@@ -241,10 +241,6 @@ export function SkillRulePreview({
                 : ''}
             </p>
           ))}
-          <p className="text-xs text-dim">
-            Time, costs and outcomes are previews. Apply agreed changes on the sheet after resolving
-            the action.
-          </p>
         </div>
       )}
     </div>
