@@ -24,6 +24,9 @@ expectations come from observed regressions and explicit user preferences.
 - Let numeric values and their modifier controls wrap as a group when necessary;
   never overlap adjacent values, clip controls or assume a sample value is the
   maximum supported value. Keep editable values close to their own action.
+- Saving feedback must not reflow an editor or anchored popup during a click.
+  For skill points, use the existing row action icon for saving status; adding
+  a caption on blur can move a contributor link between pointer down and up.
 - Use the established daisyUI components, semantic theme colors, spacing and
   typography. Fix the layout structure rather than adding decorative cards,
   per-item offsets, arbitrary minimum heights or a new design system.

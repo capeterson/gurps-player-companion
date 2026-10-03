@@ -158,6 +158,8 @@ and its contributors, personal/racial training, the difficulty ladder, the
 winning declared default (including TL penalties and virtual buy-up credit),
 and active skill modifiers. An invalid draft shows the permitted points range.
 The existing draft save, queue, rejection toast and flash remain on the input.
+Saving feedback replaces the row action's icon without adding an editor row,
+so committing the input does not move a contributor link during a click.
 
 Contributing attributes, skills, traits, equipment, racial training and active
 instances link to their sheet controls. Links select the matching destination

@@ -694,7 +694,15 @@ function SkillRow({
               <span className="hidden sm:inline">
                 {expanded ? 'Done' : canWrite ? 'Edit' : 'Details'}
               </span>
-              <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+              {saving ? (
+                <span
+                  className="loading loading-spinner size-3.5 text-warning"
+                  role="status"
+                  aria-label="Saving skill"
+                />
+              ) : (
+                <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+              )}
             </button>
           )}
         </td>
@@ -704,11 +712,6 @@ function SkillRow({
           <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
             {canWrite ? (
               <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
-                {saving && (
-                  <p className="text-right text-xs text-warning" aria-live="polite">
-                    Saving…
-                  </p>
-                )}
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_7rem_6rem_5rem] md:gap-3">
                   <fieldset className="fieldset min-w-0 p-0">
                     <legend className="fieldset-legend text-xs">Name</legend>
