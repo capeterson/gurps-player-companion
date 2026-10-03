@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { activeEffectDefinitionCreate } from '../../../shared/schemas/activeEffects.ts';
+import { libraryModifierCreate } from '../../../shared/schemas/libraryMetadata.ts';
 import { type LocalLibrarySkill, type LocalLibraryTrait, getLocalDb } from '../../db/dexie.ts';
 import { api } from '../../lib/api.ts';
 import { LibraryPage } from './LibraryPage.tsx';
@@ -192,6 +193,158 @@ it('shows publication details without content-entry metadata badges on sourceboo
   for (const label of ['Legacy source', 'complete', 'definition']) {
     expect(screen.queryByText(label, { exact: true })).not.toBeInTheDocument();
   }
+});
+
+it('counts direct sourcebook links across every library category and updates from local changes', async () => {
+  const db = getLocalDb();
+  const firstSource = '0193b3c0-f1f0-7000-8000-00000000b101';
+  const secondSource = '0193b3c0-f1f0-7000-8000-00000000b102';
+  await seed();
+  await db.campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
+  await db.campaignLibrarySources.bulkPut([
+    {
+      id: firstSource,
+      campaignId: CAMPAIGN,
+      name: 'GURPS Main Book',
+      abbreviation: 'MB',
+      priority: 10,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    },
+    {
+      id: secondSource,
+      campaignId: CAMPAIGN,
+      name: 'GURPS Empty Book',
+      abbreviation: 'EB',
+      priority: 20,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      revision: 1,
+    },
+  ] as never[]);
+  const categories = [
+    ['campaignLibraryRaces', 'race'],
+    ['campaignLibraryModifiers', 'modifier'],
+    ['campaignLibraryTraits', 'trait'],
+    ['campaignLibrarySkills', 'skill'],
+    ['campaignLibrarySpells', 'spell'],
+    ['campaignLibraryItems', 'item'],
+    ['campaignLibraryLanguages', 'language'],
+    ['campaignLibraryTechniques', 'technique'],
+    ['campaignLibraryStyles', 'style'],
+    ['campaignLibraryEnchantments', 'enchantment'],
+    ['campaignLibraryActiveEffects', 'effect'],
+  ] as const;
+  const linkedIds: Record<string, string> = Object.fromEntries(
+    categories.map(([, suffix], index) => [
+      suffix,
+      `0193b3c0-f1f0-7000-8000-${String(0xb200 + index).padStart(12, '0')}`,
+    ]),
+  );
+  for (const [tableName, suffix] of categories) {
+    await db.table(tableName).put({
+      id: linkedIds[suffix],
+      campaignId: CAMPAIGN,
+      name: `Linked ${suffix}`,
+      sourceId: firstSource,
+      ...(tableName === 'campaignLibraryTraits'
+        ? { kind: 'perk', basePoints: 1, pointsPerLevel: null, maxLevel: null }
+        : {}),
+      revision: 1,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as never);
+  }
+  // Legacy citations and nested applicability references do not create a direct link.
+  await db.campaignLibraryTraits.put(
+    trait('0193b3c0-f1f0-7000-8000-00000000b220', {
+      name: 'Citation only',
+      source: 'MB71',
+      sourceId: null,
+    }),
+  );
+  await db.campaignLibraryModifiers.put({
+    ...libraryModifierCreate.parse({
+      name: 'Nested reference only',
+      category: 'enhancement',
+      applicability: {
+        traits: [{ section: 'traits', key: 'Nested trait', sourceId: firstSource }],
+      },
+    }),
+    id: '0193b3c0-f1f0-7000-8000-00000000b222',
+    campaignId: CAMPAIGN,
+    revision: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+
+  setup('/?section=sources');
+  const table = await screen.findByRole('table', { name: 'sources' });
+  const sourceRow = (name: string) =>
+    within(table).getByRole('button', { name }).closest('tr') as HTMLTableRowElement;
+  const count = (name: string) => within(sourceRow(name)).getAllByRole('cell')[1];
+  await waitFor(() => {
+    expect(count('GURPS Main Book')).toHaveTextContent('11');
+    expect(count('GURPS Empty Book')).toHaveTextContent('0');
+  });
+
+  const header = within(table).getByRole('button', { name: 'Sort by Entries' });
+  expect(header).toBeVisible();
+  for (const name of ['GURPS Main Book', 'GURPS Empty Book']) {
+    const row = sourceRow(name);
+    const nameCell = within(row).getByRole('button', { name });
+    expect(count(name)).toHaveTextContent(name === 'GURPS Main Book' ? '11' : '0');
+    expect(row.lastElementChild).toContainElement(
+      within(row).getByRole('button', { name: `Edit ${name}` }),
+    );
+    expect(nameCell).toBeVisible();
+  }
+
+  // A source filter and search affect the displayed library, not publication totals.
+  fireEvent.change(screen.getByLabelText('Source'), { target: { value: secondSource } });
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search library' }), {
+    target: { value: 'GURPS' },
+  });
+  await waitFor(() => expect(count('GURPS Main Book')).toHaveTextContent('11'));
+
+  const raceId = linkedIds.race;
+  const modifierId = linkedIds.modifier;
+  if (!raceId || !modifierId) throw new Error('Missing seeded library entries');
+  await db.campaignLibraryRaces.update(raceId, {
+    sourceId: secondSource,
+    revision: 2,
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  });
+  await waitFor(() => {
+    expect(count('GURPS Main Book')).toHaveTextContent('10');
+    expect(count('GURPS Empty Book')).toHaveTextContent('1');
+  });
+  await db.campaignLibraryModifiers.delete(modifierId);
+  await waitFor(() => expect(count('GURPS Main Book')).toHaveTextContent('9'));
+  await db.campaignLibraryModifiers.put({
+    ...libraryModifierCreate.parse({
+      name: 'Newly linked modifier',
+      category: 'enhancement',
+      sourceId: secondSource,
+      applicability: { universal: true },
+    }),
+    id: '0193b3c0-f1f0-7000-8000-00000000b221',
+    campaignId: CAMPAIGN,
+    revision: 1,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  });
+  await waitFor(() => expect(count('GURPS Empty Book')).toHaveTextContent('2'));
+
+  fireEvent.click(header);
+  const names = () =>
+    within(table)
+      .getAllByRole('button', { name: /^GURPS (Main|Empty) Book$/ })
+      .map((button) => button.textContent?.trim());
+  expect(names()).toEqual(['GURPS Empty Book', 'GURPS Main Book']);
+  fireEvent.click(header);
+  expect(names()).toEqual(['GURPS Main Book', 'GURPS Empty Book']);
 });
 
 it('shows library content without source, completeness, role or preference badges', async () => {

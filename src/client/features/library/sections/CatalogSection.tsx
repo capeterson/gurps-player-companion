@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type {
   LibraryModifierCreate,
   LibrarySourceCreate,
@@ -42,12 +43,35 @@ export function CatalogSection({
     section,
   );
   const noun = section === 'sources' ? 'source' : 'modifier';
+  const entryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [key, entries] of Object.entries(shell.library)) {
+      if (key === 'sources') continue;
+      for (const entry of entries) {
+        if ('sourceId' in entry && entry.sourceId) {
+          counts.set(entry.sourceId, (counts.get(entry.sourceId) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+  }, [shell.library]);
   const config: LibrarySectionConfig<LocalLibrarySource | LocalLibraryModifier> = {
     key: section,
     entityClass: section === 'sources' ? 'campaign_library_source' : 'campaign_library_modifier',
     noun,
     plural: section,
-    columns: [],
+    columns:
+      section === 'sources'
+        ? [
+            {
+              sort: 'entryCount',
+              label: 'Entries',
+              className: 'w-16 text-right sm:w-20',
+              compare: (a, b) => (entryCounts.get(a.id) ?? 0) - (entryCounts.get(b.id) ?? 0),
+              cell: (row) => entryCounts.get(row.id) ?? 0,
+            },
+          ]
+        : [],
     group: section === 'sources' ? null : (row) => ('category' in row ? row.category : ''),
     meta: (row) =>
       'priority' in row ? `${row.abbreviation} · Priority ${row.priority}` : row.category,
