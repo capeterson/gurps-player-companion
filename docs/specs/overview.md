@@ -1094,7 +1094,8 @@ settings sections; switching sections retains drafts.
 - **Sync status indicator and log** (header): a quiet etched arrow orbit replaces
   filled success/warning badges. Synced uses a still outline gem and muted ink;
   a connected WebSocket fills the gem with success green while the orbit stays muted.
-  Syncing rotates primary-colored arrows around the gem; offline uses a neutral pause mark; errors
+  Syncing rotates primary-colored arrows around the gem, which stays green while
+  the WebSocket is connected; offline uses a neutral pause mark; errors
   use a copper exclamation and take precedence if the browser is also offline.
   Hover/focus text and the accessible name describe the state. An error always
   names its reason (in the tooltip and in a banner at the top of the log) rather than pointing at a toast that may never
