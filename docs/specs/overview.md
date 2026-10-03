@@ -596,6 +596,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   chip again collapses it. The pencil opens basic item details in the same
   place. Category controls are separate from row selection and container
   expansion, and hidden editors retain their drafts while switching sections.
+  Attack IDs stay internal; editors show **Attack name**, **Source reference**,
+  and ordinary stat labels for each alternate attack. Enchantments identify their
+  source and use readable stat-effect choices without revision/snapshot text.
+  Range and magic activation choices use player-facing labels. **Recalculate price**
+  opens the existing pricing dialog with labeled cost/weight results and units;
+  trait pricing similarly uses **Recalculate points**.
   **+ Category**, in the pencil's item-details editor, adds another role
   without changing siblings or equipped/worn state. Category removal has a separate inline confirmation; containers with
   contents must be emptied first. Read-only viewers see summary badges only.

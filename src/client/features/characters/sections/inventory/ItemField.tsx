@@ -13,6 +13,8 @@ export interface ItemFieldSpec {
   optional?: boolean;
   advanced?: boolean;
   choices?: readonly string[];
+  choiceLabels?: Readonly<Record<string, string>>;
+  emptyChoiceLabel?: string;
 }
 
 export function hasFieldValue(value: unknown): boolean {
@@ -120,10 +122,12 @@ function ScalarItemField({
                 draft.commit();
               }}
             >
-              {spec.optional && <option value="">Any / unspecified</option>}
+              {spec.optional && (
+                <option value="">{spec.emptyChoiceLabel ?? 'Not specified'}</option>
+              )}
               {spec.choices.map((choice) => (
                 <option key={choice} value={choice}>
-                  {choice.charAt(0).toUpperCase() + choice.slice(1)}
+                  {spec.choiceLabels?.[choice] ?? choice.charAt(0).toUpperCase() + choice.slice(1)}
                 </option>
               ))}
             </select>

@@ -40,6 +40,7 @@ export function RepriceEntry({
   const flash = useFieldFlash(`${entityClass}:${entry.id}:entry`);
   const sourceId = section === 'traits' ? entry.libraryTraitId : entry.libraryItemId;
   const source = library?.[section].find((row) => row.id === sourceId);
+  const savedValues = section === 'items' ? 'price and weight' : 'point cost';
   if (!entry.pricingResolution && !sourceId) return null;
   const changed =
     library &&
@@ -55,14 +56,14 @@ export function RepriceEntry({
     >
       <p className="text-sm">
         {!source
-          ? 'Retained pricing snapshot'
+          ? `Using saved ${savedValues}`
           : changed
-            ? 'Pricing source changed — saved values retained'
-            : 'Saved pricing values'}
+            ? `Library ${section === 'items' ? 'price' : 'point cost'} changed — using your saved ${savedValues}`
+            : `Saved ${savedValues}`}
       </p>
       {source && (
         <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
-          Re-resolve pricing
+          {section === 'items' ? 'Recalculate price' : 'Recalculate points'}
         </button>
       )}
       {error && (
