@@ -209,7 +209,6 @@ export function SoloTrackerCard({
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="label-eyebrow">Solo tracker</p>
-          <p className="text-sm text-base-content/60">This device only. Cleared on logout.</p>
         </div>
         {tracker && <span className="badge">Round {tracker.round}</span>}
       </div>

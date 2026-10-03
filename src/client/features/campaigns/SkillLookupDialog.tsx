@@ -87,10 +87,6 @@ export function SkillLookupDialog({ open, characters, onClose, onSelect }: Props
           </button>
         </header>
 
-        <p className="text-xs text-base-content/60">
-          Pick a skill or stat to show its value on every character card.
-        </p>
-
         <LibraryAutocomplete<Option>
           value={query}
           onChange={setQuery}

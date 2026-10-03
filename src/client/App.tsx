@@ -163,7 +163,7 @@ export function App() {
           className="menu dropdown-content z-50 mt-1 w-52 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
         >
           <li className="menu-title px-3 py-2">
-            <span>{characterName ?? 'Character'}</span>
+            <span>{me.data ? `${me.data.displayName} · ${me.data.email}` : 'Account'}</span>
           </li>
           <li>
             <Link to="/">Home</Link>
@@ -179,14 +179,6 @@ export function App() {
           </li>
           <li>
             <Link to="/about">About</Link>
-          </li>
-          <li>
-            <button type="button" onClick={toggleTheme}>
-              Switch to {modeLabel(oppositeMode(mode))} mode
-            </button>
-          </li>
-          <li className="menu-title px-3 py-2">
-            <span>{me.data ? `${me.data.displayName} · ${me.data.email}` : 'Account'}</span>
           </li>
           {me.data?.isSuperuser && (
             <>
@@ -216,6 +208,15 @@ export function App() {
           <div className="relative flex w-full shrink-0 items-center justify-end before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] [&>details]:shrink-0 [&>span]:shrink-0">
             <SyncStatusIndicator triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
             <NotificationsBell triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm min-h-11 h-11 w-11 shrink-0 rounded-none border-0 shadow-none"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
+              title={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
+            >
+              <AppIcon name={mode === 'dark' ? 'sun' : 'moon'} size={20} />
+            </button>
           </div>
         ),
       }}

@@ -15,6 +15,10 @@ import { useEffect, useState } from 'react';
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
+import {
+  type SkillLevelBreakdown,
+  resolveSkillLevelBreakdowns,
+} from '../../../shared/domain/skillCalc.ts';
 import type { CharacterDetail, CharacterListItem } from '../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../db/dexie.ts';
 import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
@@ -29,11 +33,17 @@ import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinChara
  * Dexie open.
  */
 /** Server-built details are authoritative; local details explicitly flag missing definitions. */
-export type EffectAwareCharacterDetail = CharacterDetail & { raceName?: string };
+export type EffectAwareCharacterDetail = CharacterDetail & {
+  raceName?: string;
+  skillLevelBreakdowns?: Map<string, SkillLevelBreakdown>;
+};
 export type CharacterDetailResult = EffectAwareCharacterDetail | null | undefined;
 
 /** Explicit overrides are for tests; production reads only synced declarations. */
-export type UseCharacterDetailOptions = LibraryEffectOverrides;
+export type UseCharacterDetailOptions = LibraryEffectOverrides & {
+  /** Read-only calculation of unsaved skill points; never writes the local row. */
+  skillPointPreview?: { skillId: string; points: number };
+};
 
 export function useCharacterDetail(
   id: string | undefined,
@@ -56,7 +66,17 @@ export function useCharacterDetail(
         db.characterCombat.get(id),
         character.campaignId ? db.campaigns.get(character.campaignId) : Promise.resolve(undefined),
       ]);
-    const joined = joinCharacterMechanics(character.campaignId, traits, skills, options);
+    const preview = options.skillPointPreview;
+    const joined = joinCharacterMechanics(
+      character.campaignId,
+      traits,
+      preview
+        ? skills.map((skill) =>
+            skill.id === preview.skillId ? { ...skill, points: preview.points } : skill,
+          )
+        : skills,
+      options,
+    );
     const detail = buildCharacterDetail({
       now: clock,
       character,
@@ -81,12 +101,43 @@ export function useCharacterDetail(
     });
     return {
       ...detail,
+      ...(preview
+        ? {
+            skillLevelBreakdowns: resolveSkillLevelBreakdowns(
+              detail.skills.map((skill) => ({
+                id: skill.id,
+                name: skill.name,
+                specialization: skill.specialization,
+                attribute: skill.attribute,
+                difficulty: skill.difficulty,
+                techLevel: skill.techLevel,
+                ...(skill.defaults === undefined ? {} : { defaults: skill.defaults }),
+                points: skill.points + (skill.racialTrainingPoints ?? 0),
+                ...(skill.libraryMechanics?.skillRules?.groups
+                  ? { groups: skill.libraryMechanics.skillRules.groups }
+                  : {}),
+                ...(skill.libraryMechanics?.skillRules?.tags
+                  ? { tags: skill.libraryMechanics.skillRules.tags }
+                  : {}),
+              })),
+              detail.derived,
+              campaign?.houseRules ? { campaignRules: campaign.houseRules } : undefined,
+            ),
+          }
+        : {}),
       ...(character.minimalViewMasked && character.raceName !== undefined
         ? { raceName: character.raceName }
         : {}),
       libraryEffectsKnown: joined.libraryEffectsKnown,
     };
-  }, [id, clock, options.libraryTraitEffects, options.librarySkillEffects]);
+  }, [
+    id,
+    clock,
+    options.libraryTraitEffects,
+    options.librarySkillEffects,
+    options.skillPointPreview?.skillId,
+    options.skillPointPreview?.points,
+  ]);
   const activeEffectsEnabled = useExperimentalActiveEffects(result?.campaignId);
   const nextExpiry = (activeEffectsEnabled ? result?.activeEffects : [])
     ?.filter((e) => e.state === 'active' && e.expiresAt && Date.parse(e.expiresAt) > clock)

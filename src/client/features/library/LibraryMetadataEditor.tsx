@@ -24,7 +24,7 @@ export function LibraryMetadataEditor({
     <LibraryAdvancedFields
       title={`Source and completeness · ${(value.status ?? 'complete').replaceAll('_', ' ')}`}
       error={error}
-      hint="Optional publication details and review status. Only complete definitions can be added to a character."
+      hint="Only complete definitions can be added to a character."
     >
       <fieldset className="fieldset min-w-0">
         <legend className="sr-only">Source and completeness</legend>

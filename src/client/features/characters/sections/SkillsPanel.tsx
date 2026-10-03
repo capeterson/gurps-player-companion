@@ -24,6 +24,7 @@ import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
+import { SkillPointsBreakdown } from './SkillPointsBreakdown.tsx';
 import { ProseActionPreview } from './SkillRulePreview.tsx';
 import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
 import type { RollRequest } from './rollTypes.ts';
@@ -693,7 +694,15 @@ function SkillRow({
               <span className="hidden sm:inline">
                 {expanded ? 'Done' : canWrite ? 'Edit' : 'Details'}
               </span>
-              <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+              {saving ? (
+                <span
+                  className="loading loading-spinner size-3.5 text-warning"
+                  role="status"
+                  aria-label="Saving skill"
+                />
+              ) : (
+                <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
+              )}
             </button>
           )}
         </td>
@@ -703,16 +712,6 @@ function SkillRow({
           <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
             {canWrite ? (
               <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
-                <header className="flex min-w-0 items-start justify-between gap-3">
-                  <h3 className="min-w-0 [overflow-wrap:anywhere] font-medium">
-                    Edit {displayName}
-                  </h3>
-                  {saving && (
-                    <span className="text-xs text-warning" aria-live="polite">
-                      Saving…
-                    </span>
-                  )}
-                </header>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_7rem_6rem_5rem] md:gap-3">
                   <fieldset className="fieldset min-w-0 p-0">
                     <legend className="fieldset-legend text-xs">Name</legend>
@@ -759,11 +758,27 @@ function SkillRow({
                     <legend className="fieldset-legend text-xs">
                       {skill.racialTrainingPoints ? 'Personal points' : 'Points'}
                     </legend>
-                    <input
-                      aria-label={`${displayName} points`}
-                      className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
-                      inputMode="numeric"
-                      {...pointsField.inputProps}
+                    <InfoTooltip
+                      scrollable
+                      side="bottom"
+                      containerClassName="w-full"
+                      contentClassName="w-80"
+                      content={
+                        <SkillPointsBreakdown
+                          characterId={characterId}
+                          skillId={skill.id}
+                          draftPoints={pointsField.value}
+                        />
+                      }
+                      renderTrigger={(descriptionId) => (
+                        <input
+                          aria-label={`${displayName} points`}
+                          aria-describedby={descriptionId}
+                          className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
+                          inputMode="numeric"
+                          {...pointsField.inputProps}
+                        />
+                      )}
                     />
                   </fieldset>
                 </div>
@@ -1056,10 +1071,6 @@ function SkillsTable({
               No skills match “{query}”.
             </p>
           )}
-          <div className="border-t border-base-300 px-4 py-2 text-[10px] text-base-content/50 sm:px-5">
-            Click a column heading to sort; right-click to filter values. Drag a row handle or focus
-            it and use ↑/↓ for custom order.
-          </div>
           {saveFailed && (
             <output className="block px-4 pb-3 text-xs text-warning sm:px-5">
               This browser could not save the skill order. It will reset when you leave this page.

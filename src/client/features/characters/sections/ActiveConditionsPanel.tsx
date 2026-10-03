@@ -60,10 +60,6 @@ export function ActiveConditionsPanel({
   if (!enabled || !groups.length) return null;
   const content = (
     <>
-      <p className="mb-3 text-xs text-muted">
-        Enable a condition to apply its modifiers. Groups come from trait effects and Combat →
-        Active Effects.
-      </p>
       <div className="space-y-2">
         {groups.map((g) => (
           <label key={g.group} className="flex min-h-11 items-center justify-between gap-3">

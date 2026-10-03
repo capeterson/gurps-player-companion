@@ -11,6 +11,7 @@ export const LIBRARY_SORTS = [
   'duration',
   'kind',
   'techniqueCount',
+  'entryCount',
 ] as const;
 export type LibrarySort = (typeof LIBRARY_SORTS)[number];
 

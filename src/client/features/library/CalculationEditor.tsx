@@ -174,8 +174,8 @@ export function CalculationEditor({
       error={error}
       hint={
         allowBasic
-          ? 'Use this for choices, levels or variable prices. Leave it empty to use the basic price fields. Pattern fields are a draft until you choose Use pattern.'
-          : 'Choose a pattern and enter the amount, then choose Use pattern to apply it.'
+          ? 'Leave empty to use the basic price fields. Pattern changes apply only when you choose Use pattern.'
+          : 'Pattern changes apply only when you choose Use pattern.'
       }
     >
       <fieldset className="fieldset min-w-0">
@@ -315,10 +315,7 @@ export function CalculationEditor({
             />
           </label>
         )}
-        <p className="text-xs">
-          Use pattern replaces the rule. Advanced rules remain editable below; no book values are
-          supplied.
-        </p>
+        <p className="text-xs">Using a pattern replaces the current rule.</p>
         {value && (
           <StructuredFields
             schema={calculationDefinition}

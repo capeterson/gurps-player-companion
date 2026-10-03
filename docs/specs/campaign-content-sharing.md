@@ -402,6 +402,12 @@ entries to existing campaigns.
 
 Sources appear as a flat, sortable list with no Publications group heading or
 group fold control. Each sourcebook can still expand to show its notes or editor.
+The **Entries** column totals entries linked directly by `sourceId` across all
+eleven non-source library categories, including modifiers, races and active
+effects. It shows zero for unused books, supports sorting and column filtering,
+and updates from the campaign's local library as entries are added, relinked or
+deleted. Search and source filters do not change these totals. Members count
+only entries available to them; restricted entries are included for owners.
 
 Library languages carry only the book definition — `name`, `description`,
 `source`, and `isSignLanguage`. Fluency and point cost are per-character and

@@ -373,9 +373,6 @@ export function LibraryPackageEditor({
       <div className="card-body min-w-0 gap-5">
         <div>
           <h3 className="card-title">Edit a library package</h3>
-          <p className="mt-1 text-sm text-base-content/70">
-            Stage related definitions together, then review the changes before applying them.
-          </p>
         </div>
         <fieldset disabled={pending} className="fieldset min-w-0 space-y-4">
           <fieldset disabled={rawError !== null} className="fieldset min-w-0 space-y-4">

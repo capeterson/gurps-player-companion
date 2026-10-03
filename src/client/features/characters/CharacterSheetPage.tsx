@@ -367,7 +367,7 @@ function PrimaryAttrCell({
   const manualEffect = tempEffects.effects.find((e) => e.id === MANUAL_TEMP_EFFECT_ID);
   const tempManual = manualEffect?.mods[axis] ?? 0;
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div id={`attribute-${label}`} className="flex flex-col gap-0.5 min-w-0">
       <InfoTooltip
         content={
           <StatTooltipContent
@@ -380,7 +380,7 @@ function PrimaryAttrCell({
       >
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
-      <span className="flex items-baseline gap-2">
+      <span className="flex flex-wrap items-baseline gap-2">
         {totalAdjustment !== 0 ? (
           <>
             <span
@@ -485,7 +485,7 @@ function SecondaryModCell({
   }${tempTotal !== 0 ? ` ${fmtSignedDelta(tempTotal, modScale ?? 1)}` : ''}`;
 
   return (
-    <div className="flex flex-col gap-0.5 min-w-0">
+    <div id={`attribute-${label}`} className="flex flex-col gap-0.5 min-w-0">
       <InfoTooltip
         content={
           <StatTooltipContent
@@ -498,7 +498,7 @@ function SecondaryModCell({
       >
         <span className="label-eyebrow">{label}</span>
       </InfoTooltip>
-      <span className="flex items-baseline gap-2">
+      <span className="flex flex-wrap items-baseline gap-2">
         <span
           className={`num text-xl font-semibold ${adjusted ? 'text-warning' : ''}`}
           title={adjusted ? `Effective ${displayValue} (${breakdown})` : undefined}
@@ -906,7 +906,7 @@ function SecondaryModsPanel({
 }) {
   return (
     <StatCard title="Secondary attributes" points={character.points.secondary}>
-      <div className="grid grid-cols-2 gap-3.5">
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3">
         <SecondaryModCell
           label="HP"
           modField="hpMod"
@@ -1530,9 +1530,15 @@ export function CharacterSheetPage() {
   const sectionHeading = useRef<HTMLHeadingElement>(null);
   const anchor = parseSheetAnchor(location.hash);
   const anchorTab: SheetTab | null = anchor
-    ? ({ inventory: 'Inventory', skill: 'Skills', trait: 'Traits', spell: 'Magic' }[
-        anchor.kind
-      ] as SheetTab)
+    ? ({
+        inventory: 'Inventory',
+        skill: 'Skills',
+        trait: 'Traits',
+        spell: 'Magic',
+        race: 'Overview',
+        active_effect: 'Combat',
+        attribute: 'Overview',
+      }[anchor.kind] as SheetTab)
     : location.hash === '#history'
       ? 'History'
       : null;
@@ -1589,6 +1595,9 @@ export function CharacterSheetPage() {
         skill: character.skills,
         trait: character.traits,
         spell: character.spells,
+        race: [{ id: character.id }],
+        active_effect: character.activeEffects ?? [],
+        attribute: ['ST', 'DX', 'IQ', 'HT', 'Will', 'Per'].map((id) => ({ id })),
       }[anchor.kind].some((entry) => entry.id === anchor.id),
   );
   const anchorTargetId = anchor ? sheetAnchor(anchor.kind, anchor.id) : null;
@@ -1756,6 +1765,7 @@ export function CharacterSheetPage() {
               canWrite={canWrite}
               experimentalTurnTracker={campaign?.experimentalTurnTracker === true}
               experimentalActiveEffects={campaign?.experimentalActiveEffects === true}
+              anchorActiveEffectId={anchor?.kind === 'active_effect' ? anchor.id : null}
             />
           )}
           {tab === 'Overview' && (
@@ -1764,10 +1774,11 @@ export function CharacterSheetPage() {
                 <FoldSection
                   preferenceKey={`${character.id}:overview`}
                   title="Sheet overview"
+                  forceOpen={anchor?.kind === 'attribute'}
                   icon="identity"
                   summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
                 >
-                  <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid items-stretch gap-4 md:grid-cols-2">
                     <AttributesPanel
                       character={character}
                       canWrite={canWrite}
@@ -1806,6 +1817,7 @@ export function CharacterSheetPage() {
               <FoldSection
                 preferenceKey={`${character.id}:IdentityPanel`}
                 title="Identity"
+                forceOpen={anchor?.kind === 'race'}
                 icon="identity"
               >
                 <IdentityPanel

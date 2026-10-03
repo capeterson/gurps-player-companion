@@ -1,4 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME } from '../../src/shared/schemas/themePreferences';
 import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -71,11 +72,11 @@ async function expectReachableAfterScroll(page: Page, control: Locator) {
         );
         const panel = element.closest('.dropdown-content')?.getBoundingClientRect();
         return (
-          panel !== undefined &&
-          rect.left >= panel.left &&
-          rect.top >= panel.top &&
-          rect.right <= panel.right &&
-          rect.bottom <= panel.bottom &&
+          (panel === undefined ||
+            (rect.left >= panel.left &&
+              rect.top >= panel.top &&
+              rect.right <= panel.right &&
+              rect.bottom <= panel.bottom)) &&
           rect.left >= left &&
           rect.top >= top &&
           rect.right <= right &&
@@ -92,11 +93,12 @@ test('account and compact character menus remain touch reachable through resize 
 }, testInfo) => {
   test.setTimeout(120_000);
   const email = `touch-shell-${suffix()}-${'long-account-address-'.repeat(3)}@example.com`;
+  const displayName = 'Touch Shell QA With A Long Display Name';
   const characterName = `${'ResponsiveTouchCharacterNameWithoutSpaces'.repeat(3).slice(0, 112)}`;
 
   await page.goto('/register');
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/display name/i).fill('Touch Shell QA With A Long Display Name');
+  await page.getByLabel(/display name/i).fill(displayName);
   await page.getByLabel(/^password\b/i).fill(password);
   await page.getByRole('button', { name: /(create account|sign up|register)/i }).tap();
   await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible({
@@ -116,7 +118,13 @@ test('account and compact character menus remain touch reachable through resize 
   const compactViewports = [
     { width: 320, height: 568 },
     { width: 390, height: 844 },
+    { width: 479, height: 800 },
+    { width: 480, height: 800 },
+    { width: 481, height: 800 },
     { width: 568, height: 320 },
+    { width: 639, height: 800 },
+    { width: 640, height: 800 },
+    { width: 641, height: 800 },
     { width: 667, height: 375 },
     { width: 844, height: 390 },
     { width: 1279, height: 768 },
@@ -139,15 +147,44 @@ test('account and compact character menus remain touch reachable through resize 
     const trigger = compactNav.locator('summary');
     await trigger.tap();
     const menu = compactNav.locator('ul.dropdown-content');
-    await expect(menu).toContainText(characterName);
+    const identity = menu.locator(':scope > li').first();
+    await expect(identity).toContainText(displayName);
+    await expect(identity).toContainText(email);
+    await expect(menu).not.toContainText(characterName);
+    await expect(menu.getByRole('button', { name: /^Switch to / })).toHaveCount(0);
     await expectOverlayInsideVisualViewport(page, menu);
     const logout = menu.getByRole('button', { name: 'Logout', exact: true });
     await expectReachableAfterScroll(page, logout);
+    await trigger.tap();
+
+    const themeToggle = page
+      .locator('header.app-header button[aria-label^="Switch to "]')
+      .filter({ visible: true });
+    await expect(themeToggle).toHaveCount(1);
+    await expectReachableAfterScroll(page, themeToggle);
+    const themeBounds = await themeToggle.boundingBox();
+    expect(themeBounds?.width).toBeGreaterThanOrEqual(44);
+    expect(themeBounds?.height).toBeGreaterThanOrEqual(44);
+    expect((themeBounds?.x ?? 0) + (themeBounds?.width ?? 0)).toBeGreaterThanOrEqual(
+      viewport.width - 9,
+    );
+    const notifications = page
+      .locator('header.app-header summary[aria-label^="Notifications"]')
+      .filter({ visible: true });
+    const notificationBounds = await notifications.boundingBox();
+    expect((notificationBounds?.x ?? 0) + (notificationBounds?.width ?? 0)).toBeLessThanOrEqual(
+      themeBounds?.x ?? 0,
+    );
+    await trigger.tap();
 
     if (
+      viewport.width === 320 ||
+      viewport.width === 480 ||
+      viewport.width === 640 ||
       (viewport.width === 568 && viewport.height === 320) ||
       (viewport.width === 844 && viewport.height === 390)
     ) {
+      await identity.scrollIntoViewIfNeeded();
       await captureReviewScreenshot(page, {
         path: testInfo.outputPath(`compact-menu-${viewport.width}x${viewport.height}.png`),
         animations: 'disabled',
@@ -184,7 +221,8 @@ test('account and compact character menus remain touch reachable through resize 
   for (const scale of [2, 1]) {
     await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: scale });
     await settleViewport(page);
-    await expect(compactMenu).toContainText(characterName);
+    await expect(compactMenu.locator(':scope > li').first()).toContainText(email);
+    await expect(compactMenu).not.toContainText(characterName);
     await expectOverlayInsideVisualViewport(page, compactMenu);
     await expectReachableAfterScroll(
       page,
@@ -217,12 +255,20 @@ test('account and compact character menus remain touch reachable through resize 
   const openCompactMenu = compactNav.locator('ul.dropdown-content');
   await expectOverlayInsideVisualViewport(page, openCompactMenu);
 
-  const switchToDark = openCompactMenu.getByRole('button', { name: 'Switch to Dark mode' });
-  await expectReachableAfterScroll(page, switchToDark);
+  await compactTrigger.tap();
+  const switchToDark = page
+    .getByRole('button', { name: 'Switch to Dark mode', exact: true })
+    .filter({ visible: true });
+  await expect(switchToDark).toBeVisible();
   await switchToDark.tap();
-  const switchToLight = openCompactMenu.getByRole('button', { name: 'Switch to Light mode' });
-  await expectReachableAfterScroll(page, switchToLight);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_DARK_THEME);
+  const switchToLight = page
+    .getByRole('button', { name: 'Switch to Light mode', exact: true })
+    .filter({ visible: true });
+  await expect(switchToLight).toBeVisible();
   await switchToLight.tap();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_LIGHT_THEME);
+  await compactTrigger.tap();
 
   const about = openCompactMenu.getByRole('link', { name: 'About', exact: true });
   await expectReachableAfterScroll(page, about);

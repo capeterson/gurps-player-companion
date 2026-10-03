@@ -155,6 +155,9 @@ showing a key input; **Match another edition** chooses an existing named
 definition's stable key. Portable YAML labels translate to/from
 UUIDs at import/export, including nested pricing references. Migration 0068
 backfills existing links; Dexie v17 upgrades cached and queued edits.
+The Sources table includes a sortable **Entries** column counting accessible
+library entries linked to each book across all categories. Counts update with
+local edits and remain independent of search and source filters.
 
 ### Library selection
 
@@ -239,9 +242,9 @@ DR by contributing source name and source ID, combining declarations from the sa
 source. Trait contributions link to the owned trait row; the target is revealed
 through search and column filters without automatically opening its editor.
 
-First-time users without characters see a **Create your first character** action and
-campaign-invitation guidance instead of returning-user copy. Character creation trims
-names, prevents duplicate pending submits, and preserves a new draft typed while an
+First-time users without characters see a **Create your first character** action;
+the home dashboard omits generic onboarding and returning-user filler. Character
+creation trims names, prevents duplicate pending submits, and preserves a new draft typed while an
 earlier creation finishes.
 
 The home page's recent characters, `/characters` listing, campaign overview
@@ -418,7 +421,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   row on narrow screens, and the shared row handle supports drag and keyboard
   ordering. Sort and custom order are device-only per-character preferences.
   Adding is collapsed until requested, and one full-width row editor opens at a
-  time. Its **Edit** heading wraps the full trait name, including unspaced names.
+  time. The summary row supplies the name, so the editor starts with its fields.
   Notes, source rules, modifiers, and custom mechanics remain available
   there; advanced sections appear only when configured or when an owner chooses
   to add effects. Read-only campaign viewers retain search, sorting,
@@ -434,8 +437,13 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The shared row handle supports drag and keyboard ordering. Sort and custom
   order are device-only per-character preferences, survive reloads, and clear on
   logout. A row opens one full-width inline editor; the add form stays collapsed
-  until requested. The **Edit** heading wraps long skill names and specializations
-  within the editor. Source & rules is absent unless that skill has configured
+  until requested. Hovering or focusing its points input previews the net level
+  as points are typed, with an attribute/training/default/modifier breakdown and
+  clickable contributor links. The tooltip wraps and scrolls within the viewport;
+  previewing retains the input’s normal save and rollback behavior. The editor
+  uses the summary row for context, without a repeated “Edit …” title. The same
+  pattern applies to trait, spell, language and technique editors; inventory
+  editors retain their category heading without repeating the item name. Source & rules is absent unless that skill has configured
   TL or owned mechanics to show. Read-only viewers keep search, sorting, custom
   presentation order, details, and rolls without receiving mutation controls.
   Library definitions explicitly declare whether specialization is forbidden,
@@ -642,6 +650,17 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Encumbered Move
   floors at 1 while the load is legal and reads 0 past the 10×BL carry
   cap (B17).
+- **Balanced Overview cards.** The sheet uses one column on phones and two
+  columns from 768px, including wide desktops. Attributes and Secondary attributes
+  align at both edges; Status starts immediately below Attributes. Secondary
+  values use three columns where the available width supports them, and modifier
+  groups wrap inside their cells. Utility disclosures retain their content height.
+- **Concise interaction copy.** Sheet tables, editors, combat controls, inventory,
+  settings, campaign pages and library authoring omit obvious click/save/close
+  instructions and filler introductions. Labels and controls carry routine
+  context; actionable errors, permission warnings, rule limits and non-obvious
+  consequences remain. Settings labels the optional header switches as
+  **Current Status controls**.
 - **Current Status and Combat tab (live-gameplay surfaces)**. Combat follows
   Overview in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
@@ -1092,6 +1111,9 @@ settings sections; switching sections retains drafts.
   Long account names stay truncated at every width so the user-menu
   trigger fits alongside the other header controls; the menu retains the account
   email within viewport bounds.
+  The compact character menu starts with the signed-in user's name and email,
+  omits the repeated character name, and keeps the dark/light toggle in the
+  upper-right header beside sync and notifications.
 - **Logged-in home**: a compact welcome and the four most recently updated
   characters. The welcome heading wraps long unspaced account names within its
   card. Global Character, Campaign, Log, and Library destinations stay in the
@@ -1160,7 +1182,9 @@ settings sections; switching sections retains drafts.
   [notifications.md](notifications.md).
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
-  button. Never reloads on its own (`SwUpdatePrompt`, `src/sw/registerSW.ts`).
+  button. The message wraps while Reload and Dismiss remain readable and inside
+  the toast on narrow screens. Never reloads on its own (`SwUpdatePrompt`,
+  `src/sw/registerSW.ts`).
 - **Styled error recovery**: unknown routes and unexpected router/render errors
   use the app shell rather than React Router's developer fallback. The
   page offers home/reload actions and shows a unique error reference, server
@@ -1421,6 +1445,8 @@ src/
                  navigation fallback. Mutable worker/bootstrap/HTML entrypoints
                  are served no-store; hashed assets remain cacheable. Outbox
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
+.agents/skills/  Project-local development skills; gpc-ui-design records established
+                 UI expectations and is required by AGENTS.md before UI work
 skills/          Portable GPC workflow skills, client metadata, and synthetic eval cases
 tests/
   skills/        Eval-grader regression tests, run by skills:check and CI

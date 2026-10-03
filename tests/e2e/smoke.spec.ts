@@ -60,7 +60,6 @@ test('roll history moves from Combat into the History tab and survives reload lo
   );
   await page.getByRole('tab', { name: 'Roll history' }).click();
   await expect(page.getByRole('list', { name: 'Roll history entries' })).toContainText('Dodge');
-  await expect(page.getByText(/saved on this device only and never synced/i)).toBeVisible();
 
   await page.reload();
   await selectCharacterSection(page, 'History');

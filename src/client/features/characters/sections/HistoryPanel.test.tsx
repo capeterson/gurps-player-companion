@@ -71,9 +71,6 @@ describe('HistoryPanel', () => {
     expect(rollHistoryTab).toHaveFocus();
     expect(rollHistoryTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByText('ST 10 → 11')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Up to 250 rolls — saved on this device only and never synced.'),
-    ).toBeInTheDocument();
     const rollHistory = screen.getByRole('list', { name: 'Roll history entries' });
     expect(rollHistory).toHaveTextContent('Dodge');
     expect(rollHistory).toHaveTextContent('vs 12');

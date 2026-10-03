@@ -164,9 +164,7 @@ export function ArmorFacetEditor({
               </div>
               <fieldset className="fieldset min-w-0">
                 <legend className="fieldset-legend">Protected locations</legend>
-                <p className="text-sm text-base-content/70">
-                  Choose the locations this armor protects. Torso also covers vitals.
-                </p>
+                <p className="text-sm text-base-content/70">Torso also covers vitals.</p>
                 {locations.length === 0 && (
                   <p className="text-sm text-warning">No protected locations selected.</p>
                 )}

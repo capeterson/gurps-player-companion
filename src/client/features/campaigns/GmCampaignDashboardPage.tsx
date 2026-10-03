@@ -29,7 +29,6 @@ export function GmCampaignDashboardPage() {
       <CampaignWorkspaceHeader campaignId={id} workspace={workspace} />
       <CampaignPageHeading
         title="GM dashboard"
-        description="Monitor the party and review recent character activity."
         actions={
           <button type="button" className="btn btn-sm" onClick={() => setLookupOpen(true)}>
             Skill lookup

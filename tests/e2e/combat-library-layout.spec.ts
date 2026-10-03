@@ -551,5 +551,6 @@ test('Protection before penetration links active trait DR to its highlighted tra
   await expect(edit).toBeVisible();
   await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toHaveCount(0);
   await edit.click();
-  await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toBeVisible();
+  await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toHaveCount(0);
+  await expect(traitBody.getByLabel('Iron Skin name', { exact: true })).toBeVisible();
 });

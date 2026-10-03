@@ -117,9 +117,6 @@ export function SettingsPage() {
       <header className="space-y-2">
         <p className="label-eyebrow">Account</p>
         <h1 className="font-display text-3xl">Settings</h1>
-        <p className="max-w-2xl text-sm text-muted">
-          Manage your theme, character sheet display and sign-in credentials.
-        </p>
       </header>
 
       <AppearanceSection />
@@ -130,16 +127,11 @@ export function SettingsPage() {
         <div className="card gap-4 p-card">
           <div>
             <p className="label-eyebrow">Preferences</p>
-            <h2 className="font-display text-2xl">Character sheet</h2>
-            <p className="text-sm text-muted">
-              Choose which optional controls appear in Current Status. Saved for this account on
-              this device.
-            </p>
+            <h2 className="font-display text-2xl">Current Status controls</h2>
           </div>
           <label className="flex items-center justify-between gap-4">
             <span>
               <span className="block font-medium">Posture</span>
-              <span className="text-xs text-muted">Show the posture control in the header.</span>
             </span>
             <input
               type="checkbox"
@@ -153,7 +145,6 @@ export function SettingsPage() {
           <label className="flex items-center justify-between gap-4">
             <span>
               <span className="block font-medium">Maneuver</span>
-              <span className="text-xs text-muted">Show the maneuver control in the header.</span>
             </span>
             <input
               type="checkbox"
@@ -167,7 +158,6 @@ export function SettingsPage() {
           <label className="flex items-center justify-between gap-4">
             <span>
               <span className="block font-medium">Conditions</span>
-              <span className="text-xs text-muted">Show the conditions control in the header.</span>
             </span>
             <input
               type="checkbox"

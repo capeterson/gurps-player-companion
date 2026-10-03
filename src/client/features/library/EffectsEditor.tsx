@@ -304,7 +304,7 @@ export function EffectsEditor<T extends TraitEffect>({
 
       {drafts.length === 0 && (
         <p className="rounded bg-base-200/60 p-2 text-xs text-base-content/60">
-          No mechanical effects. Add one for stat, skill, defense, DR, damage, or weapon bonuses.
+          No mechanical effects.
         </p>
       )}
 

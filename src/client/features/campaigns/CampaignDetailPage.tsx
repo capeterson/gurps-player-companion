@@ -37,10 +37,7 @@ export function CampaignDetailPage() {
       <CampaignWorkspaceHeader campaignId={c.id} workspace={workspace} />
 
       <section className="max-w-5xl space-y-4">
-        <CampaignPageHeading
-          title="Overview"
-          description="The people, rules, and shared play space for this campaign."
-        />
+        <CampaignPageHeading title="Overview" />
         <dl className="stats stats-vertical w-full border border-base-300 bg-base-100 sm:stats-horizontal">
           <div className="stat py-3">
             <dt className="stat-title text-xs">Point target</dt>

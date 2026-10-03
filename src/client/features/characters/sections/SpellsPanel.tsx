@@ -454,12 +454,11 @@ function SpellRow({
       {canWrite && (
         <tr id={editorId} hidden={!expanded}>
           <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
-            <header className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="min-w-0 font-medium [overflow-wrap:anywhere]">Edit {spell.name}</h3>
+            <div className="mb-3 flex justify-end">
               <button type="button" className="btn btn-ghost btn-sm min-h-11" onClick={onToggle}>
                 Done
               </button>
-            </header>
+            </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-[minmax(0,1fr)_7rem_6rem_6rem]">
               <label className="form-control col-span-2 min-w-0 lg:col-span-1">
                 <span className="label-text text-xs">Spell name</span>
@@ -510,10 +509,7 @@ function SpellRow({
                 data-flash-parity={notesField.inputProps['data-flash-parity']}
               />
             </label>
-            <footer className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-3">
-              <p className="text-xs text-base-content/60">
-                Fields save individually. Done closes the editor.
-              </p>
+            <footer className="mt-3 flex flex-wrap items-center justify-end gap-3 border-t border-base-300 pt-3">
               <button
                 type="button"
                 className="btn btn-ghost btn-sm min-h-11 text-error"
@@ -897,12 +893,6 @@ function SpellsTable({
             </TableBody>
           )}
         </Table>
-      )}
-      {character.spells.length > 0 && (
-        <p className="text-xs text-base-content/60">
-          Level opens a roll. Cast and Maintain pay energy separately. Upkeep 0 is free; — means no
-          upkeep recorded.
-        </p>
       )}
       {reference && (
         <SpellReferenceDialog

@@ -402,7 +402,8 @@ test('spell list and reference dialog stay contained across mobile, tablet, and 
 
     if (width === 320) {
       await spellRow.getByRole('button', { name: `Edit ${spellName}` }).click();
-      await expect(page.getByRole('heading', { name: `Edit ${spellName}` })).toBeVisible();
+      await expect(page.getByRole('heading', { name: `Edit ${spellName}` })).toHaveCount(0);
+      await expect(page.getByLabel(`${spellName} name`, { exact: true })).toBeVisible();
       const nameInput = page.getByLabel(`${spellName} name`);
       const nameBox = await nameInput.boundingBox();
       if (!nameBox) throw new Error('Spell editor name input has no bounds at 320px');

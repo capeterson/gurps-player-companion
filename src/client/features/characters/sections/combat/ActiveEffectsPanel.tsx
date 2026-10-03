@@ -43,7 +43,8 @@ function EffectNotes({ entry, characterId }: { entry: ActiveEffectInstance; char
 export function ActiveEffectsPanel({
   character,
   canWrite,
-}: { character: CharacterDetail; canWrite: boolean }) {
+  anchorActiveEffectId,
+}: { character: CharacterDetail; canWrite: boolean; anchorActiveEffectId?: string | null }) {
   const enabled = useExperimentalActiveEffects(character.campaignId);
   const [sourceInventoryId, setSourceInventoryId] = useState<string | null>(null);
   const [custom, setCustom] = useState(false);
@@ -82,6 +83,7 @@ export function ActiveEffectsPanel({
   return (
     <FoldSection
       title="Active Effects"
+      forceOpen={Boolean(anchorActiveEffectId)}
       preferenceKey={`${character.id}:active-effects`}
       className="card p-card"
     >
@@ -89,7 +91,11 @@ export function ActiveEffectsPanel({
         {(character.activeEffects ?? []).map((entry) => {
           const expired = effectExpired(entry, Date.now());
           return (
-            <article key={entry.id} className="rounded border border-base-300 p-3">
+            <article
+              key={entry.id}
+              id={`active_effect-${entry.id}`}
+              className="rounded border border-base-300 p-3"
+            >
               <div className="flex flex-wrap justify-between">
                 <h3>{entry.name}</h3>
                 <span>{expired ? 'expired' : entry.state}</span>

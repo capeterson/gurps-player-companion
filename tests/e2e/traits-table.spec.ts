@@ -162,9 +162,10 @@ test('trait table and expanded editor wrap long names, notes, and modifiers resp
           actionCellBox.x + actionCellBox.width,
         );
       }
-      const editorHeading = page.getByRole('heading', { name: `Edit ${traitName}` });
-      await expect(editorHeading).toBeVisible();
-      const editor = editorHeading.locator('xpath=../..');
+      await expect(page.getByRole('heading', { name: `Edit ${traitName}` })).toHaveCount(0);
+      const editor = page
+        .getByLabel(`${traitName} name`, { exact: true })
+        .locator('xpath=ancestor::tr');
       await expectInsideViewport(page, editor);
       await expect(editor.getByLabel(`${traitName} name`)).toBeVisible();
       await expect(editor.getByLabel(`${traitName} points`)).toBeVisible();
