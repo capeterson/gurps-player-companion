@@ -1731,7 +1731,7 @@ export function CharacterSheetPage() {
           compact={tab === 'Combat'}
         />
 
-        {character.libraryEffectsKnown === false && <MechanicsUnavailable />}
+        {character.libraryEffectsKnown === false && <MechanicsUnavailable character={character} />}
         {character.libraryEffectsKnown !== false &&
           (character.warnings.length > 0 || character.dismissedWarnings.length > 0) && (
             <FoldSection

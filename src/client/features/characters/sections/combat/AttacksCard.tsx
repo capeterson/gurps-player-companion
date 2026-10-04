@@ -23,6 +23,7 @@ import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { Table, TableBody, TableHeader } from '../../../../components/ui/Table.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
+import { mechanicsUnavailableReason } from '../../mechanicsUnavailableReason.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import {
@@ -243,7 +244,8 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
       <output className="sr-only">{announcement}</output>
       {!effectsKnown && (
         <p className="text-xs text-warning">
-          ST-based damage is unavailable until linked library effects load.
+          ST-based damage is unavailable until linked library effects load.{' '}
+          {mechanicsUnavailableReason(character)}
         </p>
       )}
       <WeaponEffectDiagnostics

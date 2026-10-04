@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import {
   aggregateDrByLocation,
+  armorLayerStacks,
   armorLayering,
+  describeArmorLayerStacks,
   effectiveDrByLocation,
   layeredArmorDrContributions,
   resolveArmorDb,
@@ -92,6 +94,99 @@ describe('aggregateDrByLocation', () => {
       item(2, ['skull'], { flexible: true, concealable: true }),
     ];
     expect(armorLayering(headLayers)).toEqual({ dxPenalty: 0, invalidLocations: [] });
+  });
+
+  it('names the conflicting layers, groups independent conflicts, and explains three-layer stacks', () => {
+    const layers = [
+      { ...item(4, ['torso'], { flexible: false }), id: 'vest', name: 'Brigandine vest' },
+      { ...item(3, ['torso'], { flexible: false }), id: 'shirt', name: 'Mail shirt' },
+      { ...item(2, ['arm_left'], { flexible: false }), id: 'vambrace', name: 'Iron vambrace' },
+      { ...item(1, ['arm_left'], { flexible: false }), id: 'sleeve', name: 'Padded sleeve' },
+      { ...item(1, ['leg_right'], { flexible: false }), id: 'greave', name: 'Right greave' },
+      { ...item(1, ['leg_right'], { flexible: false }), id: 'hose', name: 'Wool hose' },
+      { ...item(1, ['eye'], { flexible: false }), id: 'visor', name: 'Eye visor' },
+      { ...item(1, ['eye'], { flexible: false }), id: 'goggle', name: 'Goggles' },
+      { ...item(1, ['tail_feathers'], { flexible: false }), id: 'tail1', name: 'Tail guard' },
+      { ...item(1, ['tail_feathers'], { flexible: false }), id: 'tail2', name: 'Tail wrap' },
+    ];
+    const descriptions = describeArmorLayerStacks(
+      armorLayerStacks(layers).filter((stack) => stack.invalid),
+    );
+    expect(descriptions).toContain(
+      '“Brigandine vest”, “Mail shirt” at Torso, Vitals: an inner layer must be flexible and concealable.',
+    );
+    expect(descriptions).toContain(
+      '“Iron vambrace”, “Padded sleeve” at Left Arm: an inner layer must be flexible and concealable.',
+    );
+    expect(descriptions).toContain(
+      '“Right greave”, “Wool hose” at Right Leg: an inner layer must be flexible and concealable.',
+    );
+    expect(descriptions).toContain(
+      '“Eye visor”, “Goggles” at Eyes: an inner layer must be flexible and concealable.',
+    );
+    expect(descriptions).toContain(
+      '“Tail guard”, “Tail wrap” at Tail Feathers: an inner layer must be flexible and concealable.',
+    );
+
+    const threeLayers = [
+      { ...item(4, ['torso'], { flexible: false }), id: 'outer', name: 'Outer plate' },
+      { ...item(3, ['torso'], { flexible: true, concealable: true }), id: 'middle', name: 'Mail' },
+      {
+        ...item(2, ['torso'], { flexible: true, concealable: true }),
+        id: 'inner',
+        name: 'Gambeson',
+      },
+    ];
+    expect(
+      describeArmorLayerStacks(armorLayerStacks(threeLayers).filter((stack) => stack.invalid)),
+    ).toContain(
+      '“Outer plate”, “Mail”, “Gambeson” at Torso, Vitals: at most two layers may overlap.',
+    );
+  });
+
+  it('does not combine disjoint facings or unavailable inventory into a conflict', () => {
+    const front = {
+      ...item(4, ['torso'], { frontOnly: true, flexible: false }),
+      id: 'front',
+      name: 'Front plate',
+    };
+    const back = {
+      ...item(3, ['torso'], { backOnly: true, flexible: false }),
+      id: 'back',
+      name: 'Back plate',
+    };
+    const stashed = {
+      ...item(9, ['torso'], { flexible: false }),
+      id: 'stashed',
+      name: 'Stashed plate',
+      worn: false,
+    };
+    const depleted = {
+      ...item(7, ['torso'], { flexible: false }),
+      id: 'depleted',
+      name: 'Broken plate',
+      quantity: 0,
+    };
+    const unequipped = {
+      ...item(6, ['torso'], { flexible: false }),
+      id: 'unequipped',
+      name: 'Loose plate',
+      equipped: false,
+    };
+
+    expect(armorLayering([front, back]).invalidLocations).toEqual([]);
+    expect(
+      armorLayering([front, back, stashed, depleted, unequipped], 'front').invalidLocations,
+    ).toEqual([]);
+    expect(
+      armorLayering([front, back, stashed, depleted, unequipped], 'back').invalidLocations,
+    ).toEqual([]);
+    expect(
+      aggregateDrByLocation([front, back, stashed, depleted, unequipped], 'front').get('torso')?.dr,
+    ).toBe(4);
+    expect(
+      aggregateDrByLocation([front, back, stashed, depleted, unequipped], 'back').get('torso')?.dr,
+    ).toBe(3);
   });
 
   it('filters directional DR for front, back, and side facings', () => {

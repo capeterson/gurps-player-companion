@@ -1,4 +1,5 @@
 /** Presentation choices shared by armor inspection and incoming damage. */
+export { locationLabel } from '../../../../../shared/constants/hitLocations.ts';
 export const DAMAGE_TYPES = [
   ['cr', 'Crushing (cr)'],
   ['cut', 'Cutting (cut)'],
@@ -25,11 +26,3 @@ export const ARMOR_DIVISORS = [
   ['0.2', 'Divisor (0.2) · five times DR'],
   ['0.1', 'Divisor (0.1) · ten times DR'],
 ] as const;
-
-export function locationLabel(location: string): string {
-  if (location === 'eye') return 'Eyes';
-  const parts = location.split('_');
-  const words =
-    parts.length === 2 && ['left', 'right'].includes(parts[1] ?? '') ? [parts[1], parts[0]] : parts;
-  return words.map((word) => (word ? word[0]?.toUpperCase() + word.slice(1) : '')).join(' ');
-}

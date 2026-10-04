@@ -6,7 +6,9 @@ import {
   aggregateDrByLocation,
   armorAppliesToFacing,
   armorCoversLocation,
+  armorLayerStacks,
   armorLayering,
+  describeArmorLayerStacks,
   effectiveDrByLocation,
   innateDrCoversLocation,
   layeredArmorDrContributions,
@@ -27,6 +29,7 @@ import { AppIcon } from '../../../../components/ui/AppIcon.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
 import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import { SheetAnchorLink } from '../../SheetAnchorLink.tsx';
+import { mechanicsUnavailableReason } from '../../mechanicsUnavailableReason.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { ArmorLocationMap } from './ArmorLocationMap.tsx';
@@ -173,10 +176,10 @@ export function DrSummaryCard({
       >
         <section className="space-y-4" aria-label="Incoming attack">
           {!known && (
-            <output className="text-sm text-warning">
+            <output className="block break-words text-sm text-warning">
               {invalidLayers.includes(location)
-                ? 'DR unavailable: resolve overlapping armor layers in Inventory (B286).'
-                : 'DR unavailable: linked library effects or campaign house rules have not loaded.'}
+                ? `DR unavailable: resolve overlapping armor layers in Inventory (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, selectedFacing).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
+                : `DR unavailable. ${mechanicsUnavailableReason(character)} Reconnect to load the missing rules.`}
             </output>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

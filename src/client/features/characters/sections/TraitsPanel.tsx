@@ -1,4 +1,5 @@
 import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { locationLabel } from '../../../../shared/constants/hitLocations.ts';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
 import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
@@ -656,7 +657,7 @@ function traitEffectSummary(
 ): string {
   let summary = effectPreview(effect);
   if (effect.target === 'dr' && effect.hitLocation) {
-    summary += ` at ${effect.hitLocation}`;
+    summary += ` at ${locationLabel(effect.hitLocation)}`;
   }
   const weaponSelector = effect.weaponSelector;
   if (weaponSelector?.kind === 'inventory_item') {

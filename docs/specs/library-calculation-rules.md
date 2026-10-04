@@ -241,7 +241,12 @@ halving skill (B376).
 Armor records `concealable` for the inner-layer requirement (B286). At most two
 layers may overlap; one must be flexible and concealable. Invalid locations
 have no automatic armor DR, show an explicit unavailable state, and disable
-applying injury until corrected. Legal layering outside the head subtracts 1
+applying injury until corrected. Sheet warnings and incoming-damage blockers name
+the overlapping inventory pieces, group their affected locations using friendly
+body-part labels, and distinguish excess layers from a missing flexible,
+concealable inner layer. Only available, equipped pieces that actually overlap
+on a facing are implicated. Legal layering warnings also name the pieces.
+Legal layering outside the head subtracts 1
 from effective DX and DX-based skills without altering Basic Speed/Move.
 
 Carried powerstones with positive quantities and available ancestors are casting

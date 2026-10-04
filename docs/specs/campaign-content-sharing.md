@@ -348,7 +348,8 @@ names in activity summaries wrap inside the feed instead of being clipped.
 Player sheets and GM cards share `joinCharacterMechanics`, reading the validated
 source/version declarations on synced trait/skill rows. The GM dashboard uses its
 local campaign mirror when HTTP is unavailable, while an explicit authorization
-failure still blocks it. Missing definitions show an unavailable notice instead
+failure still blocks it. Missing definitions show an unavailable notice naming
+the affected owned traits and skills, including specializations, instead
 of baseline stats or skill-lookup numbers. No authenticated service-worker cache
 is involved; closing the app offline retains the same local derivation.
 
@@ -685,7 +686,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   import. Review names staged changes outside the selected sourcebooks instead of
   silently filtering them out; unchanged entries outside the scope remain untouched.
   New entries inherit the selected sourcebook when exactly one is selected. Raw
-  editing waits until invalid local entry fields are corrected, so a raw replacement
+  editing waits until invalid local entry fields are corrected; blockers identify
+  those entries by category and name, and schema errors identify the entry and
+  friendly field label rather than an array path, so a raw replacement
   cannot discard an unresolved field draft. Replace removals apply only after confirmation. This editor stages a
   package for its current campaign and preserves linked enchantment IDs and owned
   snapshots; the separate portable download export still strips campaign-local

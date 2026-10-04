@@ -23,7 +23,8 @@ export function PlayerCharacterQuickActions({
   const character = useCharacterDetail(characterId ?? undefined);
   const access = useCharacterAccessLocal(character, meId);
   if (!character || !access.isOwner || !access.canWrite || access.isMinimal) return null;
-  if (character.libraryEffectsKnown === false) return <MechanicsUnavailable />;
+  if (character.libraryEffectsKnown === false)
+    return <MechanicsUnavailable character={character} />;
   return <OwnCharacterQuickActions character={character} />;
 }
 

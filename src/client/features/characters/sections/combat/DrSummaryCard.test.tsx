@@ -41,6 +41,37 @@ function makeCharacter(
 }
 
 describe('DrSummaryCard', () => {
+  it('names illegal armor in the readout and damage dialog, and prevents applying injury', () => {
+    const character = makeCharacter([
+      { dr: 4, locations: ['torso'] },
+      { dr: 3, locations: ['torso'] },
+    ]);
+    const vest = character.inventory[0];
+    const shirt = character.inventory[1];
+    if (!vest?.armor || !shirt?.armor) throw new Error('missing armor fixtures');
+    vest.name = 'Brigandine vest';
+    shirt.name = 'Mail shirt';
+    vest.armor = { ...vest.armor, flexible: false, concealable: false };
+    shirt.armor = { ...shirt.armor, flexible: false, concealable: false };
+    const bumpHp = vi.fn();
+
+    render(<DrSummaryCard character={character} canWrite hpMax={10} bumpHp={bumpHp} />);
+
+    expect(screen.getByText(/DR unavailable: resolve overlapping armor layers/)).toHaveTextContent(
+      '“Brigandine vest”, “Mail shirt” at Torso, Vitals',
+    );
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('—');
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    expect(
+      screen.getByText(/Resolve overlapping armor layers in Inventory before applying damage/),
+    ).toHaveTextContent('“Brigandine vest”, “Mail shirt” at Torso, Vitals');
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '10' } });
+    const unavailable = screen.getByRole('button', { name: 'Damage unavailable' });
+    expect(unavailable).toBeDisabled();
+    fireEvent.submit(unavailable.closest('form') as HTMLFormElement);
+    expect(bumpHp).not.toHaveBeenCalled();
+  });
+
   it('links an armor layer to its inventory anchor', () => {
     const character = makeCharacter([{ dr: 4, locations: ['torso'] }]);
     render(<DrSummaryCard character={character} />);

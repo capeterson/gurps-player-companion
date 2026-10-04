@@ -2,7 +2,7 @@ import type { ActiveEffectInstance } from '../schemas/activeEffects.ts';
 import type { PricingResolution } from '../schemas/calculation.ts';
 import { type CharacterRace, HUMAN_RACE } from '../schemas/race.ts';
 import { resolveActiveEffects } from './activeEffects.ts';
-import { armorLayering } from './armorDr.ts';
+import { armorLayerStacks, armorLayering, describeArmorLayerStacks } from './armorDr.ts';
 import { inventoryAvailability } from './inventoryAvailability.ts';
 import { racialProfile } from './race.ts';
 import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
@@ -547,6 +547,9 @@ export function buildCharacterDetail(
   const layering = armorLayering(
     inventory.map((item) => ({ ...item, armor: item.armor as InventoryItemOut['armor'] })),
   );
+  const layerStacks = armorLayerStacks(
+    inventory.map((item) => ({ ...item, armor: item.armor as InventoryItemOut['armor'] })),
+  );
   const itemEnchantments = new Map(
     inventory.map((item) => [
       item.id,
@@ -1013,13 +1016,13 @@ export function buildCharacterDetail(
     warnings.push({
       code: 'inventory.armor_layers',
       severity: 'warn',
-      message: `Resolve armor layers at ${layering.invalidLocations.join(', ')}: an inner layer must be flexible and concealable (B286). Armor DR at these locations is unavailable until corrected.`,
+      message: `Resolve overlapping armor layers in Inventory. ${describeArmorLayerStacks(layerStacks.filter((stack) => stack.invalid))} Armor DR at these locations is unavailable until corrected (B286).`,
     });
   if (layering.dxPenalty && !dismissed.has('inventory.armor_layer_dx'))
     warnings.push({
       code: 'inventory.armor_layer_dx',
       severity: 'note',
-      message: 'Layered armor outside the head gives −1 DX and DX-based skills (B286).',
+      message: `Layered armor outside the head gives −1 DX and DX-based skills (B286). ${describeArmorLayerStacks(layerStacks.filter((stack) => !stack.invalid && stack.locations.some((location) => !['skull', 'face', 'eye', 'eyes', 'head'].includes(location))))}`,
     });
 
   return {

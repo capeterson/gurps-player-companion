@@ -24,7 +24,11 @@ import { getLocalDb } from '../../db/dexie.ts';
 import { useExperimentalActiveEffects } from '../../hooks/useExperimentalActiveEffects.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { characterIdsToMinimize } from '../../sync/minimalViewSweep.ts';
-import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinCharacterMechanics.ts';
+import {
+  type LibraryEffectOverrides,
+  type UnavailableMechanics,
+  joinCharacterMechanics,
+} from './joinCharacterMechanics.ts';
 
 /**
  * `undefined` while the live query is still mounting; `null` for
@@ -34,6 +38,7 @@ import { type LibraryEffectOverrides, joinCharacterMechanics } from './joinChara
  */
 /** Server-built details are authoritative; local details explicitly flag missing definitions. */
 export type EffectAwareCharacterDetail = CharacterDetail & {
+  unavailableMechanics?: readonly UnavailableMechanics[];
   raceName?: string;
   skillLevelBreakdowns?: Map<string, SkillLevelBreakdown>;
 };
@@ -129,6 +134,7 @@ export function useCharacterDetail(
         ? { raceName: character.raceName }
         : {}),
       libraryEffectsKnown: joined.libraryEffectsKnown,
+      unavailableMechanics: joined.unavailableMechanics,
     };
   }, [
     id,
