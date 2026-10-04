@@ -3,8 +3,8 @@
  * describe this page's socket independently of the HTTP sync indicator.
  */
 import { getLocalDb } from '../db/dexie.ts';
-import { connectionStore } from '../lib/connectionState.ts';
 import { invalidateEncounter } from '../features/encounters/encounterInvalidation.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator } from './orchestrator.ts';
 

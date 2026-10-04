@@ -4,8 +4,8 @@ import type { EntityClass } from '../../shared/schemas/sync.ts';
 import type { OutboxEntry, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { syncEntityTable } from '../db/syncEntityStore.ts';
-import { useDialogState } from '../hooks/useDialogState.ts';
 import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
+import { useDialogState } from '../hooks/useDialogState.ts';
 import { connectionStore } from '../lib/connectionState.ts';
 import { isNetworkError } from '../lib/networkErrors.ts';
 import { useToasts } from '../lib/toast.tsx';
@@ -45,7 +45,12 @@ interface SyncLogViewProps {
   storageMessage?: string;
 }
 
-export function SyncLogView({ open, onClose, online: browserOnline, storageMessage }: SyncLogViewProps) {
+export function SyncLogView({
+  open,
+  onClose,
+  online: browserOnline,
+  storageMessage,
+}: SyncLogViewProps) {
   const ref = useDialogState(open);
   const toasts = useToasts();
   const status = useSyncStatus();
@@ -395,25 +400,27 @@ export function SyncLogView({ open, onClose, online: browserOnline, storageMessa
                 ))}
               </section>
             )}
-            {status.state === 'error' && status.error && !isNetworkSyncLogEntry({ result: 'failed', reason: status.error.reason }) && (
-              // The badge that opens this dialog says something is
-              // wrong; this is where it says *what*.  Cycle-level
-              // failures (server down, connection dropped, session
-              // lost) produce no toast and no outbox row, so without
-              // this the dialog looked completely healthy.
-              <section
-                aria-labelledby="sync-current-error-title"
-                className="rounded-box border border-warning/50 bg-warning/10 p-3"
-              >
-                <h3 id="sync-current-error-title" className="font-semibold text-warning">
-                  Sync isn't currently working
-                </h3>
-                <p className="mt-1 text-sm">{status.error.reason}</p>
-                <p className="mt-1 text-xs text-base-content/60">
-                  Last attempt {formatTime(status.error.at)}.
-                </p>
-              </section>
-            )}
+            {status.state === 'error' &&
+              status.error &&
+              !isNetworkSyncLogEntry({ result: 'failed', reason: status.error.reason }) && (
+                // The badge that opens this dialog says something is
+                // wrong; this is where it says *what*.  Cycle-level
+                // failures (server down, connection dropped, session
+                // lost) produce no toast and no outbox row, so without
+                // this the dialog looked completely healthy.
+                <section
+                  aria-labelledby="sync-current-error-title"
+                  className="rounded-box border border-warning/50 bg-warning/10 p-3"
+                >
+                  <h3 id="sync-current-error-title" className="font-semibold text-warning">
+                    Sync isn't currently working
+                  </h3>
+                  <p className="mt-1 text-sm">{status.error.reason}</p>
+                  <p className="mt-1 text-xs text-base-content/60">
+                    Last attempt {formatTime(status.error.at)}.
+                  </p>
+                </section>
+              )}
 
             {failures.length > 0 && (
               <section aria-labelledby="sync-failures-title">
@@ -1175,7 +1182,8 @@ function PendingDetails({ op, hideValues }: { op: OutboxEntry; hideValues: boole
   rows.push(textRow('Operation', op.command));
   rows.push(textRow('Queued', formatTime(op.enqueuedAt)));
   if (op.attemptCount > 0) rows.push(textRow('Attempts', String(op.attemptCount)));
-  if (op.serverReason && !isNetworkRetry(op)) rows.push(textRow('Last error', op.serverReason, 'error'));
+  if (op.serverReason && !isNetworkRetry(op))
+    rows.push(textRow('Last error', op.serverReason, 'error'));
   return <DetailList rows={rows} />;
 }
 
@@ -1267,11 +1275,14 @@ function statusLabel(op: OutboxEntry): string {
 }
 
 function isNetworkRetry(op: OutboxEntry): boolean {
-  return op.status === 'transient_retry' && isNetworkSyncLogEntry({
-    result: 'retrying',
-    reason: op.serverReason,
-    details: op.lastError,
-  });
+  return (
+    op.status === 'transient_retry' &&
+    isNetworkSyncLogEntry({
+      result: 'retrying',
+      reason: op.serverReason,
+      details: op.lastError,
+    })
+  );
 }
 
 function formatTime(value: string): string {

@@ -542,7 +542,7 @@ of raw network-error alerts; an unopened notifications cache says
 **Notifications unavailable offline** rather than claiming it is empty.
 Debug exports include the connection snapshot as well as physical `onLine`.
 
-It is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
+The journal is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
 the outbox's `previousValue` / `newValue`. Pull entries compare the row in
 Dexie immediately before and after applying the cursor change and snapshot only
 the data fields that actually moved; this means a pending local field protected
@@ -806,7 +806,7 @@ Offline and error states replace the gem with their respective symbols.
 A known actionable error retains priority during device/reachability offline;
 its tooltip includes the reason and offline context. Intentional offline mode
 keeps its own icon and leaves actionable errors available inside the dialog.
-The offline presentation changes no outbox/replay behavior. The control opens
+The icons preserve the outbox's ordering and retry guarantees. The control opens
 the existing sync log in every state; reduced-motion users get static arrows.
 
 **The indicator's `error` state always carries a reason.** `syncStateStore`

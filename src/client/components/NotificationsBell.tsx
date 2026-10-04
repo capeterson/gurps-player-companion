@@ -14,8 +14,8 @@ import {
   campaignInvitationNotificationPayload,
   eventNotificationPayload,
 } from '../../shared/schemas/notification.ts';
-import { useViewportBoundedOverlay } from '../hooks/useViewportBoundedOverlay.ts';
 import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
+import { useViewportBoundedOverlay } from '../hooks/useViewportBoundedOverlay.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { useDesktopNotificationDelivery } from '../lib/desktopNotifications.ts';
 import { invitationsApi } from '../lib/invitations.ts';
@@ -136,13 +136,17 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
           )}
         </div>
         {unavailableOffline ? (
-          <p className="text-sm text-base-content/60 py-4 text-center">Notifications unavailable offline.</p>
-        ) : notifications.isError && (
-          <QueryReadError
-            label="notifications"
-            error={notifications.error}
-            onRetry={() => void notifications.refetch()}
-          />
+          <p className="text-sm text-base-content/60 py-4 text-center">
+            Notifications unavailable offline.
+          </p>
+        ) : (
+          notifications.isError && (
+            <QueryReadError
+              label="notifications"
+              error={notifications.error}
+              onRetry={() => void notifications.refetch()}
+            />
+          )
         )}
         {items.length === 0 && !notifications.isError && !unavailableOffline ? (
           <p className="text-sm text-base-content/60 py-4 text-center">You're all caught up.</p>

@@ -17,9 +17,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
+import { isNetworkSyncLogEntry } from '../sync/syncLog.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { useSyncWsStatus } from '../sync/useSyncWsStatus.ts';
-import { isNetworkSyncLogEntry } from '../sync/syncLog.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 import { InfoTooltip } from './ui/InfoTooltip.tsx';
 
@@ -39,10 +39,9 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
   });
 
   // A sync failure stays actionable when connectivity also drops.
-  const visualState =
-    manualOffline
-      ? 'paused'
-      : state === 'error' && !networkFailure
+  const visualState = manualOffline
+    ? 'paused'
+    : state === 'error' && !networkFailure
       ? 'error'
       : !online || networkFailure
         ? 'offline'
@@ -52,9 +51,10 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
   const meta = STATE_META[visualState];
 
   // Build a single-line tooltip: state message · storage info
-  const statusMsg = error && !manualOffline && !networkFailure
-    ? `${error.reason}${online ? '' : ' · Offline'} — click for details`
-    : meta.tooltip;
+  const statusMsg =
+    error && !manualOffline && !networkFailure
+      ? `${error.reason}${online ? '' : ' · Offline'} — click for details`
+      : meta.tooltip;
 
   let storageMsg = '';
   if (storage.data) {

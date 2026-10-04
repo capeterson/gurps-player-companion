@@ -14,12 +14,12 @@ export function QueryReadError({
   const { online } = useConnectionStatus();
   if (isNetworkError(error)) {
     return (
-      <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
+      <output className="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
         <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{label} unavailable offline</span>
         <button type="button" className="btn btn-sm" onClick={onRetry} disabled={!online}>
           Retry
         </button>
-      </div>
+      </output>
     );
   }
   const reason = error instanceof Error ? error.message : 'Please try again.';

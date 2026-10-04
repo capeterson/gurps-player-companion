@@ -389,8 +389,7 @@ class SyncOrchestrator {
   /** Run an explicit HTTP outbox/cursor cycle and wait for its result. */
   async syncNow(): Promise<void> {
     if (!tokenStore.read()) throw new Error('Sign in to sync');
-    if (!connectionStore.canAttemptNetwork())
-      throw new Error('Reconnect to sync');
+    if (!connectionStore.canAttemptNetwork()) throw new Error('Reconnect to sync');
     if (this.recoveryInProgress) throw new Error('A full re-sync is already in progress');
     if (this.isClientOutdated()) throw new Error('App update required before syncing');
     const generation = this.sessionGeneration;
@@ -923,7 +922,12 @@ class SyncOrchestrator {
   private mediaWarm: Promise<void> | null = null;
 
   private startMediaWork(): void {
-    if (!this.currentUserId || this.sessionAbort.signal.aborted || !connectionStore.canAttemptNetwork()) return;
+    if (
+      !this.currentUserId ||
+      this.sessionAbort.signal.aborted ||
+      !connectionStore.canAttemptNetwork()
+    )
+      return;
     const userId = this.currentUserId;
     const signal = this.sessionAbort.signal;
     if (!this.mediaWork) {

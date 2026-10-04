@@ -14,8 +14,8 @@ import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react
 import { Link, useLocation } from 'react-router-dom';
 import { getLocalDb } from '../db/dexie.ts';
 import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
-import { connectionStore } from '../lib/connectionState.ts';
 import { api } from '../lib/api.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { isAccountMismatch, writeActiveUser } from '../sync/activeUser.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';

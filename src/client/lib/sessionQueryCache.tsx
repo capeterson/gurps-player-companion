@@ -34,12 +34,12 @@ export function SessionQueryCacheBoundary() {
   useEffect(() => {
     if (!currentSession.current) connectionStore.reset();
     return tokenStore.subscribe((next) => {
-        const nextSession = next?.sessionId ?? null;
-        if (nextSession === currentSession.current) return;
-        currentSession.current = nextSession;
-        connectionStore.reset();
-        clearSessionQueryCache(queryClient);
-      });
+      const nextSession = next?.sessionId ?? null;
+      if (nextSession === currentSession.current) return;
+      currentSession.current = nextSession;
+      connectionStore.reset();
+      clearSessionQueryCache(queryClient);
+    });
   }, [queryClient]);
 
   return null;

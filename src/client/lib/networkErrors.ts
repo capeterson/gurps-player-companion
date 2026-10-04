@@ -7,7 +7,9 @@ export class NetworkUnavailableError extends Error {
 }
 
 export function isNetworkErrorMessage(message: string): boolean {
-  return /^(?:Offline|Failed to fetch|Failed to Fetch|Load failed|NetworkError when attempting to fetch resource\.?|The Internet connection appears to be offline\.?|A network error occurred\.?)$/.test(message);
+  return /^(?:Offline|Failed to fetch|Failed to Fetch|Load failed|NetworkError when attempting to fetch resource\.?|The Internet connection appears to be offline\.?|A network error occurred\.?)$/.test(
+    message,
+  );
 }
 
 export function isNetworkError(error: unknown): boolean {
