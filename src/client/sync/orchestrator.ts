@@ -315,9 +315,9 @@ class SyncOrchestrator {
   /**
    * Set when the server answered 426: this build's sync protocol is too old.
    * Sync pauses (queued operations stay untouched) until the app reloads onto
-   * the current build, or the forced-reload guard window passes.
+   * the current build after the user chooses Reload in the persistent toast.
    */
-  private clientOutdatedUntil = 0;
+  private clientOutdated = false;
   /** Invalidates every response that originated before logout/account switch. */
   private sessionGeneration = 0;
   private sessionAbort = new AbortController();
@@ -2717,22 +2717,20 @@ class SyncOrchestrator {
   }
 
   private isClientOutdated(): boolean {
-    // Skip the clock read in the common case; scheduling snapshots elsewhere
-    // depend on the order of Date.now() calls.
-    return this.clientOutdatedUntil !== 0 && Date.now() < this.clientOutdatedUntil;
+    return this.clientOutdated;
   }
 
   /**
    * The server no longer accepts this build's sync protocol. Queued edits
-   * stay in the outbox; the page reloads onto the current build, whose Dexie
-   * upgrades migrate them before they are sent.
+   * stay in the outbox until the user reloads onto the current build, whose
+   * Dexie upgrades migrate them before they are sent.
    */
   private async handleClientOutdated(err: unknown): Promise<void> {
     const alreadyReported = this.isClientOutdated();
-    this.clientOutdatedUntil = Date.now() + CLIENT_OUTDATED_PAUSE_MS;
+    this.clientOutdated = true;
     this.markCycleFailed();
     if (alreadyReported) return;
-    const reason = 'App update required — reloading to sync your changes';
+    const reason = 'App update required — choose Reload to sync your changes';
     await appendSyncLog({
       direction: 'local',
       result: 'failed',
@@ -2854,9 +2852,6 @@ async function reportCycleFailure(
  * is down" and "my edit was rejected" -- and the user is the one who
  * has to tell those apart when the badge goes red.
  */
-/** Matches the forced-reload guard window in `requestClientUpdate`. */
-const CLIENT_OUTDATED_PAUSE_MS = 60_000;
-
 function isClientOutdatedError(err: unknown): boolean {
   return err instanceof ApiError && err.status === 426;
 }

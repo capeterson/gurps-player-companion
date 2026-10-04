@@ -66,6 +66,9 @@ expectations come from observed regressions and explicit user preferences.
 
 ## Navigation and calculations
 
+- App updates never reload the page automatically, even when the server refuses
+  an old sync protocol. Use the existing persistent `SwUpdatePrompt` toast with
+  its Reload button; preserve drafts and queued edits until the user acts.
 - Keep destination menus for navigation. The compact character menu starts
   with account name/email and omits the character name already in the breadcrumb.
   Put the light/dark control in the upper-right header, outside that menu.

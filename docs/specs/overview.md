@@ -1212,7 +1212,8 @@ settings sections; switching sections retains drafts.
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. The message wraps while Reload and Dismiss remain readable and inside
-  the toast on narrow screens. Never reloads on its own (`SwUpdatePrompt`,
+  the toast on narrow screens. Never reloads on its own, including when sync
+  requires a newer build; edits remain queued until the user chooses Reload (`SwUpdatePrompt`,
   `src/sw/registerSW.ts`).
 - **Styled error recovery**: unknown routes and unexpected router/render errors
   use the app shell rather than React Router's developer fallback. The
@@ -1440,7 +1441,7 @@ src/
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
                  libraryMechanics.ts validates synced character-owned declarations)
     syncProtocol.ts  Sync protocol version + header; `/sync/*` answers 426 to
-                 an outdated build, which then force-reloads onto the current one
+                 an outdated build, which pauses sync and offers a user-controlled Reload
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text

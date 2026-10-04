@@ -33,6 +33,11 @@ edits say **Waiting for connection**. HTTP/validation failures retain their
 actionable explanations. Online-only reads use neutral offline availability text
 instead of raw connection-error alerts. See [offline-sync.md](offline-sync.md).
 
+App updates always use the existing persistent toast with a **Reload** button.
+The page never reloads automatically, including after a sync-protocol rejection;
+the user chooses when to interrupt their work. Required updates pause sync and
+retain queued edits until that choice.
+
 ## Character cards
 
 Home, the Characters listing, campaign overview roster, and GM dashboard use

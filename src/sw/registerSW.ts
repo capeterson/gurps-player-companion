@@ -37,7 +37,6 @@ import { connectionStore } from '../client/lib/connectionState.ts';
 
 const UPDATE_READY_EVENT = 'gpc:sw-update-ready';
 const CONTROLLER_CHANGED_EVENT = 'gpc:sw-controller-changed';
-const CLIENT_OUTDATED_EVENT = 'gpc:client-outdated';
 
 /** How often a foreground tab re-checks for a new build. */
 export const SW_UPDATE_POLL_MS = 60 * 60 * 1000;
@@ -255,49 +254,20 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
   };
 }
 
-/*
- * # Forced update
- *
- * The prompt above leaves reloading to the user because nothing breaks while
- * they wait. A server that refuses this build's sync protocol (HTTP 426, see
- * `shared/syncProtocol.ts`) is different: queued edits cannot be sent until
- * the page runs the current build, so the update is no longer optional.
- */
-
-/** sessionStorage key: when this tab last forced a reload for a 426. */
-const FORCED_RELOAD_KEY = 'gpc:forced-update-reload-at';
-/** A tab that is still outdated right after a forced reload waits this long before trying again. */
-export const FORCED_RELOAD_MIN_INTERVAL_MS = 60_000;
+/** Protocol-incompatible builds use the same user-controlled update prompt. */
 const SW_STEP_TIMEOUT_MS = 10_000;
 /** Pause after the user leaves an input so its blur commit reaches the outbox. */
 const EDIT_SETTLE_MS = 500;
 
-export interface ForcedUpdateOptions {
+export interface ClientUpdateOptions {
   reload?: () => void;
-  now?: () => number;
 }
 
-let forcedUpdateStarted = false;
+let clientUpdateRequested = false;
 
 /** Test seam. */
-export function resetForcedUpdateForTests(): void {
-  forcedUpdateStarted = false;
-}
-
-function readForcedReloadAt(): number {
-  try {
-    return Number(window.sessionStorage.getItem(FORCED_RELOAD_KEY) ?? 0) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-function writeForcedReloadAt(at: number): void {
-  try {
-    window.sessionStorage.setItem(FORCED_RELOAD_KEY, String(at));
-  } catch {
-    // Storage unavailable: the in-memory latch still prevents repeats in this page.
-  }
+export function resetClientUpdateForTests(): void {
+  clientUpdateRequested = false;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
@@ -364,37 +334,32 @@ function waitUntilNotEditing(): Promise<void> {
 }
 
 /**
- * Force this tab onto the current build: announce it, activate the newest
- * service worker, wait until the user is not mid-edit, then reload. Queued
- * outbox operations stay in IndexedDB and are sent by the new build.
- *
- * Returns false without reloading when this tab already force-reloaded within
- * `FORCED_RELOAD_MIN_INTERVAL_MS` (the server may still be mid-deploy), which
- * prevents a reload loop; the caller retries after that window.
+ * Offer the current build without interrupting the user's work. Only the
+ * persistent toast's Reload action activates the latest worker and reloads.
+ * Queued operations remain in IndexedDB while sync waits for that choice.
  */
-export function requestClientUpdate(options: ForcedUpdateOptions = {}): boolean {
-  if (typeof window === 'undefined') return false;
-  if (forcedUpdateStarted) return true;
-  const now = options.now ?? Date.now;
-  window.dispatchEvent(new CustomEvent(CLIENT_OUTDATED_EVENT));
-  if (now() - readForcedReloadAt() < FORCED_RELOAD_MIN_INTERVAL_MS) return false;
-  forcedUpdateStarted = true;
-  const reload = options.reload ?? (() => window.location.reload());
-  void (async () => {
-    try {
-      await activateLatestWorker();
-    } catch {
-      // The reload still fetches the newest shell when the network allows.
-    }
-    await waitUntilNotEditing();
-    writeForcedReloadAt(now());
-    reload();
-  })();
-  return true;
+export function requestClientUpdate(options: ClientUpdateOptions = {}): void {
+  if (typeof window === 'undefined' || clientUpdateRequested) return;
+  clientUpdateRequested = true;
+  let reloading = false;
+  const reload = () => {
+    if (reloading) return;
+    reloading = true;
+    void (async () => {
+      try {
+        await activateLatestWorker();
+      } catch {
+        // The user's reload still fetches the newest shell when possible.
+      }
+      await waitUntilNotEditing();
+      (options.reload ?? (() => window.location.reload()))();
+    })();
+  };
+  pendingUpdate = reload;
+  window.dispatchEvent(new CustomEvent(UPDATE_READY_EVENT, { detail: { reload } }));
 }
 
 export const swEvents = {
   UPDATE_READY: UPDATE_READY_EVENT,
   CONTROLLER_CHANGED: CONTROLLER_CHANGED_EVENT,
-  CLIENT_OUTDATED: CLIENT_OUTDATED_EVENT,
 } as const;

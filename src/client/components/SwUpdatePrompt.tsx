@@ -51,22 +51,9 @@ export function SwUpdatePrompt() {
       if (typeof reload === 'function') announce(reload);
     };
 
-    // The server refused this build's sync protocol; registerSW is reloading
-    // the tab (once the user leaves any input). Say why the page will reload.
-    const onClientOutdated = () => {
-      toasts.push('Updating the app so your changes can sync. It will reload shortly.', {
-        kind: 'info',
-        persistent: true,
-        id: TOAST_ID,
-        action: { label: 'Reload now', onClick: () => window.location.reload() },
-      });
-    };
-
     window.addEventListener(swEvents.UPDATE_READY, onUpdateReady);
-    window.addEventListener(swEvents.CLIENT_OUTDATED, onClientOutdated);
     return () => {
       window.removeEventListener(swEvents.UPDATE_READY, onUpdateReady);
-      window.removeEventListener(swEvents.CLIENT_OUTDATED, onClientOutdated);
     };
   }, [toasts]);
 

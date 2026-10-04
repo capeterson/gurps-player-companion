@@ -93,6 +93,11 @@ across `gpc-*` projects; each belongs to a specific checkout.
 
 ## Interaction design rules
 
+App updates MUST never force or schedule a page reload, including HTTP 426
+sync-protocol rejections. Always offer the existing persistent toast with its
+Reload button. Preserve drafts and queued edits until the user chooses Reload;
+an incompatible build pauses sync while it waits.
+
 ### Start UI work with the project design skill
 
 Read [.agents/skills/gpc-ui-design/SKILL.md](.agents/skills/gpc-ui-design/SKILL.md)

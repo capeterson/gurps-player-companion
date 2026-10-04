@@ -374,10 +374,11 @@ A middleware in `routes/sync.ts` checks the header on every `/sync/*` route
   No operation is read, applied or rejected. The orchestrator restores each
   claimed op's pre-claim status and attempt count (no delivery uncertainty, no
   rollback, no rejection toast), journals the reason, shows it on the indicator,
-  pauses drain and pull for 60 s, and calls `requestClientUpdate()` to activate
-  the newest service worker and reload (see
-  [architecture.md](architecture.md#stale-build-discovery)). The current build
-  then sends the preserved ops.
+  pauses drain and pull until the user reloads, and calls `requestClientUpdate()`
+  to show the persistent new-version toast with a **Reload** button (see
+  [architecture.md](architecture.md#stale-build-discovery)). Activation and reload
+  happen only after that explicit action; there is no automatic or timed reload.
+  The current build then sends the preserved ops.
 - newer than the server (a rolling deploy or rollback reached an older replica)
   → **503** with `Retry-After: 5`, handled as an ordinary whole-batch failure.
 
@@ -399,7 +400,7 @@ new shape; the reloaded build runs that upgrade before it sends anything.
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch moves to `transient_retry` without reverting local edits; loop retries quietly and connectivity shows offline. Expected browser connection failures do not append `failed` or `retrying` journal entries. |
-| HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and the page force-updates (see *Sync protocol version*). |
+| HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and a persistent toast offers Reload when the user is ready (see *Sync protocol version*). |
 
 ## The session must survive a server outage
 
