@@ -92,6 +92,43 @@ describe('PricingResolver', () => {
     expect(onResolve).not.toHaveBeenCalled();
   });
 
+  it('names selected modifiers when a duplicate group makes trait pricing unavailable', () => {
+    const pricedEntry = {
+      ...entry,
+      availableModifiers: [
+        {
+          name: 'Acrobatic',
+          category: 'enhancement',
+          costType: 'percent',
+          costValue: 20,
+          group: 'Fighting style',
+        },
+        {
+          name: 'Cautious',
+          category: 'limitation',
+          costType: 'percent',
+          costValue: -10,
+          group: 'Fighting style',
+        },
+      ],
+    } as PricedDefinition;
+    render(
+      <PricingResolver
+        campaignId="campaign"
+        section="traits"
+        entry={pricedEntry}
+        onResolve={onResolve}
+        onCancel={onCancel}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Acrobatic'));
+    fireEvent.click(screen.getByLabelText('Cautious'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Fighting style (Acrobatic, Cautious)');
+    expect(screen.getByRole('button', { name: 'Use these values' })).toBeDisabled();
+    expect(onResolve).not.toHaveBeenCalled();
+  });
+
   it('renders reserved-name defaults and preserves __proto__ as an editable input key', () => {
     const onChange = vi.fn();
     render(

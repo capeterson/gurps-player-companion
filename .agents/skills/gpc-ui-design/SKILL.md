@@ -37,6 +37,13 @@ expectations come from observed regressions and explicit user preferences.
 
 ## Context and copy
 
+- Calculation blockers name the affected owned entries and held results. Group
+  overlapping armor pieces with their affected body parts, and use the shared
+  `locationLabel` from `src/shared/constants/hitLocations.ts` rather than raw
+  location keys. Missing linked-rule notices identify the affected traits/skills;
+  bulk validation blockers identify the invalid rows instead of asking the player
+  to search the whole sheet or package.
+
 - A table row already identifies the entry. Expanded skill, trait, spell,
   language and technique editors start with labeled fields; do not repeat
   “Edit Diplomacy” or another title. Inventory keeps its category title without

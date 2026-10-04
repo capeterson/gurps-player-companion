@@ -65,7 +65,11 @@ export function useCampaignCharacterDetails(
               }
             : null,
         });
-        return { ...detail, libraryEffectsKnown: joined.libraryEffectsKnown };
+        return {
+          ...detail,
+          libraryEffectsKnown: joined.libraryEffectsKnown,
+          unavailableMechanics: joined.unavailableMechanics,
+        };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [campaignId]);

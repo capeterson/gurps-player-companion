@@ -421,10 +421,16 @@ describe('AttacksCard', () => {
     const character = {
       ...makeCharacter('thr+1 imp / sw+1 cut / 2d pi'),
       libraryEffectsKnown: false,
+      unavailableMechanics: [
+        { id: 'trait-1', kind: 'trait' as const, name: 'Unusual Strength' },
+        { id: 'skill-1', kind: 'skill' as const, name: 'Bow (Longbow)' },
+      ],
     };
     const openRoll = vi.fn();
     const view = render(<AttacksCard character={character} openRoll={openRoll} />);
-    expect(screen.getByText(/ST-based damage is unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/ST-based damage is unavailable/)).toHaveTextContent(
+      'trait “Unusual Strength”, skill “Bow (Longbow)”',
+    );
     expect(screen.queryByRole('button', { name: '1d-1 imp' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '1d+1 cut' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '2d pi' }));

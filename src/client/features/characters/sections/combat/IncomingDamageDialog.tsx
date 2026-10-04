@@ -15,12 +15,15 @@
 import { type FormEvent, useMemo, useState } from 'react';
 import {
   type ArmorFacing,
+  armorLayerStacks,
   armorLayering,
+  describeArmorLayerStacks,
   effectiveDrByLocation,
   resolveArmorDb,
 } from '../../../../../shared/domain/armorDr.ts';
 import { applyDamage, parseArmorDivisor } from '../../../../../shared/domain/injuryCalc.ts';
 import { useDialogState } from '../../../../hooks/useDialogState.ts';
+import { mechanicsUnavailableReason } from '../../mechanicsUnavailableReason.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import { ARMOR_DIVISORS, DAMAGE_TYPES, locationLabel } from './armorViewOptions.ts';
 
@@ -110,8 +113,8 @@ export function IncomingDamageDialog({
             : '';
   const breakdown = !effectsKnown
     ? invalidLayers
-      ? 'Resolve overlapping armor layers in Inventory before applying damage (B286).'
-      : 'Linked library effects or campaign house rules are unavailable. Reconnect and load them before applying damage.'
+      ? `Resolve overlapping armor layers in Inventory before applying damage (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, facing).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
+      : `${mechanicsUnavailableReason(character)} Reconnect and load the missing rules before applying damage.`
     : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
           divisorText ? `=${result.effectiveDr}` : ''
@@ -164,7 +167,7 @@ export function IncomingDamageDialog({
             </p>
           )}
 
-          <p className="num rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80">
+          <p className="num break-words rounded-lg border border-base-300/60 bg-base-200/40 px-3 py-2 text-xs text-base-content/80">
             {breakdown}
           </p>
           <p className="rounded-lg border border-base-300/60 px-3 py-2 text-xs text-base-content/80">

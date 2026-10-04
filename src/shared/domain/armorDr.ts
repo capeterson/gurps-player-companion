@@ -20,7 +20,7 @@
  * Pure TS (shared domain) — runs in Bun, browser, and service worker.
  */
 
-import { HIT_LOCATIONS } from '../constants/hitLocations.ts';
+import { HIT_LOCATIONS, locationLabel } from '../constants/hitLocations.ts';
 import type { ResolvedEffectOut } from '../schemas/character.ts';
 import type { ArmorData, InventoryItemOut } from '../schemas/inventory.ts';
 import { type AvailabilityItem, availableEquipment } from './inventoryAvailability.ts';
@@ -273,6 +273,65 @@ export function layeredArmorDrContributions(
   });
 }
 
+export interface ArmorLayerStack {
+  readonly items: readonly ArmorItemRow[];
+  readonly locations: string[];
+  readonly invalid: boolean;
+}
+
+/** Keep the actual overlapping pieces together, including facing and availability. */
+export function armorLayerStacks(
+  items: readonly ArmorItemRow[],
+  facing?: ArmorFacing,
+): ArmorLayerStack[] {
+  const equipped = availableEquipment(items).filter((item) => item.isArmor && item.armor);
+  const locations = new Set(equipped.flatMap((item) => item.armor?.locations ?? []));
+  if (locations.has('torso')) locations.add('vitals');
+  const stacks = new Map<string, ArmorLayerStack>();
+  const facings: readonly ArmorFacing[] = facing ? [facing] : ['front', 'back', 'left', 'right'];
+  for (const direction of facings) {
+    for (const location of locations) {
+      const layers = equipped.filter(
+        (item) =>
+          item.armor &&
+          armorCoversLocation(item.armor, location) &&
+          armorAppliesToFacing(item.armor, direction),
+      );
+      if (layers.length <= 1) continue;
+      const key = layers.map((item) => equipped.indexOf(item)).join(',');
+      let stack = stacks.get(key);
+      if (!stack) {
+        stack = {
+          items: layers,
+          locations: [],
+          invalid:
+            layers.length > 2 ||
+            !layers.some((item) => item.armor?.flexible && item.armor.concealable),
+        };
+        stacks.set(key, stack);
+      }
+      if (!stack.locations.includes(location)) stack.locations.push(location);
+    }
+  }
+  return [...stacks.values()];
+}
+
+/** Describe the implicated pieces without blaming unrelated armor or facings. */
+export function describeArmorLayerStacks(stacks: readonly ArmorLayerStack[]): string {
+  return stacks
+    .map((stack) => {
+      const names = stack.items.map((item) => `“${item.name ?? 'Armor'}”`).join(', ');
+      const locations = stack.locations.map(locationLabel).join(', ');
+      const reason = stack.invalid
+        ? stack.items.length > 2
+          ? ': at most two layers may overlap'
+          : ': an inner layer must be flexible and concealable'
+        : '';
+      return `${names} at ${locations}${reason}.`;
+    })
+    .join(' ');
+}
+
 /** B286: at most an outer layer and a flexible, concealable inner layer.
  * Layering on the head is exempt from the DX penalty. Ambiguous/illegal
  * selections are flagged rather than counted as automatic protection. */
@@ -280,33 +339,21 @@ export function armorLayering(
   items: readonly ArmorItemRow[],
   facing?: ArmorFacing,
 ): { dxPenalty: number; invalidLocations: string[] } {
-  if (!facing) {
-    const facings = (['front', 'back', 'left', 'right'] as const).map((direction) =>
-      armorLayering(items, direction),
-    );
-    return {
-      dxPenalty: Math.max(...facings.map((entry) => entry.dxPenalty)),
-      invalidLocations: [...new Set(facings.flatMap((entry) => entry.invalidLocations))],
-    };
-  }
-  const equipped = availableEquipment(items).filter((item) => item.isArmor && item.armor);
-  const locations = new Set(equipped.flatMap((item) => item.armor?.locations ?? []));
-  if (locations.has('torso')) locations.add('vitals');
-  const invalidLocations: string[] = [];
-  let dxPenalty = 0;
-  for (const location of locations) {
-    const layers = equipped.filter(
-      (item) =>
-        item.armor &&
-        armorCoversLocation(item.armor, location) &&
-        armorAppliesToFacing(item.armor, facing),
-    );
-    if (layers.length <= 1) continue;
-    if (layers.length > 2 || !layers.some((item) => item.armor?.flexible && item.armor.concealable))
-      invalidLocations.push(location);
-    else if (!['skull', 'face', 'eye', 'eyes', 'head'].includes(location)) dxPenalty = 1;
-  }
-  return { dxPenalty, invalidLocations };
+  const stacks = armorLayerStacks(items, facing);
+  return {
+    dxPenalty: stacks.some(
+      (stack) =>
+        !stack.invalid &&
+        stack.locations.some(
+          (location) => !['skull', 'face', 'eye', 'eyes', 'head'].includes(location),
+        ),
+    )
+      ? 1
+      : 0,
+    invalidLocations: [
+      ...new Set(stacks.filter((stack) => stack.invalid).flatMap((stack) => stack.locations)),
+    ],
+  };
 }
 
 export function aggregateDrByLocation(
