@@ -30,6 +30,63 @@ afterEach(async () => {
 });
 
 describe('sync log', () => {
+  it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])(
+    'omits connection failures from single and batched writes: %s',
+    async (message) => {
+      await appendSyncLog({
+        direction: 'pull',
+        result: 'failed',
+        reason: `Downloading server changes failed — ${message}`,
+      });
+      await appendSyncLogEntries([
+        {
+          direction: 'push',
+          result: 'retrying',
+          reason: `Upload will retry — ${message}`,
+        },
+        {
+          direction: 'push',
+          result: 'failed',
+          reason: `Uploading changes failed — ${message}`,
+        },
+        { id: 'saved', direction: 'push', result: 'synced' },
+      ]);
+      expect((await getLocalDb().syncLog.toArray()).map((entry) => entry.id)).toEqual(['saved']);
+      expect(await getLocalDb().syncLogBodies.count()).toBe(0);
+    },
+  );
+
+  it('retains HTTP failures, application errors and rejected edits', async () => {
+    await appendSyncLogEntries([
+      {
+        id: 'http',
+        direction: 'pull',
+        result: 'failed',
+        reason: 'Downloading server changes failed (HTTP 503) — Failed to fetch',
+      },
+      {
+        id: 'online-http',
+        direction: 'push',
+        result: 'failed',
+        reason: 'Failed to fetch',
+        details: { status: 503 },
+      },
+      {
+        id: 'application',
+        direction: 'local',
+        result: 'failed',
+        reason: 'Sync failed — Cannot read properties of undefined',
+      },
+      {
+        id: 'rejected',
+        direction: 'push',
+        result: 'rolled_back',
+        reason: 'Failed to fetch',
+      },
+    ]);
+    expect(await getLocalDb().syncLog.count()).toBe(4);
+  });
+
   it('retains only the newest 1,000 records', async () => {
     const db = getLocalDb();
     const entries = Array.from({ length: SYNC_LOG_RETENTION }, (_, index) => ({

@@ -1166,6 +1166,9 @@ settings sections; switching sections retains drafts.
   data change). Both times survive journal pruning. The log's **Sync now** button
   runs an HTTP outbox/cursor cycle; successful empty checks refresh Last sync without
   changing Last changes. Failed or interrupted checks leave Last sync unchanged.
+  Expected offline connection failures do not add sync-log entries, and older
+  matching entries are hidden from the activity list. HTTP errors and rejected
+  edits remain visible; unsynced edits keep their normal retry behavior.
   Larger diagnostic payloads use device-local gzip storage and load when a
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.

@@ -821,6 +821,72 @@ describe('cursor pull sync-log values', () => {
 });
 
 describe('whole-cycle failures', () => {
+  it('keeps repeated offline pulls out of the journal without advancing the cursor', async () => {
+    login();
+    const db = getLocalDb();
+    await db.syncCursors.put({ entityClass: 'character', revision: 7 });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError('NetworkError when attempting to fetch resource.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await expect(getSyncOrchestrator().triggerCursorPull()).rejects.toThrow('NetworkError');
+    }
+    expect(await db.syncLog.count()).toBe(0);
+    expect((await db.syncCursors.get('character'))?.revision).toBe(7);
+    expect(await db.syncMeta.get(lastSuccessfulSyncKey())).toBeUndefined();
+
+    fetchMock.mockImplementation(async () => cursorResponse());
+    await getSyncOrchestrator().triggerCursorPull();
+    await waitFor(() => expect(syncStateStore.status.state).toBe('synced'), { timeout: 2_000 });
+    expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(expect.any(String));
+  });
+
+  it('retains and retries an offline upload without journalling the connection error', async () => {
+    await seedCharacter();
+    login();
+    const db = getLocalDb();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow('Failed to fetch');
+    expect((await db.characters.get(CHAR_ID))?.st).toBe(12);
+    const op = (await db.outbox.toArray())[0];
+    expect(op).toMatchObject({ status: 'transient_retry', deliveryUncertain: true });
+    expect(await db.syncLog.count()).toBe(0);
+    expect(await db.rejectionToasts.count()).toBe(0);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (!url.includes('/sync/operations')) return cursorResponse();
+        return new Response(
+          JSON.stringify({
+            outcomes: [
+              {
+                clientOpId: op?.clientOpId,
+                status: 'applied',
+                newRevision: 2,
+              },
+            ],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    await getSyncOrchestrator().syncNow();
+    expect(await db.outbox.count()).toBe(0);
+    expect((await db.characters.get(CHAR_ID))?.st).toBe(12);
+    expect((await db.syncLog.toArray()).some((entry) => entry.result === 'synced')).toBe(true);
+  });
+
   it('retries a delivery-uncertain operation before its newer same-field successor', async () => {
     await seedCharacter();
     login();

@@ -398,7 +398,7 @@ new shape; the reloaded build runs that upgrade before it sends anything.
 | `stale_base` | Same as conflict — `baseRevision` was behind the server. If `latestEntity` shows the field unchanged, the client re-enqueues the op with the fresh revision instead of rolling back (the self-heal below); the server's batch-local fast-forward means a same-client burst now settles in one round trip rather than needing this self-heal per op. |
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
-| network error | Whole batch reverts to `transient_retry`; loop retries, and a `failed` journal entry + a named indicator error record why. |
+| network error | Whole batch moves to `transient_retry` without reverting local edits; loop retries and the indicator retains the current reason. Expected browser connection failures do not append `failed` or `retrying` journal entries. |
 | HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and the page force-updates (see *Sync protocol version*). |
 
 ## The session must survive a server outage
@@ -485,12 +485,19 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   can't flush the 1,000-row journal; the live retry state (attempt count,
   backoff timing) is always visible via the outbox rows themselves.
 - `failed` — a **whole-cycle** failure: the drain POST or the cursor pull
-  itself errored (dropped connection, 5xx, reverse-proxy/tunnel error), so no
+  itself errored (5xx, reverse-proxy/tunnel response, or application error), so no
   individual operation has an outcome to report. These carry no `entityClass` /
   `entityId` / `command`; `reason` names the failure including its HTTP status
-  and `details` carries the raw error. **This class of failure previously
-  logged nothing anywhere** — no outbox row, no rejection record, no toast —
-  which left the red badge with nothing to point at during a server outage.
+  and `details` carries the raw error.
+
+Expected browser connection failures (`Failed to fetch`, Firefox's
+`NetworkError when attempting to fetch resource.`, and Safari's `Load failed`)
+are normal for offline PWA use. Both single and batched journal writes omit their
+`failed` and `retrying` entries, and the dialog filters matching historical
+entries without loading compressed bodies or deleting old debug records. HTTP
+error responses, other application errors and rejected edits remain recorded.
+This does not change retry/backoff, delivery uncertainty, queued values, cursors,
+the indicator's current error reason or the successful-sync timestamps.
 
 It is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
 the outbox's `previousValue` / `newValue`. Pull entries compare the row in
@@ -779,7 +786,8 @@ persistent toast, and the badge should follow the queue.)
 **Every cycle-ending `catch` goes through `reportCycleFailure()`** — the cursor
 pull, the drain POST, *and* `runLoop`'s outer catch (which covers
 `recoverStaleInFlight`, `readDrainableOps`, `applyOutcomes` and Dexie faults).
-It writes the journal entry and sets the named error together, and de-dupes via
+It sets the named error and writes a journal entry unless the failure is an
+expected browser connection error, and de-dupes via
 a `WeakSet` so an error reported by the pull path and rethrown into `runLoop`
 isn't logged twice. A bare `syncStateStore.set('error')` anywhere reintroduces
 the unexplained red badge this design exists to remove.

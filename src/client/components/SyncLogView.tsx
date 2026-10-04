@@ -17,6 +17,7 @@ import {
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
 import {
+  isNetworkSyncLogEntry,
   isSuccessfulSyncOperation,
   lastChangesSyncKey,
   lastSuccessfulSyncKey,
@@ -66,7 +67,13 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     [],
   );
   const log = useLiveQuery(
-    () => getLocalDb().syncLog.orderBy('occurredAt').reverse().limit(1_000).toArray(),
+    () =>
+      getLocalDb()
+        .syncLog.orderBy('occurredAt')
+        .reverse()
+        .filter((entry) => !isNetworkSyncLogEntry(entry))
+        .limit(1_000)
+        .toArray(),
     [],
   );
   // Bulk-read each class once. Never decompress journal bodies to render titles.
