@@ -1,5 +1,6 @@
 import { QueryClient, type QueryKey, hashKey, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { connectionStore } from './connectionState.ts';
 import { tokenStore } from './tokenStore.ts';
 
 function sessionHash(queryKey: QueryKey): string {
@@ -30,16 +31,16 @@ export function SessionQueryCacheBoundary() {
   const queryClient = useQueryClient();
   const currentSession = useRef(tokenStore.read()?.sessionId ?? null);
 
-  useEffect(
-    () =>
-      tokenStore.subscribe((next) => {
+  useEffect(() => {
+    if (!currentSession.current) connectionStore.reset();
+    return tokenStore.subscribe((next) => {
         const nextSession = next?.sessionId ?? null;
         if (nextSession === currentSession.current) return;
         currentSession.current = nextSession;
+        connectionStore.reset();
         clearSessionQueryCache(queryClient);
-      }),
-    [queryClient],
-  );
+      });
+  }, [queryClient]);
 
   return null;
 }

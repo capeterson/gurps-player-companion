@@ -3,6 +3,7 @@
  * describe this page's socket independently of the HTTP sync indicator.
  */
 import { getLocalDb } from '../db/dexie.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { invalidateEncounter } from '../features/encounters/encounterInvalidation.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { getSyncOrchestrator } from './orchestrator.ts';
@@ -46,6 +47,7 @@ class SyncWsSubscriber {
   private accessToken: string | null = null;
   private generation = 0;
   private unsubscribeTokens: (() => void) | null = null;
+  private unsubscribeConnection: (() => void) | null = null;
   private listeners = new Set<() => void>();
   private snapshot: SyncWsStatus = { state: 'stopped', lastConnectedAt: null };
 
@@ -71,8 +73,10 @@ class SyncWsSubscriber {
     if (this.running) return;
     this.running = true;
     this.unsubscribeTokens = tokenStore.subscribe(this.refreshSession);
-    window.addEventListener('online', this.onOnline);
-    window.addEventListener('offline', this.onOffline);
+    this.unsubscribeConnection = connectionStore.subscribe(() => {
+      if (connectionStore.status.online) this.onOnline();
+      else this.onOffline();
+    });
     this.refreshSession();
   }
 
@@ -80,8 +84,8 @@ class SyncWsSubscriber {
     this.running = false;
     this.unsubscribeTokens?.();
     this.unsubscribeTokens = null;
-    window.removeEventListener('online', this.onOnline);
-    window.removeEventListener('offline', this.onOffline);
+    this.unsubscribeConnection?.();
+    this.unsubscribeConnection = null;
     this.disconnect();
     this.sessionId = null;
     this.userId = null;
@@ -184,7 +188,7 @@ class SyncWsSubscriber {
 
   private connect(): void {
     if (!this.running || !this.sessionId) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (!connectionStore.canAttemptNetwork() || !connectionStore.status.online) {
       this.publish('offline');
       return;
     }
@@ -290,7 +294,7 @@ class SyncWsSubscriber {
 
   private scheduleReconnect(delayOverrideMs?: number): void {
     if (!this.running || !this.sessionId || this.reconnectTimer) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (!connectionStore.canAttemptNetwork() || !connectionStore.status.online) {
       this.publish('offline');
       return;
     }

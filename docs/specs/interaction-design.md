@@ -26,6 +26,13 @@ Help pages retain substantive guidance without generic introductory filler. Savi
 accessible labels, keyboard shortcut titles, and calculation/source breakdowns
 remain available where relevant.
 
+The sync dialog offers **Go offline** / **Go online**, and the header identifies
+an intentional pause with a quiet slashed sync orbit. Routine offline connection
+failures are absent from activity rows, error banners and retry warnings; queued
+edits say **Waiting for connection**. HTTP/validation failures retain their
+actionable explanations. Online-only reads use neutral offline availability text
+instead of raw connection-error alerts. See [offline-sync.md](offline-sync.md).
+
 ## Character cards
 
 Home, the Characters listing, campaign overview roster, and GM dashboard use

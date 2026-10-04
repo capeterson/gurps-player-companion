@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { connectionStore } from '../lib/connectionState.ts';
 import { SyncBootstrapGate } from './SyncBootstrapGate.tsx';
 
 const mocks = vi.hoisted(() => {
@@ -84,6 +85,11 @@ describe('SyncBootstrapGate', () => {
     mocks.api.mockReset().mockResolvedValue({ id: 'user-1' });
     mocks.accountMismatch.mockReturnValue(false);
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    connectionStore.reset();
+  });
+
+  afterEach(() => {
+    connectionStore.reset();
   });
 
   it('offers sign-in again with the full route when the session expires mid-bootstrap', async () => {
@@ -120,6 +126,22 @@ describe('SyncBootstrapGate', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/connect to the internet/i);
     expect(screen.getByRole('button', { name: 'Retry download' })).toBeDisabled();
     expect(screen.queryByRole('heading', { name: 'Character sheet' })).not.toBeInTheDocument();
+  });
+
+  it('offers Go online from an initial-download block in manual offline mode', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    connectionStore.reset();
+    connectionStore.setManualOffline(true);
+    renderGate();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/connect to the internet/i);
+    await waitFor(() => expect(mocks.bootstrap).toHaveBeenCalledTimes(1));
+    const goOnline = screen.getByRole('button', { name: 'Go online' });
+    expect(goOnline).toBeEnabled();
+    fireEvent.click(goOnline);
+
+    await waitFor(() => expect(connectionStore.status.manualOffline).toBe(false));
+    await waitFor(() => expect(mocks.bootstrap).toHaveBeenCalledTimes(2));
   });
 
   it('renders already-bootstrapped pages without starting another first pull', async () => {

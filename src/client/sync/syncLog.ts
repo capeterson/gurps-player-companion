@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { isNetworkErrorMessage } from '../lib/networkErrors.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { newClientId } from './outbox.ts';
 import { packSyncLogEntry } from './syncLogPayload.ts';
@@ -47,9 +48,7 @@ export function isNetworkSyncLogEntry(
   // Match the complete browser message, including older journal rows whose
   // payload may be compressed. Never decode bodies just to filter the log.
   const message = reason.includes(' — ') ? reason.slice(reason.lastIndexOf(' — ') + 3) : reason;
-  return /^(?:Failed to fetch|Failed to Fetch|Load failed|NetworkError when attempting to fetch resource\.?|The Internet connection appears to be offline\.?|A network error occurred\.?)$/.test(
-    message,
-  );
+  return isNetworkErrorMessage(message);
 }
 
 /**

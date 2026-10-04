@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from './api.ts';
+import { OFFLINE_MODE_KEY, connectionStore } from './connectionState.ts';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './sessionQueryCache.tsx';
 import { tokenStore } from './tokenStore.ts';
 
@@ -12,6 +13,7 @@ function login(accessToken: string, refreshToken: string): void {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  connectionStore.reset();
   tokenStore.clear();
 });
 
@@ -38,6 +40,27 @@ describe('session-scoped TanStack Query cache', () => {
 
     await waitFor(() => expect(client.getQueryCache().getAll()).toHaveLength(0));
     expect(client.getMutationCache().getAll()).toHaveLength(0);
+  });
+
+  it('clears the manual offline choice when the session is signed out or changed', () => {
+    login('account-a', 'refresh-a');
+    const client = createSessionQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <SessionQueryCacheBoundary />
+      </QueryClientProvider>,
+    );
+    connectionStore.setManualOffline(true);
+    expect(localStorage.getItem(OFFLINE_MODE_KEY)).toBe('true');
+
+    tokenStore.clear();
+    expect(localStorage.getItem(OFFLINE_MODE_KEY)).toBeNull();
+    expect(connectionStore.status.manualOffline).toBe(false);
+
+    connectionStore.setManualOffline(true);
+    login('account-b', 'refresh-b');
+    expect(localStorage.getItem(OFFLINE_MODE_KEY)).toBeNull();
+    expect(connectionStore.status.manualOffline).toBe(false);
   });
 
   it('cannot cache a successful old-account response released after account switching', async () => {

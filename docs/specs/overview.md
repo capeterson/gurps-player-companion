@@ -1173,6 +1173,11 @@ settings sections; switching sections retains drafts.
   Expected offline connection failures do not add sync-log entries, and older
   matching entries are hidden from the activity list. HTTP errors and rejected
   edits remain visible; unsynced edits keep their normal retry behavior.
+  **Go offline** pauses network work on this device and across its tabs until
+  **Go online** resumes it; the choice survives reload and has a distinct quiet
+  slashed-orbit icon. Offline connection retries appear as waiting rather than
+  repeated failures. Background reads pause and notifications name unavailable
+  offline data without showing raw connection errors.
   Larger diagnostic payloads use device-local gzip storage and load when a
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
@@ -1382,6 +1387,8 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    lib/connectionState.ts, lib/networkErrors.ts  Device offline choice,
+                 shared reachability and expected fetch-failure classification
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
@@ -1415,7 +1422,8 @@ src/
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
-    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+    hooks/       useConnectionStatus (shared offline mode/reachability),
+                 useDraftField (canonical draft-on-blur), useDraftToggle,
                  useUnsyncedChangesGuard (confirmed session cleanup),
                  useAppHeaderBottom (live sticky-header offset),
                  useSelectedCampaignId (legacy Log/Library campaign URL selection),

@@ -1,4 +1,4 @@
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { polyfill as mobileDragDropPolyfill } from 'mobile-drag-drop';
 import 'mobile-drag-drop/default.css';
 import { type ComponentType, StrictMode, Suspense, lazy } from 'react';
@@ -16,6 +16,8 @@ import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
+import { connectionStore } from './lib/connectionState.ts';
+import { setPwaConnectionControl } from './lib/api.ts';
 import { applyStoredTheme } from './lib/theme.ts';
 import { ToastProvider } from './lib/toast.tsx';
 import { RequireAuth } from './routes/RequireAuth.tsx';
@@ -23,7 +25,15 @@ import { RequireSessionOnly } from './routes/RequireSessionOnly.tsx';
 import './styles/theme.css';
 
 applyStoredTheme();
+setPwaConnectionControl(true);
 registerSwLifecycle();
+// Polling and React Query retries share the PWA's intentional offline choice.
+onlineManager.setEventListener((setOnline) => {
+  const update = () => setOnline(connectionStore.status.online);
+  const unsubscribe = connectionStore.subscribe(update);
+  update();
+  return unsubscribe;
+});
 
 // Touch-device support for the inventory's HTML5 drag-and-drop.
 // holdToDrag: a 350 ms long-press initiates drag, so quick swipes

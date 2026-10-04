@@ -14,29 +14,22 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
 import { formatBytes, readLocalDbStatus } from '../lib/localDbStatus.ts';
 import { useSyncStatus } from '../sync/useSyncIndicatorState.ts';
 import { useSyncWsStatus } from '../sync/useSyncWsStatus.ts';
+import { isNetworkSyncLogEntry } from '../sync/syncLog.ts';
 import { SyncLogView } from './SyncLogView.tsx';
 import { InfoTooltip } from './ui/InfoTooltip.tsx';
 
 export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const { state, error } = useSyncStatus();
   const websocket = useSyncWsStatus();
+  const networkFailure = error && isNetworkSyncLogEntry({ result: 'failed', reason: error.reason });
 
-  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const { online, manualOffline } = useConnectionStatus();
   const [logOpen, setLogOpen] = useState(false);
-  useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
-  }, []);
 
   const storage = useQuery({
     queryKey: ['sync-indicator', 'storage'],
@@ -47,9 +40,11 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
 
   // A sync failure stays actionable when connectivity also drops.
   const visualState =
-    state === 'error'
+    manualOffline
+      ? 'paused'
+      : state === 'error' && !networkFailure
       ? 'error'
-      : !online
+      : !online || networkFailure
         ? 'offline'
         : state === 'synced' && websocket.state === 'connected'
           ? 'connected'
@@ -57,7 +52,7 @@ export function SyncStatusIndicator({ triggerClassName = '' }: { triggerClassNam
   const meta = STATE_META[visualState];
 
   // Build a single-line tooltip: state message · storage info
-  const statusMsg = error
+  const statusMsg = error && !manualOffline && !networkFailure
     ? `${error.reason}${online ? '' : ' · Offline'} — click for details`
     : meta.tooltip;
 
@@ -131,6 +126,11 @@ const STATE_META = {
     ariaLabel: 'Offline — changes saved on this device',
     tooltip: 'Saved on this device — changes will sync when reconnected',
   },
+  paused: {
+    colorClass: 'text-muted',
+    ariaLabel: 'Offline mode — sync paused',
+    tooltip: 'Offline mode · Choose Go online to resume sync',
+  },
 } as const;
 
 /** The same etched orbit in every state; only the center and motion change. */
@@ -154,6 +154,8 @@ function SyncSymbol({ state, connected }: { state: keyof typeof STATE_META; conn
         <path d="M12 8v5m0 3h.01" />
       ) : state === 'offline' ? (
         <path d="M10 9v6m4-6v6" />
+      ) : state === 'paused' ? (
+        <path d="m8 16 8-8" />
       ) : (
         <path
           d="m12 8 3 4-3 4-3-4Z"

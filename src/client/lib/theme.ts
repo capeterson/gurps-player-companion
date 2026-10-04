@@ -32,6 +32,7 @@ import {
   themePreferences,
 } from '../../shared/schemas/themePreferences.ts';
 import { ApiError, api } from './api.ts';
+import { CONNECTION_CHANGE_EVENT, connectionStore } from './connectionState.ts';
 
 export type { DarkThemeName, LightThemeName, ThemeName, ThemePreferences };
 export { DARK_THEMES, LIGHT_THEMES, THEME_LABELS };
@@ -248,6 +249,7 @@ function isRejection(err: unknown): err is ApiError {
  */
 export async function pushThemePreferences(): Promise<void> {
   if (!state.pending) return;
+  if (!connectionStore.canAttemptNetwork()) return;
   if (pushInFlight) {
     pushAgain = true;
     return;
@@ -308,6 +310,7 @@ export function clearPendingThemePreferences() {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => void pushThemePreferences());
+  window.addEventListener(CONNECTION_CHANGE_EVENT, () => void pushThemePreferences());
   window.addEventListener('storage', (event) => {
     if (event.key !== MODE_KEY && event.key !== PREFERENCES_KEY) return;
     const next = readStoredState();

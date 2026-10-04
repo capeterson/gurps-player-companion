@@ -33,6 +33,8 @@
  * all DOM access is feature-detected.
  */
 
+import { connectionStore } from '../client/lib/connectionState.ts';
+
 const UPDATE_READY_EVENT = 'gpc:sw-update-ready';
 const CONTROLLER_CHANGED_EVENT = 'gpc:sw-controller-changed';
 const CLIENT_OUTDATED_EVENT = 'gpc:client-outdated';
@@ -176,7 +178,7 @@ export function registerSwLifecycle(events: SwLifecycleEvents = {}): () => void 
     if (pendingUpdate) return;
     const now = Date.now();
     if (!force && now - lastCheckAt < MIN_CHECK_GAP_MS) return;
-    if (navigator.onLine === false) return;
+    if (!connectionStore.canAttemptNetwork()) return;
     lastCheckAt = now;
     // A worker that installed while the prompt was dismissed is parked
     // in `waiting` and won't fire `updatefound` again; announceUpdate
