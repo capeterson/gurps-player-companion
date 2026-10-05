@@ -934,6 +934,13 @@ rule that has been broken at least once.
 
 ## Self-healing & pruning
 
+Overview campaign navigation and assignment choices read `db.campaigns`, warmed
+by the cursor and the online campaign refresher. The edit pencil first opens the
+library-link warning, then reveals the dropdown; a separate final confirmation
+precedes `enqueueFieldPatch`. Canceling either step never changes IndexedDB or the
+outbox. The same flow works offline, and server rejection flashes the visible
+campaign link or editor alongside the persisted rejection toast.
+
 Campaign assignment patches detach all six child library references in the same
 IndexedDB transaction as the parent edit and outbox operation. Trait and skill
 declarations remain available as retained copies while offline, after reload,

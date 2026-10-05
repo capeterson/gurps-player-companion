@@ -27,7 +27,6 @@ import { MediaImage } from '../../components/MediaImage.tsx';
 import { Markdown } from '../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { EffectSourcesList } from '../../components/ui/EffectSourcesList.tsx';
 import { FoldSection } from '../../components/ui/FoldSection.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
@@ -44,6 +43,7 @@ import {
   nullableTextParser,
   scaledIntParser,
 } from '../../lib/parsers.ts';
+import { CampaignAssignmentControl } from './CampaignAssignmentControl.tsx';
 import { CharacterRaceControl } from './CharacterRaceControl.tsx';
 import { SHEET_ICONS, SHEET_TABS, SheetNavigation, type SheetTab } from './SheetNavigation.tsx';
 import { parseSheetAnchor, sheetAnchor } from './sheetAnchors.ts';
@@ -65,7 +65,7 @@ import { CombatStatusProvider } from './sections/combat/CombatStatusProvider.tsx
 import { CombatTab } from './sections/combat/CombatTab.tsx';
 import { useCharacterFieldSave } from './sections/useCharacterPatch.ts';
 import { type TempEffectsApi, useTempEffects } from './sections/useTempEffects.ts';
-import { type CampaignSummary, useCharacterAccessLocal } from './useCharacterAccess.ts';
+import { useCharacterAccessLocal } from './useCharacterAccess.ts';
 import {
   type EffectAwareCharacterDetail as CharacterDetail,
   useCharacterDetail,
@@ -540,11 +540,9 @@ function SecondaryModCell({
 function IdentityPanel({
   character,
   canWrite,
-  campaigns,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
-  campaigns: CampaignSummary[];
 }) {
   // Bundled saver -- spreading `{ onSave, flashKey }` into useDraftField
   // wires the field to the flashBus so async server rejections trigger
@@ -594,27 +592,6 @@ function IdentityPanel({
   // Lazily create the editor, then retain it across view/edit switches so its
   // source mode and unsaved draft survive. The shared hook owns all saves.
   const [descriptionMode, setDescriptionMode] = useState<'unopened' | 'view' | 'edit'>('unopened');
-  const campaignFlashKey = makeFlashKey('character', character.id, 'campaignId');
-  const campaignFlash = useFieldFlash(campaignFlashKey);
-  const [pendingCampaign, setPendingCampaign] = useState<{
-    characterId: string;
-    from: string;
-    to: string | null;
-  } | null>(null);
-  useEffect(() => {
-    void character.id;
-    void character.campaignId;
-    setPendingCampaign(null);
-  }, [character.id, character.campaignId]);
-  const saveCampaign = (next: string | null) =>
-    enqueueFieldPatch({
-      entityClass: 'character',
-      entityId: character.id,
-      fieldPath: 'campaignId',
-      attemptedValue: next,
-      humanName: 'campaign',
-      flashKey: campaignFlashKey,
-    });
 
   return (
     <section className="card p-5 space-y-3">
@@ -694,40 +671,11 @@ function IdentityPanel({
             <span>{character.birthdate ?? '—'}</span>
           )}
         </div>
-        <div className="form-control">
-          <span className="label-text-alt label-eyebrow">Campaign</span>
-          {canWrite ? (
-            <select
-              aria-label="campaign"
-              className={`${DRAFT_FIELD_CLASS} select select-bordered select-sm`}
-              value={character.campaignId ?? ''}
-              data-flashing={campaignFlash['data-flashing']}
-              data-flash-parity={campaignFlash['data-flash-parity']}
-              onChange={(e) => {
-                const next = e.target.value || null;
-                if (next === character.campaignId) return;
-                if (character.campaignId != null) {
-                  setPendingCampaign({
-                    characterId: character.id,
-                    from: character.campaignId,
-                    to: next,
-                  });
-                } else {
-                  void saveCampaign(next);
-                }
-              }}
-            >
-              <option value="">No campaign</option>
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>{campaigns.find((c) => c.id === character.campaignId)?.name ?? '—'}</span>
-          )}
-        </div>
+        <CampaignAssignmentControl
+          characterId={character.id}
+          campaignId={character.campaignId ?? null}
+          canWrite={canWrite}
+        />
       </div>
       <fieldset
         aria-label="Character description"
@@ -780,27 +728,6 @@ function IdentityPanel({
             <p className="text-sm text-muted">No description yet.</p>
           ))}
       </fieldset>
-      <ConfirmDialog
-        open={pendingCampaign !== null}
-        title="Change character campaign?"
-        confirmLabel="Change campaign"
-        onCancel={() => setPendingCampaign(null)}
-        onConfirm={() => {
-          if (
-            pendingCampaign &&
-            character.id === pendingCampaign.characterId &&
-            character.campaignId === pendingCampaign.from
-          ) {
-            void saveCampaign(pendingCampaign.to);
-          }
-          setPendingCampaign(null);
-        }}
-      >
-        Changing or leaving this campaign may impact your character sheet. Campaign library content
-        already copied to this character will be retained, but its live links will be removed.
-        Rejoining the campaign later will not restore those links, so that content will no longer
-        receive campaign library updates automatically.
-      </ConfirmDialog>
     </section>
   );
 }
@@ -1564,9 +1491,8 @@ export function CharacterSheetPage() {
   // Fetch the character's campaign (if any) so the hero can show
   // a `Points / Target` ratio, and so the Identity panel can offer the
   // full campaign list. This is the online refresher only — see
-  // useMirrorCampaigns.ts; the share-gate decision itself is
-  // local-first via useCharacterAccessLocal below and does not wait on
-  // this REST call.
+  // useMirrorCampaigns.ts. CampaignAssignmentControl and the share-gate
+  // decision read Dexie, including on an offline cold start.
   const campaigns = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => api<CampaignOut[]>('/campaigns'),
@@ -1820,12 +1746,7 @@ export function CharacterSheetPage() {
                 forceOpen={anchor?.kind === 'race'}
                 icon="identity"
               >
-                <IdentityPanel
-                  key={character.id}
-                  character={character}
-                  canWrite={canWrite}
-                  campaigns={campaigns.data ?? []}
-                />
+                <IdentityPanel key={character.id} character={character} canWrite={canWrite} />
               </FoldSection>
             </div>
           )}

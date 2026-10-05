@@ -1,9 +1,44 @@
 import { expect, test as unauthenticatedTest } from '@playwright/test';
 import { test } from './authenticated-fixture';
-import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import {
+  assignOverviewCampaign,
+  expectCharacterNavigationReady,
+  selectCharacterSection,
+} from './character-navigation';
 import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+
+async function createCompleteSpellFixture(
+  page: import('@playwright/test').Page,
+  campaignId: string,
+  spell: {
+    name: string;
+    college: string;
+    castingTime: string;
+    duration: string;
+  },
+) {
+  const accessToken = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
+  );
+  const response = await page.request.post(`/api/v1/campaigns/${campaignId}/library/spells`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    data: {
+      key: `responsive-${suffix()}`,
+      name: spell.name,
+      college: spell.college,
+      difficulty: 'H',
+      baseEnergyCost: 2,
+      maintenanceCost: 1,
+      castingTime: spell.castingTime,
+      duration: spell.duration,
+      status: 'complete',
+      role: 'definition',
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
 
 unauthenticatedTest(
   'header tooltips and alerts stay within the viewport from mobile through desktop',
@@ -250,7 +285,7 @@ test('long campaign-library trait names do not create page-level horizontal over
   await page.getByRole('link', { name: 'Responsive library trait' }).click();
   await page.getByRole('link', { name: /^library$/i }).click();
   await page.getByRole('button', { name: /add trait/i }).click();
-  await page.getByLabel(/name \*/i).fill(traitName);
+  await page.getByLabel('Name', { exact: true }).fill(traitName);
   await page.getByRole('button', { name: /^add trait$/i }).click();
   await expect(page.getByText(traitName, { exact: true })).toHaveCount(1);
 
@@ -430,19 +465,22 @@ test('spell list and reference dialog stay contained across mobile, tablet, and 
   await page.getByLabel(/campaign name/i).fill('Responsive spell library');
   await page.getByRole('button', { name: /^create$/i }).click();
   await page.getByRole('link', { name: 'Responsive spell library' }).click();
+  const responsiveCampaignId = new URL(page.url()).pathname.split('/')[2];
+  if (!responsiveCampaignId) throw new Error('missing responsive spell campaign ID');
+  await createCompleteSpellFixture(page, responsiveCampaignId, {
+    name: maintainableSpellName,
+    college: 'Maintained magic',
+    castingTime: '40 seconds',
+    duration: '1 minute',
+  });
+  await page.reload();
   await page.getByRole('link', { name: /^library$/i }).click();
-  await page.getByRole('button', { name: /^spells 0$/i }).click();
-  await page.getByRole('button', { name: /add spell/i }).click();
-  await page.getByLabel(/name \*/i).fill(maintainableSpellName);
-  await page.getByLabel('Upkeep').fill('1');
-  await page.getByRole('button', { name: /^add spell$/i }).click();
+  await page.getByRole('button', { name: /^spells 1$/i }).click();
   await expect(page.getByText(maintainableSpellName, { exact: true })).toBeVisible();
 
   await page.goto(characterUrl);
   await selectCharacterSection(page, 'Overview');
-  await page
-    .getByLabel('campaign', { exact: true })
-    .selectOption({ label: 'Responsive spell library' });
+  await assignOverviewCampaign(page, 'Responsive spell library');
   await selectCharacterSection(page, 'Magic');
   await page.getByRole('button', { name: '+ Add spell' }).click();
   await page.getByLabel(/^spell$/i).fill(maintainableSpellName);
@@ -600,17 +638,19 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
   await page.getByLabel(/campaign name/i).fill(campaignName);
   await page.getByRole('button', { name: /^create$/i }).click();
   await page.getByRole('link', { name: campaignName }).click();
-  await page.getByRole('link', { name: /^library$/i }).click();
-  await page.getByRole('button', { name: /^spells 0$/i }).click();
-  await page.getByRole('button', { name: /add spell/i }).click();
-  await page.getByLabel(/name \*/i).fill(spellName);
+  const maintenanceCampaignId = new URL(page.url()).pathname.split('/')[2];
+  if (!maintenanceCampaignId) throw new Error('missing maintenance campaign ID');
   const longCollege = 'Pneumonoultramicroscopicsilicovolcanoconiosis-responsive spell college';
   const longCastingTime = 'Pneumonoultramicroscopically40Second';
-  await page.getByLabel('College').fill(longCollege);
-  await page.getByLabel('Upkeep').fill('1');
-  await page.getByLabel('Casting time').fill(longCastingTime);
-  await page.getByLabel('Duration').fill(longCastingTime);
-  await page.getByRole('button', { name: /^add spell$/i }).click();
+  await createCompleteSpellFixture(page, maintenanceCampaignId, {
+    name: spellName,
+    college: longCollege,
+    castingTime: longCastingTime,
+    duration: longCastingTime,
+  });
+  await page.reload();
+  await page.getByRole('link', { name: /^library$/i }).click();
+  await page.getByRole('button', { name: /^spells 1$/i }).click();
   await expect(page.getByText(spellName, { exact: true })).toBeVisible();
 
   await page.goto('/characters');
@@ -619,7 +659,7 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
   await expectCharacterNavigationReady(page);
 
   await selectCharacterSection(page, 'Overview');
-  await page.getByLabel('campaign', { exact: true }).selectOption({ label: campaignName });
+  await assignOverviewCampaign(page, campaignName);
   await selectCharacterSection(page, 'Traits');
   await page.getByRole('button', { name: '+ Add trait' }).click();
   await page.getByLabel('Trait name').fill('Magery');

@@ -1,6 +1,10 @@
 import { type Locator, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
-import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import {
+  assignOverviewCampaign,
+  expectCharacterNavigationReady,
+  selectCharacterSection,
+} from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
 
 const VIEWPORTS = [
@@ -92,7 +96,7 @@ test('unbroken spell names and descriptions remain readable in the sheet and cas
     const characterUrl = page.url();
 
     await selectCharacterSection(page, 'Overview');
-    await page.getByLabel('campaign', { exact: true }).selectOption({ label: campaignName });
+    await assignOverviewCampaign(page, campaignName);
     await selectCharacterSection(page, 'Traits');
     await page.getByRole('button', { name: '+ Add trait' }).click();
     await page.getByLabel('Trait name').fill('Magery');

@@ -66,6 +66,11 @@ expectations come from observed regressions and explicit user preferences.
 
 ## Navigation and calculations
 
+- Overview campaign names are navigation links with an adjacent edit pencil.
+  The pencil opens the library-link warning before revealing campaign choices;
+  retain a separate final confirmation before applying any changed assignment.
+  `CampaignAssignmentControl` owns the flow, including cancel and stale-context
+  handling, so routine campaign navigation cannot accidentally open editing.
 - App updates never reload the page automatically, even when the server refuses
   an old sync protocol. Use the existing persistent `SwUpdatePrompt` toast with
   its Reload button; preserve drafts and queued edits until the user acts.

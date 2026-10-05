@@ -328,7 +328,17 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   `src/client/components/markdown/`) used by the adventure log, with a
   raw-markdown/source toggle and sanitized rendering. It has no separate
   Notes destination or duplicate editing surface.
-- **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt. Pending confirmation clears when the displayed character or its campaign changes.
+- **Campaign assignment.** Overview shows the campaign as a link with an editor-only
+  edit pencil, or **No campaign** when unassigned. The pencil first opens the
+  library-link warning; **Continue** replaces the link with the campaign dropdown
+  and a cancel action. Choosing a different campaign or **No campaign** then opens
+  **Are you sure?**, naming the old and new campaign. Only **Change campaign**
+  enqueues the local-first patch and returns to the link. First assignment uses
+  the same steps; unchanged selections do not prompt. Canceling the warning
+  retains the link; canceling the final confirmation retains the dropdown and
+  original assignment. Editing clears when the displayed character, its campaign,
+  or write access changes. Names and choices come from Dexie for offline use.
+  `src/client/features/characters/CampaignAssignmentControl.tsx` owns this flow.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary attributes** card
@@ -1393,6 +1403,8 @@ src/
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
+    features/characters/CampaignAssignmentControl.tsx  Overview campaign link,
+                 pencil warning, dropdown and final local-first confirmation
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
     features/settings/ExperimentalFeaturesSection.tsx  Account-wide MCP UI opt-in

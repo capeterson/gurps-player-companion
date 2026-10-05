@@ -318,16 +318,19 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
     // Exercise the same shared confirmation component from a player surface,
     // using synthetic campaign and character rows owned by this fixture admin.
     const headers = { Authorization: `Bearer ${admin.tokens.accessToken}` };
+    const campaignSuffix = suffix;
+    const sourceCampaignName = `Dialog source ${campaignSuffix}`;
+    const destinationCampaignName = `Dialog destination ${campaignSuffix}`;
     const sourceCampaignResponse = await request.post('/api/v1/campaigns', {
       headers,
-      data: { name: `Dialog source ${suffix}` },
+      data: { name: sourceCampaignName },
     });
     expect(sourceCampaignResponse.status()).toBe(201);
     const sourceCampaign = (await sourceCampaignResponse.json()) as { id: string };
     createdCampaignIds.push(sourceCampaign.id);
     const destinationCampaignResponse = await request.post('/api/v1/campaigns', {
       headers,
-      data: { name: `Dialog destination ${suffix}` },
+      data: { name: destinationCampaignName },
     });
     expect(destinationCampaignResponse.status()).toBe(201);
     const destinationCampaign = (await destinationCampaignResponse.json()) as { id: string };
@@ -342,9 +345,7 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
 
     await page.setViewportSize({ width: 568, height: 320 });
     await page.goto(`/characters/${character.id}`);
-    const campaignSelect = page.getByLabel('campaign', { exact: true });
-    await expect(campaignSelect).toBeVisible();
-    await campaignSelect.selectOption(destinationCampaign.id);
+    await page.getByRole('button', { name: 'Edit campaign', exact: true }).click();
     const sharedDialog = page.getByRole('dialog', { name: 'Change character campaign?' });
     await expect(sharedDialog).toBeVisible();
     await expect(sharedDialog).toContainText(
@@ -354,7 +355,7 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
     const sharedContext = sharedDialog.locator('.py-3');
     const sharedCancel = sharedDialog.getByRole('button', { name: 'Cancel', exact: true });
     const sharedConfirm = sharedDialog.getByRole('button', {
-      name: 'Change campaign',
+      name: 'Continue',
       exact: true,
     });
     await expectInsideVisualViewport(page, sharedBox);
@@ -378,8 +379,42 @@ test('admin purge confirmation stays reachable through short viewports, pinch zo
     });
     await page.keyboard.press('Escape');
     await expect(sharedDialog).not.toBeVisible();
+    await expect(page.getByRole('link', { name: sourceCampaignName, exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Edit campaign', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Change character campaign?' })
+      .getByRole('button', { name: 'Continue', exact: true })
+      .click();
+    const campaignSelect = page.getByLabel('campaign', { exact: true });
+    await expect(campaignSelect).toBeVisible();
+    await campaignSelect.selectOption(destinationCampaign.id);
+    const finalDialog = page.getByRole('dialog', { name: 'Are you sure?' });
+    await expect(finalDialog).toBeVisible();
+    await expect(finalDialog).toContainText('Change this character');
+    const finalBox = finalDialog.locator('.modal-box');
+    await expectInsideVisualViewport(page, finalBox);
+    const finalContext = finalDialog.locator('.py-3');
+    await finalBox.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await settle(page);
+    await expect(finalContext).toBeVisible();
+    await expectPhraseInsideVisualViewport(page, finalContext, 'Change this character');
+    const finalActions = finalDialog.locator('.modal-action').getByRole('button');
+    for (const action of await finalActions.all()) {
+      await expect(action).toBeVisible();
+      await expectTextInsideVisualViewport(page, action);
+    }
+    await captureReviewScreenshot(page, {
+      path: testInfo.outputPath('final-campaign-confirmation-actions.png'),
+      animations: 'disabled',
+    });
+    await page.keyboard.press('Escape');
+    await expect(finalDialog).not.toBeVisible();
     await expect(campaignSelect).toBeVisible();
     await expect(campaignSelect).toHaveValue(sourceCampaign.id);
+    await page.getByRole('button', { name: 'Cancel editing campaign', exact: true }).click();
   } finally {
     try {
       if (createdCharacterId) {

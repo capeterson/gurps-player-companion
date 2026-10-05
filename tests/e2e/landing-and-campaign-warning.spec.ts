@@ -1,12 +1,32 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
 import { expectCharacterNavigationReady } from './character-navigation';
 import { captureReviewScreenshot, reviewArtifactsEnabled } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 const missedCharacterName =
   'A Very Long Character Name For Someone Who Missed Session And Earned No Points';
+
+async function readCampaignPatch(page: Page, attemptedValue: string | null) {
+  return page.evaluate(async (value) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('gurps-pc-local');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const rows = await new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+        const request = db.transaction('outbox').objectStore('outbox').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return rows.find((row) => row.fieldPath === 'campaignId' && row.attemptedValue === value);
+    } finally {
+      db.close();
+    }
+  }, attemptedValue);
+}
 
 function createAccountEmail() {
   return `landing-flow-${suffix()}@example.com`;
@@ -65,6 +85,78 @@ async function openPointLedger(page: import('@playwright/test').Page) {
     await ledgerButton.click();
   }
   await expect(ledgerButton).toHaveAttribute('aria-expanded', 'true');
+}
+
+async function openCampaignEditor(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'Edit campaign', exact: true }).click();
+  const warning = page.getByRole('dialog', { name: 'Change character campaign?' });
+  await expect(warning).toBeVisible();
+  return warning;
+}
+
+async function continueCampaignWarning(page: import('@playwright/test').Page) {
+  const warning = await openCampaignEditor(page);
+  await warning.getByRole('button', { name: 'Continue', exact: true }).click();
+  const select = page.getByLabel('campaign', { exact: true });
+  await expect(select).toBeVisible();
+  return select;
+}
+
+async function chooseCampaign(page: import('@playwright/test').Page, name: string) {
+  const select = await continueCampaignWarning(page);
+  await select.selectOption({ label: name });
+  return page.getByRole('dialog', { name: 'Are you sure?' });
+}
+
+async function setColorTheme(page: import('@playwright/test').Page, theme: 'light' | 'dark') {
+  const switchName = theme === 'dark' ? /switch to dark mode/i : /switch to light mode/i;
+  const switcher = page.getByRole('button', { name: switchName });
+  if (await switcher.isVisible().catch(() => false)) await switcher.click();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-theme',
+    theme === 'dark' ? 'arcane-dark' : 'arcane-light',
+  );
+}
+
+async function expectCampaignLinkAndPencil(
+  page: import('@playwright/test').Page,
+  campaignName: string,
+  width: number,
+  height: number,
+) {
+  const pencil = page.getByRole('button', { name: 'Edit campaign', exact: true });
+  await pencil.scrollIntoViewIfNeeded();
+  const wrapper = pencil.locator('xpath=..');
+  const link = wrapper.getByRole('link', { name: campaignName, exact: true });
+  await expect(link).toBeVisible();
+  await expect(pencil).toBeVisible();
+  const [container, linkBox, pencilBox] = await Promise.all([
+    wrapper.boundingBox(),
+    link.boundingBox(),
+    pencil.boundingBox(),
+  ]);
+  expect(container).not.toBeNull();
+  expect(linkBox).not.toBeNull();
+  expect(pencilBox).not.toBeNull();
+  expect(container?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((container?.x ?? 0) + (container?.width ?? 0)).toBeLessThanOrEqual(width);
+  expect(container?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((container?.y ?? 0) + (container?.height ?? 0)).toBeLessThanOrEqual(height);
+  expect(linkBox?.x ?? -1).toBeGreaterThanOrEqual(container?.x ?? 0);
+  expect((linkBox?.x ?? 0) + (linkBox?.width ?? 0)).toBeLessThanOrEqual(
+    (container?.x ?? 0) + (container?.width ?? 0),
+  );
+  expect(pencilBox?.x ?? -1).toBeGreaterThanOrEqual(container?.x ?? 0);
+  expect((pencilBox?.x ?? 0) + (pencilBox?.width ?? 0)).toBeLessThanOrEqual(
+    (container?.x ?? 0) + (container?.width ?? 0),
+  );
+  const horizontalOverlap =
+    (linkBox?.x ?? 0) < (pencilBox?.x ?? 0) + (pencilBox?.width ?? 0) &&
+    (pencilBox?.x ?? 0) < (linkBox?.x ?? 0) + (linkBox?.width ?? 0);
+  const verticalOverlap =
+    (linkBox?.y ?? 0) < (pencilBox?.y ?? 0) + (pencilBox?.height ?? 0) &&
+    (pencilBox?.y ?? 0) < (linkBox?.y ?? 0) + (linkBox?.height ?? 0);
+  expect(horizontalOverlap && verticalOverlap).toBe(false);
 }
 
 test('README screenshots match the unauthenticated landing page assets', async () => {
@@ -163,7 +255,7 @@ test('landing hero headline keeps its intended two lines across responsive break
 
 test('public landing, classic palette, Overview default, and campaign reassignment warning work', async ({
   page,
-}) => {
+}, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
@@ -227,9 +319,9 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await page.getByRole('button', { name: /switch to light mode/i }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'arcane-light');
 
-  const firstCampaignName = `Campaign A ${suffix()}`;
+  const firstCampaignName = `CampaignA${'AmberMarchesUnbrokenName'.repeat(2)} ${suffix()}`;
   await createCampaign(page, firstCampaignName);
-  const secondCampaignName = `Campaign B ${suffix()}`;
+  const secondCampaignName = `CampaignB${'SapphireCoastUnbrokenName'.repeat(2)} ${suffix()}`;
   await createCampaign(page, secondCampaignName);
 
   await page.goto('/characters');
@@ -243,13 +335,77 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible();
 
   const campaignSelect = page.getByLabel('campaign', { exact: true });
+  await page.context().setOffline(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  const initialWarning = await openCampaignEditor(page);
+  await expect(initialWarning).toContainText(/may impact your character sheet/i);
+  await initialWarning.getByRole('button', { name: 'Continue', exact: true }).click();
+  await expect(campaignSelect).toBeVisible();
   await campaignSelect.selectOption({ label: firstCampaignName });
-  await expect(campaignSelect).toHaveValue(
-    (await campaignSelect
-      .locator('option', { hasText: firstCampaignName })
-      .getAttribute('value')) ?? '',
-  );
-  await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
+  const firstCampaignId = await campaignSelect
+    .locator('option', { hasText: firstCampaignName })
+    .getAttribute('value');
+  expect(firstCampaignId).toMatch(/^[0-9a-f-]{36}$/i);
+  const firstAssignmentConfirm = page.getByRole('dialog', { name: 'Are you sure?' });
+  await expect(firstAssignmentConfirm).toContainText('No campaign');
+  await expect(firstAssignmentConfirm).toContainText(firstCampaignName);
+  await expectDialogInsideViewport(page, 1280, 900);
+  await firstAssignmentConfirm
+    .getByRole('button', { name: 'Change campaign', exact: true })
+    .click();
+  await expect(
+    page.getByRole('link', { name: firstCampaignName, exact: true }).last(),
+  ).toBeVisible();
+  await expect.poll(() => readCampaignPatch(page, firstCampaignId ?? null)).toBeTruthy();
+  const offlineCharacterId = new URL(page.url()).pathname.split('/').at(-1);
+  if (!offlineCharacterId) throw new Error('missing character ID in the current route');
+  const localCampaignId = await page.evaluate(async (characterId) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('gurps-pc-local');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = db.transaction('characters').objectStore('characters').get(characterId);
+        request.onsuccess = () => resolve(request.result?.campaignId ?? null);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, offlineCharacterId);
+  expect(localCampaignId).toBe(firstCampaignId);
+  await page.context().setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect
+    .poll(() => readCampaignPatch(page, firstCampaignId ?? null), { timeout: 15_000 })
+    .toBeFalsy();
+  const serverAssignment = await page.evaluate(async (characterId) => {
+    const stored = localStorage.getItem('gpc.tokenPair.v1');
+    if (!stored) throw new Error('missing browser token pair');
+    const tokenPair = JSON.parse(stored) as { accessToken: string };
+    const response = await fetch(`/api/v1/characters/${characterId}`, {
+      headers: { Authorization: `Bearer ${tokenPair.accessToken}` },
+    });
+    return {
+      status: response.status,
+      character: (await response.json()) as { campaignId?: string | null },
+    };
+  }, offlineCharacterId);
+  expect(serverAssignment.status).toBe(200);
+  expect(serverAssignment.character.campaignId).toBe(firstCampaignId);
+  const assignedCharacterUrl = page.url();
+  const firstCampaignHref = await page
+    .getByRole('link', { name: firstCampaignName, exact: true })
+    .last()
+    .getAttribute('href');
+  expect(firstCampaignHref).toMatch(/^\/campaigns\//);
+  const firstCampaignUrl = new URL(firstCampaignHref ?? '', page.url()).toString();
+  await page.getByRole('link', { name: firstCampaignName, exact: true }).last().click();
+  await expect(page).toHaveURL(firstCampaignUrl);
+  await page.goto(assignedCharacterUrl);
+  await expectCharacterNavigationReady(page);
   await openPointLedger(page);
   const initialPointCap = Number(
     await page
@@ -260,45 +416,78 @@ test('public landing, classic palette, Overview default, and campaign reassignme
       .innerText(),
   );
 
-  const widths = [320, 390, 430, 767, 768, 769];
-  for (const width of widths) {
-    const height = width < 768 ? 844 : 900;
-    await page.setViewportSize({ width, height });
-    await campaignSelect.selectOption({ label: secondCampaignName });
-    const dialog = page.getByRole('dialog', { name: 'Change character campaign?' });
-    await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText(/may impact your character sheet/i);
-    await expect(dialog).toContainText(/rejoining the campaign later/i);
-    await expectDialogInsideViewport(page, width, height);
-    if (width === 320 || width === 768) {
-      if (reviewArtifactsEnabled) await page.waitForTimeout(350);
-      await captureReviewScreenshot(page, {
-        path: `test-results/campaign-warning-${width}.png`,
-        animations: 'disabled',
-      });
+  const widths = [320, 375, 390, 430, 575, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025];
+  for (const theme of ['light', 'dark'] as const) {
+    await setColorTheme(page, theme);
+    for (const width of [320, 375, 575, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025]) {
+      const height = width < 768 ? 844 : 900;
+      await page.setViewportSize({ width, height });
+      await expectCampaignLinkAndPencil(page, firstCampaignName, width, height);
+      if ([375, 575].includes(width)) {
+        if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+        await captureReviewScreenshot(page, {
+          path: testInfo.outputPath(`campaign-link-pencil-${theme}-${width}.png`),
+          animations: 'disabled',
+        });
+      }
     }
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(campaignSelect).toHaveValue(
-      (await campaignSelect
-        .locator('option', { hasText: firstCampaignName })
-        .getAttribute('value')) ?? '',
-    );
+    for (const width of widths) {
+      const height = width < 768 ? 844 : 900;
+      await page.setViewportSize({ width, height });
+      const warning = await openCampaignEditor(page);
+      await expect(warning).toContainText(/may impact your character sheet/i);
+      await expect(warning).toContainText(/rejoining the campaign later/i);
+      await expectDialogInsideViewport(page, width, height);
+      if ([320, 375, 640, 768].includes(width)) {
+        if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+        await captureReviewScreenshot(page, {
+          path: `test-results/campaign-warning-${theme}-${width}.png`,
+          animations: 'disabled',
+        });
+      }
+      await warning.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(warning).toHaveCount(0);
+      await expect(
+        page.getByRole('link', { name: firstCampaignName, exact: true }).last(),
+      ).toBeVisible();
+
+      const select = await continueCampaignWarning(page);
+      await select.selectOption({ label: secondCampaignName });
+      const finalConfirmation = page.getByRole('dialog', { name: 'Are you sure?' });
+      await expect(finalConfirmation).toContainText(firstCampaignName);
+      await expect(finalConfirmation).toContainText(secondCampaignName);
+      await expectDialogInsideViewport(page, width, height);
+      if ([320, 375, 640, 768].includes(width)) {
+        if (reviewArtifactsEnabled) await page.waitForTimeout(350);
+        await captureReviewScreenshot(page, {
+          path: `test-results/campaign-final-confirmation-${theme}-${width}.png`,
+          animations: 'disabled',
+        });
+      }
+      await finalConfirmation.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
+        (await page
+          .getByLabel('campaign', { exact: true })
+          .locator('option', { hasText: firstCampaignName })
+          .getAttribute('value')) ?? '',
+      );
+      await page.getByRole('button', { name: 'Cancel editing campaign', exact: true }).click();
+    }
   }
 
+  await setColorTheme(page, 'light');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await campaignSelect.selectOption({ label: secondCampaignName });
-  const confirmation = page.getByRole('dialog', { name: 'Change character campaign?' });
+  const confirmation = await chooseCampaign(page, secondCampaignName);
   await confirmation.getByRole('button', { name: 'Change campaign', exact: true }).click();
-  await expect(campaignSelect).toHaveValue(
-    (await campaignSelect
-      .locator('option', { hasText: secondCampaignName })
-      .getAttribute('value')) ?? '',
-  );
+  await expect(
+    page.getByRole('link', { name: secondCampaignName, exact: true }).last(),
+  ).toBeVisible();
 
   // Selecting the current campaign leaves the character assignment alone.
-  await campaignSelect.selectOption({ label: secondCampaignName });
-  await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
+  const unchangedSelect = await continueCampaignWarning(page);
+  await unchangedSelect.selectOption({ label: secondCampaignName });
+  await expect(page.getByRole('dialog', { name: 'Are you sure?' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Cancel editing campaign', exact: true }).click();
 
   const awardedCharacterUrl = page.url();
   await page.goto('/characters');
@@ -306,13 +495,11 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   const missedCharacterUrl = page.url();
-  await page.getByLabel('campaign', { exact: true }).selectOption({ label: secondCampaignName });
-  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
-    (await page
-      .getByLabel('campaign', { exact: true })
-      .locator('option', { hasText: secondCampaignName })
-      .getAttribute('value')) ?? '',
-  );
+  const missedAssignment = await chooseCampaign(page, secondCampaignName);
+  await missedAssignment.getByRole('button', { name: 'Change campaign', exact: true }).click();
+  await expect(
+    page.getByRole('link', { name: secondCampaignName, exact: true }).last(),
+  ).toBeVisible();
 
   await page.goto('/campaigns');
   await page.getByRole('link', { name: secondCampaignName }).click();
@@ -328,7 +515,9 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     await page.setViewportSize({ width, height });
     await page.getByRole('button', { name: 'Choose characters' }).click();
     const recipients = page.getByRole('dialog', { name: 'Apply points to characters' });
-    await expect(recipients).toContainText('Leave out characters whose players missed the session');
+    await expect(recipients.getByRole('checkbox')).toHaveCount(2);
+    await expect(recipients.getByRole('button', { name: 'Select all characters' })).toBeVisible();
+    await expect(recipients.getByRole('button', { name: 'Use selected characters' })).toBeVisible();
     await expectDialogInsideViewport(page, width, height);
     if (width === 320 || width === 768) {
       if (reviewArtifactsEnabled) await page.waitForTimeout(350);
@@ -363,8 +552,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   const finalCampaignSelect = page.getByLabel('campaign', { exact: true });
   for (const width of [320, 768]) {
     await page.setViewportSize({ width, height: 900 });
-    await finalCampaignSelect.selectOption('');
-    const leaveDialog = page.getByRole('dialog', { name: 'Change character campaign?' });
+    const leaveDialog = await openCampaignEditor(page);
     await expect(leaveDialog).toBeVisible();
     await expectDialogInsideViewport(page, width, 900);
     if (width === 320) {
@@ -375,15 +563,24 @@ test('public landing, classic palette, Overview default, and campaign reassignme
       });
     }
     await leaveDialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(
+      page.getByRole('link', { name: secondCampaignName, exact: true }).last(),
+    ).toBeVisible();
+
+    const select = await continueCampaignWarning(page);
+    await select.selectOption('');
+    const confirmationToLeave = page.getByRole('dialog', { name: 'Are you sure?' });
+    await expectDialogInsideViewport(page, width, 900);
+    await confirmationToLeave.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(finalCampaignSelect).toHaveValue(
       (await finalCampaignSelect
         .locator('option', { hasText: secondCampaignName })
         .getAttribute('value')) ?? '',
     );
+    await page.getByRole('button', { name: 'Cancel editing campaign', exact: true }).click();
   }
 
-  await finalCampaignSelect.selectOption('');
-  const leaveConfirmed = page.getByRole('dialog', { name: 'Change character campaign?' });
+  const leaveConfirmed = await chooseCampaign(page, 'No campaign');
   await expect(leaveConfirmed).toBeVisible();
   await expectDialogInsideViewport(page, 768, 900);
   if (reviewArtifactsEnabled) await page.waitForTimeout(350);
@@ -391,8 +588,12 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     path: 'test-results/campaign-leave-768.png',
     animations: 'disabled',
   });
-  await leaveConfirmed.getByRole('button', { name: 'Change campaign' }).click();
-  await expect(finalCampaignSelect).toHaveValue('');
+  await leaveConfirmed.getByRole('button', { name: 'Change campaign', exact: true }).click();
+  await expect(leaveConfirmed).toHaveCount(0);
+  await expect(page.getByLabel('campaign', { exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('.label-eyebrow', { hasText: 'Campaign' }).locator('xpath=..'),
+  ).toContainText('No campaign');
 
   await page.goto(missedCharacterUrl);
   await expectCharacterNavigationReady(page);
@@ -401,30 +602,19 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     missedCharacterName,
   );
   await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
-  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
-    (await page
-      .getByLabel('campaign', { exact: true })
-      .locator('option', { hasText: secondCampaignName })
-      .getAttribute('value')) ?? '',
-  );
+  await expect(
+    page.getByRole('link', { name: secondCampaignName, exact: true }).last(),
+  ).toBeVisible();
   await expect(page.getByText('Earned points', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Point cap', { exact: true }).locator('xpath=..')).toContainText(
     String(initialPointCap),
   );
 
-  // Exercise a param-to-param SPA history transition with a warning still open.
+  // Exercise a param-to-param SPA history transition with the campaign warning open.
   await page.getByRole('link', { name: /all characters/i }).click();
   await page.getByRole('link', { name: 'Campaign Assignment QA' }).click();
   await expectCharacterNavigationReady(page);
-  const returningCampaignSelect = page.getByLabel('campaign', { exact: true });
-  const secondCampaignValue = await returningCampaignSelect
-    .locator('option', { hasText: secondCampaignName })
-    .getAttribute('value');
-  await returningCampaignSelect.selectOption({ label: secondCampaignName });
-  await expect(returningCampaignSelect).toHaveValue(secondCampaignValue ?? '');
-  await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
-  await returningCampaignSelect.selectOption('');
-  await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toBeVisible();
+  await openCampaignEditor(page);
   await page.evaluate(() => window.history.go(-2));
   await expect(page).toHaveURL(missedCharacterUrl);
   await expectCharacterNavigationReady(page);
@@ -433,10 +623,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     missedCharacterName,
   );
   await expect(page.getByRole('dialog', { name: 'Change character campaign?' })).toHaveCount(0);
-  await expect(page.getByLabel('campaign', { exact: true })).toHaveValue(
-    (await page
-      .getByLabel('campaign', { exact: true })
-      .locator('option', { hasText: secondCampaignName })
-      .getAttribute('value')) ?? '',
-  );
+  await expect(
+    page.getByRole('link', { name: secondCampaignName, exact: true }).last(),
+  ).toBeVisible();
 });
