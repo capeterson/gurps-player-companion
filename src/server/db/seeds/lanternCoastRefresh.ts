@@ -56,6 +56,7 @@ import { ensureDemoUser } from './accounts.ts';
 import { seedLanternCoast } from './lanternCoast.ts';
 import { LANTERN_CAMPAIGN_NAME, type LanternRequest } from './lanternCoastContent.ts';
 import { lanternCharacters, lanternSharedLogs } from './lanternCoastData.ts';
+import { refreshLanternCoastEquipment } from './lanternCoastEquipment.ts';
 import { lanternSeedIsCurrent, recordLanternSeedVersion } from './lanternCoastRevision.ts';
 
 const purchaseIdentity = (row: { name: string; specialization?: unknown }) =>
@@ -138,6 +139,42 @@ export async function refreshLanternCoast(
       return response.status === 204 ? null : response.json();
     };
     const campaignPath = `/campaigns/${campaign.id}`;
+    const refreshEquipment = async () => {
+      const roster = await db
+        .select()
+        .from(characters)
+        .where(eq(characters.campaignId, campaign.id));
+      const players: Parameters<typeof refreshLanternCoastEquipment>[0]['players'] = [];
+      for (const fixture of lanternCharacters) {
+        const [actor] = await db.select().from(users).where(eq(users.email, fixture.email));
+        const matches = roster.filter(
+          (row) => row.name === fixture.character.name && row.ownerId === actor?.id,
+        );
+        if (!actor || matches.length !== 1 || !matches[0]) continue;
+        players.push({
+          fixture,
+          characterId: matches[0].id,
+          actor: (await signAccessToken(actor.id, actor.authVersion)).token,
+        });
+      }
+      await refreshLanternCoastEquipment({
+        campaignId: campaign.id,
+        ownerActor: ownerToken,
+        request,
+        players,
+        ...(libraryText === undefined ? {} : { yaml: libraryText }),
+      });
+      return lanternCharacters
+        .filter((fixture) => !players.some((player) => player.fixture === fixture))
+        .map((fixture) => fixture.character.name);
+    };
+    // Equipment is a separate revision. Do not restore deleted V2 skills/notes
+    // while moving a campaign that has already received the content enrichment.
+    if (await lanternSeedIsCurrent(campaign.id, 2)) {
+      const skippedCharacters = await refreshEquipment();
+      await recordLanternSeedVersion(campaign.id, ownerId);
+      return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
+    }
     let catalog = catalogSchema.parse(await request(ownerToken, `${campaignPath}/library`, 'GET'));
 
     // Import only new definitions. Merge of the complete document would silently
@@ -539,6 +576,9 @@ export async function refreshLanternCoast(
         ...entry,
         visibility: 'campaign',
       });
+    }
+    for (const name of await refreshEquipment()) {
+      if (!skippedCharacters.includes(name)) skippedCharacters.push(name);
     }
     // Last write: a rerun must not recreate deliberate deletions after enrichment.
     await recordLanternSeedVersion(campaign.id, ownerId);

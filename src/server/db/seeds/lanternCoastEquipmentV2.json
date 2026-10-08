@@ -1,0 +1,626 @@
+{
+  "items": [
+    {
+      "name": "Wayfarer's sword",
+      "weaponData": {
+        "modes": [
+          {
+            "key": "sweep",
+            "name": "Quay sweep",
+            "damage": "sw cut",
+            "reach": "1",
+            "parry": "0",
+            "stRequired": 9,
+            "skill": "Quayblade"
+          },
+          {
+            "key": "point",
+            "name": "Beacon point",
+            "damage": "thr+1 imp",
+            "reach": "1",
+            "parry": "0",
+            "stRequired": 9,
+            "skill": "Quayblade"
+          }
+        ]
+      },
+      "key": "items_1",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Wayfarer's sword."
+    },
+    {
+      "name": "Breakwater buckler",
+      "weaponData": {
+        "damage": "thr-1 cr",
+        "reach": "1",
+        "parry": "No",
+        "db": 1,
+        "skill": "Bulwark Handling",
+        "wieldedSide": "left"
+      },
+      "key": "items_2",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Breakwater buckler."
+    },
+    {
+      "name": "Reedglass bow",
+      "weaponData": {
+        "modes": [
+          {
+            "key": "reed_shot",
+            "name": "Reed shot",
+            "damage": "thr imp",
+            "parry": "No",
+            "stRequired": 9,
+            "skill": "Reedbow",
+            "ranged": {
+              "acc": 3,
+              "range": {
+                "kind": "st_multiplier",
+                "halfDamageFactor": 9,
+                "maxFactor": 14,
+                "strengthSource": "wielder"
+              },
+              "rof": "1",
+              "shots": "1(3)",
+              "bulk": -5,
+              "recoil": 1
+            }
+          }
+        ]
+      },
+      "key": "items_3",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Reedglass bow."
+    },
+    {
+      "name": "Tidewire coat",
+      "armor": {
+        "dr": 3,
+        "typedDr": {
+          "cut": 4,
+          "corr": 2
+        },
+        "drCrushing": 1,
+        "flexible": true,
+        "locations": ["torso", "groin", "arm_left", "arm_right"]
+      },
+      "key": "items_4",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Tidewire coat."
+    },
+    {
+      "name": "Beacon rivet cap",
+      "armor": {
+        "dr": 3,
+        "locations": ["skull"]
+      },
+      "key": "items_5",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Beacon rivet cap."
+    },
+    {
+      "name": "Reedweave greaves",
+      "armor": {
+        "dr": 1,
+        "typedDr": {
+          "cut": 2
+        },
+        "locations": ["leg_left", "leg_right"]
+      },
+      "key": "items_6",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Reedweave greaves."
+    },
+    {
+      "name": "Cliffgrip boots",
+      "armor": {
+        "dr": 1,
+        "locations": ["foot_left", "foot_right"]
+      },
+      "key": "items_7",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Cliffgrip boots."
+    },
+    {
+      "name": "Trail pack",
+      "key": "items_8",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Trail pack."
+    },
+    {
+      "name": "Focus crystal",
+      "key": "items_9",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Focus crystal."
+    },
+    {
+      "name": "Tideglass wand",
+      "key": "items_10",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Tideglass wand."
+    },
+    {
+      "name": "Beacon rod",
+      "weaponData": {
+        "modes": [
+          {
+            "key": "tap",
+            "name": "Beacon tap",
+            "damage": "thr+1 cr",
+            "reach": "1,2",
+            "parry": "0",
+            "stRequired": 7,
+            "skill": "Beacon Rod"
+          },
+          {
+            "key": "sweep",
+            "name": "Rod sweep",
+            "damage": "sw+1 cr",
+            "reach": "1,2",
+            "parry": "0",
+            "stRequired": 7,
+            "skill": "Beacon Rod"
+          }
+        ]
+      },
+      "key": "items_11",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Beacon rod."
+    },
+    {
+      "name": "Bridgehook axe",
+      "weaponData": {
+        "modes": [
+          {
+            "key": "hook",
+            "name": "Bridgehook chop",
+            "damage": "sw+1 cut",
+            "reach": "1",
+            "parry": "0U",
+            "stRequired": 11,
+            "skill": "Salvage Haft"
+          }
+        ]
+      },
+      "key": "items_12",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Bridgehook axe."
+    },
+    {
+      "name": "Storm mantle",
+      "armor": {
+        "dr": 1,
+        "typedDr": {
+          "burn": 3
+        },
+        "locations": ["torso", "neck"],
+        "flexible": true
+      },
+      "key": "items_13",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Storm mantle."
+    },
+    {
+      "name": "Mistquilt coat",
+      "armor": {
+        "dr": 1,
+        "locations": ["torso", "arm_left", "arm_right"],
+        "flexible": true
+      },
+      "key": "items_14",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Mistquilt coat."
+    },
+    {
+      "name": "Rescue tether",
+      "weaponData": {
+        "modes": [
+          {
+            "key": "cast",
+            "name": "Weighted cast",
+            "damage": "thr-1 cr",
+            "parry": "No",
+            "stRequired": 8,
+            "skill": "Tether Cast",
+            "ranged": {
+              "acc": 1,
+              "range": {
+                "kind": "fixed",
+                "maxYards": 18,
+                "minimumYards": 2,
+                "halfDamageYards": null
+              },
+              "rof": "1",
+              "shots": "1(4)",
+              "bulk": -3,
+              "recoil": 1
+            }
+          }
+        ]
+      },
+      "key": "items_15",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Rescue tether."
+    },
+    {
+      "name": "Signal beads",
+      "description": "Six colored glass beads used to draft harbor codes.",
+      "key": "items_16",
+      "sourceKey": "lantern_outfits"
+    },
+    {
+      "name": "Distiller roll",
+      "description": "Holds the fictional marsh-distilling apparatus and sealed sample jars.",
+      "key": "items_17",
+      "sourceKey": "lantern_outfits"
+    },
+    {
+      "name": "Tideglass mirror",
+      "description": "A prepared focus for Glasswake Message; no automatic remote communication.",
+      "key": "items_18",
+      "sourceKey": "lantern_outfits"
+    },
+    {
+      "name": "Jetty toolbelt",
+      "key": "items_19",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Jetty toolbelt."
+    },
+    {
+      "name": "Salvage apron",
+      "armor": {
+        "dr": 2,
+        "locations": ["torso", "groin"],
+        "frontOnly": true,
+        "typedDr": {
+          "corr": 3
+        }
+      },
+      "key": "items_20",
+      "sourceKey": "lantern_outfits",
+      "description": "Original Lantern Coast item fixture: Salvage apron."
+    }
+  ],
+  "characters": [
+    {
+      "name": "Kestrel Vale",
+      "inventory": [
+        {
+          "name": "Wayfarer's sword",
+          "library": "Wayfarer's sword",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Beacon Edge"]
+        },
+        {
+          "name": "Breakwater buckler",
+          "library": "Breakwater buckler",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Reedglass bow",
+          "library": "Reedglass bow",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Gullfeather Draw"]
+        },
+        {
+          "name": "Tidewire coat",
+          "library": "Tidewire coat",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Beacon rivet cap",
+          "library": "Beacon rivet cap",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Reedweave greaves",
+          "library": "Reedweave greaves",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Cliffgrip boots",
+          "library": "Cliffgrip boots",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Trail pack",
+          "library": "Trail pack",
+          "data": {
+            "worn": true
+          },
+          "enchantments": ["Foamfold Lining"]
+        }
+      ]
+    },
+    {
+      "name": "Mira Ashfall",
+      "inventory": [
+        {
+          "name": "Beacon rod",
+          "library": "Beacon rod",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Mistquilt coat",
+          "library": "Mistquilt coat",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Focus crystal",
+          "library": "Focus crystal",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Tideglass wand",
+          "library": "Tideglass wand",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Spent focus",
+          "library": "Focus crystal",
+          "data": {
+            "worn": true,
+            "powerstoneData": {
+              "maxEnergy": 3,
+              "currentEnergy": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bram Stonebridge",
+      "inventory": [
+        {
+          "name": "Bridgehook axe",
+          "library": "Bridgehook axe",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Breakwater buckler",
+          "library": "Breakwater buckler",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Tidewire coat",
+          "library": "Tidewire coat",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Warden's Stitch"]
+        },
+        {
+          "name": "Beacon rivet cap",
+          "library": "Beacon rivet cap",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Reedweave greaves",
+          "library": "Reedweave greaves",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Cliffgrip boots",
+          "library": "Cliffgrip boots",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Storm mantle",
+          "library": "Storm mantle",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Trail pack",
+          "library": "Trail pack",
+          "data": {
+            "worn": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Iona Reedwake",
+      "inventory": [
+        {
+          "name": "Wayfarer's sword",
+          "library": "Wayfarer's sword",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Rescue tether",
+          "library": "Rescue tether",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Breakwater buckler",
+          "library": "Breakwater buckler",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Mooring Counterweight"]
+        },
+        {
+          "name": "Mistquilt coat",
+          "library": "Mistquilt coat",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        }
+      ]
+    },
+    {
+      "name": "Sable Fenwick",
+      "inventory": [
+        {
+          "name": "Beacon rod",
+          "library": "Beacon rod",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Mistquilt coat",
+          "library": "Mistquilt coat",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Warden's Stitch"]
+        },
+        {
+          "name": "Focus crystal",
+          "library": "Focus crystal",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Distiller roll",
+          "library": "Distiller roll",
+          "data": {
+            "worn": true
+          },
+          "enchantments": ["Foamfold Lining"]
+        },
+        {
+          "name": "Tideglass mirror",
+          "library": "Tideglass mirror",
+          "data": {
+            "worn": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orin Bellstrand",
+      "inventory": [
+        {
+          "name": "Bridgehook axe",
+          "library": "Bridgehook axe",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Beacon Edge"]
+        },
+        {
+          "name": "Breakwater buckler",
+          "library": "Breakwater buckler",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Salvage apron",
+          "library": "Salvage apron",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": []
+        },
+        {
+          "name": "Signal beads",
+          "library": "Signal beads",
+          "data": {
+            "worn": true,
+            "equipped": true
+          },
+          "enchantments": ["Harbor Whisper"]
+        },
+        {
+          "name": "Jetty toolbelt",
+          "library": "Jetty toolbelt",
+          "data": {
+            "worn": true
+          }
+        }
+      ]
+    }
+  ]
+}

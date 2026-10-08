@@ -4054,11 +4054,20 @@ library:
         parry: '0'
         stRequired: 9
         skill: Quayblade
+      - key: pommel
+        name: Close pommel
+        damage: thr cr
+        reach: C
+        parry: '0'
+        stRequired: 9
+        skill: Quayblade
+        notes: Close-combat crushing alternative to the sweep and impaling point.
     key: items_1
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Wayfarer''s sword.'
+    description: A coastal sword with keyed cutting sweep, impaling point and close-combat crushing pommel
+      modes; each uses Quayblade.
     calculation:
       version: 1
       inputs: []
@@ -4149,16 +4158,40 @@ library:
             kind: st_multiplier
             halfDamageFactor: 9
             maxFactor: 14
-            strengthSource: wielder
+            strengthSource: weapon
           rof: '1'
           shots: 1(3)
           bulk: -5
           recoil: 1
+        weaponSt: 11
+        strengthKind: bow
+      - key: bodkin_shot
+        name: Bodkin shot
+        damage: thr-1(2) imp
+        parry: 'No'
+        stRequired: 9
+        skill: Reedbow
+        ranged:
+          acc: 3
+          range:
+            kind: st_multiplier
+            halfDamageFactor: 9
+            maxFactor: 14
+            strengthSource: weapon
+          rof: '1'
+          shots: 1(3)
+          bulk: -5
+          recoil: 1
+        weaponSt: 11
+        strengthKind: bow
+        notes: Synthetic bodkin profile; use divisor 2 against the chosen location. Ammunition selection
+          and consumption are manual.
     key: items_3
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Reedglass bow.'
+    description: An ST 11 bow with ordinary and armor-dividing bodkin shots, purchased-ST range, aim accuracy
+      and full reload/bulk statistics.
     calculation:
       version: 1
       inputs: []
@@ -4204,11 +4237,14 @@ library:
       - groin
       - arm_left
       - arm_right
+      concealable: true
+      notes: Fine flexible mail under an outer coat or plate. Crushing DR is lower than cutting DR.
     key: items_4
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Tidewire coat.'
+    description: Fine coastal mail covering torso, groin and both arms. Flexible and concealable as an inner
+      layer; compare cutting, crushing and corrosion protection.
     calculation:
       version: 1
       inputs: []
@@ -4285,9 +4321,9 @@ library:
     cost: 54
     isArmor: true
     armor:
-      dr: 1
+      dr: 2
       typedDr:
-        cut: 2
+        cut: 3
       locations:
       - leg_left
       - leg_right
@@ -4295,7 +4331,8 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Reedweave greaves.'
+    description: Rigid reed-laminate greaves protect both legs; cutting DR exceeds crushing and impaling
+      DR. Feet remain a separate boot layer.
     calculation:
       version: 1
       inputs: []
@@ -4509,11 +4546,20 @@ library:
         parry: '0'
         stRequired: 7
         skill: Beacon Rod
+      - key: ferrule
+        name: Ferrule jab
+        damage: thr-1 imp
+        reach: '1'
+        parry: '0'
+        stRequired: 7
+        skill: Beacon Rod
+        notes: A pointed ferrule trades damage for an impaling wound modifier; not a ranged spell.
     key: items_11
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Beacon rod.'
+    description: A ferruled staff with distinct crushing tap/sweep and impaling jab modes. Compare Reach
+      1 with Reach 1,2 and thrust with swing.
     calculation:
       version: 1
       inputs: []
@@ -4555,11 +4601,28 @@ library:
         parry: 0U
         stRequired: 11
         skill: Salvage Haft
+      - key: spike
+        name: Gate spike
+        damage: thr+1(2) imp
+        reach: '1'
+        parry: 0U
+        stRequired: 11
+        skill: Salvage Haft
+        notes: 'Synthetic hardened spike profile: armor divisor 2. It remains unbalanced; no automatic gate-breaking
+          result.'
+      - key: haft
+        name: Short haft blow
+        damage: thr cr
+        reach: C
+        parry: '0'
+        stRequired: 9
+        skill: Salvage Haft
     key: items_12
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Bridgehook axe.'
+    description: A hooked axe with cutting chop, armor-dividing impaling spike and close crushing haft blow.
+      Only the haft mode avoids an unbalanced parry.
     calculation:
       version: 1
       inputs: []
@@ -4605,7 +4668,8 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Storm mantle.'
+    description: An outer fire-treated mantle over flexible concealable armor. Torso and neck receive DR
+      1, or DR 3 against burning; other locations remain uncovered.
     calculation:
       version: 1
       inputs: []
@@ -4646,11 +4710,16 @@ library:
       - arm_left
       - arm_right
       flexible: true
+      concealable: true
+      typedDr:
+        burn: 2
+        corr: 0
     key: items_14
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Mistquilt coat.'
+    description: A close-fitting quilted inner coat with treated heat-resistant batting. It leaves the neck,
+      hands and legs uncovered and offers no corrosion protection.
     calculation:
       version: 1
       inputs: []
@@ -4702,11 +4771,20 @@ library:
           shots: 1(4)
           bulk: -3
           recoil: 1
+      - key: lash
+        name: Close line lash
+        damage: thr-1 cr
+        reach: 1,2
+        parry: '-2'
+        stRequired: 8
+        skill: Tether Cast
+        notes: A melee alternative to the weighted cast; entanglement and rescue outcomes remain manual.
     key: items_15
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Rescue tether.'
+    description: A weighted line with separate fixed-range cast and melee lash modes; the cast cannot parry,
+      while the lash has a -2 parry modifier.
     calculation:
       version: 1
       inputs: []
@@ -4904,7 +4982,8 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Salvage apron.'
+    description: A rigid front plate for the torso and groin with corrosion-resistant facing. It contributes
+      nothing to back or side attacks; the inner coat remains available there.
     calculation:
       version: 1
       inputs: []
@@ -4933,6 +5012,300 @@ library:
         max: 1000000
     sourceLocator: items.20
     source: LCQO items.20
+  - name: Shoalwatch brigandine
+    category: armor
+    weightLbs: 9.5
+    cost: 180
+    isArmor: true
+    armor:
+      locations:
+      - torso
+      - groin
+      dr: 3
+      typedDr:
+        cut: 4
+        burn: 2
+      flexible: false
+    key: items_21
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: A rigid all-facing outer brigandine. Wear it over Tidewire coat to compare two named layers
+      and type-specific totals.
+    sourceLocator: items.21
+    source: LCQO items.21
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 180
+      - id: weightLbs
+        op: constant
+        value: 9.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+  - name: Beacon cuirass
+    category: armor
+    weightLbs: 12
+    cost: 240
+    isArmor: true
+    armor:
+      locations:
+      - torso
+      - groin
+      dr: 5
+      typedDr:
+        cut: 6
+        pi: 4
+        burn: 3
+        corr: 2
+      frontOnly: true
+      flexible: false
+    key: items_22
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: A front-only outer breastplate. Back and side attacks bypass this plate; a matching backplate
+      is an independent layer.
+    sourceLocator: items.22
+    source: LCQO items.22
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 240
+      - id: weightLbs
+        op: constant
+        value: 12
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+  - name: Quay backplate
+    category: armor
+    weightLbs: 7
+    cost: 120
+    isArmor: true
+    armor:
+      locations:
+      - torso
+      - groin
+      dr: 3
+      typedDr:
+        burn: 1
+        corr: 4
+      backOnly: true
+      flexible: false
+    key: items_23
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: A back-only rigid plate. Front and back plates never overlap one another for a known facing;
+      the flexible inner layer protects all facings.
+    sourceLocator: items.23
+    source: LCQO items.23
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 120
+      - id: weightLbs
+        op: constant
+        value: 7
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+  - name: Tidewire coif
+    category: armor
+    weightLbs: 2.5
+    cost: 90
+    isArmor: true
+    armor:
+      locations:
+      - skull
+      - neck
+      dr: 3
+      drCrushing: 1
+      typedDr:
+        cut: 4
+        corr: 2
+      flexible: true
+      concealable: true
+    key: items_24
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: Flexible concealable mail under a cap. Skull layering is DX-exempt; neck layering is not.
+      The face and eyes remain uncovered.
+    sourceLocator: items.24
+    source: LCQO items.24
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 90
+      - id: weightLbs
+        op: constant
+        value: 2.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+  - name: Beacon visor
+    category: armor
+    weightLbs: 1.5
+    cost: 65
+    isArmor: true
+    armor:
+      locations:
+      - face
+      - eye
+      dr: 2
+      typedDr:
+        burn: 4
+        corr: 1
+      frontOnly: true
+      flexible: false
+    key: items_25
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: A front-only face and eye guard, separate from the skull cap. Compare an armored eye with
+      the same exposed location from the side.
+    sourceLocator: items.25
+    source: LCQO items.25
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 65
+      - id: weightLbs
+        op: constant
+        value: 1.5
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+  - name: Dock leather gloves
+    category: armor
+    weightLbs: 1
+    cost: 25
+    isArmor: true
+    armor:
+      locations:
+      - hand_left
+      - hand_right
+      dr: 2
+      typedDr:
+        corr: 3
+      flexible: false
+    key: items_26
+    sourceKey: lantern_outfits
+    status: complete
+    role: definition
+    description: Rigid treated work gloves protect each hand separately. Incoming damage demonstrates the
+      lower extremity crippling threshold.
+    sourceLocator: items.26
+    source: LCQO items.26
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: cost
+        op: constant
+        value: 25
+      - id: weightLbs
+        op: constant
+        value: 1
+      outputs:
+      - key: cost
+        node: cost
+        unit: currency
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
+      - key: weightLbs
+        node: weightLbs
+        unit: pounds
+        rounding: exact
+        increment: 0.01
+        min: 0
+        max: 1000000
   sources:
   - name: Greyhaven Lives and Vows
     key: lantern_lives

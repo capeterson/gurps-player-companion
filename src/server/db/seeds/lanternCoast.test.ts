@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { and, eq } from 'drizzle-orm';
 import { stringify } from 'yaml';
+import {
+  armorLayering,
+  effectiveDrByLocation,
+  layeredArmorDrContributions,
+  resolveDr,
+} from '../../../shared/domain/armorDr.ts';
+import { parseDamageSpec } from '../../../shared/domain/damageParse.ts';
+import { applyDamage } from '../../../shared/domain/injuryCalc.ts';
 import { benefitUnlocked } from '../../../shared/domain/skillProcedures.ts';
 import { adventureLogOut } from '../../../shared/schemas/adventureLog.ts';
 import { librarySkillOut, libraryTraitOut } from '../../../shared/schemas/campaignLibrary.ts';
@@ -207,6 +215,94 @@ describe('Lantern Coast standard seed', () => {
       expect(
         orin?.skills.find((skill) => skill.name === 'Signal Weaving')?.effectiveLevel,
       ).toBeGreaterThan(orin?.iq ?? 0);
+      // Exercise the same resolved inventory/effects used by Incoming attack,
+      // rather than merely asserting that the authored YAML has armor fields.
+      for (const detail of details) {
+        for (const facing of ['front', 'back', 'left', 'right'] as const) {
+          expect(armorLayering(detail.inventory, facing).invalidLocations, detail.name).toEqual([]);
+        }
+        expect(armorLayering(detail.inventory).dxPenalty, detail.name).toBe(1);
+        expect(
+          detail.warnings.some((warning) => warning.code === 'inventory.armor_layers'),
+          detail.name,
+        ).toBe(false);
+        for (const item of detail.inventory.filter(
+          (item) => item.weaponData?.modes && item.weaponData.db == null,
+        )) {
+          expect(item.weaponData?.modes?.length, item.name).toBeGreaterThanOrEqual(2);
+          for (const mode of item.weaponData?.modes ?? [])
+            expect(parseDamageSpec(mode.damage ?? ''), mode.name).toHaveLength(1);
+        }
+      }
+      const scoutFront = effectiveDrByLocation(kestrel.inventory, kestrel.effects, 'front');
+      expect(resolveDr('cut', scoutFront.get('torso'))).toBe(8);
+      expect(resolveDr('cr', scoutFront.get('torso'))).toBe(4);
+      expect(resolveDr('cut', scoutFront.get('skull'))).toBe(9);
+      expect(resolveDr('imp', scoutFront.get('eye'))).toBe(2);
+      expect(
+        resolveDr(
+          'imp',
+          effectiveDrByLocation(kestrel.inventory, kestrel.effects, 'left').get('eye'),
+        ),
+      ).toBe(0);
+      expect(applyDamage(10, 'cut', 'torso', scoutFront, null, kestrel.derived.hp)).toMatchObject({
+        drAtLocation: 8,
+        penetrating: 2,
+        injury: 3,
+      });
+      expect(
+        applyDamage(12, 'imp', 'hand_left', scoutFront, '2', kestrel.derived.hp),
+      ).toMatchObject({
+        effectiveDr: 1,
+        preCapInjury: 11,
+        crippled: true,
+        destroyed: true,
+        injury: Math.floor(kestrel.derived.hp / 3) + 1,
+      });
+      const veteranFront = effectiveDrByLocation(bram.inventory, bram.effects, 'front');
+      expect(resolveDr('imp', veteranFront.get('torso'))).toBe(10);
+      expect(
+        resolveDr('imp', effectiveDrByLocation(bram.inventory, bram.effects, 'back').get('torso')),
+      ).toBe(8);
+      expect(
+        resolveDr('imp', effectiveDrByLocation(bram.inventory, bram.effects, 'left').get('torso')),
+      ).toBe(5);
+      expect(applyDamage(12, 'imp', 'vitals', veteranFront, '2', bram.derived.hp)).toMatchObject({
+        effectiveDr: 5,
+        multiplier: 3,
+        injury: 21,
+      });
+      expect(
+        applyDamage(12, 'imp', 'torso', veteranFront, '3', bram.derived.hp, true).effectiveDr,
+      ).toBe(4);
+      expect(applyDamage(12, 'imp', 'torso', veteranFront, '3', bram.derived.hp).effectiveDr).toBe(
+        3,
+      );
+      expect(bram.inventory.find((item) => item.name === 'Storm mantle')?.equipped).toBe(false);
+      if (!sable || !orin) throw new Error('Missing seeded protection examples');
+      expect(
+        resolveDr(
+          'burn',
+          effectiveDrByLocation(mira.inventory, mira.effects, 'front').get('torso'),
+        ),
+      ).toBe(5);
+      const stitches = layeredArmorDrContributions(sable.inventory, 'torso', 'front');
+      expect(stitches.map((line) => line.status).sort()).toEqual(['suppressed', 'winning']);
+      expect(
+        resolveDr(
+          'burn',
+          effectiveDrByLocation(sable.inventory, sable.effects, 'front').get('torso'),
+        ),
+      ).toBe(6);
+      expect(
+        resolveDr(
+          'corr',
+          effectiveDrByLocation(orin.inventory, orin.effects, 'front').get('torso'),
+        ),
+      ).toBe(3);
+      expect(
+        resolveDr('corr', effectiveDrByLocation(orin.inventory, orin.effects, 'back').get('torso')),
+      ).toBe(0);
       expect(mira.spells.find((spell) => spell.name === 'Glimmer Shoal')?.effectiveCost).toBe(1);
       expect(
         mira.inventory.find((item) => item.name === 'Focus crystal')?.powerstoneData?.currentEnergy,

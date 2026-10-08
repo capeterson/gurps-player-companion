@@ -45,14 +45,14 @@ the 50-point disadvantage cap and the five-point quirk cap.
 
 | Fixture | Useful cases |
 | --- | --- |
-| Kestrel | Sword swing/thrust modes, ranged bow statistics, shield defenses, location-specific mail/crushing DR, an enchanted sword, two Coastal Foraging specializations, a zero-point defaulted skill, a skill action with contextual modifiers and an unlocked benefit, a bought-up False Lantern Step, sign language, an active six-round ward |
-| Mira | Tideglass attunement (the app’s Magery gate), structured Beacon Resonance prerequisites, learned TL, six spells including maintenance and Very Hard difficulty, discounted casting costs, a partly charged and an empty powerstone, a partly depleted wand, FP below one-third, kneeling, an inactive sense effect |
-| Bram | Innate DR combined with enchanted mail and an overlapping mantle with burning-specific protection, an unbalanced weapon, a bought-up Hook the Haft technique, worn containers and heavy stashed salvage, HP below one-third, Reeling, an expired potion effect linked to an inventory item |
-| Iona | IQ-based tide piloting, a weighted rescue line with fixed Range/minimum, left-hand buckler with a blocking enchantment, tide-flat foraging |
-| Sable | TL3 marsh distilling and care, four original spells, enchanted nested distiller roll, an active ward, and a partly charged focus |
-| Orin | Signal skill bonuses from trait and equipped beads, TL3 winchcraft, front-only apron with corrosion-specific DR, tools and externally stashed spare parts |
+| Kestrel | Three sword modes, an ST11 bow with ordinary/bodkin shots, shield defenses, mail under brigandine, coif/cap, a front visor and limb armor, an enchanted sword, two Coastal Foraging specializations, a zero-point defaulted skill, a skill action with contextual modifiers and an unlocked benefit, a bought-up False Lantern Step, sign language, an active six-round ward |
+| Mira | Fire-treated quilt under a mantle and layered head armor, Tideglass attunement (the app’s Magery gate), structured Beacon Resonance prerequisites, learned TL, six spells including maintenance and Very Hard difficulty, discounted casting costs, a partly charged and an empty powerstone, a partly depleted wand, FP below one-third, kneeling, an inactive sense effect |
+| Bram | Innate DR, enchanted inner mail and separate front/back plates, head and limb armor, a carried spare mantle, axe hook/spike/close-haft modes, a bought-up Hook the Haft technique, worn containers and heavy stashed salvage, HP below one-third, Reeling, an expired potion effect linked to an inventory item |
+| Iona | IQ-based tide piloting, quilt under a front apron and backplate, head/leg armor, a weighted rescue line with fixed Range/minimum and a melee lash, left-hand buckler with a blocking enchantment, tide-flat foraging |
+| Sable | Fire-treated quilt under a mantle with two competing Warden's Stitches, head/hand armor, TL3 marsh distilling and care, four original spells, enchanted nested distiller roll, an active ward, and a partly charged focus |
+| Orin | Quilt under a front-only apron with corrosion-specific DR, head/hand armor, signal skill bonuses from trait and equipped beads, TL3 winchcraft, tools and externally stashed spare parts |
 | Inventory | Quantities, equipped/worn distinctions, external storage, and three-level nesting: trail pack → oilskin pouch → compass/chart; satchel → medical kit → bandages |
-| Campaign library | 30 traits and 48 skills, plus spells, items, languages, techniques, styles, mechanical enchantments, active effects, sourcebooks, and standalone modifiers; portable YAML v13 with saved library links and owned mechanics on the sheets |
+| Campaign library | 30 traits, 48 skills and 26 items, plus spells, languages, techniques, styles, mechanical enchantments, active effects, sourcebooks, and standalone modifiers; portable YAML v13 with saved library links and owned mechanics on the sheets |
 | Adventure log | Five shared entries for sessions 0–4 and three private entries per character for sessions 0, 3 and 4; distinct personal clues, locations, Markdown paragraphs/lists/table/quote examples, and the original six-point XP award total |
 | Encounter | Six PCs, a wounded raider, a hidden captive, turn order, and a three-round effect with maintenance cost; the encounter effect is a tracker reminder, not a linked sheet bonus |
 | History and sync | Real API writes from seven actors, audited changes, positive revisions, and owned mechanics for offline character use |
@@ -77,6 +77,39 @@ the finished campaign leaves **Enable active effects** off. Its construction
 briefly opts in to use the normal guarded write APIs, then disables the experiment
 before publishing the completed fixture. Reruns preserve an owner’s later choice.
 The owner can enable the experiment to exercise the sheet’s management tools.
+
+## Incoming attack examples
+
+All six loadouts have legal two-layer body armor: a flexible, concealable inner
+piece beneath an outer piece. The ordinary layering DX penalty is 1; the coif/cap
+head layers are exempt. Front and back plates do not overlap for a known facing.
+Bram carries his spare mantle unequipped, because wearing it over the mail and
+plates would make three overlapping layers.
+
+Open **Combat → Incoming attack**, choose the hit location, armor facing, damage
+type and armor penetration, then open **Incoming damage…** and enter basic damage.
+These original synthetic profiles demonstrate the app's calculations on fresh
+fixtures with the **None** house-rule set; previewing does not change HP.
+
+| Character and attack | Result to inspect |
+| --- | --- |
+| Kestrel: front torso, 10 cutting | DR 8, 2 penetrating damage, 3 injury; crushing against the same layers has DR 4 |
+| Kestrel: skull or eye | Cutting skull DR 9 includes natural skull DR; the visor gives eye DR 2 from the front and 0 from a side |
+| Kestrel: front left hand, 12 impaling, divisor 2 | Effective DR 1, pre-cap injury 11, destruction hint and the extremity HP-loss cap |
+| Bram: front vitals, 12 impaling, divisor 2 | DR 10 becomes 5, 7 penetrates and ×3 gives 21 injury; torso impaling DR is 8 from the back and 5 from a side |
+| Bram: front torso, divisor 3 | Effective DR 3 normally, or 4 with the campaign's natural-DR protection option |
+| Mira: torso, burning | Quilt plus mantle gives burning DR 5 versus default DR 2 |
+| Sable: torso, burning | DR 6; one Warden's Stitch wins and the other is suppressed rather than both stacking |
+| Orin: torso, corrosion | Front DR 3, back/side DR 0; the inner quilt still provides crushing DR 1 |
+
+The weapon examples include cutting, impaling and crushing modes, an unbalanced
+parry, close reach, bow ST and armor divisors. Ammunition consumption, tether
+entanglement and flexible-armor blunt trauma remain manual; the damage tool
+computes penetration, injury and supported location effects.
+Fresh enchanted purchases have synthetic item Power 15, so their mechanical
+bonuses function at normal mana. The equipment refresh fills blank Power on
+matching unconfigured enchantments on existing top-level library purchases;
+manually recorded values are kept.
 
 ## Fictional sourcebooks
 
@@ -166,9 +199,13 @@ After applying migrations, run:
 
 This targets the standard demo GM's exact **The Lantern Coast** campaign. It
 compares recognized older defaults with the saved content, updates only unchanged
-legacy fields, and adds the new catalog definitions, background purchases and
-journal entries. It preserves edited fields, original purchases, deleted older
-definitions/purchases, HP/FP, inventory, existing awards and campaign settings.
+legacy fields, and adds the new catalog definitions, background purchases,
+journal entries and layered combat gear. Equipment revision 3 compares armor,
+weapon modes and descriptions against the public V2 baseline before updating
+each unchanged facet. Quantities, containment, edited readiness, HP/FP, existing
+awards and campaign settings survive. Deleted older definitions/purchases stay
+deleted. A campaign already at revision 2 receives only the equipment enrichment,
+so skills or journals deleted after that refresh stay deleted.
 Missing or ambiguous character matches are skipped and reported rather than
 reconstructed. An edited old private session-4 entry is kept alongside all three
 new authored journals, yielding four private entries for that character; an
@@ -194,6 +231,9 @@ continues to skip an existing Lantern campaign and does not perform this refresh
   used by both adapters.
 - [lanternCoastRefresh.ts](../src/server/db/seeds/lanternCoastRefresh.ts): explicit,
   transactional upgrade of recognized older demo defaults.
+- [lanternCoastEquipment.ts](../src/server/db/seeds/lanternCoastEquipment.ts) and
+  [lanternCoastEquipmentV2.json](../src/server/db/seeds/lanternCoastEquipmentV2.json):
+  transport-neutral equipment enrichment and its public synthetic baseline.
 - [lanternCoastRevision.ts](../src/server/db/seeds/lanternCoastRevision.ts): internal
   completion marker that prevents later runs from restoring deleted additions.
 - [lanternCoastV1.json](../src/server/db/seeds/lanternCoastV1.json): public synthetic

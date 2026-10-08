@@ -1318,7 +1318,7 @@ src/
                  characterChildren (per-class configs plus insert/update/
                  delete for library-linked character children and the
                  child-table map used by the cursor and replay lookups)
-    db/          schema.ts (Drizzle), seeds/ (Lantern Coast recipe, conservative refresh/revision marker, REST/MCP adapters, data/accounts/tests),
+    db/          schema.ts (Drizzle), seeds/ (Lantern Coast recipe, conservative content/equipment refresh and revision marker, REST/MCP adapters, synthetic baselines/data/accounts/tests),
                  migrations/ (hand-written SQL for
                  triggers), auditContext (withAudit), client, migrate, seed
     openapi/     app, emit, check (CI drift guard against docs/openapi.json)
@@ -1536,10 +1536,16 @@ Full detail: [architecture.md](architecture.md).
 The standard `bun run db:seed` refreshes the Sample library and creates a populated
 Lantern Coast campaign with six separately owned characters, eleven library categories,
 four fictional sourcebooks with distinct abbreviations, current pricing snapshots,
-30 traits, 48 skills, five shared session entries and three private journal entries
+30 traits, 48 skills, 26 items, five shared session entries and three private journal entries
 per character, and an experimental encounter. Each fresh sheet has 12–15 skills
 and 6–8 traits within its 250-point starting budget plus six earned points and the
-campaign's disadvantage/quirk caps. Skill procedures use supported task modifiers,
+campaign's disadvantage/quirk caps. Each has legal two-layer body armor with a
+layering DX penalty, head/limb coverage, typed DR and richer weapon modes. Examples
+include separate front/back plates, a front visor, crushing-vs-cutting mail and
+competing armor enchantments; the seed guide gives Incoming attack previews.
+Synthetic enchanted purchases record item Power 15 so their bonuses function in
+normal mana; equipment refresh preserves manually configured enchantments.
+Skill procedures use supported task modifiers,
 actions, prerequisites and level benefits; social privileges and physical outcomes
 explicitly require manual adjudication. Active-effect
 demonstrations remain stored with the active-effects experiment off. See the
@@ -1550,6 +1556,10 @@ handlers for validated writes, owned mechanics, history and revisions.
 The explicit `bun run db:seed:lantern:refresh` upgrades recognized older defaults
 once while preserving edits, deleted older content and play state; its transactional
 revision marker makes subsequent runs no-ops, preserving later deletions too.
+Equipment revision 3 updates unchanged V2 armor/weapon facets and adds layered
+gear; an already-enriched V2 campaign receives equipment only, retaining later
+skill/journal deletions. Inventory quantities, containment and customized facets
+are preserved.
 Its YAML boundary resolves renamed books through surviving definition UUID links
 and excludes unavailable sourcebooks rather than restoring them.
 Ordinary seeding does not refresh existing Lantern campaigns.
