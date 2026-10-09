@@ -1,10 +1,11 @@
 # Original synthetic coastal fantasy fixtures; all sourcebooks and locators are fictional.
-version: 13
+version: 15
 campaign:
   name: The Lantern Coast
-  description: Six companions follow a vanished beacon through Greyhaven’s tide caves. Original coastal fantasy
-    rules inspired by the broad character-building, equipment and ritual-magic patterns of tabletop sourcebooks;
-    no published entries or page references are reproduced.
+  description: |-
+    Greyhaven's beacon has gone dark, its keeper Fen has vanished, and lanterns are burning in the sea caves below the cliffs where no lantern should be. Six companions bound by the Greyhaven charter follow the light down into the tide.
+
+    A low-magic coastal fantasy at TL3: ferries and shoals, bell towers and salt gardens, and tideglass wards older than the town.
   pointTarget: 250
   disadvantageCap: 50
   quirkCap: 5
@@ -25,11 +26,12 @@ library:
       value: 1
     - target: will
       value: 1
-    description: A trained breakwater guard keeps a steady weapon line and resists panic. The sheet applies +1
-      Parry and +1 Will at all times; these are the entire numerical benefit, with no surprise immunity, extra
-      defense, or faster reaction. A guard may spend a minute showing the stance to a companion, but instruction
-      does not transfer the bonus. The GM still resolves loss of footing, fear circumstances, and whether a weapon
-      can parry.
+    description: |-
+      Breakwater guards learn to fight on a wall barely wider than their boots, with spray in their eyes and a storm at their backs. The stance keeps the blade low and the mind steady.
+
+      - **On the sheet:** +1 Parry with every weapon and +1 Will, already included in both totals.
+      - **In play:** a minute of demonstration can teach a companion the stance's name, but not its benefit.
+      - **Limits:** no extra defenses, no immunity to surprise; footing and fear circumstances still apply.
     key: traits_1
     sourceKey: lantern_lives
     status: complete
@@ -55,11 +57,12 @@ library:
   - name: Longwatch Lungs
     kind: advantage
     basePoints: 7
-    description: Breathing drills and paced exertion provide one additional FP, already included in the sheet
-      maximum. This reserve can pay ordinary exertion or magic costs; it is not free breathing underwater, immunity
-      to smoke, or faster recovery. A quiet watch is a good opportunity to rest, but recovery time and fatigue
-      expenditure remain the normal campaign rules. Record any extra exertion manually rather than treating this
-      as an inexhaustible watch.
+    description: |-
+      Keepers of the long watch train their breathing on the lighthouse stairs, two hundred steps at a measured pace, until exertion stops stealing the night.
+
+      - **On the sheet:** +1 FP, already included in the maximum.
+      - **In play:** spend the extra FP on exertion, extra effort or spellcasting like any other.
+      - **Limits:** this is stamina, not water-breathing; smoke, drowning and recovery time follow normal rules.
     effects:
     - target: fp
       value: 1
@@ -90,11 +93,12 @@ library:
     basePoints: 0
     pointsPerLevel: 3
     maxLevel: 5
-    description: Practice distinguishing beacon intervals from reflections grants +1 Horizon Watch per purchased
-      level, up to five levels. The bonus applies to that skill alone, including a mundane lookout task; it never
-      raises general Perception or defeats concealment automatically. Interpreting a suspicious interval takes
-      the time specified by Horizon Watch. A false identification still needs confirmation by signal or approach,
-      and the GM supplies only information the observer could see.
+    description: |-
+      A horizon reader can tell a beacon's interval from a reflection on the swell, a fishing lantern from a signal, and a signal from a lure.
+
+      - **On the sheet:** +1 Horizon Watch per level, up to five levels (3 points per level).
+      - **In play:** interpreting a suspicious light takes Horizon Watch's normal minute-long sweep.
+      - **Limits:** only Horizon Watch improves; Perception and other sense rolls are unchanged.
     effects:
     - target: skill
       skillName: Horizon Watch
@@ -116,12 +120,13 @@ library:
       skillName: Beacon Resonance
       value: 1
       scaling: per_level
-    description: 'The fictional tideglass tradition costs 7 points plus 9 per level, to a maximum of three levels.
-      Its Magery name participates in the sheet''s existing spell-level and mana gate, and each level also grants
-      +1 Beacon Resonance. This is aptitude, not knowledge: learn spells separately, pay their stated energy,
-      and respect their range, duration, and prerequisites. Beacon Resonance can diagnose a ward during a ten-minute
-      examination; it cannot substitute for a spell, confer ownership of a beacon, or authorize a dangerous rite.
-      The GM adjudicates access to instruction and phenomena the spell system cannot represent.'
+    description: |-
+      Tideglass answers some people the way a tuning fork answers a struck note. The attunement runs in families and coastal towns, and Greyhaven's archive keepers have catalogued it for two centuries.
+
+      - **Cost:** 7 points, plus 9 points per level, up to level 3.
+      - **On the sheet:** each level adds to spell levels and enables spells under the campaign's mana; each level also grants +1 Beacon Resonance.
+      - **In play:** spells are still learned individually, pay their full energy cost, and meet their own prerequisites.
+      - **Limits:** aptitude, not knowledge; the attunement does not reveal which spells a beacon carries.
     tags:
     - beacon
     key: traits_4
@@ -133,11 +138,12 @@ library:
   - name: Stoneblood
     kind: advantage
     basePoints: 6
-    description: A mineral sheen marks a Greyhaven quarry lineage. The sheet grants innate DR 1; no extra strength,
-      healing, immunity to crushing, or protection beyond that DR is implied. The visible sheen can identify
-      the character to quarry families or an investigator, which is a manually adjudicated social consequence
-      rather than a reaction modifier. Damage, armor layering, and any exposed weak point still follow ordinary
-      combat rules.
+    description: |-
+      The old quarry families of Greyhaven are said to have stone in their blood. Their skin carries a faint mineral sheen that shrugs off scrapes and splinters.
+
+      - **On the sheet:** innate DR 1 on every location, layered beneath worn armor.
+      - **In play:** quarry families recognize the sheen; strangers may remember it too.
+      - **Limits:** no extra ST, healing or immunity; weak points and armor divisors still apply.
     effects:
     - target: dr
       value: 1
@@ -166,11 +172,12 @@ library:
   - name: Greyhaven Promise
     kind: disadvantage
     basePoints: -7
-    description: After accepting a rescue, see the traveler to a genuinely safe harbor before taking unrelated
-      paid work. This does not require a suicidal extraction, but a convenient delay or a richer offer is not
-      grounds for abandonment. When routes conflict, spend a scene arranging an escort, shelter, or an agreed
-      handover. The GM adjudicates whether safety and consent are real, and may introduce a broken promise as
-      a damaged relationship or lost commission; the app does not enforce vows or apply a flat social penalty.
+    description: |-
+      Everyone who signed the Greyhaven charter swore the same short vow: *a rescued traveler reaches a safe harbor before the rescuer takes new pay.*
+
+      - **In play:** see a rescued person to real safety (escort, shelter or an agreed handover) before accepting unrelated paid work.
+      - **When routes conflict:** spend a scene arranging that handover rather than abandoning the traveler.
+      - **Limits:** the vow never demands a suicidal rescue; breaking it costs trust, contacts and commissions.
     key: traits_6
     sourceKey: lantern_lives
     status: complete
@@ -201,12 +208,12 @@ library:
       category: limitation
       costType: percent
       costValue: -30
-    description: An unfamiliar beacon echo demands a pause to sketch its rhythm, normally ten minutes if recording
-      is safe. In a chase or rising tide, the player must explain restraint or accept the delay; the GM resolves
-      the compulsion and consequences rather than the app rolling self-control. A purchased Trusted companion
-      intervenes limitation lets the named companion interrupt this pause with a direct warning, not erase the
-      interest permanently. Recording an echo supplies a clue, never an automatic Beacon Resonance success or
-      a free spell.
+    description: |-
+      An unfamiliar beacon echo is a puzzle that will not wait. Mira has stopped mid-chase to sketch a rhythm she may never hear again.
+
+      - **In play:** on hearing a new echo, pause about ten minutes to record its pattern, or explain aloud why you will not.
+      - **Trusted companion intervenes (-30%):** a named companion's direct warning lets you defer the pause this once.
+      - **Payoff:** a recorded echo is a genuine clue for later Beacon Resonance work, though never a free success.
     key: traits_7
     sourceKey: lantern_lives
     status: complete
@@ -232,11 +239,12 @@ library:
   - name: Bridgekeeper Oath
     kind: disadvantage
     basePoints: -8
-    description: Permit refugees to cross without a toll and put right damage the character causes to a public
-      crossing. The oath covers a reasonable repair or arranged restitution, not an obligation to rebuild every
-      damaged bridge in the coast. Assess a damaged crossing before promising a schedule; work may consume hours,
-      materials, and help. The GM adjudicates who needs passage and what restitution is sufficient, and tracks
-      a refused obligation through people and access rather than an unconditional skill penalty.
+    description: |-
+      The Stonebridge masons keep crossings open in floods and wars alike. Their oath is old enough that the village still pays it in bread.
+
+      - **In play:** let refugees cross without toll, and repair or make restitution for any damage you cause to a public crossing.
+      - **Scale:** a reasonable repair or arranged restitution, not every damaged bridge on the coast.
+      - **When refused:** consequences arrive through people, guild standing and access, not as a skill penalty.
     key: traits_8
     sourceKey: lantern_lives
     status: complete
@@ -262,11 +270,11 @@ library:
   - name: Lantern vigil
     kind: quirk
     basePoints: -1
-    description: At a safe evening halt, spend a minute lighting a small candle or explaining why no flame can
-      be spared. The ritual honors named people lost along the coast and can start a conversation with other
-      mourners. It offers no ward, divination, fear resistance, or numerical benefit. Forgetting it is a roleplaying
-      lapse for the player and GM to resolve; wind, stealth, fire danger, and candle consumption are manual scene
-      details.
+    description: |-
+      At each safe evening halt, a small candle burns for the people the coast has taken. Some lanterns on the jetty have burned this way for decades.
+
+      - **In play:** spend a minute lighting the candle, or say aloud why tonight no flame can be spared.
+      - **Effect:** none beyond the ritual; it often opens a conversation with other mourners.
     key: traits_9
     sourceKey: lantern_lives
     status: complete
@@ -292,10 +300,11 @@ library:
   - name: Tidewise Balance
     kind: advantage
     basePoints: 8
-    description: Years on rolling decks and wet ladders grant +1 Current Riding and +1 Cliff Traverse, already
-      reflected in those effective skills. The trait does not increase Dodge, Move, or every DX roll. It does
-      not cancel a task penalty for a slick surface, an impossible handhold, a dangerous current, or excess load.
-      Use the relevant task procedure and let the GM determine route difficulty and physical consequences.
+    description: |-
+      Years on pitching decks and slick ladders leave a sailor's balance in the knees, not the head.
+
+      - **On the sheet:** +1 Current Riding and +1 Cliff Traverse, already included in both effective levels.
+      - **Limits:** Dodge, Move and general DX rolls are unchanged; wet holds and strong currents still carry their task penalties.
     effects:
     - target: skill
       skillName: Current Riding
@@ -328,10 +337,12 @@ library:
   - name: Signal Memory
     kind: advantage
     basePoints: 6
-    description: Rehearsed bell phrases and catalog habits grant +1 Signal Weaving and +1 Archive Diving. This
-      is practice in two disciplines, not perfect recall of everything read or automatic understanding of an
-      unknown code. A message must still be composed and a source located in the stated task time. The GM adjudicates
-      missing records, language barriers, forged signals, and whether an old recollection is reliable.
+    description: |-
+      Bellhouse apprentices memorize hundreds of signal phrases and the catalog shelves where their histories are kept.
+
+      - **On the sheet:** +1 Signal Weaving and +1 Archive Diving.
+      - **In play:** composing a message or locating a record still takes the skill's normal time.
+      - **Limits:** practice, not perfect recall; an unknown code is still unknown.
     effects:
     - target: skill
       skillName: Signal Weaving
@@ -364,11 +375,11 @@ library:
   - name: Gentle Hands
     kind: advantage
     basePoints: 7
-    description: A practiced, patient approach grants +1 Saltwound Care and +1 Harbor Mediation. The benefit
-      represents training that applies to those skills generally, not a guarantee that every patient or disputant
-      trusts the character. It creates no automatic healing, sedation, loyalty, or reaction bonus. Use normal
-      treatment and negotiation times; the GM resolves consent, supplies, infection, and the agreement that participants
-      actually accept.
+    description: |-
+      Patients relax and quarrelling crews lower their voices around someone who works slowly, explains each step and never rushes a frightened person.
+
+      - **On the sheet:** +1 Saltwound Care and +1 Harbor Mediation.
+      - **Limits:** no automatic healing, sedation or loyalty; consent and supplies still matter.
     effects:
     - target: skill
       skillName: Saltwound Care
@@ -401,11 +412,12 @@ library:
   - name: Storm Debt
     kind: disadvantage
     basePoints: -9
-    description: A storm-guild crew paid for the character's rescue and now holds first claim on reasonable salvage
-      service. When a summons arrives, seek terms or a named substitute before accepting competing work; a routine
-      duty normally occupies a watch rather than every adventure. A summons to certain death may be challenged
-      openly, with the debt still unresolved. The GM sets schedules and social consequences, and records repayment
-      in the story; the app neither creates a debt ledger nor subtracts money automatically.
+    description: |-
+      A storm-guild crew risked three boats to pull Orin from a capsized winch barge. Guild debts are paid in salvage service, and the guild keeps careful books.
+
+      - **In play:** when a summons arrives, negotiate terms or name a substitute before taking competing work.
+      - **Scale:** a routine duty takes a watch, not a whole adventure; a summons to certain death may be challenged openly.
+      - **Unresolved:** the debt stays on the guild's books until the story repays it.
     key: traits_13
     sourceKey: lantern_lives
     status: complete
@@ -431,10 +443,11 @@ library:
   - name: Counts the gulls
     kind: quirk
     basePoints: -1
-    description: Before setting sail, count the visible gulls for about a minute and announce a personal omen.
-      The omen is a habit, not supernatural information, a weather roll, or a navigation modifier. If a hurried
-      departure prevents the count, the character remains unsettled until a safe pause permits a substitute ritual.
-      The player and GM adjudicate the interruption; the app applies no blanket anxiety penalty.
+    description: |-
+      Iona counts the gulls before every departure and announces the omen to her crew, whether they want to hear it or not.
+
+      - **In play:** about a minute of counting before setting sail. If a hurried departure prevents it, she stays visibly unsettled until a safe pause allows a substitute ritual.
+      - **Effect:** a habit, not a prophecy; it gives no weather or navigation information.
     key: traits_14
     sourceKey: lantern_lives
     status: complete
@@ -460,11 +473,11 @@ library:
   - name: Pocket gardener
     kind: perk
     basePoints: 1
-    description: A tiny salt-tolerant garden gives a concrete hobby and an excuse to trade cuttings with gardeners.
-      With an hour of care and local materials, the character may preserve one ordinary plant cutting during
-      travel, subject to the GM's assessment of weather and storage. It cannot feed a crew, create medicinal
-      effects, or replace Coastal Foraging. Plant condition, gifts, and contacts are manually adjudicated; no
-      supply or social bonus is automatic.
+    description: |-
+      A tin of salt-tolerant cuttings travels everywhere in Sable's coat, and every refuge garden on the coast has one of her seedlings.
+
+      - **In play:** with an hour of care, keep one ordinary cutting alive through travel, and trade cuttings with any gardener met along the way.
+      - **Limits:** it cannot feed a crew or replace Coastal Foraging.
     key: traits_15
     sourceKey: lantern_lives
     status: complete
@@ -490,11 +503,11 @@ library:
   - name: Beacon Courier's Seal
     kind: perk
     basePoints: 1
-    description: A current courier seal allows delivery of a sealed message to the Greyhaven beacon office during
-      its open watch, and a place in the next public dispatch. Checking the seal takes a few minutes; it offers
-      no priority over a declared emergency, immunity to searches, or access to restricted records. Staff may
-      refuse a broken or misused seal. The GM adjudicates the privilege and revocation; no reaction or skill
-      bonus is automatic.
+    description: |-
+      The blue courier seal grants a place in the beacon office's next dispatch and a dry bed at any keeper station along the route.
+
+      - **In play:** present the seal to deliver a sealed message during the office's open watch; checking it takes a few minutes.
+      - **Limits:** no priority over a declared emergency, no immunity to search and no access to restricted records. Misuse revokes it.
     key: traits_16
     sourceKey: lantern_lives
     status: complete
@@ -520,11 +533,11 @@ library:
   - name: Missing-Keeper Obligation
     kind: disadvantage
     basePoints: -5
-    description: The character promised the keeper's household a real update whenever returning to Greyhaven.
-      Spend an evening following a credible lead or arranging help before departing on unrelated business; repeating
-      a rumor does not discharge the duty. Rescue remains subject to practical safety, and the household may
-      release the promise after an honest resolution. The GM adjudicates leads, deadlines, and broken trust manually;
-      this is an obligation, not an always-on penalty.
+    description: |-
+      Kestrel promised Fen's sister a true account every time the road passes through Greyhaven, and an honest search until he is found.
+
+      - **In play:** before leaving Greyhaven on unrelated business, spend an evening following a credible lead or arranging help.
+      - **Released:** the household may release the promise after an honest resolution, whatever it turns out to be.
     key: traits_17
     sourceKey: lantern_lives
     status: complete
@@ -550,10 +563,11 @@ library:
   - name: Always Checks the Knot
     kind: quirk
     basePoints: -1
-    description: Before trusting a rope to carry a person, spend a few seconds checking its principal knot, even
-      if another expert tied it. In a hurry this can cost a moment or prompt a request for reassurance. The check
-      provides no automatic Ropework success and does not detect hidden damage. The player and GM adjudicate
-      timing; the habit never increases defense or climbing skill.
+    description: |-
+      Kestrel's first courier bag went overboard because of a knot someone else tied. It has not happened since.
+
+      - **In play:** before a rope carries a person, spend a few seconds checking its main knot, even if an expert tied it.
+      - **Effect:** a habit, not an inspection; it cannot find hidden rot.
     key: traits_18
     sourceKey: lantern_lives
     status: complete
@@ -579,11 +593,11 @@ library:
   - name: Archive Custodian
     kind: perk
     basePoints: 1
-    description: A recognized custodian may consult the Greyhaven public chart drawers and request one supervised
-      copying desk during office hours. A request takes about ten minutes when the office is staffed; sealed
-      holdings and rival archives still require permission. Missing, false, or damaged records remain possible.
-      The GM adjudicates access and loss of standing manually; this privilege does not provide a research bonus
-      or perfect information.
+    description: |-
+      Greyhaven's archive custodians hold keys to the public chart drawers and a standing claim on the copying desk by the north window.
+
+      - **In play:** request supervised access to the public drawers and a copying desk during office hours (about ten minutes when the office is staffed).
+      - **Limits:** sealed holdings and rival archives still require permission.
     key: traits_19
     sourceKey: lantern_lives
     status: complete
@@ -609,11 +623,11 @@ library:
   - name: Must Credit the Discoverer
     kind: disadvantage
     basePoints: -5
-    description: When publishing a chart, selling a research result, or reporting a discovery to patrons, name
-      the person whose observation made it possible. Spend time checking attribution before a formal presentation,
-      even when anonymity would be politically convenient. The obligation does not force exposure of an endangered
-      informant; seek their consent or withhold the publication. The GM adjudicates disputes, opportunities lost
-      through delay, and restitution for false credit. No automatic social modifier applies.
+    description: |-
+      Mira's mentor published her first discovery under his own name. She has never let that happen to anyone else.
+
+      - **In play:** when publishing a chart, selling research or reporting to patrons, name whoever made the observation possible, and spend the time to confirm it.
+      - **Exception:** never expose an endangered informant; ask their consent or withhold publication.
     key: traits_20
     sourceKey: lantern_lives
     status: complete
@@ -639,10 +653,11 @@ library:
   - name: Keeps Every Rubbing
     kind: quirk
     basePoints: -1
-    description: Ask to retain a rubbing, sketch, or copied line from each significant inscription. Making the
-      record ordinarily takes ten minutes and uses paper or wax; when copying is unsafe, return later or voice
-      regret. These notes are evidence, not a universal memory bonus or automatic translation. The GM adjudicates
-      baggage, consent to copy, and any consequences of carrying restricted text.
+    description: |-
+      Every significant inscription leaves a rubbing in Mira's satchel, including the failed copies, each one dated and labelled.
+
+      - **In play:** ask to keep a rubbing or copied line from each important inscription, which usually takes ten minutes and some wax or paper.
+      - **When copying is unsafe:** come back later, or say plainly what you regret leaving behind.
     key: traits_21
     sourceKey: lantern_lives
     status: complete
@@ -668,11 +683,11 @@ library:
   - name: Dockwright's Union Token
     kind: perk
     basePoints: 1
-    description: A current union token permits use of the public repair bench and a request to borrow one ordinary
-      hand tool while the union workshop is staffed. Sign for the tool and return it by the end of the watch;
-      scarce materials and paid labor are excluded. Abuse can suspend access until restitution is made. The GM
-      adjudicates loans and local recognition manually; the token grants neither a craft bonus nor free equipment
-      ownership.
+    description: |-
+      A brass token stamped with the Dockwrights' hammer opens the union repair bench and its tool wall.
+
+      - **In play:** borrow one ordinary hand tool while the workshop is staffed; sign for it and return it by the end of the watch.
+      - **Limits:** scarce materials and paid labor are not included; abusing the loan suspends access.
     key: traits_22
     sourceKey: lantern_lives
     status: complete
@@ -698,11 +713,12 @@ library:
   - name: Unsafe-Bridge Compulsion
     kind: disadvantage
     basePoints: -5
-    description: After noticing a credible defect in a public crossing, warn users and spend at least a short
-      scene marking the hazard or finding someone responsible. Simply walking away to save time violates the
-      compulsion, but emergency evacuation is a valid response when repair is impossible. The trait does not
-      reveal defects without a successful inspection. The GM adjudicates urgency, restraint, and consequences
-      manually; no unconditional Will or skill penalty is applied.
+    description: |-
+      Bram helped build the Stonebridge crossing that failed in the rain. He will not walk past another bad crossing.
+
+      - **In play:** after spotting a credible defect in a public crossing, warn its users and spend at least a short scene marking the hazard or finding whoever is responsible.
+      - **Emergency:** if repair is impossible, evacuating people is a valid answer.
+      - **Limits:** the compulsion does not reveal defects without a successful inspection.
     key: traits_23
     sourceKey: lantern_lives
     status: complete
@@ -728,11 +744,11 @@ library:
   - name: Tidepilot's Charter
     kind: perk
     basePoints: 1
-    description: The harbor office recognizes the character as eligible to take paid pilotage assignments on
-      its marked local channels. A current chart and a briefing are still required, and the charter does not
-      license unfamiliar waters or guarantee a client. Presenting it takes a few minutes; an unsafe voyage can
-      suspend the privilege. The GM adjudicates commissions and licensing manually, with no automatic navigation
-      or social bonus.
+    description: |-
+      A charter from the Greyhaven harbor office: permission to take paid pilotage on the marked local channels.
+
+      - **In play:** take paid piloting work on the marked channels; presenting the charter takes a few minutes.
+      - **Limits:** it does not license unfamiliar waters or guarantee clients, and an unsafe voyage suspends it.
     key: traits_24
     sourceKey: lantern_lives
     status: complete
@@ -758,11 +774,11 @@ library:
   - name: Crew Before Cargo
     kind: disadvantage
     basePoints: -5
-    description: When a voyage forces a choice between a person's safety and keeping cargo intact, choose the
-      person and explain that policy before loading a new client's goods. Seek salvage only after evacuation
-      is secure; the duty does not demand a hopeless rescue. The GM adjudicates genuine conflicts, compensation
-      demands, and trust earned or lost. The app does not automatically jettison inventory, transfer money, or
-      add a general reaction modifier.
+    description: |-
+      Iona has thrown a season's profit overboard to keep a boat afloat with all its passengers. She tells every new client that before loading their goods.
+
+      - **In play:** when safety and cargo conflict, choose the person. Salvage only after the evacuation is secure.
+      - **Limits:** no hopeless rescues; clients may still demand compensation for lost goods.
     key: traits_25
     sourceKey: lantern_lives
     status: complete
@@ -788,11 +804,11 @@ library:
   - name: Refuge-House Key
     kind: perk
     basePoints: 1
-    description: A trusted volunteer holds the key to Greyhaven's public refuge kitchen and can request a sheltered
-      place for one person until the next watch. The caretaker may refuse access during quarantine, lack of space,
-      or abuse, and private stores remain restricted. Arranging admission takes a short conversation rather than
-      bypassing consent. The GM tracks capacity and privileges manually; the key grants neither free healing
-      nor a universal hospitality bonus.
+    description: |-
+      The refuge-house key opens the public kitchen and the treatment corner where Sable keeps her clean linens.
+
+      - **In play:** request a sheltered place for one person until the next watch, after a short conversation with the caretaker.
+      - **Limits:** the caretaker may refuse during quarantine, overcrowding or abuse; private stores stay locked.
     key: traits_26
     sourceKey: lantern_lives
     status: complete
@@ -818,11 +834,11 @@ library:
   - name: Patient Before Purse
     kind: disadvantage
     basePoints: -5
-    description: If a person presents an urgent, treatable wound, offer immediate assessment before bargaining
-      over payment. Commit a reasonable treatment scene or arrange a competent replacement before returning to
-      paid errands; there is no requirement to promise a cure or enter a hopeless hazard. The GM adjudicates
-      triage, consent, and forgone opportunities manually. The trait has no automatic healing output, economic
-      deduction, or numerical bedside bonus.
+    description: |-
+      Sable treats the person at the door first and asks who will pay afterwards, if she remembers to ask at all.
+
+      - **In play:** offer immediate assessment of an urgent, treatable wound before any bargaining, then provide treatment or arrange a competent replacement.
+      - **Limits:** no requirement to promise a cure or walk into a hopeless hazard.
     key: traits_27
     sourceKey: lantern_lives
     status: complete
@@ -848,11 +864,11 @@ library:
   - name: Bellkeeper's Credentials
     kind: perk
     basePoints: 1
-    description: The beacon office permits the character to inspect the public bell schedule and request one
-      supervised test interval on an idle signal bell. Coordination normally takes ten minutes and may be refused
-      during an emergency or active watch. Private codes and control of the entire harbor network are excluded.
-      The GM adjudicates scheduling and credentials manually; no signal bonus or authority to issue false warnings
-      is implied.
+    description: |-
+      Bellkeeper's credentials let Orin climb any public bell tower, read its maintenance book and ring a supervised test interval.
+
+      - **In play:** inspect the public bell schedule and request one supervised test on an idle bell; coordinating takes about ten minutes.
+      - **Limits:** no access to private codes, and no authority over the harbor network or to issue warnings.
     key: traits_28
     sourceKey: lantern_lives
     status: complete
@@ -878,11 +894,11 @@ library:
   - name: Stolen-Signal Suspicion
     kind: disadvantage
     basePoints: -5
-    description: A rival bellhouse believes the character copied its dispatch pattern. When dealing with that
-      bellhouse or its named allies, expect inspection of commissions and a demand for an explanation before
-      gaining routine cooperation. Allow a scene for resolving the challenge; strangers outside that network
-      are unaffected. The GM keeps the accusers and triggers explicit and resolves reputation, evidence, and
-      reconciliation manually, without a blanket reaction penalty.
+    description: |-
+      The Saltmarsh Bellhouse believes Orin copied its private dispatch pattern. He did not, but he knows who taught it to him.
+
+      - **In play:** when dealing with that bellhouse or its allies, expect your commissions to be inspected and an explanation to be demanded before routine cooperation.
+      - **Scope:** strangers outside that network are unaffected.
     key: traits_29
     sourceKey: lantern_lives
     status: complete
@@ -908,10 +924,11 @@ library:
   - name: Rehearses in Whispers
     kind: quirk
     basePoints: -1
-    description: Before a formal signal performance, quietly rehearse its opening phrase for several seconds.
-      This habit can irritate a hurried partner or give a nearby listener advance warning, but supplies no automatic
-      success or bonus. The character may suppress it for an emergency while remaining visibly uncomfortable.
-      The player and GM adjudicate audible range and delay rather than applying an unconditional stealth penalty.
+    description: |-
+      Orin rehearses every formal call under his breath before he sounds it, even with a storm coming in.
+
+      - **In play:** a few seconds of whispered rehearsal before a formal signal. It can be suppressed in an emergency, with visible discomfort.
+      - **Side effect:** a close listener may hear the call before it is sounded.
     key: traits_30
     sourceKey: lantern_lives
     status: complete
@@ -942,11 +959,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Use a short coastal sword in close combat and practice safe passing drills on a narrow quay.
-      One attack uses the normal combat turn; an examination of a guard's stance takes a minute. The weapon row
-      supplies damage, reach, and parry, so this skill adds no separate damage or defense bonus. Fighting amid
-      tangled mooring lines uses the declared task penalty; the GM resolves footing, target defenses, and a dropped
-      weapon.
+    description: |-
+      The quayblade is a short, broad coastal sword built for fighting where there is no room to swing: narrow quays, ship rails and crowded stairs.
+
+      - **Use:** melee attacks and parries with any quayblade-class weapon; damage, reach and parry come from the weapon row.
+      - **Time:** one attack per turn; studying an opponent's guard takes about a minute.
+      - **Penalty:** -2 when tangled mooring lines restrict the weapon.
     key: skills_1
     sourceKey: lantern_training
     status: complete
@@ -995,11 +1013,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -4
-    description: Control the coast's small bucklers, redirect an incoming blow, and carry a shield through a
-      crowded gangway. Blocking uses the sheet defense calculated from this skill and the actual shield, not
-      a second flat defense bonus. An attack with the buckler takes the normal combat turn and uses its listed
-      mode. In cramped rigging, apply the selected handling penalty; the GM adjudicates loss of footing and which
-      attacks can be blocked.
+    description: |-
+      Breakwater guards carry a small iron-rimmed buckler that blocks spray as readily as steel, and punches nearly as hard.
+
+      - **Use:** block with a buckler or shield, or strike with its rim using the item's own attack mode.
+      - **Time:** one action per turn.
+      - **Penalty:** -2 when rigging or a crowded rail obstructs the shield arm.
     key: skills_2
     sourceKey: lantern_training
     status: complete
@@ -1048,11 +1067,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Shoot the flexible reedglass bow and maintain a safe firing lane across an open quay. Releasing
-      one shot uses a combat turn; reloading, Aim, range, ammunition, and damage come from the actual weapon
-      mode. Crosswind and a swaying platform can spoil a clean lane; the declared crosswind modifier applies
-      only when the GM confirms that circumstance. A hit does not ignore cover or defenses, and the app's combat
-      flow remains the place to resolve injury.
+    description: |-
+      Reedbows are short, layered bows of steamed marsh reed and horn. They are cheap to build, quick to string and treacherous in a crosswind.
+
+      - **Use:** ranged attacks with reedbows; accuracy, range and damage come from the bow's shot modes.
+      - **Time:** one shot per turn after readying an arrow.
+      - **Penalty:** -2 when a strong crosswind cuts across the firing lane.
     key: skills_3
     sourceKey: lantern_training
     status: complete
@@ -1101,11 +1121,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Wield a hook-axe or heavy salvage haft in combat, or make a controlled strike against a marked
-      piece of wreckage. Each strike uses a combat turn; prolonged clearing is a separate salvage task. Damage,
-      strength requirements, and an unbalanced parry come from the weapon mode and are not improved by this description.
-      Unstable wreckage gives the stated task penalty. The GM determines whether the target can be cut and whether
-      the blow releases a dangerous load.
+    description: |-
+      Salvage hafts began as wreckers' tools: a hook, a spike and a heavy head on a stout pole. Dock fighters still prefer them to anything forged for war.
+
+      - **Use:** melee attacks and parries with axes, hooks and similar hafted weapons, in each of the weapon's modes.
+      - **Time:** one attack per turn.
+      - **Penalty:** -2 when wreckage shifts underfoot.
     key: skills_4
     sourceKey: lantern_training
     status: complete
@@ -1140,7 +1161,7 @@ library:
           unit: seconds
         outcomes:
         - kind: note
-          text: Resolve the chosen haft mode; the GM adjudicates any released structural load.
+          text: Resolve the chosen haft mode. A hooked beam or rail may come loose with it.
           'on': success
         - kind: note
           text: The strike fails; do not assume the footing or suspended load remains safe.
@@ -1154,11 +1175,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Handle a beacon keeper's long rod for a tap, sweeping strike, or controlled sparring demonstration.
-      A strike uses a combat turn and the rod's listed reach, damage, and defense. The skill neither channels
-      spells through an ordinary rod nor improves every staff-shaped object. Low overhead beams impede the chosen
-      action with the stated task penalty. The GM adjudicates leverage, obstructions, and any noncombat attempt
-      to move a heavy object.
+    description: |-
+      A beacon rod is a keeper's iron pole, long enough to reach a high lantern and heavy enough to settle an argument.
+
+      - **Use:** attacks and parries with the rod's thrust and swing modes.
+      - **Time:** one action per turn.
+      - **Penalty:** -2 under low beams that restrict the sweep.
     key: skills_5
     sourceKey: lantern_training
     status: complete
@@ -1204,11 +1226,12 @@ library:
     attribute: DX
     difficulty: E
     defaults: []
-    description: Use the fictional quayworkers' grappling-and-striking drill at close reach. An attempt takes
-      a combat turn; damage and defense must come from the applicable unarmed combat mode or an explicit GM ruling.
-      Training has no declared default and does not grant a free attack, universal damage bonus, or immunity
-      to a weapon. A crowded workbench is a task obstacle. The GM resolves holds and escapes that the current
-      weapon modes do not represent.
+    description: |-
+      Dockside scrapping is what crews learn between shifts: grabs, shoves and short holds that end a quarrel before anyone draws steel.
+
+      - **Use:** unarmed grapples, holds and shoves; the skill has no default, so it must be learned.
+      - **Time:** one attempt per turn.
+      - **Penalty:** -2 when a crowded workbench or cargo stack obstructs movement.
     key: skills_6
     sourceKey: lantern_training
     status: complete
@@ -1257,12 +1280,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Move quietly between nearby cover on a shingle beach, tidal stair, or cluttered quay. A short
-      crossing normally takes a minute; a lookout contest uses the existing Slip past the lookout action against
-      Horizon Watch. Loose shingle applies the declared -2 task modifier, and choosing speed does not erase that
-      penalty. Success gives a chance to reach cover, not invisibility or passage through a locked gate. The
-      GM adjudicates observers, available cover, travel distance, and any alarm manually; the practiced-scout
-      milestone adds no numerical bonus.
+    description: |-
+      Shingle ghosting is the coast scout's craft of crossing loose stone and wet sand without a sound, keeping to the shadow of the cliff.
+
+      - **Use:** move unseen and unheard past a lookout, or set up a hidden vantage point.
+      - **Penalty:** -2 on loose shingle underfoot.
+      - **Benefit:** at relative level +2 or better, the scout is recognized as a practiced coastal scout by the keeper stations.
     procedures:
       modifiers:
       - id: noisy_ground
@@ -1310,30 +1333,22 @@ library:
       kind: required_catalog
       options:
       - name: Cliff Gardens
-        description: Survey one accessible cliff garden for familiar edible plants and usable rain traps during
-          an hour of careful searching. Reaching a ledge requires a separate climbing task; this specialization
-          does not make unstable ground safe. Use the shared Coastal Foraging task procedure, including its
-          -2 penalty when the player and GM confirm contamination in the gathering patch. Success offers a
-          plausible local find, not conjured rations or proof that every plant or water source is harmless.
-          The GM adjudicates seasonal growth, runoff, spoilage and collection limits, then records supplies,
-          travel time and any consequences manually; the action does not alter inventory or physical state.
+        description: Ledge gardens of samphire, sea kale and wild thyme, plus the rain cisterns the old keepers
+          carved into the rock. Reaching an exposed ledge needs Cliff Traverse first.
       - name: Tide Flats
-        description: Search one accessible tidal patch for familiar shellfish and a feasible gathering route
-          during an hour of careful work. Learn local tidal access separately from cliff gathering; success
-          does not certify a permanent safe channel or identify every hidden toxin. Use the shared Coastal
-          Foraging task procedure, including its -2 penalty when the player and GM confirm contamination in
-          the gathering patch. The GM decides the tide window, mud hazards, available quantity and spoilage,
-          and whether an unfamiliar specimen needs another expert. Record gathered supplies, consumed time
-          and exposure manually; the action does not create inventory or automatically change physical state.
+        description: Cockle beds, mussel ropes and the safe paths across the mud between tides. The flats are
+          generous and quick to drown the careless.
     defaults:
     - kind: attribute
       attribute: Per
       modifier: -5
-    description: 'Survey one accessible patch for food or water during an hour of careful searching. Learn Cliff
-      Gardens and Tide Flats separately: cliff practice covers edible plants and rain traps, while flats practice
-      covers shellfish and safe gathering channels. A contaminated patch imposes the declared task penalty. The
-      GM decides quantity, spoilage, tidal access, and whether unfamiliar material is safe; a success does not
-      conjure rations or diagnose every toxin. Record any supplies and travel time manually.'
+    description: |-
+      The coast feeds those who know where to look: samphire on the cliff ledges, cockles in the flats, rainwater in the old stone cisterns.
+
+      - **Specialization required:** Cliff Gardens or Tide Flats.
+      - **Time:** one hour of careful gathering in the learned habitat.
+      - **Penalty:** -2 when the gathering patch shows contamination.
+      - **Result:** success finds enough for a modest meal or a useful sample; quantity depends on the season and the patch.
     key: skills_8
     sourceKey: lantern_training
     status: complete
@@ -1382,11 +1397,12 @@ library:
     - kind: attribute
       attribute: Per
       modifier: -5
-    description: Inspect a visible horizon or beacon approach for vessels, changing intervals, and suspicious
-      silhouettes. A focused sweep takes one minute; continuing a watch requires repeated attention as conditions
-      change. Dense mist gives the declared -2 task penalty. Success supplies a plausible sighting, not a name
-      at impossible distance or knowledge behind a wall. The GM adjudicates range, illumination, hidden observers,
-      and uncertainty before a report is treated as fact.
+    description: |-
+      Lookouts sweep the horizon in a fixed rhythm: left to right, sky to sea, then the shore. They read shapes, sails and lights long before anyone else.
+
+      - **Use:** spot ships, signals, weather fronts and movement on the water or shore.
+      - **Time:** one minute for a full sweep.
+      - **Penalty:** -2 when dense mist obscures the horizon.
     key: skills_9
     sourceKey: lantern_training
     status: complete
@@ -1435,11 +1451,12 @@ library:
     - kind: attribute
       attribute: HT
       modifier: -4
-    description: Keep orientation and make a short controlled passage through coastal water or while riding a
-      small float. A difficult segment takes about a minute; longer travel needs repeated decisions, fatigue,
-      and an actual safe route. Opposing current gives the selected penalty, and the skill does not provide underwater
-      breathing or unlimited endurance. The GM adjudicates distance, carried load, exposure, and rescue opportunities;
-      record fatigue and displacement manually.
+    description: |-
+      Coast children learn to ride a current before they learn to fight one: angle across it, rest in the eddies and never swim straight against the pull.
+
+      - **Use:** cross rips, channel currents and surf without being swept away.
+      - **Time:** one minute for a short crossing.
+      - **Penalty:** -2 when a strong current opposes the route.
     key: skills_10
     sourceKey: lantern_training
     status: complete
@@ -1488,11 +1505,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -5
-    description: Climb a marked coastal pitch or cross a narrow rock shelf with suitable holds. A short pitch
-      takes ten minutes of cautious movement; rope setup is a separate task. Wet, crumbling holds give the stated
-      penalty, and no roll creates an absent handhold or supports an impossible load. The GM sets attainable
-      distance, consequences of a fall, and the value of anchors before the attempt. Equipment use, movement,
-      and injury are recorded manually.
+    description: |-
+      Cliff traverse is sideways climbing along sea cliffs between the tide line and the heather, the only way to reach many caves and nesting ledges.
+
+      - **Use:** climb and traverse rock faces, sea walls and rigging.
+      - **Time:** about ten minutes per marked pitch.
+      - **Penalty:** -2 when holds are wet or crumbling.
     key: skills_11
     sourceKey: lantern_training
     status: complete
@@ -1550,11 +1568,13 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -7
-    description: Compare a fictional beacon's pulse against a known tideglass pattern during ten minutes of undisturbed
-      study. Instruction requires IQ 12 and Magery (Tideglass attunement), as the structured prerequisite declares.
-      A cracked or incomplete lens adds the task penalty. Success distinguishes a plausible active pattern from
-      noise; it does not cast a spell, open a sealed ward, or grant energy. The GM adjudicates magical interference,
-      missing reference patterns, dangerous exposure, and the meaning of the result.
+    description: |-
+      Every beacon on the Lantern Coast hums with a pattern laid into its tideglass lens. A resonant can hear that pattern, judge whether it is healthy, and sometimes recognize who laid it.
+
+      - **Use:** examine a beacon pulse, diagnose a ward or compare one tideglass working against another.
+      - **Time:** ten minutes of undisturbed examination.
+      - **Penalty:** -2 when the beacon lens is cracked.
+      - **Synergy:** each level of Tideglass attunement adds +1.
     key: skills_12
     sourceKey: lantern_training
     status: complete
@@ -1605,11 +1625,14 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -4
-    description: 'At the learned TL, spend one minute assessing and dressing a fictional coastal wound with suitable
-      clean supplies. The existing Dress a wound action is a treatment preview: success does not automatically
-      restore HP or remove a condition. Without a suitable clean kit, apply the selected equipment penalty. The
-      GM adjudicates consent, treatable injury, infection risk, recovery, and consumed supplies under the campaign''s
-      treatment rules; record the result manually.'
+    description: |-
+      Saltwater wounds fester quickly. Coastal healers clean with boiled brine, pack with honeyed lint and bind tight against the damp.
+
+      - **Tech level required:** learned at a specific TL.
+      - **Use:** dress wounds, stop bleeding and manage infection.
+      - **Time:** one minute per wound.
+      - **Penalty:** -2 without a suitable clean treatment kit.
+      - **Result:** apply the campaign's first-aid recovery after a success.
     procedures:
       actions:
       - id: dress_wound
@@ -1652,11 +1675,12 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Locate and compare a harbor record, chart entry, or dispatch in an accessible archive. One focused
-      search takes an hour; knowing the catalog does not guarantee that a missing document exists. Unsorted or
-      damaged records impose the declared penalty. A success identifies a relevant source and its uncertainty,
-      not automatic translation or proof that it is truthful. The GM adjudicates access, language, forgery, copying
-      time, and the concrete clue recovered.
+    description: |-
+      Harbor archives are damp, crowded and gloriously disorganized. Archive divers know which shelf floods first and which clerk files everything under the ship's second name.
+
+      - **Use:** find records, charts, manifests and correspondence in an archive.
+      - **Time:** one hour per search.
+      - **Penalty:** -2 when records are unsorted or water-damaged.
     key: skills_14
     sourceKey: lantern_training
     status: complete
@@ -1706,11 +1730,12 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -6
-    description: Bring willing harbor disputants into a focused discussion of one concrete issue. A first exchange
-      takes ten minutes; entrenched disputes may take more scenes. An active feud gives the declared task penalty.
-      Use a quick contest against the opposing Harbor Mediation when a participant actively counters the proposal,
-      with the GM resolving the opponent. Success wins consideration, not consent, mind control, or a universal
-      reaction bonus; agreements and concessions are manual story outcomes.
+    description: |-
+      Harbor mediators settle berth quarrels, salvage disputes and wage strikes. The best leave both sides convinced they won something.
+
+      - **Use:** propose and broker compromises between parties who are willing to talk.
+      - **Time:** about ten minutes per proposal.
+      - **Penalty:** -2 when the parties have an active feud.
     key: skills_15
     sourceKey: lantern_training
     status: complete
@@ -1762,11 +1787,12 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Assess a small quay trade and make one good-faith offer over roughly ten minutes. The stated
-      unfamiliar-market penalty applies when the seller's customs or goods are new. A quick contest against the
-      other trader's Quayside Barter determines which side argues its position better; it is not a fixed percentage
-      discount. The GM sets the goods' condition, available price range, and any accepted offer. Money, inventory,
-      debts, and failed negotiations are recorded manually.
+    description: |-
+      On the quays everything has two prices: the one shouted and the one paid. Quayside barter is the art of finding the second without insulting anyone.
+
+      - **Use:** buy, sell and trade in harbor markets.
+      - **Time:** about ten minutes per trade.
+      - **Penalty:** -2 in markets whose customs are unfamiliar.
     key: skills_16
     sourceKey: lantern_training
     status: complete
@@ -1804,7 +1830,7 @@ library:
           text: The GM offers a plausible concession within the available trade, if the other party agrees.
           'on': success
         - kind: note
-          text: No favorable agreement is reached; the GM adjudicates a refusal or loss of the offer.
+          text: No favorable agreement is reached; the seller may refuse or withdraw the offer.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -1822,11 +1848,13 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: At the learned TL and chosen specialty, fit a salvaged component to armor or jetty hardware.
-      Spend an hour assessing and adjusting one feasible component; Body Armor and Jetty Hardware are distinct
-      training specialties. Improvised tools give the stated penalty, and the skill cannot upgrade an item's
-      technology or create material from nothing. The GM adjudicates part compatibility, consumables, final strength,
-      and failed work. Record item changes manually; the procedure grants no automatic DR or item-price change.
+    description: |-
+      Salvage fitters make broken things work again from whatever the tide brought in: armor from a drowned mercenary's kit, hinges from a wrecked gate.
+
+      - **Specialization and TL required:** for example Body Armor or Jetty Hardware.
+      - **Use:** fit, adapt and repair salvaged components in the chosen specialty.
+      - **Time:** one hour per component.
+      - **Penalty:** -2 with only improvised tools.
     key: skills_17
     sourceKey: lantern_training
     status: complete
@@ -1875,11 +1903,13 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -6
-    description: Plot a route between moving shoals using a current chart, soundings, and an observed tide. Planning
-      one leg takes ten minutes and does not replace handling the actual boat. An obsolete chart gives the stated
-      task penalty. Success identifies a feasible route and a departure window, not guaranteed passage through
-      a storm. The GM adjudicates changing water, ship draft, travel time, and any encounter; navigation and
-      cargo consequences are manual.
+    description: |-
+      Tidepilots plot a safe line through the shoals: when to leave, which channel to take and where the water will be at each turn of the tide.
+
+      - **Use:** plan passages through shoals, sandbars and tidal channels.
+      - **Time:** ten minutes per leg.
+      - **Penalty:** -2 when the available chart is obsolete.
+      - **Note:** plotting the route is separate from handling the boat (see Smallcraft Sailing).
     key: skills_18
     sourceKey: lantern_training
     status: complete
@@ -1917,8 +1947,7 @@ library:
           text: The GM provides one plausible route and tide window, subject to actual handling and weather.
           'on': success
         - kind: note
-          text: The route is unreliable; the GM identifies uncertainty or adjudicates grounding risk if it is
-            followed.
+          text: The route is unreliable; following it risks grounding on an unmarked bar.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -1929,11 +1958,12 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: Compose or interpret a short bell, pennant, or lantern message in a code shared by the crew.
-      Drafting takes one minute; transmission still requires equipment and a visible or audible path. An unfamiliar
-      codebook gives the stated penalty. Success conveys the agreed message, not translation of an unknown language,
-      a hidden command, or proof of the sender's identity. The GM adjudicates interception, reception, and any
-      ambiguity manually.
+    description: |-
+      Signal weavers compose messages in bells, lanterns and flags, and read the ones other weavers send.
+
+      - **Use:** draft, send and decode harbor signals in a known code.
+      - **Time:** about a minute per message.
+      - **Penalty:** -2 with an unfamiliar codebook format.
     key: skills_19
     sourceKey: lantern_training
     status: complete
@@ -1981,11 +2011,13 @@ library:
     techLevelPolicy:
       kind: required
     defaults: []
-    description: At the learned TL, prepare a fictional salt-herb infusion from identified samples and a distiller
-      roll. A small batch takes two hours; no default is declared because untrained processing is unsafe in the
-      fiction. Suspect samples give the declared penalty. The GM determines whether the batch is stable and any
-      agreed fictional effect; the skill does not automatically heal, poison, or supply spell energy. Record
-      ingredients, yield, and consequences manually.
+    description: |-
+      Marsh distillers render salt herbs into tinctures, washes and bitter tonics in copper coils packed into a roll of oilcloth.
+
+      - **Tech level required;** the skill has no default.
+      - **Use:** prepare infusions and identify marsh ingredients.
+      - **Time:** two hours per batch.
+      - **Penalty:** -2 when a sample's identity is uncertain.
     key: skills_20
     sourceKey: lantern_training
     status: complete
@@ -2020,8 +2052,7 @@ library:
           unit: hours
         outcomes:
         - kind: note
-          text: The GM records a stable fictional batch and any specifically agreed use; no automatic healing
-            occurs.
+          text: The batch is stable and labelled; agree with the GM what it can be used for.
           'on': success
         - kind: note
           text: The batch is unusable or suspect; the GM decides disposal, wasted ingredients, and exposure.
@@ -2037,11 +2068,13 @@ library:
     - kind: attribute
       attribute: IQ
       modifier: -5
-    description: At the learned TL, inspect and rig a tide-powered winch for one known load. A setup takes ten
-      minutes before lifting; the plan requires an actual anchor, sound rope, and room for the load. A corroded
-      drum gives the stated penalty. Success establishes a plausible setup, not an automatic strength increase
-      or the ability to exceed the equipment's safe capacity. The GM sets capacity and adjudicates lift timing,
-      rope consumption, and failure consequences manually.
+    description: |-
+      Harbor winches lift everything from cargo nets to drowned boats. A winchwright knows the drums, pawls and ratchets by sound.
+
+      - **Tech level required.**
+      - **Use:** rig, operate and repair harbor lifts and cranes.
+      - **Time:** about ten minutes to rig a lift.
+      - **Penalty:** -2 when the winch drum is corroded.
     key: skills_21
     sourceKey: lantern_training
     status: complete
@@ -2090,11 +2123,12 @@ library:
     - kind: attribute
       attribute: HT
       modifier: -5
-    description: Project a rehearsed call over a quay so a listening crew can recognize a simple agreed phrase.
-      A call takes ten seconds; an extended performance can require fatigue and pauses. Severe wind gives the
-      task penalty. Success helps willing listeners distinguish the phrase, not command real gulls, compel obedience,
-      or replace a shared language. The GM adjudicates distance, background noise, and whether hostile listeners
-      also hear it.
+    description: |-
+      Gullcalling is the coast's oldest performance: a voice pitched to carry over wind and water, used for crew calls, shanties and storm warnings.
+
+      - **Use:** project calls, songs and warnings across a harbor.
+      - **Time:** about ten seconds for a call.
+      - **Penalty:** -2 when severe wind disrupts the call.
     key: skills_22
     sourceKey: lantern_training
     status: complete
@@ -2143,11 +2177,12 @@ library:
     - kind: attribute
       attribute: DX
       modifier: -6
-    description: Throw a weighted rescue line to a reachable person or anchor without entangling them. A prepared
-      cast uses one combat turn; preparing and retrieving the actual tether uses its weapon mode's reload time.
-      Crosswind gives the task penalty, while distance and other attack circumstances come from the ranged mode.
-      Success places the line, not a secure attachment or a guaranteed haul. The GM adjudicates grip, rope capacity,
-      rescue timing, and entanglement, and records those outcomes manually.
+    description: |-
+      A rescue tether is a weighted line thrown to a swimmer, a falling climber or a fleeing thief. It is a lifeline first and a weapon second.
+
+      - **Use:** cast a weighted line to reach, snag or lash a target; range and damage come from the tether's modes.
+      - **Time:** one cast per turn.
+      - **Penalty:** -2 when a crosswind moves the line.
     key: skills_23
     sourceKey: lantern_training
     status: complete
@@ -2202,11 +2237,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Tie, inspect, and release the knots used for coastal work. A load-bearing line setup takes five
-      minutes and must have sound rope and a feasible anchor. Frayed rope gives the stated penalty; success does
-      not increase rope capacity or replace a climbing roll. The GM resolves attachment, load limits, consumed
-      rope, and a slipped knot manually. At relative level +2, sustained knot practice also grants the declared
-      +1 Net Mending benefit.
+    description: |-
+      Every sailor knows a dozen knots. A ropeworker knows which one will hold a person, which will release under load, and which will jam forever.
+
+      - **Use:** tie load-bearing knots, rig lines and lifts.
+      - **Time:** about five minutes to prepare a load-bearing line.
+      - **Penalty:** -2 when the rope is frayed.
+      - **Benefit:** at relative level +2, sustained practice grants +1 Net Mending.
     procedures:
       modifiers:
       - id: ropework_obstacle
@@ -2271,10 +2308,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Turn observed bearings and soundings into a small coastal chart. One harbor approach takes two
-      hours after gathering observations, not including the survey itself. Incomplete bearings give the task
-      penalty. The map records what was measured and dated; it cannot guarantee future tides or unfamiliar depths.
-      The GM judges scale, accuracy, missing areas, copying materials, and any error when the chart is used.
+    description: |-
+      A shoal chart is never finished. Cartographers survey bearings, mark soundings and redraw the sandbars after every storm.
+
+      - **Use:** draft and correct charts of shoals, channels and approaches.
+      - **Time:** two hours per approach chart.
+      - **Penalty:** -2 when survey bearings are incomplete.
     procedures:
       modifiers:
       - id: shoal_cartography_obstacle
@@ -2328,11 +2367,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Trim sail, plan a tack, and coordinate a small coastal boat through a short maneuver. Allow
-      one minute for the declared tack, with a suitable crew and vessel. A torn sail gives the task penalty.
-      Navigation, endurance, and harbor law are separate disciplines; success does not make a boat seaworthy
-      or cancel wind and current. The GM resolves attainable movement, crew coordination, damaged rigging, and
-      grounding manually.
+    description: |-
+      Smallcraft sailors handle skiffs, ferries and fishing boats: sheet, tiller and crew, all at once.
+
+      - **Use:** sail and maneuver small boats.
+      - **Time:** about a minute to coordinate a tack.
+      - **Penalty:** -2 with a torn sail.
     procedures:
       modifiers:
       - id: smallcraft_sailing_obstacle
@@ -2386,11 +2426,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Make introductions, identify the right harbor official, and respect the local order of a quay
-      meeting. A first approach takes five minutes. Unfamiliar local custom gives the selected penalty, and a
-      credential is still needed for restricted business. Success opens an appropriate conversation rather than
-      changing everyone's reaction. The GM adjudicates who will speak, obligations accepted, and an accidental
-      slight manually.
+    description: |-
+      Every quay has its own etiquette: whom to greet first, where not to stand, which foreman never shakes hands.
+
+      - **Use:** make introductions and avoid giving offense among dock crews and harbor officials.
+      - **Time:** about five minutes per introduction.
+      - **Penalty:** -2 when local quay customs are unfamiliar.
     procedures:
       modifiers:
       - id: dockside_etiquette_obstacle
@@ -2444,11 +2485,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: 'Compare cloud, wind, pressure signs, and recent local reports for the next coastal watch. An
-      assessment takes ten minutes at an exposed observation point. Rapidly conflicting signs impose the task
-      penalty. Forecasts remain local and uncertain: this skill does not control weather or predict a distant
-      storm precisely. The GM supplies a plausible trend, the window of confidence, and consequences of relying
-      on a mistaken forecast.'
+    description: |-
+      Weather readers watch the clouds, the swell, the gulls and their own aching knees, then decide whether the next watch sails or waits.
+
+      - **Use:** forecast the next few hours of weather and sea state.
+      - **Time:** ten minutes of observation.
+      - **Penalty:** -2 when the signs conflict and change rapidly.
     procedures:
       modifiers:
       - id: weather_reading_obstacle
@@ -2480,7 +2522,7 @@ library:
           text: The GM gives a local trend with an explicit time window and uncertainty.
           'on': success
         - kind: note
-          text: The signs remain unclear or suggest the wrong trend; the GM adjudicates the forecast manually.
+          text: The signs remain unclear, or point the wrong way. Trust the forecast at your peril.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -2502,11 +2544,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Follow physical traces across wet reed beds, mud banks, and raised marsh paths. Searching a
-      short stretch takes ten minutes; it requires an actual surviving trail. A rising tide gives the task penalty
-      and may erase a trail completely. Success suggests direction and recency, not the quarry's thoughts or
-      a route over impossible ground. The GM adjudicates tracks, search distance, broken trails, and the risk
-      of following a false sign.
+    description: |-
+      Marsh trackers follow prints in mud that fills as they watch, and crushed reeds that spring back within the hour.
+
+      - **Use:** follow people and animals through marsh, mudflat and reed bed.
+      - **Time:** ten minutes per stretch of trail.
+      - **Penalty:** -2 when the rising tide is erasing tracks.
     procedures:
       modifiers:
       - id: marsh_tracking_obstacle
@@ -2560,11 +2603,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Inspect an accessible wreck section for obvious hazards, useful material, and a possible working
-      entrance. A small section takes ten minutes before anyone moves heavy pieces. Poor sight of load-bearing
-      members imposes the task penalty. Success is a cautious assessment, not proof that a sealed hold is safe
-      or free ownership of salvage. The GM adjudicates hidden defects, survey extent, tide timing, and how the
-      information changes a plan.
+    description: |-
+      Wreck surveyors decide whether a hulk can be boarded, salvaged or should be left alone: which beams still bear weight and which deck will give way.
+
+      - **Use:** assess wrecks, collapsed buildings and damaged structures.
+      - **Time:** ten minutes per section.
+      - **Penalty:** -2 when load-bearing members are obscured.
     procedures:
       modifiers:
       - id: wreck_survey_obstacle
@@ -2618,10 +2662,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: At the learned TL, assess and repair the stonework of a small quay face or crossing. A minor
-      feasible repair takes four hours with suitable stone, mortar, and help; larger work needs a plan and repeated
-      tasks. A flooded work face imposes the task penalty. Success does not erect an entire bridge or change
-      armor DR. The GM resolves materials, curing time, load limits, and a failure or unsafe shortcut manually.
+    description: |-
+      Jetty masons set stone where the sea fights back: lime mortar that cures underwater, interlocking blocks and drain channels for the storm surge.
+
+      - **Tech level required.**
+      - **Use:** build and repair quays, sea walls and stone crossings.
+      - **Time:** about four hours for a minor repair.
+      - **Penalty:** -2 when the work face is flooded.
     procedures:
       modifiers:
       - id: jetty_masonry_obstacle
@@ -2653,7 +2700,7 @@ library:
           text: The GM records a feasible repair with its materials, curing time, and safe limit.
           'on': success
         - kind: note
-          text: The repair needs rework or inspection; the GM adjudicates wasted material and unsafe loading.
+          text: The repair needs rework before it can bear a load; some material is wasted.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -2677,10 +2724,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: At the learned TL, fit a temporary patch to one accessible hull leak. A small patch takes an
-      hour, given suitable boards, sealant, and time to work safely. Working while water actively enters imposes
-      the task penalty. Success is a limited repair with an agreed operating limit, not a new hull or immunity
-      to pressure. The GM records materials, leak rate, voyage restrictions, and a patch failure manually.
+    description: |-
+      A good patch keeps the water out long enough to reach harbor. A great one is still there next season.
+
+      - **Tech level required.**
+      - **Use:** patch and caulk hull leaks on boats and barges.
+      - **Time:** about an hour per accessible leak.
+      - **Penalty:** -2 when water is entering while the patch is fitted.
     procedures:
       modifiers:
       - id: hull_patching_obstacle
@@ -2736,10 +2786,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Restore the pattern of an ordinary fishing net or netted cargo sling. One small tear takes thirty
-      minutes with enough cord and a suitable needle. Tangled wet mesh imposes the stated penalty. The repair
-      does not increase the original net's capacity or catch fish automatically. The GM judges whether the net
-      can be repaired and records cord consumed, time spent, and flaws in the result.
+    description: |-
+      Net mending is quiet work for long evenings, and every fishing family on the coast teaches it early.
+
+      - **Use:** repair nets, mesh, sailcloth and woven lines.
+      - **Time:** about thirty minutes per small tear.
+      - **Penalty:** -2 when the mesh is wet and tangled.
     procedures:
       modifiers:
       - id: net_mending_obstacle
@@ -2785,11 +2837,14 @@ library:
     attribute: IQ
     difficulty: H
     defaults: []
-    description: At the learned TL, align and repair the mundane mounts of a fictional tideglass beacon lens.
-      Learn basic fitting first as the structured prerequisite requires. One alignment takes an hour with measuring
-      tools; a chipped lens gives the task penalty. The task does not restore a destroyed enchanted lens or cast
-      a light spell. The GM records alignment, spare parts, optical limits, and any risk of concentrating an
-      unsafe beam.
+    description: |-
+      Beacon lenses are ground tideglass set in brass mounts. A misaligned mount scatters the beam, and sometimes the ward with it.
+
+      - **Prerequisite:** at least 1 point in Salvage Fitting (any specialty).
+      - **Tech level required;** the skill has no default.
+      - **Use:** align, mount and repair beacon lenses.
+      - **Time:** about an hour per mount.
+      - **Penalty:** -2 when the lens edge is chipped.
     procedures:
       modifiers:
       - id: beacon_lenscraft_obstacle
@@ -2844,11 +2899,13 @@ library:
     attribute: IQ
     difficulty: H
     defaults: []
-    description: Copy or repair a fictional tideglass pattern already understood through Beacon Resonance. One
-      small inscription takes two hours and a stable working surface; unknown patterns cannot be invented by
-      this task. An incomplete reference gives the penalty. Success yields a readable prepared pattern, not a
-      spell, energized ward, or free magical effect. The GM decides compatible materials, the inscription's meaning,
-      and any danger from an error; those consequences are manual.
+    description: |-
+      Tideglass inscribers etch protective patterns into glass and stone. A keeper can only copy a pattern they already understand through resonance.
+
+      - **Prerequisite:** at least 1 point in Beacon Resonance; the skill has no default.
+      - **Use:** copy, restore and repair known tideglass patterns.
+      - **Time:** about two hours per pattern.
+      - **Penalty:** -2 when the reference pattern is incomplete.
     procedures:
       modifiers:
       - id: tideglass_inscription_obstacle
@@ -2909,10 +2966,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Measure a shallow channel with marked line, pole, or another suitable mundane tool. One small
-      cross-section takes ten minutes from a stable boat or bank. A turbulent surface gives the task penalty.
-      The result describes measured depth at that tide, not unseen obstacles everywhere or permanent safe passage.
-      The GM adjudicates attainable accuracy, vessel access, shifting bottom, and manual chart updates.
+    description: |-
+      Leadsmen call the depth from the bow while the pilot listens. Channel sounding turns those calls into a safe line through the water.
+
+      - **Use:** measure depths and map a channel section.
+      - **Time:** ten minutes per section.
+      - **Penalty:** -2 when turbulence obscures the sounding.
     procedures:
       modifiers:
       - id: channel_sounding_obstacle
@@ -2966,11 +3025,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Assign clear roles, routes, and signals for one feasible coastal rescue. A briefing takes five
-      minutes when the team can hear each other; an immediate emergency may leave too little time for it. Conflicting
-      instructions impose the task penalty. Success clarifies the plan without granting automatic success to
-      swimmers, climbers, or healers. The GM resolves consent, timing, available helpers, and the costs of a
-      confused plan.
+    description: |-
+      When a ferry capsizes, the first five minutes decide everything: who swims, who rows and who throws the line.
+
+      - **Use:** brief and direct rescue teams, evacuations and search parties.
+      - **Time:** about five minutes per briefing.
+      - **Penalty:** -2 when the team receives conflicting instructions.
     procedures:
       modifiers:
       - id: rescue_coordination_obstacle
@@ -3025,11 +3085,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: At the learned TL, compare several fictional patients' visible needs and decide whom the crew
-      can assess first. Basic Saltwound Care training is required. A small group takes five minutes; incomplete
-      histories impose the task penalty. The result is an order of assessment, not a diagnosis of hidden illness
-      or automatic healing. The GM adjudicates severity, consent, available helpers, and an overlooked danger
-      manually; treatment uses its separate skill.
+    description: |-
+      After a storm the refuge fills faster than any healer can work. Triage decides who is treated first.
+
+      - **Prerequisite:** at least 1 point in Saltwound Care. **Tech level required.**
+      - **Use:** assess and prioritize a small group of patients.
+      - **Time:** about five minutes per group.
+      - **Penalty:** -2 when patient histories are incomplete.
     procedures:
       modifiers:
       - id: patient_triage_obstacle
@@ -3092,11 +3154,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: At the learned TL, organize fictional harbor isolation, supply routes, and clear instructions
-      for a small refuge. A workable plan takes an hour with a caretaker and enough space. Conflicting official
-      instructions give the task penalty. Success is an agreed operational plan, not immunity to illness, a cure,
-      or authority to imprison unwilling people. The GM decides local law, consent, supplies, breaches, and the
-      duration of precautions manually.
+    description: |-
+      Fevers travel by boat. Quarantine stewards keep a refuge working (clean water, clean linen, safe visiting) without closing the harbor.
+
+      - **Tech level required.**
+      - **Use:** plan and run isolation, supply routes and precautions.
+      - **Time:** about an hour per plan.
+      - **Penalty:** -2 when officials issue conflicting precautions.
     procedures:
       modifiers:
       - id: quarantine_stewardship_obstacle
@@ -3152,10 +3216,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Prepare a simple meal from identified, edible coastal ingredients with working heat and utensils.
-      A crew pot takes an hour; unknown shellfish or marsh plants require their own identification. Spoiled stores
-      give the task penalty and may make cooking impossible. Success yields an ordinary meal, not extra FP recovery,
-      toxin removal, or limitless rations. The GM records portions, supplies, time, and any waste manually.
+    description: |-
+      Crew pots are stews of whatever the tide and market provide: fish, samphire, barley and a heel of yesterday's bread.
+
+      - **Use:** cook nourishing meals for a crew from local ingredients.
+      - **Time:** about an hour per pot.
+      - **Penalty:** -2 when stored ingredients have spoiled.
     procedures:
       modifiers:
       - id: coastal_cooking_obstacle
@@ -3209,10 +3275,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Inspect a small lot for condition, ordinary market value, and signs of concealed damage. A first
-      appraisal takes ten minutes with permission to examine the goods. Sealed or inaccessible packaging gives
-      the task penalty. Success offers a plausible range rather than the final selling price, magical identification,
-      or legal ownership. The GM adjudicates hidden defects, local scarcity, trust, and any later trade manually.
+    description: |-
+      Cargo appraisers know what a crate is worth, whether it matches its manifest and who would pay most to have it.
+
+      - **Use:** value and inspect cargo, salvage and trade goods.
+      - **Time:** about ten minutes per small lot.
+      - **Penalty:** -2 when packaging prevents a full inspection.
     procedures:
       modifiers:
       - id: cargo_appraisal_obstacle
@@ -3266,11 +3334,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Recognize local patterns of concealed landings and consider a discreet route around a staffed
-      quay. Planning takes thirty minutes and needs current local information. Recently changed patrols give
-      the penalty. Success provides a plausible lead, not automatic stealth, an available criminal contact, or
-      certainty that a route is legal. The GM adjudicates patrols, permission, travel, rivals, and consequences
-      of discovery manually.
+    description: |-
+      The coast is laced with landings that appear on no public chart. Some are used for smuggling; some once saved lives during a blockade.
+
+      - **Use:** find, assess and avoid concealed landing routes and their watchers.
+      - **Time:** about thirty minutes per route.
+      - **Penalty:** -2 when patrol schedules have changed recently.
     procedures:
       modifiers:
       - id: smuggler_routes_obstacle
@@ -3302,7 +3371,7 @@ library:
           text: The GM identifies a plausible local route or a useful gap in the available information.
           'on': success
         - kind: note
-          text: The route is stale or risky; the GM adjudicates patrol encounters if it is attempted.
+          text: The route is stale or watched; using it risks meeting a patrol.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -3324,11 +3393,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Find and interpret an ordinary Greyhaven rule about salvage, passage, labor, or cargo. Researching
-      a concrete dispute takes an hour with access to a current register. Conflicting jurisdictions give the
-      task penalty. Success identifies the likely rule and procedure, not automatic acquittal or authority over
-      officials. The GM adjudicates evidence, interpretation, representation, and the ruling; another harbor
-      may require separate local advice.
+    description: |-
+      Three harbor authorities, two guild charters and a centuries-old treaty all claim the same mudflat. Harbor lawyers make a living from that confusion.
+
+      - **Use:** research and argue berthing rights, salvage claims and manifests.
+      - **Time:** about an hour per dispute.
+      - **Penalty:** -2 when more than one harbor claims jurisdiction.
     procedures:
       modifiers:
       - id: harbor_law_obstacle
@@ -3382,11 +3452,12 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Collect and retell a coastal account while distinguishing named witnesses from remembered rumor.
-      A short retelling takes ten minutes; gathering reliable testimony is separate. Contradictory witnesses
-      give the selected penalty. Success makes the account clear and its sources traceable, not proof that every
-      event happened or a universal persuasion bonus. The GM adjudicates memory gaps, consent, audience response,
-      and any claim that needs independent confirmation.
+    description: |-
+      Storykeepers remember who told which story first and how it has changed since. Their versions are the ones the coast trusts.
+
+      - **Use:** recall, retell and attribute local stories, songs and witness accounts.
+      - **Time:** about ten minutes per account.
+      - **Penalty:** -2 when witness accounts contradict each other.
     procedures:
       modifiers:
       - id: storykeeping_obstacle
@@ -3418,8 +3489,7 @@ library:
           text: The GM confirms a clear account with witness claims separated from rumor.
           'on': success
         - kind: note
-          text: The account confuses sources or omits a key point; the GM adjudicates correction and audience
-            response.
+          text: The account confuses its sources or drops a key point; listeners may correct you.
           'on': failure
         sourceText: The action previews a task roll; the GM resolves its outcome and records resources or physical
           changes manually.
@@ -3441,11 +3511,12 @@ library:
       specialization:
         kind: any
       modifier: -3
-    description: Identify ordinary tidepool creatures, their local habitats, and common signs of a disturbed
-      shore. An accessible pool takes ten minutes of careful observation. An unfamiliar seasonal species gives
-      the penalty. Success suggests a plausible identification, not animal control, safe eating, or the effect
-      of a magical specimen. The GM resolves uncertainty, ecological clues, and whether further samples or another
-      expert are needed.
+    description: |-
+      A tidepool is a small world that changes with every tide. Reading one tells you how healthy the shore is.
+
+      - **Use:** identify shore life and judge the health of a tidepool or garden.
+      - **Time:** about ten minutes per pool.
+      - **Penalty:** -2 when a seasonal species is unfamiliar.
     procedures:
       modifiers:
       - id: tidepool_lore_obstacle
@@ -3500,11 +3571,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Organize a rehearsed crew response to a squall, including securing gear and identifying shelter.
-      A briefing and short rehearsal take ten minutes with the actual team. An unfamiliar crew gives the penalty.
-      Success establishes understood roles, not a bonus to every defense or immunity to storm damage. At relative
-      level +2, repeated training grants the declared +1 Rescue Coordination benefit. The GM resolves actual
-      performance, fatigue, lost equipment, and a missed instruction manually.
+    description: |-
+      Storm drills are practiced until they are boring, so that when the real storm comes nobody has to think.
+
+      - **Use:** rehearse and run storm responses: securing boats, evacuating quays and manning winches.
+      - **Time:** about ten minutes per rehearsal.
+      - **Penalty:** -2 when the crew has not worked together before.
+      - **Benefit:** at relative level +2, sustained drilling grants +1 Rescue Coordination.
     procedures:
       modifiers:
       - id: storm_drill_obstacle
@@ -3569,10 +3642,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: Keep a short Harbor Sign exchange visible while moving along a quay or peering from cover. One
-      short phrase takes ten seconds. Harbor Sign comprehension is required as a manually checked language condition;
-      this skill handles delivery and does not teach the language. An obstructed sightline gives the penalty.
-      The GM adjudicates who can see and understand, ambiguous gestures, and whether a lookout notices the exchange.
+    description: |-
+      Harbor Sign carries across a roaring winch room or a silent night approach. Signers phrase their messages for the moving eye, not the page.
+
+      - **Prerequisite:** the signer must know Harbor Sign.
+      - **Use:** deliver and read moving sign phrases at a distance.
+      - **Time:** about ten seconds per phrase.
+      - **Penalty:** -2 when the sightline is intermittently obstructed.
     procedures:
       modifiers:
       - id: silent_signing_obstacle
@@ -3614,8 +3690,7 @@ library:
     role: definition
     sourceLocator: skills.47
     source: LCST skills.47
-    prerequisites: The GM manually confirms Harbor Sign comprehension before a task; language fluency is not
-      automatically checked by the application.
+    prerequisites: Knows Harbor Sign at any fluency.
   - name: Bell Tuning
     attribute: IQ
     difficulty: A
@@ -3628,11 +3703,13 @@ library:
       specialization:
         kind: any
       modifier: -4
-    description: At the learned TL, compare and adjust an ordinary signal bell against a reference tone. One
-      small adjustment takes thirty minutes with a suitable tool and permission to work on the bell. Heavy background
-      noise gives the penalty. Success restores a plausible recognizable tone, not a magical resonance or greater
-      communication range. The GM records material limits, access, damage, and whether the bell needs a specialist
-      casting repair.
+    description: |-
+      Every bell on the coast has its own voice. A cracked hanger or a warped lip changes that voice, and with it the meaning of every signal.
+
+      - **Tech level required.**
+      - **Use:** compare and adjust signal bells against a reference tone.
+      - **Time:** about thirty minutes per adjustment.
+      - **Penalty:** -2 when heavy harbor noise obscures the reference.
     procedures:
       modifiers:
       - id: bell_tuning_obstacle
@@ -3683,7 +3760,11 @@ library:
     baseEnergyCost: 2
     castingTime: 2 seconds
     duration: 90 seconds
-    description: A school of thumb-sized glimmers circles a marked rope; it cannot illuminate an entire room.
+    description: |-
+      A school of thumb-sized glimmers circles a marked rope, buoy or lantern hook, lighting a working space and marking it for anyone watching from the water.
+
+      - **Effect:** bright light in a 2-yard radius around the marked object; it does not light a whole room.
+      - **Use:** often cast to mark a safe line through a dark cave or across a deck.
     maintenanceCost: 1
     key: spells_1
     sourceKey: lantern_rites
@@ -3691,45 +3772,61 @@ library:
     role: definition
     sourceLocator: spells.1
     source: LCTR spells.1
+    prerequisites: Tideglass attunement 1
   - name: Ember Thread
     college: Hearthcraft
     difficulty: H
     baseEnergyCost: 2
     castingTime: 3 seconds
     duration: 20 seconds
-    description: A warm filament dries one knot of damp tinder; the GM decides whether it catches.
+    description: |-
+      A warm red filament threads through damp tinder, wicks or a frozen lock until it dries.
+
+      - **Effect:** dries one small object, such as a knot of tinder, a wick or a powder charge, enough to burn or work normally.
+      - **Limits:** it cannot ignite anything by itself or warm a person.
     key: spells_2
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.2
     source: LCTR spells.2
+    prerequisites: Tideglass attunement 1
   - name: Borrowed Dawn
     college: Tide Vitality
     difficulty: H
     baseEnergyCost: 3
     castingTime: 4 seconds
     duration: Instant
-    description: Move a little of your rest into a consenting ally’s next breath; record any pool changes manually.
+    description: |-
+      The caster gives an ally the rest they did not get: a breath of dawn passed hand to hand.
+
+      - **Effect:** the caster pays the energy and a willing, touched subject recovers 2 FP.
+      - **Limits:** one casting per subject per hour.
     key: spells_3
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.3
     source: LCTR spells.3
+    prerequisites: Tideglass attunement 1
   - name: Stitch the Salt
     college: Tide Vitality
     difficulty: H
     baseEnergyCost: 2
     castingTime: 5 seconds
     duration: Instant
-    description: Draw salt from a shallow scrape and close it with luminous thread; the GM resolves recovery.
+    description: |-
+      Luminous thread draws salt and grit from a shallow wound and closes it cleanly.
+
+      - **Effect:** heals 1 HP of cutting, impaling or abrasion injury from the last hour, and removes any infection risk from that wound.
+      - **Limits:** once per wound; deep wounds need Mend the Undertow.
     key: spells_4
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.4
     source: LCTR spells.4
+    prerequisites: Tideglass attunement 1
   - name: Mend the Undertow
     college: Tide Vitality
     difficulty: VH
@@ -3737,7 +3834,11 @@ library:
     castingTime: 8 seconds
     prerequisites: Tideglass attunement 1; Stitch the Salt
     duration: Instant
-    description: Reconstruct a tide-battered wound from its reflection; this ritual does not restore lost limbs.
+    description: |-
+      The caster reads a wound's reflection in a bowl of seawater and draws the injured flesh back into the shape it remembers.
+
+      - **Effect:** heals 1d HP to a touched subject.
+      - **Limits:** no regrowth of lost limbs; casting time is long enough that it is rarely cast in combat.
     key: spells_5
     sourceKey: lantern_rites
     status: complete
@@ -3750,7 +3851,11 @@ library:
     baseEnergyCost: 3
     castingTime: 2 seconds
     duration: 45 seconds
-    description: A translucent ribbon marks a protected stance; the GM adjudicates protection and records bonuses.
+    description: |-
+      A translucent ribbon of tideglass light wraps the subject's guard, catching blows at the last moment.
+
+      - **Effect:** +1 to all active defenses for the duration.
+      - **Maintain:** for the listed cost each 45 seconds.
     maintenanceCost: 2
     key: spells_6
     sourceKey: lantern_rites
@@ -3758,6 +3863,7 @@ library:
     role: definition
     sourceLocator: spells.6
     source: LCTR spells.6
+    prerequisites: Tideglass attunement 1; Glimmer Shoal
   - name: Wake Compass
     college: Wayfinding
     difficulty: H
@@ -3765,13 +3871,18 @@ library:
     maintenanceCost: 1
     castingTime: 3 seconds
     duration: 4 minutes
-    description: A floating needle points to a previously touched mooring, never to an unknown destination.
+    description: |-
+      A floating needle of light points toward a mooring post, jetty or anchor stone the caster has personally touched.
+
+      - **Effect:** gives direction (not distance) to the chosen mooring, within one mile.
+      - **Limits:** it never points to a place the caster has not touched.
     key: spells_7
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.7
     source: LCTR spells.7
+    prerequisites: Tideglass attunement 1
   - name: Quiet Mooring
     college: Shelter
     difficulty: H
@@ -3779,13 +3890,18 @@ library:
     maintenanceCost: 1
     castingTime: 6 seconds
     duration: 3 minutes
-    description: Soften creaks from one tied vessel; voices and footsteps remain audible.
+    description: |-
+      Ropes stop creaking, timbers stop groaning and the hull settles quietly against the jetty.
+
+      - **Effect:** silences the structural noises of one tied vessel or small building: -4 to Hearing rolls to detect it by its creaks.
+      - **Limits:** voices, footsteps and splashes remain audible.
     key: spells_8
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.8
     source: LCTR spells.8
+    prerequisites: Tideglass attunement 1
   - name: Glasswake Message
     college: Beacon Light
     difficulty: VH
@@ -3793,13 +3909,19 @@ library:
     maintenanceCost: 2
     castingTime: 10 seconds
     duration: 2 minutes
-    description: Pass a short image between two prepared tideglass mirrors; no unattended recording.
+    description: |-
+      Two prepared tideglass mirrors share a single image for a few heartbeats: a face, a map, a signal.
+
+      - **Requires:** a Tideglass mirror at each end, both prepared by the same caster.
+      - **Effect:** sends one still image to the paired mirror at any distance on the same coast.
+      - **Limits:** the receiver must be watching the mirror; nothing is recorded.
     key: spells_9
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.9
     source: LCTR spells.9
+    prerequisites: Tideglass attunement 2; Glimmer Shoal; Wake Compass
   - name: Root the Jetty
     college: Shorecraft
     difficulty: H
@@ -3807,16 +3929,136 @@ library:
     maintenanceCost: 1
     castingTime: 4 seconds
     duration: 75 seconds
-    description: Bind loose jetty planks with spectral roots; it does not create timber.
+    description: |-
+      Spectral roots rise from the pilings and grip loose planks, stones and ropes until the spell ends.
+
+      - **Effect:** binds one 2-yard section of jetty, bridge or scaffold so that it holds as if properly fastened.
+      - **Limits:** it cannot create timber or hold more than the structure was built to bear.
     key: spells_10
     sourceKey: lantern_rites
     status: complete
     role: definition
     sourceLocator: spells.10
     source: LCTR spells.10
+    prerequisites: Tideglass attunement 1; Quiet Mooring
+  - name: Fogbank Lantern
+    college: Beacon Light
+    difficulty: H
+    baseEnergyCost: 3
+    castingTime: 2 seconds
+    prerequisites: Tideglass attunement 1; Glimmer Shoal
+    duration: 1 minute
+    description: |-
+      The keepers' answer to sea fog: a ruddy lantern-light that the mist cannot swallow.
+
+      - **Effect:** reduces vision penalties from fog and mist by up to 3 within 5 yards of the caster.
+      - **Maintain:** for the listed cost each minute.
+    maintenanceCost: 1
+    key: lc_fogbank_lantern
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.11
+    source: LCTR spells.11
+  - name: Brine Ward
+    college: Tide Vitality
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 3 seconds
+    prerequisites: Tideglass attunement 1; Stitch the Salt
+    duration: 1 day
+    description: |-
+      A thin film of salt-light seals a dressed wound against the damp and the rot.
+
+      - **Effect:** a treated wound cannot become infected for one day.
+      - **Limits:** does not heal; it protects a wound that has already been cleaned.
+    key: lc_brine_ward
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.12
+    source: LCTR spells.12
+  - name: Keeper's Lamp
+    college: Hearthcraft
+    difficulty: H
+    baseEnergyCost: 1
+    castingTime: 1 second
+    prerequisites: Tideglass attunement 1; Ember Thread
+    duration: 1 hour
+    description: |-
+      Every keeper learns this first: a lamp that burns without oil through the longest watch.
+
+      - **Effect:** a touched lamp or lantern burns at normal brightness with no fuel for one hour.
+      - **Limits:** the flame is real enough to light, but not hot enough to cook or set fires.
+    key: lc_keepers_lamp
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.13
+    source: LCTR spells.13
+  - name: Still the Swell
+    college: Shorecraft
+    difficulty: H
+    baseEnergyCost: 4
+    castingTime: 10 seconds
+    prerequisites: Tideglass attunement 1; Quiet Mooring
+    duration: 1 minute
+    description: |-
+      The caster lays both palms on the water and the chop flattens in a widening ring.
+
+      - **Effect:** calms waves within a 5-yard radius: -2 to boat-handling penalties caused by rough water there.
+      - **Maintain:** for the listed cost each minute.
+      - **Limits:** no effect on currents or tides.
+    maintenanceCost: 2
+    key: lc_still_the_swell
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.14
+    source: LCTR spells.14
+  - name: Read the Wake
+    college: Wayfinding
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 5 seconds
+    prerequisites: Tideglass attunement 1; Wake Compass
+    duration: Instant
+    description: |-
+      The caster trails a hand in the water behind a vessel and feels every keel that has passed in the last hour.
+
+      - **Effect:** learn the number, rough size and direction of boats that passed within 10 yards in the last hour.
+      - **Limits:** gives no names or cargo.
+    key: lc_read_the_wake
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.15
+    source: LCTR spells.15
+  - name: Hush the Bell
+    college: Shelter
+    difficulty: H
+    baseEnergyCost: 2
+    castingTime: 2 seconds
+    prerequisites: Tideglass attunement 1; Quiet Mooring
+    duration: 1 minute
+    description: |-
+      A whispered word muffles a bell's voice until the spell lapses.
+
+      - **Effect:** a bell up to the size of a harbor alarm makes no sound when struck.
+      - **Limits:** the caster must see the bell; the spell is useless against a bell already ringing.
+    maintenanceCost: 1
+    key: lc_hush_the_bell
+    sourceKey: lantern_rites
+    status: complete
+    role: definition
+    sourceLocator: spells.16
+    source: LCTR spells.16
   languages:
   - name: Coast Common
-    description: The party's free mother tongue.
+    description: |-
+      The everyday tongue of quays, ferries and markets from Greyhaven to the southern shoals, salted with sailing terms and borrowed words from every ship that has ever docked.
+
+      - **Spoken and written.** Every Lantern Coast native speaks it.
     key: languages_1
     sourceKey: lantern_lives
     status: complete
@@ -3824,7 +4066,11 @@ library:
     sourceLocator: languages.1
     source: LCGV languages.1
   - name: Old Beacon Script
-    description: Fragmentary language found in the lighthouse archives.
+    description: |-
+      The angular script carved on beacon lintels and tide gates three centuries ago. Nobody has spoken it as a living language in generations; scholars argue over how it sounded.
+
+      - **Mostly written.** Spoken fluency is reconstructed and rarely better than Broken.
+      - **Use:** reading inscriptions, archive copies and old keeper's logs.
     key: languages_2
     sourceKey: lantern_lives
     status: complete
@@ -3833,20 +4079,53 @@ library:
     source: LCGV languages.2
   - name: Harbor Sign
     isSignLanguage: true
-    description: Silent communication between dock crews.
+    description: |-
+      A sign language developed by dock crews to be read across a roaring winch room or a silent night approach. Phrases are broad and visible from a distance.
+
+      - **Signed only;** it has no written form.
+      - **Use:** required for Silent Signing.
     key: languages_3
     sourceKey: lantern_lives
     status: complete
     role: definition
     sourceLocator: languages.3
     source: LCGV languages.3
+  - name: Reedmarsh Cant
+    isSignLanguage: false
+    description: |-
+      The clipped trade cant of the Reedmarsh villages, half Coast Common and half older marsh words. Outsiders hear it as mumbling, which suits the marsh folk well.
+
+      - **Spoken only.**
+      - **Use:** marsh guides, distillers and boat-builders speak it among themselves.
+    key: lc_reedmarsh_cant
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: languages.4
+    source: LCGV languages.4
+  - name: Tidesong
+    isSignLanguage: false
+    description: |-
+      The wordless, rising-and-falling song selkie-blooded families use to call to one another across open water. A few fishing crews have learned enough to warn of rocks and weather.
+
+      - **Spoken only;** it carries well over water and poorly over land.
+    key: lc_tidesong
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: languages.5
+    source: LCGV languages.5
   techniques:
   - name: False Lantern Step
     defaultSkillName: Quayblade
     difficulty: H
     defaultModifier: -1
     maxLevel: 3
-    description: Practice a misleading lantern motion in a quayblade exchange; the GM resolves the contest.
+    description: |-
+      Greyhaven guards carry lanterns on night patrol. The False Lantern Step swings the light one way while the blade comes from the other.
+
+      - **Default:** Quayblade-1; can be bought up to Quayblade+2.
+      - **Use:** a deceptive attack; the defender rolls against the technique's level as a Quick Contest of skill before choosing a defense.
     key: techniques_1
     sourceKey: lantern_training
     status: complete
@@ -3858,16 +4137,103 @@ library:
     difficulty: H
     defaultModifier: -2
     maxLevel: 4
-    description: Catch a rival haft with a hooked salvage head; the GM resolves release.
+    description: |-
+      A salvage hook catches behind an opponent's haft or crossguard and wrenches it out of line.
+
+      - **Default:** Salvage Haft-2; can be bought up to Salvage Haft+2.
+      - **Use:** a disarm attempt with a hooked weapon: roll against the technique instead of the skill.
     key: techniques_2
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: techniques.2
     source: LCST techniques.2
+  - name: Breakwater Bind
+    defaultSkillName: Bulwark Handling
+    difficulty: H
+    defaultModifier: -3
+    maxLevel: 3
+    description: |-
+      The buckler's iron rim pins a weapon against the wall or rail long enough for a companion to strike.
+
+      - **Default:** Bulwark Handling-3; can be bought up to full Bulwark Handling.
+      - **Use:** after a successful block, roll against this technique to bind the attacking weapon until the attacker breaks free (Quick Contest of ST).
+    key: lc_breakwater_bind
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.3
+    source: LCST techniques.3
+  - name: Low Haft Sweep
+    defaultSkillName: Salvage Haft
+    difficulty: A
+    defaultModifier: -3
+    maxLevel: 3
+    description: |-
+      A low swing of the haft behind the knee: the quay fighter's favorite way to put someone in the water.
+
+      - **Default:** Salvage Haft-3; can be bought up to full Salvage Haft.
+      - **Use:** a sweep attack against the legs; a hit forces a DX roll to stay standing instead of dealing damage.
+    key: lc_low_haft_sweep
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.4
+    source: LCST techniques.4
+  - name: Tether Snare
+    defaultSkillName: Tether Cast
+    difficulty: H
+    defaultModifier: -2
+    maxLevel: 2
+    description: |-
+      A weighted line cast low wraps around an ankle or an oar.
+
+      - **Default:** Tether Cast-2; can be bought up to full Tether Cast.
+      - **Use:** a cast at the legs or a held object; a hit entangles the target until they spend a turn and a DX roll to free themselves.
+    key: lc_tether_snare
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.5
+    source: LCST techniques.5
+  - name: Running Shot
+    defaultSkillName: Reedbow
+    difficulty: H
+    defaultModifier: -4
+    maxLevel: 3
+    description: |-
+      Coast scouts shoot from moving boats and shifting shingle and learn to time a release between strides.
+
+      - **Default:** Reedbow-4; can be bought up to Reedbow-1.
+      - **Use:** removes part of the penalty for shooting while moving; roll against this technique instead of Reedbow.
+    key: lc_running_shot
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.6
+    source: LCST techniques.6
+  - name: Close-Quarter Rod
+    defaultSkillName: Beacon Rod
+    difficulty: A
+    defaultModifier: -2
+    maxLevel: 2
+    description: |-
+      Keepers fight on narrow lighthouse stairs. They choke up on the rod and jab with the ferrule.
+
+      - **Default:** Beacon Rod-2; can be bought up to full Beacon Rod.
+      - **Use:** offsets the penalty for using a long rod in a tight space or at close range.
+    key: lc_close_quarter_rod
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: techniques.7
+    source: LCST techniques.7
   styles:
   - name: Greyhaven Watch
-    description: Original Greyhaven harbor-watch curriculum; a suggested package, not a published style.
+    description: |-
+      The Greyhaven harbor watch trains on the breakwater itself: sword and buckler on a wet wall, a lantern in the off hand at night, and a lookout's eye between bouts.
+
+      **Teaches:** Quayblade, Bulwark Handling and Horizon Watch, with False Lantern Step and Breakwater Bind.
     skills:
     - Quayblade
     - Bulwark Handling
@@ -3875,16 +4241,68 @@ library:
     techniques:
     - name: False Lantern Step
       defaultSkillName: Quayblade
-    perks: []
+    - name: Breakwater Bind
+      defaultSkillName: Bulwark Handling
+    perks:
+    - Lantern Guard
     key: styles_1
     sourceKey: lantern_training
     status: complete
     role: definition
     sourceLocator: styles.1
     source: LCST styles.1
+  - name: Stonebridge Hafters
+    description: |-
+      The Stonebridge masons' guild has fought for its crossings since before the town had walls. Their style uses a work haft and a buckler, and wins by putting the enemy in the river.
+
+      **Teaches:** Salvage Haft, Bulwark Handling and Dockside Scrapping, with Hook the Haft, Low Haft Sweep and Breakwater Bind.
+    skills:
+    - Salvage Haft
+    - Bulwark Handling
+    - Dockside Scrapping
+    techniques:
+    - name: Hook the Haft
+      defaultSkillName: Salvage Haft
+    - name: Low Haft Sweep
+      defaultSkillName: Salvage Haft
+    - name: Breakwater Bind
+      defaultSkillName: Bulwark Handling
+    perks:
+    - Shield-Wall Training
+    - Haft Retention
+    key: lc_stonebridge_hafters
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: styles.2
+    source: LCST styles.2
+  - name: Reedwake Lifeline
+    description: |-
+      Reedwake ferry crews are rescuers first. The lifeline drills teach them to throw, snare and haul from a moving deck, and to fight only long enough to get everyone aboard.
+
+      **Teaches:** Tether Cast, Ropework, Current Riding and Smallcraft Sailing, with Tether Snare.
+    skills:
+    - Tether Cast
+    - Ropework
+    - Current Riding
+    - Smallcraft Sailing
+    techniques:
+    - name: Tether Snare
+      defaultSkillName: Tether Cast
+    perks:
+    - Deck Footing
+    key: lc_reedwake_lifeline
+    sourceKey: lantern_training
+    status: complete
+    role: definition
+    sourceLocator: styles.3
+    source: LCST styles.3
   enchantments:
   - name: Beacon Edge
-    description: 'Leave a warm beacon streak on a struck surface: +1 damage on the equipped weapon.'
+    description: |-
+      A warm streak of beacon light follows the edge through every cut.
+
+      - **On the sheet:** +1 damage with the enchanted weapon while it is equipped.
     applicability: weapon
     effects:
     - target: weapon_damage
@@ -3898,7 +4316,11 @@ library:
     sourceLocator: enchantments.1
     source: LCTR enchantments.1
   - name: Warden's Stitch
-    description: 'Tidewire seams stiffen under impact: +1 DR on the equipped armor; same-key stitches use the highest.'
+    description: |-
+      Tidewire stitched into the seams stiffens the instant something strikes it.
+
+      - **On the sheet:** +1 DR on the enchanted armor's locations while it is worn.
+      - **Stacking:** several Warden's Stitches on overlapping armor do not add; only the highest applies.
     applicability: armor
     effects:
     - target: dr
@@ -3913,7 +4335,10 @@ library:
     sourceLocator: enchantments.2
     source: LCTR enchantments.2
   - name: Gullfeather Draw
-    description: A reedglass sightline adds accuracy, not skill or damage.
+    description: |-
+      A sightline of reedglass set into the bow's grip draws the eye straight down the shaft.
+
+      - **On the sheet:** +1 Accuracy with the enchanted bow. Skill and damage are unchanged.
     applicability: weapon
     effects:
     - target: weapon_accuracy
@@ -3928,7 +4353,10 @@ library:
     sourceLocator: enchantments.3
     source: LCTR enchantments.3
   - name: Mooring Counterweight
-    description: A bound stone steadies the blocking hand.
+    description: |-
+      A small bound stone in the grip steadies the blocking hand against heavy blows.
+
+      - **On the sheet:** +1 Block with the enchanted shield while it is equipped.
     applicability: shield
     effects:
     - target: weapon_block
@@ -3942,7 +4370,10 @@ library:
     sourceLocator: enchantments.4
     source: LCTR enchantments.4
   - name: Foamfold Lining
-    description: A folding-space seam reduces this item’s carried weight by 20 percent.
+    description: |-
+      A seam of folded space in the lining makes the bag feel lighter than its contents.
+
+      - **On the sheet:** the container and everything in it count as 20% lighter for encumbrance.
     applicability: any
     effects:
     - target: weight_reduction_percent
@@ -3957,7 +4388,10 @@ library:
     sourceLocator: enchantments.5
     source: LCTR enchantments.5
   - name: Harbor Whisper
-    description: Prepared signal beads improve Signal Weaving while this item is equipped.
+    description: |-
+      Each bead is tuned to a different harbor code and hums faintly when the right phrase is formed.
+
+      - **On the sheet:** +1 Signal Weaving while the beads are equipped.
     applicability: any
     effects:
     - target: skill
@@ -3974,7 +4408,11 @@ library:
     source: LCTR enchantments.6
   activeEffects:
   - name: Beacon Ward
-    description: A campaign blessing with visible remaining rounds.
+    description: |-
+      A keeper's blessing that wraps the subject in a faint blue shimmer against cold spray and stray blows.
+
+      - **On the sheet:** +1 DR on all locations for 6 rounds.
+      - **Also:** sheltered from sea chill; the GM may waive fatigue from cold exposure.
     effects:
     - target: dr
       value: 1
@@ -3997,7 +4435,10 @@ library:
     sourceLocator: activeEffects.1
     source: LCTR activeEffects.1
   - name: Lantern Sight
-    description: A persistent sense reminder that can be activated or deactivated.
+    description: |-
+      Tideglass-sensitive eyes pick out beacon markings carved or painted anywhere within 10 yards, even in darkness.
+
+      - **Sense:** see beacon markings within 10 yards. Toggle it on while exploring and off when not needed.
     effects: []
     capabilities:
     - kind: sense
@@ -4017,7 +4458,10 @@ library:
     sourceLocator: activeEffects.2
     source: LCTR activeEffects.2
   - name: Rallying Draught
-    description: A short-lived campaign strength boost; advancing rounds does not consume the source item.
+    description: |-
+      A bitter, fortifying draught brewed for hauling crews: three heartbeats of borrowed strength.
+
+      - **On the sheet:** +2 ST for 3 rounds, including ST-based damage and lifting.
     effects:
     - target: st
       value: 2
@@ -4066,8 +4510,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A coastal sword with keyed cutting sweep, impaling point and close-combat crushing pommel
-      modes; each uses Quayblade.
+    description: |-
+      The classic Greyhaven quayblade: broad, short and weighted toward the point, with a heavy brass pommel for the close fight.
+
+      - **Modes:** quay sweep (cutting), beacon point (impaling) and close pommel (crushing), all with Quayblade.
     calculation:
       version: 1
       inputs: []
@@ -4111,7 +4557,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Breakwater buckler.'
+    description: |-
+      A round iron-rimmed buckler worn by breakwater guards. It turns spray as well as steel, and its rim makes a fine club.
+
+      - **Use:** Bulwark Handling for blocks and rim strikes.
     calculation:
       version: 1
       inputs: []
@@ -4184,14 +4633,15 @@ library:
           recoil: 1
         weaponSt: 11
         strengthKind: bow
-        notes: Synthetic bodkin profile; use divisor 2 against the chosen location. Ammunition selection
-          and consumption are manual.
+        notes: Narrow bodkin heads halve the target’s DR. Track arrows used after each fight.
     key: items_3
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: An ST 11 bow with ordinary and armor-dividing bodkin shots, purchased-ST range, aim accuracy
-      and full reload/bulk statistics.
+    description: |-
+      A short composite bow of steamed reed and horn, made for ST 11 archers. Its glass-tipped arrows whistle in flight.
+
+      - **Modes:** reed shot, and bodkin shot that halves the target's DR.
     calculation:
       version: 1
       inputs: []
@@ -4243,8 +4693,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: Fine coastal mail covering torso, groin and both arms. Flexible and concealable as an inner
-      layer; compare cutting, crushing and corrosion protection.
+    description: |-
+      Fine coastal mail of tinned wire that will not rust in the spray. It is flexible enough to wear under a coat or brigandine.
+
+      - **Covers:** torso, groin and both arms.
     calculation:
       version: 1
       inputs: []
@@ -4286,7 +4738,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Beacon rivet cap.'
+    description: |-
+      A low steel cap riveted with brass, the badge of the beacon watch.
+
+      - **Covers:** skull; wear it over a coif.
     calculation:
       version: 1
       inputs: []
@@ -4331,8 +4786,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: Rigid reed-laminate greaves protect both legs; cutting DR exceeds crushing and impaling
-      DR. Feet remain a separate boot layer.
+    description: |-
+      Laminated reed greaves, light and rigid, that turn a blade far better than a club.
+
+      - **Covers:** both legs; better against cutting than crushing or impaling.
     calculation:
       version: 1
       inputs: []
@@ -4375,7 +4832,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Cliffgrip boots.'
+    description: |-
+      Soft-soled boots with tarred grips, made for wet rock, slick decks and cliff paths.
+
+      - **Covers:** both feet.
     calculation:
       version: 1
       inputs: []
@@ -4414,7 +4874,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Trail pack.'
+    description: |-
+      A waxed canvas pack with a frame of bent ash and a weatherproof flap.
+
+      - **Holds:** up to 32 lbs of gear.
     calculation:
       version: 1
       inputs: []
@@ -4454,7 +4917,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Focus crystal.'
+    description: |-
+      A tideglass crystal that stores spell energy for later casting. It glows faintly when charged.
+
+      - **Stores:** up to 7 energy; spend it in place of FP when casting.
     calculation:
       version: 1
       inputs: []
@@ -4497,7 +4963,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Tideglass wand.'
+    description: |-
+      A slim wand of polished tideglass, charged with Glimmer Shoal.
+
+      - **Effect:** casts Glimmer Shoal at skill 16 without spending the user's energy; each casting uses one charge.
     calculation:
       version: 1
       inputs: []
@@ -4558,8 +5027,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A ferruled staff with distinct crushing tap/sweep and impaling jab modes. Compare Reach
-      1 with Reach 1,2 and thrust with swing.
+    description: |-
+      The beacon keeper's iron-shod staff, long enough to trim a high wick and heavy enough to defend the stair.
+
+      - **Modes:** tap (crushing), sweep (crushing, reach 1-2) and ferrule jab (impaling).
     calculation:
       version: 1
       inputs: []
@@ -4608,8 +5079,7 @@ library:
         parry: 0U
         stRequired: 11
         skill: Salvage Haft
-        notes: 'Synthetic hardened spike profile: armor divisor 2. It remains unbalanced; no automatic gate-breaking
-          result.'
+        notes: A hardened back spike that halves DR. The axe is unbalanced, so it cannot parry after attacking.
       - key: haft
         name: Short haft blow
         damage: thr cr
@@ -4621,8 +5091,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A hooked axe with cutting chop, armor-dividing impaling spike and close crushing haft blow.
-      Only the haft mode avoids an unbalanced parry.
+    description: |-
+      A salvage axe with a hooked beard and a back spike. It was made for prying apart wrecks and does the same to shields.
+
+      - **Modes:** chop (cutting), gate spike (impaling, halves DR) and short haft blow (crushing). Only the haft blow can parry without the axe becoming unready.
     calculation:
       version: 1
       inputs: []
@@ -4668,8 +5140,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: An outer fire-treated mantle over flexible concealable armor. Torso and neck receive DR
-      1, or DR 3 against burning; other locations remain uncovered.
+    description: |-
+      A fire-treated oilcloth mantle worn over the shoulders. It sheds burning pitch as easily as rain.
+
+      - **Covers:** torso and neck; DR 1, or DR 3 against burning attacks.
     calculation:
       version: 1
       inputs: []
@@ -4718,8 +5192,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A close-fitting quilted inner coat with treated heat-resistant batting. It leaves the neck,
-      hands and legs uncovered and offers no corrosion protection.
+    description: |-
+      A close-fitting coat of quilted wool batting, treated against heat and worn under heavier layers.
+
+      - **Covers:** torso and both arms.
     calculation:
       version: 1
       inputs: []
@@ -4783,8 +5259,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A weighted line with separate fixed-range cast and melee lash modes; the cast cannot parry,
-      while the lash has a -2 parry modifier.
+    description: |-
+      A coil of tarred line with a lead weight at the end: a rescuer's tool that doubles as a weapon.
+
+      - **Modes:** weighted cast at range, or a close-in lash. Neither is good for parrying.
     calculation:
       version: 1
       inputs: []
@@ -4817,7 +5295,10 @@ library:
     category: general
     weightLbs: 0.3
     cost: 27
-    description: Six colored glass beads used to draft harbor codes.
+    description: |-
+      Six colored glass beads on a cord, each tuned to a harbor signal code.
+
+      - **Use:** a reference for composing and checking signals in the field.
     key: items_16
     sourceKey: lantern_outfits
     status: complete
@@ -4856,7 +5337,10 @@ library:
     cost: 92
     isContainer: true
     hideawayCapacityLbs: 6
-    description: Holds the fictional marsh-distilling apparatus and sealed sample jars.
+    description: |-
+      An oilcloth roll that unfolds into a field still: copper coil, sealed jars and a spirit burner.
+
+      - **Holds:** up to 6 lbs of distilling gear and samples.
     key: items_17
     sourceKey: lantern_outfits
     status: complete
@@ -4893,7 +5377,10 @@ library:
     category: magic
     weightLbs: 0.6
     cost: 210
-    description: A prepared focus for Glasswake Message; no automatic remote communication.
+    description: |-
+      A palm-sized mirror of tideglass, prepared to pair with another for Glasswake Message.
+
+      - **Use:** one of the pair needed to send or receive a Glasswake Message.
     key: items_18
     sourceKey: lantern_outfits
     status: complete
@@ -4936,7 +5423,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: 'Original Lantern Coast item fixture: Jetty toolbelt.'
+    description: |-
+      A heavy leather belt of loops and pouches for spanners, chalk and pins.
+
+      - **Holds:** up to 10 lbs of tools.
     calculation:
       version: 1
       inputs: []
@@ -4982,8 +5472,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A rigid front plate for the torso and groin with corrosion-resistant facing. It contributes
-      nothing to back or side attacks; the inner coat remains available there.
+    description: |-
+      A rigid leather apron faced with tarred plates. Built for winch work, it also stops a dock knife.
+
+      - **Covers:** torso and groin from the front only; resists corrosive spray.
     calculation:
       version: 1
       inputs: []
@@ -5030,8 +5522,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A rigid all-facing outer brigandine. Wear it over Tidewire coat to compare two named layers
-      and type-specific totals.
+    description: |-
+      A brigandine of small steel plates riveted inside a blue canvas coat, the uniform of the Shoalwatch.
+
+      - **Covers:** torso and groin from every direction; often worn over mail.
     sourceLocator: items.21
     source: LCQO items.21
     calculation:
@@ -5081,8 +5575,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A front-only outer breastplate. Back and side attacks bypass this plate; a matching backplate
-      is an independent layer.
+    description: |-
+      A polished steel breastplate stamped with the beacon crest.
+
+      - **Covers:** torso and groin from the front only; pair it with a backplate.
     sourceLocator: items.22
     source: LCQO items.22
     calculation:
@@ -5130,8 +5626,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A back-only rigid plate. Front and back plates never overlap one another for a known facing;
-      the flexible inner layer protects all facings.
+    description: |-
+      A plain steel backplate buckled to a matching breastplate or worn alone over mail.
+
+      - **Covers:** torso and groin from the back only.
     sourceLocator: items.23
     source: LCQO items.23
     calculation:
@@ -5180,8 +5678,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: Flexible concealable mail under a cap. Skull layering is DX-exempt; neck layering is not.
-      The face and eyes remain uncovered.
+    description: |-
+      A hood of fine tinned mail that protects the head and throat under a cap.
+
+      - **Covers:** skull and neck; face and eyes remain exposed.
     sourceLocator: items.24
     source: LCQO items.24
     calculation:
@@ -5229,8 +5729,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: A front-only face and eye guard, separate from the skull cap. Compare an armored eye with
-      the same exposed location from the side.
+    description: |-
+      A hinged steel visor with narrow eye slits that clips to the rim of a cap.
+
+      - **Covers:** face and eyes from the front only.
     sourceLocator: items.25
     source: LCQO items.25
     calculation:
@@ -5276,8 +5778,10 @@ library:
     sourceKey: lantern_outfits
     status: complete
     role: definition
-    description: Rigid treated work gloves protect each hand separately. Incoming damage demonstrates the
-      lower extremity crippling threshold.
+    description: |-
+      Stiff treated-leather work gloves, made to handle hot rope and sharp salvage.
+
+      - **Covers:** both hands.
     sourceLocator: items.26
     source: LCQO items.26
     calculation:
@@ -5310,31 +5814,31 @@ library:
   - name: Greyhaven Lives and Vows
     key: lantern_lives
     abbreviation: LCGV
-    edition: Synthetic playtest 1
+    edition: First edition
     priority: 0
-    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
-      are fixture identifiers, not real page citations.
+    notes: 'The people of the Lantern Coast: their vows, debts, privileges and peculiar habits, with racial templates
+      for the Shoalborn and the selkie-blooded. Written for this campaign; not a published GURPS book.'
   - name: The Shoalwatch Training Almanac
     key: lantern_training
     abbreviation: LCST
-    edition: Synthetic playtest 1
+    edition: First edition
     priority: 1
-    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
-      are fixture identifiers, not real page citations.
+    notes: Harbor-watch drills, coastal trades and fighting styles taught on the quays of Greyhaven and Stonebridge.
+      Written for this campaign; not a published GURPS book.
   - name: Tideglass Rites and Resonances
     key: lantern_rites
     abbreviation: LCTR
-    edition: Synthetic playtest 1
+    edition: First edition
     priority: 2
-    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
-      are fixture identifiers, not real page citations.
+    notes: 'Tideglass magic: the beacon colleges, enchantments and wards of the coast''s keepers. Written for
+      this campaign; not a published GURPS book.'
   - name: The Quaywright’s Outfit Ledger
     key: lantern_outfits
     abbreviation: LCQO
-    edition: Synthetic playtest 1
+    edition: First edition
     priority: 3
-    notes: Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators
-      are fixture identifiers, not real page citations.
+    notes: Arms, armor and kit from the coast's chandlers, armorers and tideglass workshops. Written for this
+      campaign; not a published GURPS book.
   modifiers:
   - name: Only beneath a beacon
     key: beneath_beacon
@@ -5343,7 +5847,11 @@ library:
     role: definition
     category: limitation
     costType: percent
-    description: Narrative boundary agreed with the GM; no automatic location detection.
+    description: |-
+      The ability works only while the user stands within sight of a lit beacon or keeper's lantern.
+
+      - **Applies to:** beacon-tagged advantages.
+      - **-30%.**
     calculation:
       version: 1
       inputs: []
@@ -5369,3 +5877,345 @@ library:
       traits: []
     sourceLocator: modifiers.1
     source: LCGV modifiers.1
+  - name: Tide-bound
+    key: lc_tide_bound
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    category: limitation
+    costType: percent
+    description: |-
+      The ability works only while the user is within 10 yards of salt water.
+
+      - **Applies to:** advantages.
+      - **-20%.**
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: modifier
+        op: constant
+        value: -20
+      outputs:
+      - key: modifier
+        node: modifier
+        unit: percentage
+        rounding: exact
+        increment: 0.01
+        min: -200
+        max: 1000000
+    applicability:
+      universal: false
+      traitKinds:
+      - advantage
+      traitTags: []
+      traits: []
+    sourceLocator: modifiers.2
+    source: LCGV modifiers.2
+  - name: Takes extra time
+    key: lc_takes_extra_time
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    category: limitation
+    costType: percent
+    description: |-
+      Using the ability takes twice as long as normal: a careful ritual rather than a reflex.
+
+      - **Applies to:** advantages.
+      - **-10%.**
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: modifier
+        op: constant
+        value: -10
+      outputs:
+      - key: modifier
+        node: modifier
+        unit: percentage
+        rounding: exact
+        increment: 0.01
+        min: -200
+        max: 1000000
+    applicability:
+      universal: false
+      traitKinds:
+      - advantage
+      traitTags: []
+      traits: []
+    sourceLocator: modifiers.3
+    source: LCGV modifiers.3
+  - name: Requires a lantern focus
+    key: lc_lantern_focus
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    category: limitation
+    costType: percent
+    description: |-
+      The ability requires a lit lantern or tideglass focus in hand. Losing it means losing the ability.
+
+      - **Applies to:** advantages.
+      - **-20%.**
+    calculation:
+      version: 1
+      inputs: []
+      tables: []
+      nodes:
+      - id: modifier
+        op: constant
+        value: -20
+      outputs:
+      - key: modifier
+        node: modifier
+        unit: percentage
+        rounding: exact
+        increment: 0.01
+        min: -200
+        max: 1000000
+    applicability:
+      universal: false
+      traitKinds:
+      - advantage
+      traitTags: []
+      traits: []
+    sourceLocator: modifiers.4
+    source: LCGV modifiers.4
+  races:
+  - name: Selkie-blooded
+    description: |-
+      Somewhere in a selkie-blooded family tree is a grey seal who came ashore and stayed a while. Their descendants are sleek-haired and dark-eyed, swim as easily as they walk, and on the right night can take the sealskin form of their ancestor.
+
+      - **On the sheet:** +1 HT and +1 Will, plus Cold-Water Hardy and Pull of the Sea.
+      - **Racial training:** Current Riding.
+      - **Alternate form:** Seal form, which keeps the race's cost.
+    kind: race
+    points: 26
+    attributeModifiers:
+      ht: 1
+      will: 1
+    traits:
+    - key: cold-water-hardy
+      name: Cold-Water Hardy
+      kind: advantage
+      points: 5
+      level: null
+      description: Ignores the fatigue and HT penalties of cold water and sea spray.
+      effects: []
+    - key: sealskin-memory
+      name: Sealskin Memory
+      kind: advantage
+      points: 10
+      level: null
+      description: Can shift into Seal form once per night, taking about a minute; returning takes the same.
+      effects: []
+    - key: pull-of-the-sea
+      name: Pull of the Sea
+      kind: disadvantage
+      points: -5
+      level: null
+      description: Must spend at least an hour in the sea every few days or become restless and short-tempered.
+      effects: []
+    skills:
+    - specialization: null
+      techLevel: null
+      key: current-riding
+      name: Current Riding
+      attribute: HT
+      difficulty: E
+      points: 1
+      description: Learned in the water before learned on land.
+    features:
+    - Hair is always slightly damp to the touch.
+    - Eyes reflect light like a seal's at night.
+    effects: []
+    variants: []
+    forms:
+    - key: seal-form
+      name: Seal form
+      description: A large grey seal, fast and graceful in water and clumsy on land. Gear does not transform;
+        it stays where it fell.
+      points: 26
+      attributeModifiers:
+        dx: -2
+        move: -3
+        ht: 1
+      traits:
+      - key: cold-water-hardy
+        name: Cold-Water Hardy
+        kind: advantage
+        points: 5
+        level: null
+        description: Ignores the fatigue and HT penalties of cold water.
+        effects: []
+      - key: seal-swimmer
+        name: Seal Swimmer
+        kind: advantage
+        points: 10
+        level: null
+        description: Water Move 6 and can hold breath for ten minutes.
+        effects: []
+      - key: no-hands
+        name: Flippers
+        kind: disadvantage
+        points: -15
+        level: null
+        description: Cannot use tools or weapons; can carry small objects in the mouth.
+        effects: []
+      skills: []
+      features:
+      - Cannot speak in seal form; can still sing Tidesong.
+      effects: []
+    compatibleRaceKeys: []
+    removesTraits: []
+    removesSkills: []
+    tags:
+    - coastal
+    - fae
+    key: lc_selkie_blooded
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: races.2
+    source: LCGV races.2
+  - name: Shoalborn
+    description: |-
+      Families who have fished, piloted and salvaged the Lantern Coast shoals for twenty generations. They are broad-handed, salt-weathered and comfortable in cold water. Most never learn to sleep well on land.
+
+      - **On the sheet:** +1 HT and +1 Per, plus Shoal Breath, Salt-Squint and the Landsick quirk.
+      - **Racial training:** Current Riding.
+    kind: race
+    points: 24
+    attributeModifiers:
+      ht: 1
+      per: 1
+    traits:
+    - key: shoal-breath
+      name: Shoal Breath
+      kind: advantage
+      points: 4
+      level: 2
+      description: Hold breath twice as long as normal, enough to free a fouled anchor or reach a trapped swimmer.
+      effects: []
+    - key: salt-squint
+      name: Salt-Squint
+      kind: advantage
+      points: 5
+      level: null
+      description: No vision penalties from glare off water, snow or white sand.
+      effects: []
+    - key: landsick
+      name: Landsick
+      kind: quirk
+      points: -1
+      level: null
+      description: Sleeps poorly more than a day's walk from the sea and says so.
+      effects: []
+    skills:
+    - specialization: null
+      techLevel: null
+      key: current-riding
+      name: Current Riding
+      attribute: HT
+      difficulty: E
+      points: 1
+      description: Every Shoalborn child learns to ride a rip before they can read.
+    features:
+    - Hands are broad and calloused; most Shoalborn can be recognized by their grip.
+    effects: []
+    variants:
+    - key: fogward
+      name: Fogward Shoalborn
+      description: The northern bell-tower families, raised in near-constant fog. They trade some of their sea-sense
+        for keen ears.
+      points: 20
+      attributeModifiers:
+        ht: 1
+      traits:
+      - key: fog-ear
+        name: Fog Ear
+        kind: advantage
+        points: 6
+        level: 3
+        description: +3 to Hearing rolls; Fogward bellkeepers can judge distance by echo.
+        effects: []
+      - key: shoal-breath
+        name: Shoal Breath
+        kind: advantage
+        points: 4
+        level: 2
+        description: Hold breath twice as long as normal.
+        effects: []
+      - key: landsick
+        name: Landsick
+        kind: quirk
+        points: -1
+        level: null
+        description: Sleeps poorly more than a day's walk from the sea and says so.
+        effects: []
+      skills:
+      - specialization: null
+        techLevel: null
+        key: current-riding
+        name: Current Riding
+        attribute: HT
+        difficulty: E
+        points: 1
+        description: Every Shoalborn child learns to ride a rip before they can read.
+      features:
+      - Fogward families wear bell charms braided into their hair.
+      effects: []
+    forms: []
+    compatibleRaceKeys: []
+    removesTraits: []
+    removesSkills: []
+    tags:
+    - coastal
+    key: lc_shoalborn
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: races.1
+    source: LCGV races.1
+  - name: Tide-touched
+    description: |-
+      Some who drown on the Lantern Coast come back. The sea leaves them a little colder, a little quieter, and able to hear the beacons sing.
+
+      - **Applies to:** any race, including Human.
+      - **On the sheet:** +1 Will and the Beacon Hum trait (+1 Beacon Resonance).
+    kind: lens
+    points: 10
+    attributeModifiers:
+      will: 1
+    traits:
+    - key: beacon-hum
+      name: Beacon Hum
+      kind: advantage
+      points: 5
+      level: null
+      description: Hears the faint song of tideglass wards; +1 Beacon Resonance.
+      effects:
+      - target: skill
+        skillName: Beacon Resonance
+        value: 1
+    skills: []
+    features:
+    - Breath fogs slightly even on warm nights.
+    effects: []
+    variants: []
+    forms: []
+    compatibleRaceKeys: []
+    removesTraits: []
+    removesSkills: []
+    tags:
+    - beacon
+    key: lc_tide_touched
+    sourceKey: lantern_lives
+    status: complete
+    role: definition
+    sourceLocator: races.3
+    source: LCGV races.3

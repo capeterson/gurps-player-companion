@@ -11,6 +11,7 @@ import { encounterOut } from '../../../shared/schemas/encounter.ts';
 import { inventoryItemCreate } from '../../../shared/schemas/inventory.ts';
 import { languageCreate } from '../../../shared/schemas/language.ts';
 import { libraryModifierOut } from '../../../shared/schemas/libraryMetadata.ts';
+import { libraryRaceOut } from '../../../shared/schemas/race.ts';
 import { skillCreate } from '../../../shared/schemas/skill.ts';
 import { spellCreate } from '../../../shared/schemas/spell.ts';
 import { techniqueCreate } from '../../../shared/schemas/technique.ts';
@@ -41,6 +42,20 @@ export type LanternRequest = (
   body?: unknown,
 ) => Promise<unknown>;
 
+/** Uploads optional campaign artwork and returns the ready asset ID, or null to skip. */
+export type LanternArtworkUpload = (
+  actor: string,
+  targetType: 'character' | 'campaign',
+  targetId: string,
+  slug: string,
+) => Promise<string | null>;
+
+export const lanternArtworkSlug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
 /** The REST script supplies six players; MCP acceptance supplies one existing owner.
  * All campaign content, including owned pricing/mechanics, comes from this recipe.
  * nextEffectId identifies JSON effect instances only; row IDs come from API creates.
@@ -51,12 +66,14 @@ export async function populateLanternCoast({
   ownerActor,
   playerFor,
   nextEffectId,
+  uploadArtwork,
 }: {
   yaml: string;
   request: LanternRequest;
   ownerActor: string;
   playerFor: (fixture: SeedCharacter, campaignPath: string) => Promise<string>;
   nextEffectId: () => Promise<string>;
+  uploadArtwork?: LanternArtworkUpload;
 }) {
   const document = parseLibraryYaml(yaml);
   const campaign = identified.parse(
@@ -71,6 +88,8 @@ export async function populateLanternCoast({
     }),
   );
   const campaignPath = `/campaigns/${campaign.id}`;
+  const cover = await uploadArtwork?.(ownerActor, 'campaign', campaign.id, 'cover');
+  if (cover) await request(ownerActor, campaignPath, 'PATCH', { coverAssetId: cover });
   await request(ownerActor, `${campaignPath}/library/import`, 'POST', { yaml, mode: 'merge' });
   const library = libraryResponse.parse(
     await request(ownerActor, `${campaignPath}/library`, 'GET'),
@@ -96,6 +115,22 @@ export async function populateLanternCoast({
     if (!found) throw new Error(`Missing Lantern fixture ${section}: ${name}`);
     return found;
   };
+  const raceChoice = (race: NonNullable<SeedCharacter['race']>) => {
+    const base = race.name ? libraryRaceOut.parse(definition('races', race.name)) : null;
+    const variant = race.variant
+      ? base?.variants.find((option) => option.name === race.variant)
+      : undefined;
+    if (race.variant && !variant) throw new Error(`Missing Lantern race variant: ${race.variant}`);
+    return {
+      selection: {
+        raceId: base?.id ?? null,
+        variantKey: variant?.key ?? null,
+        lensIds: (race.lenses ?? []).map((name) => definition('races', name).id),
+        formKey: null,
+      },
+      snapshot: null,
+    };
+  };
   const characterIds: string[] = [];
   for (const fixture of lanternCharacters) {
     const token = await playerFor(fixture, campaignPath);
@@ -107,6 +142,13 @@ export async function populateLanternCoast({
     );
     characterIds.push(character.id);
     const path = `/characters/${character.id}`;
+    const portrait = await uploadArtwork?.(
+      token,
+      'character',
+      character.id,
+      lanternArtworkSlug(fixture.character.name),
+    );
+    if (portrait) await request(token, path, 'PATCH', { portraitAssetId: portrait });
     for (const [section, link] of [
       ['traits', 'libraryTraitId'],
       ['skills', 'librarySkillId'],
@@ -176,11 +218,11 @@ export async function populateLanternCoast({
         state: entry.state,
         ...(entry.state === 'expired' ? { remainingRounds: 0 } : {}),
         sourceInventoryId,
-        notes:
-          'Seeded play-state example; advance rounds or toggle state to exercise the effect lifecycle.',
+        notes: entry.notes,
       });
     }
     await request(token, path, 'PATCH', { activeEffects: effects });
+    if (fixture.race) await request(token, path, 'PATCH', { race: raceChoice(fixture.race) });
     await request(token, `${path}/combat`, 'PATCH', fixture.combat);
     // Real multi-actor, private content for permission and history testing.
     for (const { key: _key, ...entry } of fixture.privateLogs) {

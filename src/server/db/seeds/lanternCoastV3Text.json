@@ -1,0 +1,1735 @@
+{
+  "campaign": {
+    "description": "Six companions follow a vanished beacon through Greyhaven’s tide caves. Original coastal fantasy rules inspired by the broad character-building, equipment and ritual-magic patterns of tabletop sourcebooks; no published entries or page references are reproduced."
+  },
+  "library": {
+    "traits": {
+      "traits_1": {
+        "description": "A trained breakwater guard keeps a steady weapon line and resists panic. The sheet applies +1 Parry and +1 Will at all times; these are the entire numerical benefit, with no surprise immunity, extra defense, or faster reaction. A guard may spend a minute showing the stance to a companion, but instruction does not transfer the bonus. The GM still resolves loss of footing, fear circumstances, and whether a weapon can parry."
+      },
+      "traits_2": {
+        "description": "Breathing drills and paced exertion provide one additional FP, already included in the sheet maximum. This reserve can pay ordinary exertion or magic costs; it is not free breathing underwater, immunity to smoke, or faster recovery. A quiet watch is a good opportunity to rest, but recovery time and fatigue expenditure remain the normal campaign rules. Record any extra exertion manually rather than treating this as an inexhaustible watch."
+      },
+      "traits_3": {
+        "description": "Practice distinguishing beacon intervals from reflections grants +1 Horizon Watch per purchased level, up to five levels. The bonus applies to that skill alone, including a mundane lookout task; it never raises general Perception or defeats concealment automatically. Interpreting a suspicious interval takes the time specified by Horizon Watch. A false identification still needs confirmation by signal or approach, and the GM supplies only information the observer could see."
+      },
+      "traits_4": {
+        "description": "The fictional tideglass tradition costs 7 points plus 9 per level, to a maximum of three levels. Its Magery name participates in the sheet's existing spell-level and mana gate, and each level also grants +1 Beacon Resonance. This is aptitude, not knowledge: learn spells separately, pay their stated energy, and respect their range, duration, and prerequisites. Beacon Resonance can diagnose a ward during a ten-minute examination; it cannot substitute for a spell, confer ownership of a beacon, or authorize a dangerous rite. The GM adjudicates access to instruction and phenomena the spell system cannot represent."
+      },
+      "traits_5": {
+        "description": "A mineral sheen marks a Greyhaven quarry lineage. The sheet grants innate DR 1; no extra strength, healing, immunity to crushing, or protection beyond that DR is implied. The visible sheen can identify the character to quarry families or an investigator, which is a manually adjudicated social consequence rather than a reaction modifier. Damage, armor layering, and any exposed weak point still follow ordinary combat rules."
+      },
+      "traits_6": {
+        "description": "After accepting a rescue, see the traveler to a genuinely safe harbor before taking unrelated paid work. This does not require a suicidal extraction, but a convenient delay or a richer offer is not grounds for abandonment. When routes conflict, spend a scene arranging an escort, shelter, or an agreed handover. The GM adjudicates whether safety and consent are real, and may introduce a broken promise as a damaged relationship or lost commission; the app does not enforce vows or apply a flat social penalty."
+      },
+      "traits_7": {
+        "description": "An unfamiliar beacon echo demands a pause to sketch its rhythm, normally ten minutes if recording is safe. In a chase or rising tide, the player must explain restraint or accept the delay; the GM resolves the compulsion and consequences rather than the app rolling self-control. A purchased Trusted companion intervenes limitation lets the named companion interrupt this pause with a direct warning, not erase the interest permanently. Recording an echo supplies a clue, never an automatic Beacon Resonance success or a free spell."
+      },
+      "traits_8": {
+        "description": "Permit refugees to cross without a toll and put right damage the character causes to a public crossing. The oath covers a reasonable repair or arranged restitution, not an obligation to rebuild every damaged bridge in the coast. Assess a damaged crossing before promising a schedule; work may consume hours, materials, and help. The GM adjudicates who needs passage and what restitution is sufficient, and tracks a refused obligation through people and access rather than an unconditional skill penalty."
+      },
+      "traits_9": {
+        "description": "At a safe evening halt, spend a minute lighting a small candle or explaining why no flame can be spared. The ritual honors named people lost along the coast and can start a conversation with other mourners. It offers no ward, divination, fear resistance, or numerical benefit. Forgetting it is a roleplaying lapse for the player and GM to resolve; wind, stealth, fire danger, and candle consumption are manual scene details."
+      },
+      "traits_10": {
+        "description": "Years on rolling decks and wet ladders grant +1 Current Riding and +1 Cliff Traverse, already reflected in those effective skills. The trait does not increase Dodge, Move, or every DX roll. It does not cancel a task penalty for a slick surface, an impossible handhold, a dangerous current, or excess load. Use the relevant task procedure and let the GM determine route difficulty and physical consequences."
+      },
+      "traits_11": {
+        "description": "Rehearsed bell phrases and catalog habits grant +1 Signal Weaving and +1 Archive Diving. This is practice in two disciplines, not perfect recall of everything read or automatic understanding of an unknown code. A message must still be composed and a source located in the stated task time. The GM adjudicates missing records, language barriers, forged signals, and whether an old recollection is reliable."
+      },
+      "traits_12": {
+        "description": "A practiced, patient approach grants +1 Saltwound Care and +1 Harbor Mediation. The benefit represents training that applies to those skills generally, not a guarantee that every patient or disputant trusts the character. It creates no automatic healing, sedation, loyalty, or reaction bonus. Use normal treatment and negotiation times; the GM resolves consent, supplies, infection, and the agreement that participants actually accept."
+      },
+      "traits_13": {
+        "description": "A storm-guild crew paid for the character's rescue and now holds first claim on reasonable salvage service. When a summons arrives, seek terms or a named substitute before accepting competing work; a routine duty normally occupies a watch rather than every adventure. A summons to certain death may be challenged openly, with the debt still unresolved. The GM sets schedules and social consequences, and records repayment in the story; the app neither creates a debt ledger nor subtracts money automatically."
+      },
+      "traits_14": {
+        "description": "Before setting sail, count the visible gulls for about a minute and announce a personal omen. The omen is a habit, not supernatural information, a weather roll, or a navigation modifier. If a hurried departure prevents the count, the character remains unsettled until a safe pause permits a substitute ritual. The player and GM adjudicate the interruption; the app applies no blanket anxiety penalty."
+      },
+      "traits_15": {
+        "description": "A tiny salt-tolerant garden gives a concrete hobby and an excuse to trade cuttings with gardeners. With an hour of care and local materials, the character may preserve one ordinary plant cutting during travel, subject to the GM's assessment of weather and storage. It cannot feed a crew, create medicinal effects, or replace Coastal Foraging. Plant condition, gifts, and contacts are manually adjudicated; no supply or social bonus is automatic."
+      },
+      "traits_16": {
+        "description": "A current courier seal allows delivery of a sealed message to the Greyhaven beacon office during its open watch, and a place in the next public dispatch. Checking the seal takes a few minutes; it offers no priority over a declared emergency, immunity to searches, or access to restricted records. Staff may refuse a broken or misused seal. The GM adjudicates the privilege and revocation; no reaction or skill bonus is automatic."
+      },
+      "traits_17": {
+        "description": "The character promised the keeper's household a real update whenever returning to Greyhaven. Spend an evening following a credible lead or arranging help before departing on unrelated business; repeating a rumor does not discharge the duty. Rescue remains subject to practical safety, and the household may release the promise after an honest resolution. The GM adjudicates leads, deadlines, and broken trust manually; this is an obligation, not an always-on penalty."
+      },
+      "traits_18": {
+        "description": "Before trusting a rope to carry a person, spend a few seconds checking its principal knot, even if another expert tied it. In a hurry this can cost a moment or prompt a request for reassurance. The check provides no automatic Ropework success and does not detect hidden damage. The player and GM adjudicate timing; the habit never increases defense or climbing skill."
+      },
+      "traits_19": {
+        "description": "A recognized custodian may consult the Greyhaven public chart drawers and request one supervised copying desk during office hours. A request takes about ten minutes when the office is staffed; sealed holdings and rival archives still require permission. Missing, false, or damaged records remain possible. The GM adjudicates access and loss of standing manually; this privilege does not provide a research bonus or perfect information."
+      },
+      "traits_20": {
+        "description": "When publishing a chart, selling a research result, or reporting a discovery to patrons, name the person whose observation made it possible. Spend time checking attribution before a formal presentation, even when anonymity would be politically convenient. The obligation does not force exposure of an endangered informant; seek their consent or withhold the publication. The GM adjudicates disputes, opportunities lost through delay, and restitution for false credit. No automatic social modifier applies."
+      },
+      "traits_21": {
+        "description": "Ask to retain a rubbing, sketch, or copied line from each significant inscription. Making the record ordinarily takes ten minutes and uses paper or wax; when copying is unsafe, return later or voice regret. These notes are evidence, not a universal memory bonus or automatic translation. The GM adjudicates baggage, consent to copy, and any consequences of carrying restricted text."
+      },
+      "traits_22": {
+        "description": "A current union token permits use of the public repair bench and a request to borrow one ordinary hand tool while the union workshop is staffed. Sign for the tool and return it by the end of the watch; scarce materials and paid labor are excluded. Abuse can suspend access until restitution is made. The GM adjudicates loans and local recognition manually; the token grants neither a craft bonus nor free equipment ownership."
+      },
+      "traits_23": {
+        "description": "After noticing a credible defect in a public crossing, warn users and spend at least a short scene marking the hazard or finding someone responsible. Simply walking away to save time violates the compulsion, but emergency evacuation is a valid response when repair is impossible. The trait does not reveal defects without a successful inspection. The GM adjudicates urgency, restraint, and consequences manually; no unconditional Will or skill penalty is applied."
+      },
+      "traits_24": {
+        "description": "The harbor office recognizes the character as eligible to take paid pilotage assignments on its marked local channels. A current chart and a briefing are still required, and the charter does not license unfamiliar waters or guarantee a client. Presenting it takes a few minutes; an unsafe voyage can suspend the privilege. The GM adjudicates commissions and licensing manually, with no automatic navigation or social bonus."
+      },
+      "traits_25": {
+        "description": "When a voyage forces a choice between a person's safety and keeping cargo intact, choose the person and explain that policy before loading a new client's goods. Seek salvage only after evacuation is secure; the duty does not demand a hopeless rescue. The GM adjudicates genuine conflicts, compensation demands, and trust earned or lost. The app does not automatically jettison inventory, transfer money, or add a general reaction modifier."
+      },
+      "traits_26": {
+        "description": "A trusted volunteer holds the key to Greyhaven's public refuge kitchen and can request a sheltered place for one person until the next watch. The caretaker may refuse access during quarantine, lack of space, or abuse, and private stores remain restricted. Arranging admission takes a short conversation rather than bypassing consent. The GM tracks capacity and privileges manually; the key grants neither free healing nor a universal hospitality bonus."
+      },
+      "traits_27": {
+        "description": "If a person presents an urgent, treatable wound, offer immediate assessment before bargaining over payment. Commit a reasonable treatment scene or arrange a competent replacement before returning to paid errands; there is no requirement to promise a cure or enter a hopeless hazard. The GM adjudicates triage, consent, and forgone opportunities manually. The trait has no automatic healing output, economic deduction, or numerical bedside bonus."
+      },
+      "traits_28": {
+        "description": "The beacon office permits the character to inspect the public bell schedule and request one supervised test interval on an idle signal bell. Coordination normally takes ten minutes and may be refused during an emergency or active watch. Private codes and control of the entire harbor network are excluded. The GM adjudicates scheduling and credentials manually; no signal bonus or authority to issue false warnings is implied."
+      },
+      "traits_29": {
+        "description": "A rival bellhouse believes the character copied its dispatch pattern. When dealing with that bellhouse or its named allies, expect inspection of commissions and a demand for an explanation before gaining routine cooperation. Allow a scene for resolving the challenge; strangers outside that network are unaffected. The GM keeps the accusers and triggers explicit and resolves reputation, evidence, and reconciliation manually, without a blanket reaction penalty."
+      },
+      "traits_30": {
+        "description": "Before a formal signal performance, quietly rehearse its opening phrase for several seconds. This habit can irritate a hurried partner or give a nearby listener advance warning, but supplies no automatic success or bonus. The character may suppress it for an emergency while remaining visibly uncomfortable. The player and GM adjudicate audible range and delay rather than applying an unconditional stealth penalty."
+      }
+    },
+    "skills": {
+      "skills_1": {
+        "description": "Use a short coastal sword in close combat and practice safe passing drills on a narrow quay. One attack uses the normal combat turn; an examination of a guard's stance takes a minute. The weapon row supplies damage, reach, and parry, so this skill adds no separate damage or defense bonus. Fighting amid tangled mooring lines uses the declared task penalty; the GM resolves footing, target defenses, and a dropped weapon."
+      },
+      "skills_2": {
+        "description": "Control the coast's small bucklers, redirect an incoming blow, and carry a shield through a crowded gangway. Blocking uses the sheet defense calculated from this skill and the actual shield, not a second flat defense bonus. An attack with the buckler takes the normal combat turn and uses its listed mode. In cramped rigging, apply the selected handling penalty; the GM adjudicates loss of footing and which attacks can be blocked."
+      },
+      "skills_3": {
+        "description": "Shoot the flexible reedglass bow and maintain a safe firing lane across an open quay. Releasing one shot uses a combat turn; reloading, Aim, range, ammunition, and damage come from the actual weapon mode. Crosswind and a swaying platform can spoil a clean lane; the declared crosswind modifier applies only when the GM confirms that circumstance. A hit does not ignore cover or defenses, and the app's combat flow remains the place to resolve injury."
+      },
+      "skills_4": {
+        "description": "Wield a hook-axe or heavy salvage haft in combat, or make a controlled strike against a marked piece of wreckage. Each strike uses a combat turn; prolonged clearing is a separate salvage task. Damage, strength requirements, and an unbalanced parry come from the weapon mode and are not improved by this description. Unstable wreckage gives the stated task penalty. The GM determines whether the target can be cut and whether the blow releases a dangerous load.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "salvage_haft_obstacle",
+              "label": "Wreckage shifts underfoot",
+              "when": [
+                {
+                  "input": {
+                    "domain": "environment",
+                    "key": "salvage_haft_obstacle",
+                    "label": "Wreckage shifts underfoot"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "salvage_haft_task",
+              "label": "Make a haft strike",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 1
+                },
+                "unit": "seconds"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "Resolve the chosen haft mode. A hooked beam or rail may come loose with it.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The strike fails; do not assume the footing or suspended load remains safe.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_5": {
+        "description": "Handle a beacon keeper's long rod for a tap, sweeping strike, or controlled sparring demonstration. A strike uses a combat turn and the rod's listed reach, damage, and defense. The skill neither channels spells through an ordinary rod nor improves every staff-shaped object. Low overhead beams impede the chosen action with the stated task penalty. The GM adjudicates leverage, obstructions, and any noncombat attempt to move a heavy object."
+      },
+      "skills_6": {
+        "description": "Use the fictional quayworkers' grappling-and-striking drill at close reach. An attempt takes a combat turn; damage and defense must come from the applicable unarmed combat mode or an explicit GM ruling. Training has no declared default and does not grant a free attack, universal damage bonus, or immunity to a weapon. A crowded workbench is a task obstacle. The GM resolves holds and escapes that the current weapon modes do not represent."
+      },
+      "skills_7": {
+        "description": "Move quietly between nearby cover on a shingle beach, tidal stair, or cluttered quay. A short crossing normally takes a minute; a lookout contest uses the existing Slip past the lookout action against Horizon Watch. Loose shingle applies the declared -2 task modifier, and choosing speed does not erase that penalty. Success gives a chance to reach cover, not invisibility or passage through a locked gate. The GM adjudicates observers, available cover, travel distance, and any alarm manually; the practiced-scout milestone adds no numerical bonus."
+      },
+      "skills_8": {
+        "description": "Survey one accessible patch for food or water during an hour of careful searching. Learn Cliff Gardens and Tide Flats separately: cliff practice covers edible plants and rain traps, while flats practice covers shellfish and safe gathering channels. A contaminated patch imposes the declared task penalty. The GM decides quantity, spoilage, tidal access, and whether unfamiliar material is safe; a success does not conjure rations or diagnose every toxin. Record any supplies and travel time manually.",
+        "specializationPolicy": {
+          "kind": "required_catalog",
+          "options": [
+            {
+              "name": "Cliff Gardens",
+              "description": "Ledge gardens of samphire, sea kale and wild thyme, plus the rain cisterns the old keepers carved into the rock. Reaching an exposed ledge needs Cliff Traverse first."
+            },
+            {
+              "name": "Tide Flats",
+              "description": "Cockle beds, mussel ropes and the safe paths across the mud between tides. The flats are generous and quick to drown the careless."
+            }
+          ]
+        }
+      },
+      "skills_9": {
+        "description": "Inspect a visible horizon or beacon approach for vessels, changing intervals, and suspicious silhouettes. A focused sweep takes one minute; continuing a watch requires repeated attention as conditions change. Dense mist gives the declared -2 task penalty. Success supplies a plausible sighting, not a name at impossible distance or knowledge behind a wall. The GM adjudicates range, illumination, hidden observers, and uncertainty before a report is treated as fact."
+      },
+      "skills_10": {
+        "description": "Keep orientation and make a short controlled passage through coastal water or while riding a small float. A difficult segment takes about a minute; longer travel needs repeated decisions, fatigue, and an actual safe route. Opposing current gives the selected penalty, and the skill does not provide underwater breathing or unlimited endurance. The GM adjudicates distance, carried load, exposure, and rescue opportunities; record fatigue and displacement manually."
+      },
+      "skills_11": {
+        "description": "Climb a marked coastal pitch or cross a narrow rock shelf with suitable holds. A short pitch takes ten minutes of cautious movement; rope setup is a separate task. Wet, crumbling holds give the stated penalty, and no roll creates an absent handhold or supports an impossible load. The GM sets attainable distance, consequences of a fall, and the value of anchors before the attempt. Equipment use, movement, and injury are recorded manually."
+      },
+      "skills_12": {
+        "description": "Compare a fictional beacon's pulse against a known tideglass pattern during ten minutes of undisturbed study. Instruction requires IQ 12 and Magery (Tideglass attunement), as the structured prerequisite declares. A cracked or incomplete lens adds the task penalty. Success distinguishes a plausible active pattern from noise; it does not cast a spell, open a sealed ward, or grant energy. The GM adjudicates magical interference, missing reference patterns, dangerous exposure, and the meaning of the result."
+      },
+      "skills_13": {
+        "description": "At the learned TL, spend one minute assessing and dressing a fictional coastal wound with suitable clean supplies. The existing Dress a wound action is a treatment preview: success does not automatically restore HP or remove a condition. Without a suitable clean kit, apply the selected equipment penalty. The GM adjudicates consent, treatable injury, infection risk, recovery, and consumed supplies under the campaign's treatment rules; record the result manually."
+      },
+      "skills_14": {
+        "description": "Locate and compare a harbor record, chart entry, or dispatch in an accessible archive. One focused search takes an hour; knowing the catalog does not guarantee that a missing document exists. Unsorted or damaged records impose the declared penalty. A success identifies a relevant source and its uncertainty, not automatic translation or proof that it is truthful. The GM adjudicates access, language, forgery, copying time, and the concrete clue recovered."
+      },
+      "skills_15": {
+        "description": "Bring willing harbor disputants into a focused discussion of one concrete issue. A first exchange takes ten minutes; entrenched disputes may take more scenes. An active feud gives the declared task penalty. Use a quick contest against the opposing Harbor Mediation when a participant actively counters the proposal, with the GM resolving the opponent. Success wins consideration, not consent, mind control, or a universal reaction bonus; agreements and concessions are manual story outcomes."
+      },
+      "skills_16": {
+        "description": "Assess a small quay trade and make one good-faith offer over roughly ten minutes. The stated unfamiliar-market penalty applies when the seller's customs or goods are new. A quick contest against the other trader's Quayside Barter determines which side argues its position better; it is not a fixed percentage discount. The GM sets the goods' condition, available price range, and any accepted offer. Money, inventory, debts, and failed negotiations are recorded manually.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "quayside_barter_obstacle",
+              "label": "The market customs are unfamiliar",
+              "when": [
+                {
+                  "input": {
+                    "domain": "familiarity",
+                    "key": "quayside_barter_obstacle",
+                    "label": "The market customs are unfamiliar"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "quayside_barter_task",
+              "label": "Negotiate a quay trade",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 10
+                },
+                "unit": "minutes"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM offers a plausible concession within the available trade, if the other party agrees.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "No favorable agreement is reached; the seller may refuse or withdraw the offer.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually.",
+              "contest": {
+                "kind": "quick",
+                "opponent": "Quayside Barter"
+              }
+            }
+          ]
+        }
+      },
+      "skills_17": {
+        "description": "At the learned TL and chosen specialty, fit a salvaged component to armor or jetty hardware. Spend an hour assessing and adjusting one feasible component; Body Armor and Jetty Hardware are distinct training specialties. Improvised tools give the stated penalty, and the skill cannot upgrade an item's technology or create material from nothing. The GM adjudicates part compatibility, consumables, final strength, and failed work. Record item changes manually; the procedure grants no automatic DR or item-price change."
+      },
+      "skills_18": {
+        "description": "Plot a route between moving shoals using a current chart, soundings, and an observed tide. Planning one leg takes ten minutes and does not replace handling the actual boat. An obsolete chart gives the stated task penalty. Success identifies a feasible route and a departure window, not guaranteed passage through a storm. The GM adjudicates changing water, ship draft, travel time, and any encounter; navigation and cargo consequences are manual.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "tidepilot_obstacle",
+              "label": "The available chart is obsolete",
+              "when": [
+                {
+                  "input": {
+                    "domain": "equipment",
+                    "key": "tidepilot_obstacle",
+                    "label": "The available chart is obsolete"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "tidepilot_task",
+              "label": "Plot a shoal passage",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 10
+                },
+                "unit": "minutes"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM provides one plausible route and tide window, subject to actual handling and weather.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The route is unreliable; following it risks grounding on an unmarked bar.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_19": {
+        "description": "Compose or interpret a short bell, pennant, or lantern message in a code shared by the crew. Drafting takes one minute; transmission still requires equipment and a visible or audible path. An unfamiliar codebook gives the stated penalty. Success conveys the agreed message, not translation of an unknown language, a hidden command, or proof of the sender's identity. The GM adjudicates interception, reception, and any ambiguity manually."
+      },
+      "skills_20": {
+        "description": "At the learned TL, prepare a fictional salt-herb infusion from identified samples and a distiller roll. A small batch takes two hours; no default is declared because untrained processing is unsafe in the fiction. Suspect samples give the declared penalty. The GM determines whether the batch is stable and any agreed fictional effect; the skill does not automatically heal, poison, or supply spell energy. Record ingredients, yield, and consequences manually.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "marsh_distilling_obstacle",
+              "label": "The sample identity is uncertain",
+              "when": [
+                {
+                  "input": {
+                    "domain": "equipment",
+                    "key": "marsh_distilling_obstacle",
+                    "label": "The sample identity is uncertain"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "marsh_distilling_task",
+              "label": "Prepare a marsh infusion",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 2
+                },
+                "unit": "hours"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The batch is stable and labelled; agree with the GM what it can be used for.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The batch is unusable or suspect; the GM decides disposal, wasted ingredients, and exposure.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_21": {
+        "description": "At the learned TL, inspect and rig a tide-powered winch for one known load. A setup takes ten minutes before lifting; the plan requires an actual anchor, sound rope, and room for the load. A corroded drum gives the stated penalty. Success establishes a plausible setup, not an automatic strength increase or the ability to exceed the equipment's safe capacity. The GM sets capacity and adjudicates lift timing, rope consumption, and failure consequences manually."
+      },
+      "skills_22": {
+        "description": "Project a rehearsed call over a quay so a listening crew can recognize a simple agreed phrase. A call takes ten seconds; an extended performance can require fatigue and pauses. Severe wind gives the task penalty. Success helps willing listeners distinguish the phrase, not command real gulls, compel obedience, or replace a shared language. The GM adjudicates distance, background noise, and whether hostile listeners also hear it."
+      },
+      "skills_23": {
+        "description": "Throw a weighted rescue line to a reachable person or anchor without entangling them. A prepared cast uses one combat turn; preparing and retrieving the actual tether uses its weapon mode's reload time. Crosswind gives the task penalty, while distance and other attack circumstances come from the ranged mode. Success places the line, not a secure attachment or a guaranteed haul. The GM adjudicates grip, rope capacity, rescue timing, and entanglement, and records those outcomes manually."
+      },
+      "skills_24": {
+        "description": "Tie, inspect, and release the knots used for coastal work. A load-bearing line setup takes five minutes and must have sound rope and a feasible anchor. Frayed rope gives the stated penalty; success does not increase rope capacity or replace a climbing roll. The GM resolves attachment, load limits, consumed rope, and a slipped knot manually. At relative level +2, sustained knot practice also grants the declared +1 Net Mending benefit."
+      },
+      "skills_25": {
+        "description": "Turn observed bearings and soundings into a small coastal chart. One harbor approach takes two hours after gathering observations, not including the survey itself. Incomplete bearings give the task penalty. The map records what was measured and dated; it cannot guarantee future tides or unfamiliar depths. The GM judges scale, accuracy, missing areas, copying materials, and any error when the chart is used."
+      },
+      "skills_26": {
+        "description": "Trim sail, plan a tack, and coordinate a small coastal boat through a short maneuver. Allow one minute for the declared tack, with a suitable crew and vessel. A torn sail gives the task penalty. Navigation, endurance, and harbor law are separate disciplines; success does not make a boat seaworthy or cancel wind and current. The GM resolves attainable movement, crew coordination, damaged rigging, and grounding manually."
+      },
+      "skills_27": {
+        "description": "Make introductions, identify the right harbor official, and respect the local order of a quay meeting. A first approach takes five minutes. Unfamiliar local custom gives the selected penalty, and a credential is still needed for restricted business. Success opens an appropriate conversation rather than changing everyone's reaction. The GM adjudicates who will speak, obligations accepted, and an accidental slight manually."
+      },
+      "skills_28": {
+        "description": "Compare cloud, wind, pressure signs, and recent local reports for the next coastal watch. An assessment takes ten minutes at an exposed observation point. Rapidly conflicting signs impose the task penalty. Forecasts remain local and uncertain: this skill does not control weather or predict a distant storm precisely. The GM supplies a plausible trend, the window of confidence, and consequences of relying on a mistaken forecast.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "weather_reading_obstacle",
+              "label": "Weather signs conflict rapidly",
+              "when": [
+                {
+                  "input": {
+                    "domain": "environment",
+                    "key": "weather_reading_obstacle",
+                    "label": "Weather signs conflict rapidly"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "weather_reading_task",
+              "label": "Read the next watch's weather",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 10
+                },
+                "unit": "minutes"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM gives a local trend with an explicit time window and uncertainty.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The signs remain unclear, or point the wrong way. Trust the forecast at your peril.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_29": {
+        "description": "Follow physical traces across wet reed beds, mud banks, and raised marsh paths. Searching a short stretch takes ten minutes; it requires an actual surviving trail. A rising tide gives the task penalty and may erase a trail completely. Success suggests direction and recency, not the quarry's thoughts or a route over impossible ground. The GM adjudicates tracks, search distance, broken trails, and the risk of following a false sign."
+      },
+      "skills_30": {
+        "description": "Inspect an accessible wreck section for obvious hazards, useful material, and a possible working entrance. A small section takes ten minutes before anyone moves heavy pieces. Poor sight of load-bearing members imposes the task penalty. Success is a cautious assessment, not proof that a sealed hold is safe or free ownership of salvage. The GM adjudicates hidden defects, survey extent, tide timing, and how the information changes a plan."
+      },
+      "skills_31": {
+        "description": "At the learned TL, assess and repair the stonework of a small quay face or crossing. A minor feasible repair takes four hours with suitable stone, mortar, and help; larger work needs a plan and repeated tasks. A flooded work face imposes the task penalty. Success does not erect an entire bridge or change armor DR. The GM resolves materials, curing time, load limits, and a failure or unsafe shortcut manually.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "jetty_masonry_obstacle",
+              "label": "The work face is flooded",
+              "when": [
+                {
+                  "input": {
+                    "domain": "environment",
+                    "key": "jetty_masonry_obstacle",
+                    "label": "The work face is flooded"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "jetty_masonry_task",
+              "label": "Repair a minor quay defect",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 4
+                },
+                "unit": "hours"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM records a feasible repair with its materials, curing time, and safe limit.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The repair needs rework before it can bear a load; some material is wasted.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_32": {
+        "description": "At the learned TL, fit a temporary patch to one accessible hull leak. A small patch takes an hour, given suitable boards, sealant, and time to work safely. Working while water actively enters imposes the task penalty. Success is a limited repair with an agreed operating limit, not a new hull or immunity to pressure. The GM records materials, leak rate, voyage restrictions, and a patch failure manually."
+      },
+      "skills_33": {
+        "description": "Restore the pattern of an ordinary fishing net or netted cargo sling. One small tear takes thirty minutes with enough cord and a suitable needle. Tangled wet mesh imposes the stated penalty. The repair does not increase the original net's capacity or catch fish automatically. The GM judges whether the net can be repaired and records cord consumed, time spent, and flaws in the result."
+      },
+      "skills_34": {
+        "description": "At the learned TL, align and repair the mundane mounts of a fictional tideglass beacon lens. Learn basic fitting first as the structured prerequisite requires. One alignment takes an hour with measuring tools; a chipped lens gives the task penalty. The task does not restore a destroyed enchanted lens or cast a light spell. The GM records alignment, spare parts, optical limits, and any risk of concentrating an unsafe beam."
+      },
+      "skills_35": {
+        "description": "Copy or repair a fictional tideglass pattern already understood through Beacon Resonance. One small inscription takes two hours and a stable working surface; unknown patterns cannot be invented by this task. An incomplete reference gives the penalty. Success yields a readable prepared pattern, not a spell, energized ward, or free magical effect. The GM decides compatible materials, the inscription's meaning, and any danger from an error; those consequences are manual."
+      },
+      "skills_36": {
+        "description": "Measure a shallow channel with marked line, pole, or another suitable mundane tool. One small cross-section takes ten minutes from a stable boat or bank. A turbulent surface gives the task penalty. The result describes measured depth at that tide, not unseen obstacles everywhere or permanent safe passage. The GM adjudicates attainable accuracy, vessel access, shifting bottom, and manual chart updates."
+      },
+      "skills_37": {
+        "description": "Assign clear roles, routes, and signals for one feasible coastal rescue. A briefing takes five minutes when the team can hear each other; an immediate emergency may leave too little time for it. Conflicting instructions impose the task penalty. Success clarifies the plan without granting automatic success to swimmers, climbers, or healers. The GM resolves consent, timing, available helpers, and the costs of a confused plan."
+      },
+      "skills_38": {
+        "description": "At the learned TL, compare several fictional patients' visible needs and decide whom the crew can assess first. Basic Saltwound Care training is required. A small group takes five minutes; incomplete histories impose the task penalty. The result is an order of assessment, not a diagnosis of hidden illness or automatic healing. The GM adjudicates severity, consent, available helpers, and an overlooked danger manually; treatment uses its separate skill."
+      },
+      "skills_39": {
+        "description": "At the learned TL, organize fictional harbor isolation, supply routes, and clear instructions for a small refuge. A workable plan takes an hour with a caretaker and enough space. Conflicting official instructions give the task penalty. Success is an agreed operational plan, not immunity to illness, a cure, or authority to imprison unwilling people. The GM decides local law, consent, supplies, breaches, and the duration of precautions manually."
+      },
+      "skills_40": {
+        "description": "Prepare a simple meal from identified, edible coastal ingredients with working heat and utensils. A crew pot takes an hour; unknown shellfish or marsh plants require their own identification. Spoiled stores give the task penalty and may make cooking impossible. Success yields an ordinary meal, not extra FP recovery, toxin removal, or limitless rations. The GM records portions, supplies, time, and any waste manually."
+      },
+      "skills_41": {
+        "description": "Inspect a small lot for condition, ordinary market value, and signs of concealed damage. A first appraisal takes ten minutes with permission to examine the goods. Sealed or inaccessible packaging gives the task penalty. Success offers a plausible range rather than the final selling price, magical identification, or legal ownership. The GM adjudicates hidden defects, local scarcity, trust, and any later trade manually."
+      },
+      "skills_42": {
+        "description": "Recognize local patterns of concealed landings and consider a discreet route around a staffed quay. Planning takes thirty minutes and needs current local information. Recently changed patrols give the penalty. Success provides a plausible lead, not automatic stealth, an available criminal contact, or certainty that a route is legal. The GM adjudicates patrols, permission, travel, rivals, and consequences of discovery manually.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "smuggler_routes_obstacle",
+              "label": "Patrol schedules changed recently",
+              "when": [
+                {
+                  "input": {
+                    "domain": "familiarity",
+                    "key": "smuggler_routes_obstacle",
+                    "label": "Patrol schedules changed recently"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "smuggler_routes_task",
+              "label": "Assess a concealed landing route",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 30
+                },
+                "unit": "minutes"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM identifies a plausible local route or a useful gap in the available information.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The route is stale or watched; using it risks meeting a patrol.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_43": {
+        "description": "Find and interpret an ordinary Greyhaven rule about salvage, passage, labor, or cargo. Researching a concrete dispute takes an hour with access to a current register. Conflicting jurisdictions give the task penalty. Success identifies the likely rule and procedure, not automatic acquittal or authority over officials. The GM adjudicates evidence, interpretation, representation, and the ruling; another harbor may require separate local advice."
+      },
+      "skills_44": {
+        "description": "Collect and retell a coastal account while distinguishing named witnesses from remembered rumor. A short retelling takes ten minutes; gathering reliable testimony is separate. Contradictory witnesses give the selected penalty. Success makes the account clear and its sources traceable, not proof that every event happened or a universal persuasion bonus. The GM adjudicates memory gaps, consent, audience response, and any claim that needs independent confirmation.",
+        "procedures": {
+          "modifiers": [
+            {
+              "id": "storykeeping_obstacle",
+              "label": "Witness accounts contradict each other",
+              "when": [
+                {
+                  "input": {
+                    "domain": "task",
+                    "key": "storykeeping_obstacle",
+                    "label": "Witness accounts contradict each other"
+                  },
+                  "operator": "equals",
+                  "value": true
+                }
+              ],
+              "value": {
+                "kind": "fixed",
+                "value": -2
+              },
+              "appliesTo": "task_roll",
+              "sourceText": "Apply only when the player and GM confirm this circumstance for the current task."
+            }
+          ],
+          "actions": [
+            {
+              "id": "storykeeping_task",
+              "label": "Retell an attributed coast story",
+              "roll": {
+                "basis": "skill"
+              },
+              "time": {
+                "amount": {
+                  "kind": "constant",
+                  "value": 10
+                },
+                "unit": "minutes"
+              },
+              "outcomes": [
+                {
+                  "kind": "note",
+                  "text": "The GM confirms a clear account with witness claims separated from rumor.",
+                  "on": "success"
+                },
+                {
+                  "kind": "note",
+                  "text": "The account confuses its sources or drops a key point; listeners may correct you.",
+                  "on": "failure"
+                }
+              ],
+              "sourceText": "The action previews a task roll; the GM resolves its outcome and records resources or physical changes manually."
+            }
+          ]
+        }
+      },
+      "skills_45": {
+        "description": "Identify ordinary tidepool creatures, their local habitats, and common signs of a disturbed shore. An accessible pool takes ten minutes of careful observation. An unfamiliar seasonal species gives the penalty. Success suggests a plausible identification, not animal control, safe eating, or the effect of a magical specimen. The GM resolves uncertainty, ecological clues, and whether further samples or another expert are needed."
+      },
+      "skills_46": {
+        "description": "Organize a rehearsed crew response to a squall, including securing gear and identifying shelter. A briefing and short rehearsal take ten minutes with the actual team. An unfamiliar crew gives the penalty. Success establishes understood roles, not a bonus to every defense or immunity to storm damage. At relative level +2, repeated training grants the declared +1 Rescue Coordination benefit. The GM resolves actual performance, fatigue, lost equipment, and a missed instruction manually."
+      },
+      "skills_47": {
+        "description": "Keep a short Harbor Sign exchange visible while moving along a quay or peering from cover. One short phrase takes ten seconds. Harbor Sign comprehension is required as a manually checked language condition; this skill handles delivery and does not teach the language. An obstructed sightline gives the penalty. The GM adjudicates who can see and understand, ambiguous gestures, and whether a lookout notices the exchange.",
+        "prerequisites": "The GM manually confirms Harbor Sign comprehension before a task; language fluency is not automatically checked by the application."
+      },
+      "skills_48": {
+        "description": "At the learned TL, compare and adjust an ordinary signal bell against a reference tone. One small adjustment takes thirty minutes with a suitable tool and permission to work on the bell. Heavy background noise gives the penalty. Success restores a plausible recognizable tone, not a magical resonance or greater communication range. The GM records material limits, access, damage, and whether the bell needs a specialist casting repair."
+      }
+    },
+    "items": {
+      "items_3": {
+        "weaponData": {
+          "modes": [
+            {
+              "key": "reed_shot",
+              "name": "Reed shot",
+              "damage": "thr imp",
+              "parry": "No",
+              "stRequired": 9,
+              "skill": "Reedbow",
+              "ranged": {
+                "acc": 3,
+                "range": {
+                  "kind": "st_multiplier",
+                  "halfDamageFactor": 9,
+                  "maxFactor": 14,
+                  "strengthSource": "weapon"
+                },
+                "rof": "1",
+                "shots": "1(3)",
+                "bulk": -5,
+                "recoil": 1
+              },
+              "weaponSt": 11,
+              "strengthKind": "bow"
+            },
+            {
+              "key": "bodkin_shot",
+              "name": "Bodkin shot",
+              "damage": "thr-1(2) imp",
+              "parry": "No",
+              "stRequired": 9,
+              "skill": "Reedbow",
+              "ranged": {
+                "acc": 3,
+                "range": {
+                  "kind": "st_multiplier",
+                  "halfDamageFactor": 9,
+                  "maxFactor": 14,
+                  "strengthSource": "weapon"
+                },
+                "rof": "1",
+                "shots": "1(3)",
+                "bulk": -5,
+                "recoil": 1
+              },
+              "weaponSt": 11,
+              "strengthKind": "bow",
+              "notes": "Narrow bodkin heads halve the target’s DR. Track arrows used after each fight."
+            }
+          ]
+        },
+        "description": "An ST 11 bow with ordinary and armor-dividing bodkin shots, purchased-ST range, aim accuracy and full reload/bulk statistics."
+      },
+      "items_12": {
+        "weaponData": {
+          "modes": [
+            {
+              "key": "hook",
+              "name": "Bridgehook chop",
+              "damage": "sw+1 cut",
+              "reach": "1",
+              "parry": "0U",
+              "stRequired": 11,
+              "skill": "Salvage Haft"
+            },
+            {
+              "key": "spike",
+              "name": "Gate spike",
+              "damage": "thr+1(2) imp",
+              "reach": "1",
+              "parry": "0U",
+              "stRequired": 11,
+              "skill": "Salvage Haft",
+              "notes": "A hardened back spike that halves DR. The axe is unbalanced, so it cannot parry after attacking."
+            },
+            {
+              "key": "haft",
+              "name": "Short haft blow",
+              "damage": "thr cr",
+              "reach": "C",
+              "parry": "0",
+              "stRequired": 9,
+              "skill": "Salvage Haft"
+            }
+          ]
+        },
+        "description": "A hooked axe with cutting chop, armor-dividing impaling spike and close crushing haft blow. Only the haft mode avoids an unbalanced parry."
+      },
+      "items_1": {
+        "description": "A coastal sword with keyed cutting sweep, impaling point and close-combat crushing pommel modes; each uses Quayblade."
+      },
+      "items_2": {
+        "description": "Original Lantern Coast item fixture: Breakwater buckler."
+      },
+      "items_4": {
+        "description": "Fine coastal mail covering torso, groin and both arms. Flexible and concealable as an inner layer; compare cutting, crushing and corrosion protection."
+      },
+      "items_5": {
+        "description": "Original Lantern Coast item fixture: Beacon rivet cap."
+      },
+      "items_6": {
+        "description": "Rigid reed-laminate greaves protect both legs; cutting DR exceeds crushing and impaling DR. Feet remain a separate boot layer."
+      },
+      "items_7": {
+        "description": "Original Lantern Coast item fixture: Cliffgrip boots."
+      },
+      "items_8": {
+        "description": "Original Lantern Coast item fixture: Trail pack."
+      },
+      "items_9": {
+        "description": "Original Lantern Coast item fixture: Focus crystal."
+      },
+      "items_10": {
+        "description": "Original Lantern Coast item fixture: Tideglass wand."
+      },
+      "items_11": {
+        "description": "A ferruled staff with distinct crushing tap/sweep and impaling jab modes. Compare Reach 1 with Reach 1,2 and thrust with swing."
+      },
+      "items_13": {
+        "description": "An outer fire-treated mantle over flexible concealable armor. Torso and neck receive DR 1, or DR 3 against burning; other locations remain uncovered."
+      },
+      "items_14": {
+        "description": "A close-fitting quilted inner coat with treated heat-resistant batting. It leaves the neck, hands and legs uncovered and offers no corrosion protection."
+      },
+      "items_15": {
+        "description": "A weighted line with separate fixed-range cast and melee lash modes; the cast cannot parry, while the lash has a -2 parry modifier."
+      },
+      "items_16": {
+        "description": "Six colored glass beads used to draft harbor codes."
+      },
+      "items_17": {
+        "description": "Holds the fictional marsh-distilling apparatus and sealed sample jars."
+      },
+      "items_18": {
+        "description": "A prepared focus for Glasswake Message; no automatic remote communication."
+      },
+      "items_19": {
+        "description": "Original Lantern Coast item fixture: Jetty toolbelt."
+      },
+      "items_20": {
+        "description": "A rigid front plate for the torso and groin with corrosion-resistant facing. It contributes nothing to back or side attacks; the inner coat remains available there."
+      },
+      "items_21": {
+        "description": "A rigid all-facing outer brigandine. Wear it over Tidewire coat to compare two named layers and type-specific totals."
+      },
+      "items_22": {
+        "description": "A front-only outer breastplate. Back and side attacks bypass this plate; a matching backplate is an independent layer."
+      },
+      "items_23": {
+        "description": "A back-only rigid plate. Front and back plates never overlap one another for a known facing; the flexible inner layer protects all facings."
+      },
+      "items_24": {
+        "description": "Flexible concealable mail under a cap. Skull layering is DX-exempt; neck layering is not. The face and eyes remain uncovered."
+      },
+      "items_25": {
+        "description": "A front-only face and eye guard, separate from the skull cap. Compare an armored eye with the same exposed location from the side."
+      },
+      "items_26": {
+        "description": "Rigid treated work gloves protect each hand separately. Incoming damage demonstrates the lower extremity crippling threshold."
+      }
+    },
+    "sources": {
+      "lantern_lives": {
+        "notes": "Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators are fixture identifiers, not real page citations.",
+        "edition": "Synthetic playtest 1"
+      },
+      "lantern_training": {
+        "notes": "Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators are fixture identifiers, not real page citations.",
+        "edition": "Synthetic playtest 1"
+      },
+      "lantern_rites": {
+        "notes": "Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators are fixture identifiers, not real page citations.",
+        "edition": "Synthetic playtest 1"
+      },
+      "lantern_outfits": {
+        "notes": "Fictional sourcebook written for the Lantern Coast demo; not a published GURPS book. Section locators are fixture identifiers, not real page citations.",
+        "edition": "Synthetic playtest 1"
+      }
+    },
+    "languages": {
+      "languages_1": {
+        "description": "The party's free mother tongue."
+      },
+      "languages_2": {
+        "description": "Fragmentary language found in the lighthouse archives."
+      },
+      "languages_3": {
+        "description": "Silent communication between dock crews."
+      }
+    },
+    "spells": {
+      "spells_1": {
+        "description": "A school of thumb-sized glimmers circles a marked rope; it cannot illuminate an entire room.",
+        "prerequisites": null
+      },
+      "spells_2": {
+        "description": "A warm filament dries one knot of damp tinder; the GM decides whether it catches.",
+        "prerequisites": null
+      },
+      "spells_3": {
+        "description": "Move a little of your rest into a consenting ally’s next breath; record any pool changes manually.",
+        "prerequisites": null
+      },
+      "spells_4": {
+        "description": "Draw salt from a shallow scrape and close it with luminous thread; the GM resolves recovery.",
+        "prerequisites": null
+      },
+      "spells_5": {
+        "description": "Reconstruct a tide-battered wound from its reflection; this ritual does not restore lost limbs.",
+        "prerequisites": "Tideglass attunement 1; Stitch the Salt"
+      },
+      "spells_6": {
+        "description": "A translucent ribbon marks a protected stance; the GM adjudicates protection and records bonuses.",
+        "prerequisites": null
+      },
+      "spells_7": {
+        "description": "A floating needle points to a previously touched mooring, never to an unknown destination.",
+        "prerequisites": null
+      },
+      "spells_8": {
+        "description": "Soften creaks from one tied vessel; voices and footsteps remain audible.",
+        "prerequisites": null
+      },
+      "spells_9": {
+        "description": "Pass a short image between two prepared tideglass mirrors; no unattended recording.",
+        "prerequisites": null
+      },
+      "spells_10": {
+        "description": "Bind loose jetty planks with spectral roots; it does not create timber.",
+        "prerequisites": null
+      }
+    },
+    "techniques": {
+      "techniques_1": {
+        "description": "Practice a misleading lantern motion in a quayblade exchange; the GM resolves the contest."
+      },
+      "techniques_2": {
+        "description": "Catch a rival haft with a hooked salvage head; the GM resolves release."
+      }
+    },
+    "styles": {
+      "styles_1": {
+        "description": "Original Greyhaven harbor-watch curriculum; a suggested package, not a published style.",
+        "techniques": [
+          {
+            "name": "False Lantern Step",
+            "defaultSkillName": "Quayblade"
+          }
+        ],
+        "perks": []
+      }
+    },
+    "enchantments": {
+      "enchantments_1": {
+        "description": "Leave a warm beacon streak on a struck surface: +1 damage on the equipped weapon."
+      },
+      "enchantments_2": {
+        "description": "Tidewire seams stiffen under impact: +1 DR on the equipped armor; same-key stitches use the highest."
+      },
+      "enchantments_3": {
+        "description": "A reedglass sightline adds accuracy, not skill or damage."
+      },
+      "enchantments_4": {
+        "description": "A bound stone steadies the blocking hand."
+      },
+      "enchantments_5": {
+        "description": "A folding-space seam reduces this item’s carried weight by 20 percent."
+      },
+      "enchantments_6": {
+        "description": "Prepared signal beads improve Signal Weaving while this item is equipped."
+      }
+    },
+    "activeEffects": {
+      "activeeffects_1": {
+        "description": "A campaign blessing with visible remaining rounds."
+      },
+      "activeeffects_2": {
+        "description": "A persistent sense reminder that can be activated or deactivated."
+      },
+      "activeeffects_3": {
+        "description": "A short-lived campaign strength boost; advancing rounds does not consume the source item."
+      }
+    },
+    "modifiers": {
+      "beneath_beacon": {
+        "description": "Narrative boundary agreed with the GM; no automatic location detection."
+      }
+    }
+  },
+  "characters": [
+    {
+      "name": "Kestrel Vale",
+      "character": {
+        "name": "Kestrel Vale",
+        "st": 12,
+        "dx": 13,
+        "iq": 11,
+        "ht": 12,
+        "perMod": 1,
+        "age": 28,
+        "height": "5 ft 9 in",
+        "weight": "155 lb",
+        "birthdate": "12 Rainmoot, 1178",
+        "appearance": "## Keeper of the last light\n\nA coastal scout with a weathered blue cloak and a promise to keep.\n\n- Find the missing lighthouse keeper.\n- Return the **brass compass** to its owner.\n\n### Contacts\n| Name | Connection |\n| --- | --- |\n| Captain Iona | Owes us passage |\n| Fen the keeper | Missing since the storm |"
+      },
+      "traits": [
+        {
+          "name": "Breakwater Poise",
+          "points": 12
+        },
+        {
+          "name": "Longwatch Lungs",
+          "points": 7
+        },
+        {
+          "name": "Horizon Reader",
+          "points": 6,
+          "level": 2
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        },
+        {
+          "name": "Beacon Courier's Seal",
+          "points": 1
+        },
+        {
+          "name": "Missing-Keeper Obligation",
+          "points": -5
+        },
+        {
+          "name": "Always Checks the Knot",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Quayblade",
+          "points": 8
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 4
+        },
+        {
+          "name": "Reedbow",
+          "points": 8
+        },
+        {
+          "name": "Shingle Ghosting",
+          "points": 8
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Cliff Gardens",
+          "points": 2
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Tide Flats",
+          "points": 4
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 4
+        },
+        {
+          "name": "Current Riding",
+          "points": 1
+        },
+        {
+          "name": "Cliff Traverse",
+          "points": 2
+        },
+        {
+          "name": "Saltwound Care",
+          "points": 1
+        },
+        {
+          "name": "Quayside Barter",
+          "points": 0
+        },
+        {
+          "name": "Ropework",
+          "points": 2
+        },
+        {
+          "name": "Marsh Tracking",
+          "points": 4
+        },
+        {
+          "name": "Weather Reading",
+          "points": 2
+        },
+        {
+          "name": "Smuggler Routes",
+          "points": 1
+        }
+      ],
+      "spells": [],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Harbor Sign",
+          "points": 2
+        }
+      ],
+      "techniques": [
+        {
+          "name": "False Lantern Step",
+          "points": 3
+        }
+      ]
+    },
+    {
+      "name": "Mira Ashfall",
+      "character": {
+        "name": "Mira Ashfall",
+        "st": 9,
+        "dx": 11,
+        "iq": 15,
+        "ht": 11,
+        "fpMod": 2,
+        "willMod": 1,
+        "age": 34,
+        "height": "5 ft 6 in",
+        "weight": "130 lb",
+        "birthdate": "First thaw, 1172",
+        "appearance": "## Cartographer of forgotten magic\n\nInk-stained cuffs, copper spectacles, and a satchel full of questions.\n\n> The beacon is a warning, not a weapon.\n\n**Research:** compare the Old Beacon Script with the tide-gate inscription."
+      },
+      "traits": [
+        {
+          "name": "Magery (Tideglass attunement)",
+          "points": 25,
+          "level": 2
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Echo Collector",
+          "points": -6
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        },
+        {
+          "name": "Archive Custodian",
+          "points": 1
+        },
+        {
+          "name": "Must Credit the Discoverer",
+          "points": -5
+        },
+        {
+          "name": "Keeps Every Rubbing",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Beacon Resonance",
+          "points": 8
+        },
+        {
+          "name": "Archive Diving",
+          "points": 4
+        },
+        {
+          "name": "Saltwound Care",
+          "points": 2
+        },
+        {
+          "name": "Harbor Mediation",
+          "points": 4
+        },
+        {
+          "name": "Beacon Rod",
+          "points": 4
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 1
+        },
+        {
+          "name": "Salvage Fitting",
+          "specialization": "Jetty Hardware",
+          "points": 1
+        },
+        {
+          "name": "Beacon Lenscraft",
+          "points": 2
+        },
+        {
+          "name": "Tideglass Inscription",
+          "points": 4
+        },
+        {
+          "name": "Shoal Cartography",
+          "points": 2
+        },
+        {
+          "name": "Harbor Law",
+          "points": 1
+        },
+        {
+          "name": "Storykeeping",
+          "points": 1
+        }
+      ],
+      "spells": [
+        {
+          "name": "Glimmer Shoal",
+          "points": 4
+        },
+        {
+          "name": "Ember Thread",
+          "points": 1
+        },
+        {
+          "name": "Borrowed Dawn",
+          "points": 2
+        },
+        {
+          "name": "Stitch the Salt",
+          "points": 4
+        },
+        {
+          "name": "Mend the Undertow",
+          "points": 4
+        },
+        {
+          "name": "Breakwater Veil",
+          "points": 2
+        }
+      ],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Old Beacon Script",
+          "points": 3
+        }
+      ],
+      "techniques": []
+    },
+    {
+      "name": "Bram Stonebridge",
+      "character": {
+        "name": "Bram Stonebridge",
+        "st": 14,
+        "dx": 11,
+        "iq": 10,
+        "ht": 13,
+        "hpMod": 2,
+        "age": 46,
+        "height": "6 ft 2 in",
+        "weight": "225 lb",
+        "birthdate": "9 Deepwinter, 1160",
+        "appearance": "## The bridge holds\n\nA retired mason who measures every room for a defensible doorway.\n\n- Repair the Greyhaven crossing.\n- Keep the party alive long enough to be paid.\n\n**Current injury:** battered left arm after holding the bridge; condition tracking is manual."
+      },
+      "traits": [
+        {
+          "name": "Stoneblood",
+          "points": 6
+        },
+        {
+          "name": "Breakwater Poise",
+          "points": 12
+        },
+        {
+          "name": "Bridgekeeper Oath",
+          "points": -8
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Dockwright's Union Token",
+          "points": 1
+        },
+        {
+          "name": "Unsafe-Bridge Compulsion",
+          "points": -5
+        }
+      ],
+      "skills": [
+        {
+          "name": "Salvage Haft",
+          "points": 12
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 8
+        },
+        {
+          "name": "Dockside Scrapping",
+          "points": 4
+        },
+        {
+          "name": "Salvage Fitting",
+          "specialization": "Body Armor",
+          "points": 4
+        },
+        {
+          "name": "Cliff Traverse",
+          "points": 2
+        },
+        {
+          "name": "Saltwound Care",
+          "points": 1
+        },
+        {
+          "name": "Quayside Barter",
+          "points": 2
+        },
+        {
+          "name": "Current Riding",
+          "points": 0
+        },
+        {
+          "name": "Jetty Masonry",
+          "points": 8
+        },
+        {
+          "name": "Hull Patching",
+          "points": 2
+        },
+        {
+          "name": "Ropework",
+          "points": 2
+        },
+        {
+          "name": "Cargo Appraisal",
+          "points": 1
+        },
+        {
+          "name": "Storm Drill",
+          "points": 2
+        }
+      ],
+      "spells": [],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Old Beacon Script",
+          "points": 1
+        }
+      ],
+      "techniques": [
+        {
+          "name": "Hook the Haft",
+          "points": 4
+        }
+      ]
+    },
+    {
+      "name": "Iona Reedwake",
+      "character": {
+        "name": "Iona Reedwake",
+        "st": 11,
+        "dx": 12,
+        "iq": 13,
+        "ht": 12,
+        "perMod": 1,
+        "age": 39,
+        "height": "5 ft 10 in",
+        "weight": "165 lb",
+        "birthdate": "3 Highwater, 1167",
+        "appearance": "## Pilot of the shoals\n\nA ferry captain with a knotted chart cord. Find a safe berth for the rescued keeper."
+      },
+      "traits": [
+        {
+          "name": "Tidewise Balance",
+          "points": 8
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Counts the gulls",
+          "points": -1
+        },
+        {
+          "name": "Tidepilot's Charter",
+          "points": 1
+        },
+        {
+          "name": "Crew Before Cargo",
+          "points": -5
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Tidepilot",
+          "points": 12
+        },
+        {
+          "name": "Current Riding",
+          "points": 4
+        },
+        {
+          "name": "Tether Cast",
+          "points": 8
+        },
+        {
+          "name": "Quayblade",
+          "points": 4
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 2
+        },
+        {
+          "name": "Horizon Watch",
+          "points": 4
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Tide Flats",
+          "points": 2
+        },
+        {
+          "name": "Smallcraft Sailing",
+          "points": 8
+        },
+        {
+          "name": "Channel Sounding",
+          "points": 4
+        },
+        {
+          "name": "Weather Reading",
+          "points": 2
+        },
+        {
+          "name": "Rescue Coordination",
+          "points": 4
+        },
+        {
+          "name": "Harbor Law",
+          "points": 1
+        },
+        {
+          "name": "Silent Signing",
+          "points": 2
+        },
+        {
+          "name": "Dockside Etiquette",
+          "points": 1
+        }
+      ],
+      "spells": [],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Harbor Sign",
+          "points": 3
+        }
+      ],
+      "techniques": [
+        {
+          "name": "False Lantern Step",
+          "points": 2
+        }
+      ]
+    },
+    {
+      "name": "Sable Fenwick",
+      "character": {
+        "name": "Sable Fenwick",
+        "st": 10,
+        "dx": 11,
+        "iq": 14,
+        "ht": 12,
+        "willMod": 1,
+        "age": 31,
+        "height": "5 ft 5 in",
+        "weight": "145 lb",
+        "birthdate": "18 Reedfall, 1175",
+        "appearance": "## Keeper of the marsh garden\n\nA field medic carrying sealed jars of fictional salt herbs. Recover the garden beneath the flooded jetty."
+      },
+      "traits": [
+        {
+          "name": "Gentle Hands",
+          "points": 7
+        },
+        {
+          "name": "Magery (Tideglass attunement)",
+          "points": 16,
+          "level": 1
+        },
+        {
+          "name": "Greyhaven Promise",
+          "points": -7
+        },
+        {
+          "name": "Pocket gardener",
+          "points": 1
+        },
+        {
+          "name": "Refuge-House Key",
+          "points": 1
+        },
+        {
+          "name": "Patient Before Purse",
+          "points": -5
+        }
+      ],
+      "skills": [
+        {
+          "name": "Saltwound Care",
+          "points": 8
+        },
+        {
+          "name": "Marsh Distilling",
+          "points": 8
+        },
+        {
+          "name": "Beacon Resonance",
+          "points": 4
+        },
+        {
+          "name": "Harbor Mediation",
+          "points": 4
+        },
+        {
+          "name": "Beacon Rod",
+          "points": 2
+        },
+        {
+          "name": "Coastal Foraging",
+          "specialization": "Cliff Gardens",
+          "points": 4
+        },
+        {
+          "name": "Patient Triage",
+          "points": 4
+        },
+        {
+          "name": "Quarantine Stewardship",
+          "points": 2
+        },
+        {
+          "name": "Tidepool Lore",
+          "points": 2
+        },
+        {
+          "name": "Coastal Cooking",
+          "points": 1
+        },
+        {
+          "name": "Net Mending",
+          "points": 1
+        },
+        {
+          "name": "Storykeeping",
+          "points": 1
+        }
+      ],
+      "spells": [
+        {
+          "name": "Stitch the Salt",
+          "points": 8
+        },
+        {
+          "name": "Borrowed Dawn",
+          "points": 4
+        },
+        {
+          "name": "Root the Jetty",
+          "points": 4
+        },
+        {
+          "name": "Quiet Mooring",
+          "points": 2
+        }
+      ],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Old Beacon Script",
+          "points": 2
+        }
+      ],
+      "techniques": []
+    },
+    {
+      "name": "Orin Bellstrand",
+      "character": {
+        "name": "Orin Bellstrand",
+        "st": 12,
+        "dx": 12,
+        "iq": 12,
+        "ht": 11,
+        "age": 24,
+        "height": "5 ft 8 in",
+        "weight": "160 lb",
+        "birthdate": "6 Bellmoot, 1182",
+        "appearance": "## The signal arrives\n\nA jetty mechanic with glass beads braided into his sleeves. Decode the false distress signal before another crew follows it."
+      },
+      "traits": [
+        {
+          "name": "Signal Memory",
+          "points": 6
+        },
+        {
+          "name": "Longwatch Lungs",
+          "points": 7
+        },
+        {
+          "name": "Storm Debt",
+          "points": -9
+        },
+        {
+          "name": "Lantern vigil",
+          "points": -1
+        },
+        {
+          "name": "Bellkeeper's Credentials",
+          "points": 1
+        },
+        {
+          "name": "Stolen-Signal Suspicion",
+          "points": -5
+        },
+        {
+          "name": "Rehearses in Whispers",
+          "points": -1
+        }
+      ],
+      "skills": [
+        {
+          "name": "Signal Weaving",
+          "points": 8
+        },
+        {
+          "name": "Harbor Winchcraft",
+          "points": 8
+        },
+        {
+          "name": "Gullcall Performance",
+          "points": 4
+        },
+        {
+          "name": "Salvage Fitting",
+          "specialization": "Jetty Hardware",
+          "points": 4
+        },
+        {
+          "name": "Salvage Haft",
+          "points": 4
+        },
+        {
+          "name": "Bulwark Handling",
+          "points": 2
+        },
+        {
+          "name": "Archive Diving",
+          "points": 2
+        },
+        {
+          "name": "Bell Tuning",
+          "points": 4
+        },
+        {
+          "name": "Beacon Lenscraft",
+          "points": 4
+        },
+        {
+          "name": "Ropework",
+          "points": 2
+        },
+        {
+          "name": "Hull Patching",
+          "points": 1
+        },
+        {
+          "name": "Dockside Etiquette",
+          "points": 1
+        },
+        {
+          "name": "Silent Signing",
+          "points": 2
+        },
+        {
+          "name": "Storm Drill",
+          "points": 2
+        }
+      ],
+      "spells": [],
+      "languages": [
+        {
+          "name": "Coast Common",
+          "points": 0
+        },
+        {
+          "name": "Harbor Sign",
+          "points": 2
+        }
+      ],
+      "techniques": [
+        {
+          "name": "Hook the Haft",
+          "points": 3
+        }
+      ]
+    }
+  ],
+  "effectNotes": "Seeded play-state example; advance rounds or toggle state to exercise the effect lifecycle.",
+  "inventoryNotes": {
+    "Sealed marsh jars": "Fictional ingredients; no automatic healing effect."
+  }
+}

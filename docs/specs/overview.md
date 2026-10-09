@@ -1496,7 +1496,8 @@ scripts/
   seed-lantern-mcp.ts  NDJSON connector bridge for the shared Lantern recipe (one existing owner)
 bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
-  lantern_coast.yaml    Synthetic Lantern Coast library and four fictional sourcebooks; bootstrap/README.md lists seven demo accounts
+  lantern_coast.yaml    Original Lantern Coast library and four campaign sourcebooks; bootstrap/README.md lists seven demo accounts
+  lantern_coast_art/    Optional seed portraits and campaign cover, uploaded when present
 ```
 
 Read the top-of-file doc comments — most load-bearing modules
@@ -1534,12 +1535,16 @@ Full detail: [architecture.md](architecture.md).
 ## Orientation notes for future sessions
 
 The standard `bun run db:seed` refreshes the Sample library and creates a populated
-Lantern Coast campaign with six separately owned characters, eleven library categories,
-four fictional sourcebooks with distinct abbreviations, current pricing snapshots,
-30 traits, 48 skills, 26 items, five shared session entries and three private journal entries
-per character, and an experimental encounter. Each fresh sheet has 12–15 skills
-and 6–8 traits within its 250-point starting budget plus six earned points and the
-campaign's disadvantage/quirk caps. Each has legal two-layer body armor with a
+Lantern Coast campaign with six separately owned characters, twelve library categories,
+four original sourcebooks with distinct abbreviations, current pricing snapshots,
+30 traits, 48 skills, 16 spells, seven techniques, three styles, five languages, three
+races, 26 items, five shared session entries and three private journal entries
+per character, and an experimental encounter. Library and sheet copy is written
+in-world: a short description plus a Markdown list of what the sheet calculates,
+times and penalties. Each fresh sheet has 12–15 skills and 6–8 traits and spends
+all but six of its 250-point budget plus six earned points, within the campaign's
+disadvantage/quirk caps. Iona (Selkie-blooded, with a seal form), Orin (Fogward
+Shoalborn variant) and Mira (Human with the Tide-touched lens) show races. Each has legal two-layer body armor with a
 layering DX penalty, head/limb coverage, typed DR and richer weapon modes. Examples
 include separate front/back plates, a front visor, crushing-vs-cutting mail and
 competing armor enchantments; the seed guide gives Incoming attack previews.
@@ -1558,7 +1563,8 @@ once while preserving edits, deleted older content and play state; its transacti
 revision marker makes subsequent runs no-ops, preserving later deletions too.
 Equipment revision 3 updates unchanged V2 armor/weapon facets and adds layered
 gear; an already-enriched V2 campaign receives equipment only, retaining later
-skill/journal deletions. Inventory quantities, containment and customized facets
+skill/journal deletions. Content revision 4 upgrades unchanged V3 copy and builds,
+adds the new definitions and assigns races to characters still on Human. Inventory quantities, containment and customized facets
 are preserved.
 Its YAML boundary resolves renamed books through surviving definition UUID links
 and excludes unavailable sourcebooks rather than restoring them.

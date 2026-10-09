@@ -98,6 +98,49 @@ describe('Lantern Coast standard seed', () => {
         }
       }
       for (const trait of libraryTraits) expect(trait.description?.trim(), trait.name).toBeTruthy();
+      // Front-door copy: every player-facing definition is authored in-world, with
+      // no test-fixture vocabulary or placeholder text, and sections are populated.
+      const metaCopy = /fixture|synthetic|fictional|placeholder|adjudicat/i;
+      const visibleText = (value: unknown): string[] =>
+        typeof value === 'string'
+          ? [value]
+          : Array.isArray(value)
+            ? value.flatMap(visibleText)
+            : value && typeof value === 'object'
+              ? Object.entries(value).flatMap(([key, entry]) =>
+                  ['description', 'notes', 'prerequisites', 'text', 'features'].includes(key)
+                    ? visibleText(entry)
+                    : typeof entry === 'object'
+                      ? visibleText(entry)
+                      : [],
+                )
+              : [];
+      for (const [section, count] of [
+        ['traits', 30],
+        ['skills', 48],
+        ['spells', 16],
+        ['languages', 5],
+        ['techniques', 7],
+        ['styles', 3],
+        ['enchantments', 6],
+        ['activeEffects', 3],
+        ['items', 26],
+        ['modifiers', 4],
+        ['races', 3],
+      ] as const) {
+        const entries = library[section] as { name: string; description: string | null }[];
+        expect(entries, section).toHaveLength(count);
+        expect(new Set(entries.map((entry) => entry.description)).size, section).toBe(count);
+        for (const entry of entries) {
+          expect(entry.description?.trim().length ?? 0, entry.name).toBeGreaterThan(60);
+          for (const text of visibleText(entry)) expect(text, entry.name).not.toMatch(metaCopy);
+        }
+      }
+      for (const source of library.sources as { name: string; notes: string; edition: string }[])
+        expect(`${source.notes} ${source.edition}`, source.name).not.toMatch(metaCopy);
+      expect(campaign?.description ?? '').not.toMatch(metaCopy);
+      for (const spell of library.spells as { name: string; prerequisites: string | null }[])
+        expect(spell.prerequisites, spell.name).toContain('Tideglass attunement');
       const ropework = librarySkills.find((skill) => skill.name === 'Ropework');
       expect(ropework?.procedures?.actions[0]).toMatchObject({
         id: 'ropework_task',
@@ -134,7 +177,7 @@ describe('Lantern Coast standard seed', () => {
       }
       const signing = librarySkills.find((skill) => skill.name === 'Silent Signing');
       expect(signing?.prerequisiteRules).toBeNull();
-      expect(signing?.prerequisites).toContain('manually confirms Harbor Sign comprehension');
+      expect(signing?.prerequisites).toBe('Knows Harbor Sign at any fluency.');
       const details = [];
       for (const row of roster) details.push(await loadCharacterDetail(row.id));
       const kestrel = details.find((row) => row.name === 'Kestrel Vale');
@@ -145,9 +188,12 @@ describe('Lantern Coast standard seed', () => {
         expect(detail.libraryEffectsKnown).toBe(true);
         expect(detail.revision).toBeGreaterThan(0);
         expect(detail.traits.every((trait) => trait.libraryMechanics?.effects != null)).toBe(true);
-        expect(detail.skills.every((skill) => skill.libraryMechanics?.skillRules != null)).toBe(
-          true,
-        );
+        // Race-granted skills are read-only projections without a library definition.
+        expect(
+          detail.skills
+            .filter((skill) => !skill.raceGranted)
+            .every((skill) => skill.libraryMechanics?.skillRules != null),
+        ).toBe(true);
         expect(detail.skills.every((skill) => skill.effectiveLevel != null)).toBe(true);
         expect(detail.skills.length, detail.name).toBeGreaterThanOrEqual(12);
         expect(detail.skills.length, detail.name).toBeLessThanOrEqual(15);
@@ -156,9 +202,15 @@ describe('Lantern Coast standard seed', () => {
         expect(detail.earnedPoints, detail.name).toBe(6);
         expect(detail.points.total, detail.name).toBeLessThanOrEqual(250 + 6);
         expect(detail.points.unspent, detail.name).toBe(250 + 6 - detail.points.total);
+        // Nearly complete sheets: only the six recently awarded points remain unspent.
+        expect(detail.points.unspent, detail.name).toBe(6);
+        expect(detail.appearance ?? '', detail.name).not.toMatch(metaCopy);
+        for (const text of visibleText([...detail.traits, ...detail.skills, ...detail.inventory]))
+          expect(text, detail.name).not.toMatch(metaCopy);
         expect(-detail.points.disadvantages, detail.name).toBeLessThanOrEqual(50);
         expect(-detail.points.quirks, detail.name).toBeLessThanOrEqual(5);
-        expect(detail.languages).toHaveLength(2);
+        expect(detail.languages.length, detail.name).toBeGreaterThanOrEqual(2);
+        expect(detail.languages.length, detail.name).toBeLessThanOrEqual(3);
       }
       expect(kestrel.skills.filter((skill) => skill.name === 'Coastal Foraging')).toHaveLength(2);
       expect(kestrel.skills.find((skill) => skill.name === 'Quayside Barter')?.points).toBe(0);
@@ -175,7 +227,14 @@ describe('Lantern Coast standard seed', () => {
           ?.mechanics?.effects[0]?.target,
       ).toBe('weapon_damage');
       expect(kestrel.techniques[0]?.level).toBeGreaterThan(10);
-      expect(mira.spells).toHaveLength(6);
+      expect(mira.spells).toHaveLength(8);
+      expect(mira.race?.snapshot?.name).toBe('Human · Tide-touched');
+      expect(kestrel.race?.snapshot ?? null).toBeNull();
+      expect(bram.techniques.map((technique) => technique.name).sort()).toEqual([
+        'Breakwater Bind',
+        'Hook the Haft',
+        'Low Haft Sweep',
+      ]);
       expect(
         mira.skills.find((skill) => skill.name === 'Beacon Lenscraft')?.prerequisiteStatus,
       ).toBe('met');
@@ -204,7 +263,11 @@ describe('Lantern Coast standard seed', () => {
       expect(bow?.baseWeaponData?.modes?.[0]?.ranged?.range?.kind).toBe('st_multiplier');
       expect(bow?.enchantments[0]?.mechanics?.effects[0]?.target).toBe('weapon_accuracy');
       const sable = details.find((row) => row.name === 'Sable Fenwick');
-      expect(sable?.spells).toHaveLength(4);
+      expect(sable?.spells).toHaveLength(6);
+      const iona = details.find((row) => row.name === 'Iona Reedwake');
+      expect(iona?.race?.snapshot?.name).toBe('Selkie-blooded');
+      expect(iona?.race?.snapshot?.forms.map((form) => form.name)).toEqual(['Seal form']);
+      expect(iona?.languages.some((language) => language.name === 'Tidesong')).toBe(true);
       expect(
         sable?.skills.find((skill) => skill.name === 'Patient Triage')?.prerequisiteStatus,
       ).toBe('met');
@@ -215,6 +278,9 @@ describe('Lantern Coast standard seed', () => {
       expect(
         orin?.skills.find((skill) => skill.name === 'Signal Weaving')?.effectiveLevel,
       ).toBeGreaterThan(orin?.iq ?? 0);
+      expect(orin?.race?.snapshot?.name).toBe('Fogward Shoalborn');
+      // The Fogward variant's racial Current Riding is a read-only projected skill.
+      expect(orin?.race?.snapshot?.skills.map((skill) => skill.name)).toEqual(['Current Riding']);
       // Exercise the same resolved inventory/effects used by Incoming attack,
       // rather than merely asserting that the authored YAML has armor fields.
       for (const detail of details) {
@@ -427,7 +493,8 @@ describe('Lantern Coast standard seed', () => {
       const detail = await loadCharacterDetail(character.id);
       expect(detail.name).toBe('Player renamed this character');
       expect(detail.combat?.currentHp).toBe(1);
-      expect(detail.skills).toHaveLength(0);
+      // Deleted purchases stay deleted; only a read-only racial projection may remain.
+      expect(detail.skills.filter((skill) => !skill.raceGranted)).toHaveLength(0);
       expect(await rows(first.campaignId)).toHaveLength(6);
       const [campaign] = await getDb()
         .select()

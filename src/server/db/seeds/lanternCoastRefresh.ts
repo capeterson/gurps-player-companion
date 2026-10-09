@@ -55,6 +55,7 @@ import {
 import { ensureDemoUser } from './accounts.ts';
 import { seedLanternCoast } from './lanternCoast.ts';
 import { LANTERN_CAMPAIGN_NAME, type LanternRequest } from './lanternCoastContent.ts';
+import { refreshLanternCoastV4 } from './lanternCoastContentV4.ts';
 import { lanternCharacters, lanternSharedLogs } from './lanternCoastData.ts';
 import { refreshLanternCoastEquipment } from './lanternCoastEquipment.ts';
 import { lanternSeedIsCurrent, recordLanternSeedVersion } from './lanternCoastRevision.ts';
@@ -139,7 +140,7 @@ export async function refreshLanternCoast(
       return response.status === 204 ? null : response.json();
     };
     const campaignPath = `/campaigns/${campaign.id}`;
-    const refreshEquipment = async () => {
+    const matchedPlayers = async () => {
       const roster = await db
         .select()
         .from(characters)
@@ -157,21 +158,44 @@ export async function refreshLanternCoast(
           actor: (await signAccessToken(actor.id, actor.authVersion)).token,
         });
       }
+      const skipped = lanternCharacters
+        .filter((fixture) => !players.some((player) => player.fixture === fixture))
+        .map((fixture) => fixture.character.name);
+      return { players, skipped };
+    };
+    const yamlOverride = libraryText === undefined ? {} : { yaml: libraryText };
+    const refreshEquipment = async () => {
+      const { players, skipped } = await matchedPlayers();
       await refreshLanternCoastEquipment({
         campaignId: campaign.id,
         ownerActor: ownerToken,
         request,
         players,
-        ...(libraryText === undefined ? {} : { yaml: libraryText }),
+        ...yamlOverride,
       });
-      return lanternCharacters
-        .filter((fixture) => !players.some((player) => player.fixture === fixture))
-        .map((fixture) => fixture.character.name);
+      return skipped;
     };
-    // Equipment is a separate revision. Do not restore deleted V2 skills/notes
-    // while moving a campaign that has already received the content enrichment.
+    const refreshContentV4 = async () => {
+      const { players, skipped } = await matchedPlayers();
+      await refreshLanternCoastV4({
+        campaignId: campaign.id,
+        ownerActor: ownerToken,
+        request,
+        players,
+        ...yamlOverride,
+      });
+      return skipped;
+    };
+    // Each later revision runs alone on a campaign that already received the
+    // earlier ones, so deleted V2 skills/notes and V3 equipment are not restored.
+    if (await lanternSeedIsCurrent(campaign.id, 3)) {
+      const skippedCharacters = await refreshContentV4();
+      await recordLanternSeedVersion(campaign.id, ownerId);
+      return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
+    }
     if (await lanternSeedIsCurrent(campaign.id, 2)) {
       const skippedCharacters = await refreshEquipment();
+      await refreshContentV4();
       await recordLanternSeedVersion(campaign.id, ownerId);
       return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
     }
@@ -577,7 +601,7 @@ export async function refreshLanternCoast(
         visibility: 'campaign',
       });
     }
-    for (const name of await refreshEquipment()) {
+    for (const name of [...(await refreshEquipment()), ...(await refreshContentV4())]) {
       if (!skippedCharacters.includes(name)) skippedCharacters.push(name);
     }
     // Last write: a rerun must not recreate deliberate deletions after enrichment.

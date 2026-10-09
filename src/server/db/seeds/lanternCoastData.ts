@@ -80,7 +80,14 @@ export interface SeedCharacter {
   privateLogs: SeedLogDefinition[];
   inventory: SeedItem[];
   combat: Record<string, unknown>;
-  effects: { name: string; state: 'active' | 'inactive' | 'expired'; sourceItem?: string }[];
+  effects: {
+    name: string;
+    state: 'active' | 'inactive' | 'expired';
+    sourceItem?: string;
+    notes: string;
+  }[];
+  /** Library race/lens names; omitted for the Human default. */
+  race?: { name?: string; variant?: string; lenses?: string[] };
 }
 const motherTongue = {
   name: 'Coast Common',
@@ -102,8 +109,8 @@ export const lanternCharacters: SeedCharacter[] = [
     displayName: 'Rowan',
     character: {
       name: 'Kestrel Vale',
-      st: 12,
-      dx: 13,
+      st: 13,
+      dx: 14,
       iq: 11,
       ht: 12,
       perMod: 1,
@@ -139,15 +146,15 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Quayblade', points: 8 },
-      { name: 'Bulwark Handling', points: 4 },
-      { name: 'Reedbow', points: 8 },
-      { name: 'Shingle Ghosting', points: 8 },
+      { name: 'Quayblade', points: 12 },
+      { name: 'Bulwark Handling', points: 8 },
+      { name: 'Reedbow', points: 12 },
+      { name: 'Shingle Ghosting', points: 12 },
       { name: 'Coastal Foraging', specialization: 'Cliff Gardens', points: 2 },
       { name: 'Coastal Foraging', specialization: 'Tide Flats', points: 4 },
-      { name: 'Horizon Watch', points: 4 },
+      { name: 'Horizon Watch', points: 8 },
       { name: 'Current Riding', points: 1 },
-      { name: 'Cliff Traverse', points: 2 },
+      { name: 'Cliff Traverse', points: 4 },
       { name: 'Saltwound Care', techLevel: 3, points: 1 },
       { name: 'Quayside Barter', points: 0 },
       { name: 'Ropework', points: 2, notes: 'Courier climbs and awkward parcels.' },
@@ -168,7 +175,11 @@ export const lanternCharacters: SeedCharacter[] = [
       motherTongue,
       { name: 'Harbor Sign', spokenFluency: 'accented', writtenFluency: 'n/a', points: 2 },
     ],
-    techniques: [{ name: 'False Lantern Step', points: 3 }],
+    techniques: [
+      { name: 'False Lantern Step', points: 3 },
+      { name: 'Running Shot', points: 3 },
+      { name: 'Breakwater Bind', points: 2 },
+    ],
     privateLogs: [
       {
         key: 'kestrel-courier-route',
@@ -245,7 +256,13 @@ export const lanternCharacters: SeedCharacter[] = [
       posture: 'standing',
       conditions: [],
     },
-    effects: [{ name: 'Beacon Ward', state: 'active' }],
+    effects: [
+      {
+        name: 'Beacon Ward',
+        state: 'active',
+        notes: 'Mira’s ward from the tide gate, still holding.',
+      },
+    ],
   },
   {
     email: 'mira@example.invalid',
@@ -254,8 +271,8 @@ export const lanternCharacters: SeedCharacter[] = [
       name: 'Mira Ashfall',
       st: 9,
       dx: 11,
-      iq: 15,
-      ht: 11,
+      iq: 16,
+      ht: 12,
       fpMod: 2,
       willMod: 1,
       age: 34,
@@ -298,10 +315,10 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Beacon Resonance', points: 8 },
-      { name: 'Archive Diving', points: 4 },
+      { name: 'Beacon Resonance', points: 12 },
+      { name: 'Archive Diving', points: 8 },
       { name: 'Saltwound Care', techLevel: 3, points: 2 },
-      { name: 'Harbor Mediation', points: 4 },
+      { name: 'Harbor Mediation', points: 8 },
       { name: 'Beacon Rod', points: 4 },
       { name: 'Horizon Watch', points: 1 },
       {
@@ -340,7 +357,9 @@ export const lanternCharacters: SeedCharacter[] = [
       { name: 'Borrowed Dawn', points: 2 },
       { name: 'Stitch the Salt', points: 4 },
       { name: 'Mend the Undertow', points: 4 },
-      { name: 'Breakwater Veil', points: 2 },
+      { name: 'Breakwater Veil', points: 4 },
+      { name: 'Fogbank Lantern', points: 2 },
+      { name: "Keeper's Lamp", points: 1 },
     ],
     languages: [
       motherTongue,
@@ -416,7 +435,15 @@ export const lanternCharacters: SeedCharacter[] = [
       posture: 'kneeling',
       conditions: [],
     },
-    effects: [{ name: 'Lantern Sight', state: 'inactive', sourceItem: 'Tideglass wand' }],
+    effects: [
+      {
+        name: 'Lantern Sight',
+        state: 'inactive',
+        sourceItem: 'Tideglass wand',
+        notes: 'Switch on to read the beacon markings in the sea caves.',
+      },
+    ],
+    race: { lenses: ['Tide-touched'] },
   },
   {
     email: 'bram@example.invalid',
@@ -424,21 +451,24 @@ export const lanternCharacters: SeedCharacter[] = [
     manager: true,
     character: {
       name: 'Bram Stonebridge',
-      st: 14,
-      dx: 11,
-      iq: 10,
-      ht: 13,
+      st: 15,
+      dx: 12,
+      iq: 11,
+      ht: 14,
       hpMod: 2,
+      willMod: 1,
+      perMod: 1,
       age: 46,
       height: '6 ft 2 in',
       weight: '225 lb',
       birthdate: '9 Deepwinter, 1160',
       appearance:
-        '## The bridge holds\n\nA retired mason who measures every room for a defensible doorway.\n\n- Repair the Greyhaven crossing.\n- Keep the party alive long enough to be paid.\n\n**Current injury:** battered left arm after holding the bridge; condition tracking is manual.',
+        '## The bridge holds\n\nA retired Stonebridge mason, grey at the temples and broad as a doorway, who measures every room for the place he would hold it from.\n\n- Repair the Greyhaven crossing.\n- Keep the party alive long enough to be paid.\n\n**Current injury:** a battered left arm from holding the bridge brace. Sable has it bound and has forbidden lifting.',
     },
     traits: [
       { name: 'Stoneblood', points: 6 },
       { name: 'Breakwater Poise', points: 12 },
+      { name: 'Longwatch Lungs', points: 7 },
       { name: 'Bridgekeeper Oath', points: -8 },
       { name: 'Greyhaven Promise', points: -7 },
       {
@@ -453,13 +483,13 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Salvage Haft', points: 12 },
-      { name: 'Bulwark Handling', points: 8 },
-      { name: 'Dockside Scrapping', points: 4 },
-      { name: 'Salvage Fitting', specialization: 'Body Armor', techLevel: 3, points: 4 },
-      { name: 'Cliff Traverse', points: 2 },
+      { name: 'Salvage Haft', points: 16 },
+      { name: 'Bulwark Handling', points: 12 },
+      { name: 'Dockside Scrapping', points: 8 },
+      { name: 'Salvage Fitting', specialization: 'Body Armor', techLevel: 3, points: 8 },
+      { name: 'Cliff Traverse', points: 4 },
       { name: 'Saltwound Care', techLevel: 3, points: 1 },
-      { name: 'Quayside Barter', points: 2 },
+      { name: 'Quayside Barter', points: 4 },
       { name: 'Current Riding', points: 0 },
       {
         name: 'Jetty Masonry',
@@ -490,7 +520,11 @@ export const lanternCharacters: SeedCharacter[] = [
       motherTongue,
       { name: 'Old Beacon Script', spokenFluency: 'none', writtenFluency: 'broken', points: 1 },
     ],
-    techniques: [{ name: 'Hook the Haft', points: 4 }],
+    techniques: [
+      { name: 'Hook the Haft', points: 5 },
+      { name: 'Low Haft Sweep', points: 3 },
+      { name: 'Breakwater Bind', points: 3 },
+    ],
     privateLogs: [
       {
         key: 'bram-old-invoice',
@@ -559,7 +593,14 @@ export const lanternCharacters: SeedCharacter[] = [
       posture: 'standing',
       conditions: ['reeling'],
     },
-    effects: [{ name: 'Rallying Draught', state: 'expired', sourceItem: 'Rallying draught' }],
+    effects: [
+      {
+        name: 'Rallying Draught',
+        state: 'expired',
+        sourceItem: 'Rallying draught',
+        notes: 'Drunk at the bridge brace; it wore off before the last family crossed.',
+      },
+    ],
   },
   {
     email: 'iona@example.invalid',
@@ -576,7 +617,7 @@ export const lanternCharacters: SeedCharacter[] = [
       weight: '165 lb',
       birthdate: '3 Highwater, 1167',
       appearance:
-        '## Pilot of the shoals\n\nA ferry captain with a knotted chart cord. Find a safe berth for the rescued keeper.',
+        '## Pilot of the shoals\n\nCaptain of the *Reedwake* ferry: sleek dark hair that never quite dries, a knotted chart cord at her wrist, and a voice that carries over any wind.\n\n- Find the passenger who left her ferry at the bell buoy.\n- Bring Fen home, and keep a dry berth ready for him.\n\n> Count them aboard. Count them ashore. Then count them again.',
     },
     traits: [
       { name: 'Tidewise Balance', points: 8 },
@@ -599,20 +640,20 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Tidepilot', points: 12 },
-      { name: 'Current Riding', points: 4 },
-      { name: 'Tether Cast', points: 8 },
-      { name: 'Quayblade', points: 4 },
+      { name: 'Tidepilot', points: 16 },
+      { name: 'Current Riding', points: 8 },
+      { name: 'Tether Cast', points: 12 },
+      { name: 'Quayblade', points: 8 },
       { name: 'Bulwark Handling', points: 2 },
-      { name: 'Horizon Watch', points: 4 },
+      { name: 'Horizon Watch', points: 8 },
       { name: 'Coastal Foraging', specialization: 'Tide Flats', points: 2 },
-      { name: 'Smallcraft Sailing', points: 8, notes: 'Ferry work began in a borrowed skiff.' },
+      { name: 'Smallcraft Sailing', points: 12, notes: 'Ferry work began in a borrowed skiff.' },
       {
         name: 'Channel Sounding',
         points: 4,
         notes: 'Keep the lead line honest when the charts are old.',
       },
-      { name: 'Weather Reading', points: 2, notes: 'Watch the squall before watching the fare.' },
+      { name: 'Weather Reading', points: 4, notes: 'Watch the squall before watching the fare.' },
       {
         name: 'Rescue Coordination',
         points: 4,
@@ -634,8 +675,12 @@ export const lanternCharacters: SeedCharacter[] = [
     languages: [
       motherTongue,
       { name: 'Harbor Sign', spokenFluency: 'native', writtenFluency: 'n/a', points: 3 },
+      { name: 'Tidesong', spokenFluency: 'accented', writtenFluency: 'none', points: 2 },
     ],
-    techniques: [{ name: 'False Lantern Step', points: 2 }],
+    techniques: [
+      { name: 'False Lantern Step', points: 2 },
+      { name: 'Tether Snare', points: 3 },
+    ],
     privateLogs: [
       {
         key: 'iona-manifest',
@@ -681,6 +726,7 @@ export const lanternCharacters: SeedCharacter[] = [
     ],
     combat: { currentHp: 11, currentFp: 10, maneuver: 'Wait', posture: 'standing', conditions: [] },
     effects: [],
+    race: { name: 'Selkie-blooded' },
   },
   {
     email: 'sable@example.invalid',
@@ -690,18 +736,19 @@ export const lanternCharacters: SeedCharacter[] = [
       st: 10,
       dx: 11,
       iq: 14,
-      ht: 12,
+      ht: 13,
       willMod: 1,
+      perMod: 1,
       age: 31,
       height: '5 ft 5 in',
       weight: '145 lb',
       birthdate: '18 Reedfall, 1175',
       appearance:
-        '## Keeper of the marsh garden\n\nA field medic carrying sealed jars of fictional salt herbs. Recover the garden beneath the flooded jetty.',
+        '## Keeper of the marsh garden\n\nA Reedmarsh field medic with soil under her nails, a tin of cuttings in her coat and a row of sealed salt-herb jars on her belt.\n\n- Recover the garden beneath the flooded jetty.\n- Find out why the roots blackened *before* the storm.\n\n**Rule of the refuge:** treat first, ask later.',
     },
     traits: [
       { name: 'Gentle Hands', points: 7 },
-      { name: 'Magery (Tideglass attunement)', points: 16, level: 1 },
+      { name: 'Magery (Tideglass attunement)', points: 25, level: 2 },
       { name: 'Greyhaven Promise', points: -7 },
       { name: 'Pocket gardener', points: 1 },
       {
@@ -716,16 +763,16 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Saltwound Care', techLevel: 3, points: 8 },
-      { name: 'Marsh Distilling', techLevel: 3, points: 8 },
+      { name: 'Saltwound Care', techLevel: 3, points: 12 },
+      { name: 'Marsh Distilling', techLevel: 3, points: 12 },
       { name: 'Beacon Resonance', points: 4 },
-      { name: 'Harbor Mediation', points: 4 },
-      { name: 'Beacon Rod', points: 2 },
+      { name: 'Harbor Mediation', points: 8 },
+      { name: 'Beacon Rod', points: 4 },
       { name: 'Coastal Foraging', specialization: 'Cliff Gardens', points: 4 },
       {
         name: 'Patient Triage',
         techLevel: 3,
-        points: 4,
+        points: 8,
         notes: 'Choose the next patient without promising miracles.',
       },
       {
@@ -736,7 +783,7 @@ export const lanternCharacters: SeedCharacter[] = [
       },
       {
         name: 'Tidepool Lore',
-        points: 2,
+        points: 4,
         notes: 'Know what belonged in the garden before the water came.',
       },
       { name: 'Coastal Cooking', points: 1, notes: 'A warm pot makes a long night bearable.' },
@@ -756,10 +803,13 @@ export const lanternCharacters: SeedCharacter[] = [
       { name: 'Borrowed Dawn', points: 4 },
       { name: 'Root the Jetty', points: 4 },
       { name: 'Quiet Mooring', points: 2 },
+      { name: 'Brine Ward', points: 2 },
+      { name: 'Still the Swell', points: 2 },
     ],
     languages: [
       motherTongue,
       { name: 'Old Beacon Script', spokenFluency: 'broken', writtenFluency: 'broken', points: 2 },
+      { name: 'Reedmarsh Cant', spokenFluency: 'native', writtenFluency: 'none', points: 3 },
     ],
     techniques: [],
     privateLogs: [
@@ -809,7 +859,7 @@ export const lanternCharacters: SeedCharacter[] = [
               quantity: 3,
               weightLbs: 0.3,
               cost: 7,
-              notes: 'Fictional ingredients; no automatic healing effect.',
+              notes: 'Saltwort, marsh mallow and bitter sedge, labelled in Sable’s hand.',
             },
           },
           { name: 'Clean bandages', data: { quantity: 8, weightLbs: 0.1, cost: 1 } },
@@ -824,7 +874,13 @@ export const lanternCharacters: SeedCharacter[] = [
       posture: 'standing',
       conditions: [],
     },
-    effects: [{ name: 'Beacon Ward', state: 'active' }],
+    effects: [
+      {
+        name: 'Beacon Ward',
+        state: 'active',
+        notes: 'Mira’s ward from the tide gate, still holding.',
+      },
+    ],
   },
   {
     email: 'orin@example.invalid',
@@ -832,15 +888,15 @@ export const lanternCharacters: SeedCharacter[] = [
     character: {
       name: 'Orin Bellstrand',
       st: 12,
-      dx: 12,
-      iq: 12,
-      ht: 11,
+      dx: 13,
+      iq: 13,
+      ht: 12,
       age: 24,
       height: '5 ft 8 in',
       weight: '160 lb',
       birthdate: '6 Bellmoot, 1182',
       appearance:
-        '## The signal arrives\n\nA jetty mechanic with glass beads braided into his sleeves. Decode the false distress signal before another crew follows it.',
+        '## The signal arrives\n\nA Fogward bell-mechanic from the northern towers: glass beads braided into his sleeves, a bell charm in his hair and grease to the elbows.\n\n- Decode the false distress signal before another crew follows it.\n- Find out what Master Pell knows.\n\n**Three short, one held.** He hears it in his sleep.',
     },
     traits: [
       { name: 'Signal Memory', points: 6 },
@@ -865,12 +921,12 @@ export const lanternCharacters: SeedCharacter[] = [
       },
     ],
     skills: [
-      { name: 'Signal Weaving', points: 8 },
-      { name: 'Harbor Winchcraft', techLevel: 3, points: 8 },
+      { name: 'Signal Weaving', points: 12 },
+      { name: 'Harbor Winchcraft', techLevel: 3, points: 12 },
       { name: 'Gullcall Performance', points: 4 },
       { name: 'Salvage Fitting', specialization: 'Jetty Hardware', techLevel: 3, points: 4 },
-      { name: 'Salvage Haft', points: 4 },
-      { name: 'Bulwark Handling', points: 2 },
+      { name: 'Salvage Haft', points: 8 },
+      { name: 'Bulwark Handling', points: 4 },
       { name: 'Archive Diving', points: 2 },
       {
         name: 'Bell Tuning',
@@ -884,7 +940,7 @@ export const lanternCharacters: SeedCharacter[] = [
         points: 4,
         notes: 'Align the mechanism before trusting the beam.',
       },
-      { name: 'Ropework', points: 2, notes: 'Rig temporary lifts at the jetty.' },
+      { name: 'Ropework', points: 4, notes: 'Rig temporary lifts at the jetty.' },
       {
         name: 'Hull Patching',
         techLevel: 3,
@@ -904,7 +960,10 @@ export const lanternCharacters: SeedCharacter[] = [
       motherTongue,
       { name: 'Harbor Sign', spokenFluency: 'accented', writtenFluency: 'n/a', points: 2 },
     ],
-    techniques: [{ name: 'Hook the Haft', points: 3 }],
+    techniques: [
+      { name: 'Hook the Haft', points: 4 },
+      { name: 'Low Haft Sweep', points: 2 },
+    ],
     privateLogs: [
       {
         key: 'orin-practice-pattern',
@@ -957,5 +1016,6 @@ export const lanternCharacters: SeedCharacter[] = [
     ],
     combat: { currentHp: 9, currentFp: 8, maneuver: 'Ready', posture: 'crouching', conditions: [] },
     effects: [],
+    race: { name: 'Shoalborn', variant: 'Fogward Shoalborn' },
   },
 ];
