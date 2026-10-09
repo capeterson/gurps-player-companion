@@ -128,17 +128,30 @@ function groupIdSegment(value: string): string {
   ).join('-');
 }
 
-/** Short description preview; preserve source punctuation rather than parse Markdown per row. */
+/**
+ * Short description preview. Rather than parse Markdown per row, strip only
+ * unambiguous syntax in one linear pass over a bounded prefix: line-leading list,
+ * heading and quote markers, paired strong emphasis, inline code ticks and link
+ * targets. Other punctuation (`*`, `_`, `>`, `#` within a line) is preserved.
+ */
 export function plainExcerpt(markdown: string | null | undefined): string {
   if (!markdown) return '';
+  const text = markdown
+    .slice(0, 1200)
+    .replace(/^[ \t]*(?:[-+*]|\d+[.)]|#{1,6}|>)[ \t]+/gm, '')
+    .replace(/(\*\*|__)(?=\S)([^\n]*?\S)\1/g, '$2')
+    .replace(/`([^`\n]+)`/g, '$1')
+    .replace(/!?\[([^\]\n]*)\]\([^)\n]*\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
   let end = 0;
   let codePoints = 0;
-  for (const character of markdown) {
+  for (const character of text) {
     if (codePoints === 300) break;
     end += character.length;
     codePoints += 1;
   }
-  return markdown.slice(0, end).replace(/\s+/g, ' ').trim();
+  return text.slice(0, end).trim();
 }
 
 function usePreferences(

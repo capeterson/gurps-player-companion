@@ -139,6 +139,14 @@ it('preserves excerpt punctuation and does not split a Unicode character at the 
   expect(plainExcerpt(`${'x'.repeat(299)}😀Z`)).toBe(`${'x'.repeat(299)}😀`);
 });
 
+it('shows Markdown descriptions as readable plain text in the excerpt', () => {
+  const markdown =
+    'Tidepilots plot a **safe** line.\n\n- **Use:** plan passages.\n- **Time:** ten minutes per leg.\n\n> Count them aboard.\n\n## Notes\n1. See [the chart](https://example.com) and `Smallcraft Sailing`.';
+  expect(plainExcerpt(markdown)).toBe(
+    'Tidepilots plot a safe line. Use: plan passages. Time: ten minutes per leg. Count them aboard. Notes See the chart and Smallcraft Sailing.',
+  );
+});
+
 function setup(initialEntry = '/', transferOnly = false) {
   return render(
     <QueryClientProvider
@@ -519,8 +527,8 @@ it('renders markdown only for an expanded entry, even in a large library', async
   setup('/?section=skills');
   expect(await screen.findByText('500 of 500 skills.', { exact: false })).toBeVisible();
   expect(renderMarkdown).not.toHaveBeenCalled();
-  // Collapsed rows show a plain-text excerpt instead.
-  expect(screen.getByText('**Bold** description 7')).toBeVisible();
+  // Collapsed rows show a plain-text excerpt instead, without Markdown syntax.
+  expect(screen.getByText('Bold description 7')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Skill 007' }));
   await waitFor(() =>
     expect(document.querySelector('.markdown-body strong')).toHaveTextContent('Bold'),
