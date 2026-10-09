@@ -97,14 +97,12 @@ export async function loadLibraryGraph(tx: AuditTx, campaignId: string): Promise
     activeEffects: campaignLibraryActiveEffects,
     races: campaignLibraryRaces,
   };
-  return Object.fromEntries(
-    await Promise.all(
-      Object.entries(tables).map(async ([key, table]) => [
-        key,
-        await tx.select().from(table).where(eq(table.campaignId, campaignId)),
-      ]),
-    ),
-  ) as LibraryGraph;
+  // One transaction is one connection: issue the reads in turn. Overlapping
+  // queries on a pg client are deprecated and become an error in pg 9.
+  const graph: Record<string, unknown[]> = {};
+  for (const [key, table] of Object.entries(tables))
+    graph[key] = await tx.select().from(table).where(eq(table.campaignId, campaignId));
+  return graph as LibraryGraph;
 }
 export async function validateLibraryDeletion(
   tx: AuditTx,

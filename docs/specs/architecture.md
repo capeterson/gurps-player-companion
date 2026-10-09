@@ -32,10 +32,13 @@ doesn't reject the token-in-query handshake) → raw bounded MCP transport →
 OpenAPI doc → error handler →
 static/SPA fallback (last, so it never shadows `/api/*`).
 
-The OpenAPI and MCP catalog check and emit commands construct this route graph
-with test configuration and `ENVIRONMENT=test`. They generate metadata without
-starting media, notification, or account-purge maintenance, so they need no database
-connection and terminate after producing or checking the snapshot.
+`createApp()` only builds the route graph. Media, notification and account-purge
+maintenance start from the server entrypoints (`startServer` in `index.ts` and the
+Vite dev entry) through `startBackgroundMaintenance`, beside the matching shutdown
+stop. Seeds, refreshes and the OpenAPI/MCP check and emit commands reuse the app
+in-process and exit once they close the database pool; `appLifecycle.test.ts`
+guards this for a development-environment script. The OpenAPI and MCP commands
+also use test configuration and `ENVIRONMENT=test`, so they need no database connection.
 
 Notification maintenance shares this process and uses a dedicated Postgres
 session on `DATABASE_URL` for queue `LISTEN/NOTIFY`. The connection must preserve
@@ -554,16 +557,25 @@ the nightly run; overdue accounts run on the next night after startup.
   `seeds/lanternCoast.ts` uses the normal in-process API handlers for validated,
   audited campaign/character writes and owned library snapshots. The standard
   seed is atomic and advisory-lock serialized; Lantern identity is owner/name,
-  and reruns preserve its play state. Fresh Lantern content includes 26 items
+  and reruns preserve its play state. A fresh seed completes in seconds and exits.
+  Fresh Lantern content includes 26 items
   with legal layered loadouts, typed/directional protection, multiple weapon modes
   and functional Power-15 enchantments, plus 30 traits,
-  48 skills, six sheets with 12–15 skills and 6–8 traits, five shared logs and
-  three private entries per character. `db:seed:lantern:refresh` is an explicit,
+  48 skills, 16 spells, seven techniques, three styles, five languages, four
+  modifiers and three races (two templates, one with a complete variant and one with
+  an alternate form, plus an additive lens). Six sheets with 12–15 skills and 6–8 traits
+  each spend all but the six recently awarded points; three carry races. Five shared
+  logs and three private entries per character. Optional portraits and a cover are
+  uploaded through the normal media API from `bootstrap/lantern_coast_art/` when those
+  files exist and media storage is enabled. `db:seed:lantern:refresh` is an explicit,
   conservative one-time upgrade of recognized older defaults. It compares saved
   fields with the previous fixture, preserves edits/deleted older entries and
   play state, and skips missing or ambiguous characters. Revision 3 enriches only
   equipment in campaigns already at revision 2, preserving later skill/journal
-  deletions. Equipment facets
+  deletions. Revision 4 (`lanternCoastContentV4.ts`) compares against
+  `lanternCoastV3Text.json`: it adds missing new definitions, replaces library and
+  owned trait/skill copy, attributes, purchase points and appearance only where they
+  still equal V3, and assigns races only to characters still on the Human default. Equipment facets
   are compared against the public synthetic V2 baseline; blank seeded item Power
   is completed while manual values survive. All writes
   use the normal validated APIs. Internal `demo_seed_updates` markers are written
