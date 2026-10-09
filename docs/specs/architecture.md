@@ -554,12 +554,18 @@ the nightly run; overdue accounts run on the next night after startup.
   `seeds/lanternCoast.ts` uses the normal in-process API handlers for validated,
   audited campaign/character writes and owned library snapshots. The standard
   seed is atomic and advisory-lock serialized; Lantern identity is owner/name,
-  and reruns preserve its play state. Fresh Lantern content includes 30 traits,
+  and reruns preserve its play state. Fresh Lantern content includes 26 items
+  with legal layered loadouts, typed/directional protection, multiple weapon modes
+  and functional Power-15 enchantments, plus 30 traits,
   48 skills, six sheets with 12–15 skills and 6–8 traits, five shared logs and
   three private entries per character. `db:seed:lantern:refresh` is an explicit,
   conservative one-time upgrade of recognized older defaults. It compares saved
   fields with the previous fixture, preserves edits/deleted older entries and
-  play state, and skips missing or ambiguous characters. Content changes still
+  play state, and skips missing or ambiguous characters. Revision 3 enriches only
+  equipment in campaigns already at revision 2, preserving later skill/journal
+  deletions. Equipment facets
+  are compared against the public synthetic V2 baseline; blank seeded item Power
+  is completed while manual values survive. All writes
   use the normal validated APIs. Internal `demo_seed_updates` markers are written
   in the same transaction and prevent repeated refreshes from restoring later
   deletions; this bookkeeping table is not a syncable user entity. See [the seed guide](../../bootstrap/README.md)

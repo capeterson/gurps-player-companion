@@ -65,6 +65,8 @@ export interface SeedItem {
   enchantments?: string[];
   contents?: SeedItem[];
 }
+/** Synthetic enchanted purchases are functional in the campaign's normal mana. */
+export const LANTERN_ITEM_POWER = 15;
 export interface SeedCharacter {
   email: string;
   displayName: string;
@@ -198,7 +200,11 @@ export const lanternCharacters: SeedCharacter[] = [
       worn('Breakwater buckler'),
       worn('Reedglass bow', ['Gullfeather Draw']),
       worn('Tidewire coat'),
+      worn('Shoalwatch brigandine'),
+      worn('Tidewire coif'),
       worn('Beacon rivet cap'),
+      worn('Beacon visor'),
+      worn('Dock leather gloves'),
       worn('Reedweave greaves'),
       worn('Cliffgrip boots'),
       {
@@ -370,6 +376,11 @@ export const lanternCharacters: SeedCharacter[] = [
     inventory: [
       worn('Beacon rod'),
       worn('Mistquilt coat'),
+      worn('Storm mantle'),
+      worn('Tidewire coif'),
+      worn('Beacon rivet cap'),
+      worn('Beacon visor'),
+      worn('Cliffgrip boots'),
       worn('Focus crystal'),
       worn('Tideglass wand'),
       {
@@ -510,10 +521,22 @@ export const lanternCharacters: SeedCharacter[] = [
       worn('Bridgehook axe'),
       worn('Breakwater buckler'),
       worn('Tidewire coat', ["Warden's Stitch"]),
+      worn('Beacon cuirass'),
+      worn('Quay backplate'),
+      worn('Tidewire coif'),
       worn('Beacon rivet cap'),
+      worn('Beacon visor'),
+      worn('Dock leather gloves'),
       worn('Reedweave greaves'),
       worn('Cliffgrip boots'),
-      worn('Storm mantle'),
+      {
+        ...worn('Storm mantle'),
+        data: {
+          worn: true,
+          equipped: false,
+          notes: 'Spare outer mantle; unequip the plates before wearing it over the mail.',
+        },
+      },
       {
         name: 'Trail pack',
         library: 'Trail pack',
@@ -644,6 +667,12 @@ export const lanternCharacters: SeedCharacter[] = [
       worn('Rescue tether'),
       worn('Breakwater buckler', ['Mooring Counterweight']),
       worn('Mistquilt coat'),
+      worn('Salvage apron'),
+      worn('Quay backplate'),
+      worn('Tidewire coif'),
+      worn('Beacon rivet cap'),
+      worn('Reedweave greaves'),
+      worn('Cliffgrip boots'),
       {
         name: 'Pilot’s locker',
         data: { isContainer: true, worn: true, weightLbs: 1.6, cost: 42 },
@@ -762,6 +791,11 @@ export const lanternCharacters: SeedCharacter[] = [
     inventory: [
       worn('Beacon rod'),
       worn('Mistquilt coat', ["Warden's Stitch"]),
+      worn('Storm mantle', ["Warden's Stitch"]),
+      worn('Tidewire coif'),
+      worn('Beacon rivet cap'),
+      worn('Dock leather gloves'),
+      worn('Cliffgrip boots'),
       worn('Focus crystal'),
       {
         name: 'Distiller roll',
@@ -901,6 +935,11 @@ export const lanternCharacters: SeedCharacter[] = [
       worn('Bridgehook axe', ['Beacon Edge']),
       worn('Breakwater buckler'),
       worn('Salvage apron'),
+      worn('Mistquilt coat'),
+      worn('Tidewire coif'),
+      worn('Beacon rivet cap'),
+      worn('Dock leather gloves'),
+      worn('Cliffgrip boots'),
       worn('Signal beads', ['Harbor Whisper']),
       {
         name: 'Jetty toolbelt',

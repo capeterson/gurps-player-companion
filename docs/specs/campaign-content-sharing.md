@@ -700,7 +700,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   logs, and hidden-NPC encounter exercise the same permissions as normal API
   writes. Its eleven library categories use four fictional sourcebooks (`LCGV`,
   `LCST`, `LCTR`, `LCQO`) and current calculation/pricing snapshots, weapon modes,
-  structured Range, prerequisites and procedures. The reusable shared recipe
+  structured Range, prerequisites and procedures. The 26-item catalog equips
+  all six sheets with legal layered armor and typed/directional protection;
+  synthetic enchanted purchases record item Power 15. The reusable shared recipe
   also runs through MCP with one existing owner; integration coverage compares
   its complete content graph against the multi-user REST seed. Existing Lantern
   play state is preserved on repeat runs. See the

@@ -3,10 +3,10 @@ import { withAudit } from '../auditContext.ts';
 import { getDb } from '../client.ts';
 import { demoSeedUpdates } from '../schema.ts';
 
-export const LANTERN_SEED_VERSION = 2;
+export const LANTERN_SEED_VERSION = 3;
 export const LANTERN_SEED_KEY = 'lantern-coast';
 
-export async function lanternSeedIsCurrent(campaignId: string) {
+export async function lanternSeedIsCurrent(campaignId: string, version = LANTERN_SEED_VERSION) {
   const [row] = await getDb()
     .select({ version: demoSeedUpdates.version })
     .from(demoSeedUpdates)
@@ -14,7 +14,7 @@ export async function lanternSeedIsCurrent(campaignId: string) {
       and(
         eq(demoSeedUpdates.campaignId, campaignId),
         eq(demoSeedUpdates.seed, LANTERN_SEED_KEY),
-        eq(demoSeedUpdates.version, LANTERN_SEED_VERSION),
+        eq(demoSeedUpdates.version, version),
       ),
     );
   return row !== undefined;

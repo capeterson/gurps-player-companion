@@ -20,10 +20,18 @@ import { loadCharacterDetail } from '../../services/characterSummary.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../../testConfig.ts';
 import { withAudit } from '../auditContext.ts';
 import { closeDb, getDb, runInDbTransaction } from '../client.ts';
-import { characterTraits, demoSeedUpdates, entityHistory } from '../schema.ts';
+import {
+  campaignLibraryItems,
+  characterTraits,
+  characters,
+  combatStates,
+  demoSeedUpdates,
+  entityHistory,
+} from '../schema.ts';
 import { ensureDemoUser } from './accounts.ts';
-import { LANTERN_CAMPAIGN_NAME } from './lanternCoast.ts';
+import { LANTERN_CAMPAIGN_NAME, seedLanternCoast } from './lanternCoast.ts';
 import { lanternCharacters } from './lanternCoastData.ts';
+import equipmentV2 from './lanternCoastEquipmentV2.json';
 import { refreshLanternCoast } from './lanternCoastRefresh.ts';
 import legacy from './lanternCoastV1.json';
 
@@ -174,6 +182,147 @@ async function oldDemo(ownerId: string) {
 }
 
 describe('Lantern Coast explicit content refresh', () => {
+  it('upgrades V2 equipment once without restoring deleted content or overwriting customized armor', async () => {
+    await isolated(async (ownerId) => {
+      const { campaignId } = await seedLanternCoast(ownerId);
+      const roster = await getDb()
+        .select()
+        .from(characters)
+        .where(eq(characters.campaignId, campaignId));
+      const kestrel = roster.find((row) => row.name === 'Kestrel Vale');
+      if (!kestrel) throw new Error('Missing Kestrel');
+      const before = await loadCharacterDetail(kestrel.id);
+      const sword = before.inventory.find((item) => item.name === "Wayfarer's sword");
+      const bow = before.inventory.find((item) => item.name === 'Reedglass bow');
+      const oldSword = equipmentV2.items.find((item) => item.name === "Wayfarer's sword");
+      if (!sword || !bow || !oldSword?.weaponData) throw new Error('Missing weapon baseline');
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${sword.id}`, 'PATCH', {
+        weaponData: oldSword.weaponData,
+        enchantments: sword.enchantments.map((ref) => ({ ...ref, spellLevel: null })),
+      });
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${bow.id}`, 'PATCH', {
+        enchantments: bow.enchantments.map((ref) => ({
+          ...ref,
+          spellLevel: 14,
+          notes: 'GM recorded weaker Power',
+        })),
+      });
+      const coat = before.inventory.find((item) => item.name === 'Tidewire coat');
+      const pack = before.inventory.find((item) => item.name === 'Trail pack');
+      if (!pack?.libraryItemId) throw new Error('Missing old pack');
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${pack.id}`, 'DELETE');
+      await request(
+        ownerId,
+        `/campaigns/${campaignId}/library/items/${pack.libraryItemId}`,
+        'DELETE',
+      );
+      const boots = before.inventory.find((item) => item.name === 'Cliffgrip boots');
+      const oldCoat = equipmentV2.items.find((item) => item.name === 'Tidewire coat');
+      if (!coat?.libraryItemId || !boots || !oldCoat?.armor)
+        throw new Error('Missing armor baseline');
+      await request(
+        ownerId,
+        `/campaigns/${campaignId}/library/items/${coat.libraryItemId}`,
+        'PATCH',
+        { armor: oldCoat.armor, description: oldCoat.description },
+      );
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${coat.id}`, 'PATCH', {
+        armor: { ...oldCoat.armor, dr: 7 },
+        notes: 'Player fitted custom rings',
+      });
+      const removed = before.inventory.filter((item) =>
+        ['Shoalwatch brigandine', 'Tidewire coif', 'Beacon visor', 'Dock leather gloves'].includes(
+          item.name,
+        ),
+      );
+      for (const item of [...removed, boots])
+        await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${item.id}`, 'DELETE');
+      const brigandine = removed.find((item) => item.name === 'Shoalwatch brigandine');
+      if (!brigandine?.libraryItemId) throw new Error('Missing new armor definition');
+      await request(
+        ownerId,
+        `/campaigns/${campaignId}/library/items/${brigandine.libraryItemId}`,
+        'DELETE',
+      );
+      const greaves = before.inventory.find((item) => item.name === 'Reedweave greaves');
+      const oldGreaves = equipmentV2.items.find((item) => item.name === 'Reedweave greaves');
+      if (!greaves || !oldGreaves?.armor) throw new Error('Missing old greaves');
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${greaves.id}`, 'PATCH', {
+        armor: oldGreaves.armor,
+      });
+      const addedSkill = before.skills.find((skill) => skill.name === 'Ropework');
+      if (!addedSkill) throw new Error('Missing V2 skill');
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/skills/${addedSkill.id}`, 'DELETE');
+      // A recognized V2 marker must run only the new equipment revision.
+      await withAudit(ownerId, undefined, async (tx) => {
+        await tx.delete(demoSeedUpdates).where(eq(demoSeedUpdates.campaignId, campaignId));
+        await tx.insert(demoSeedUpdates).values({ campaignId, seed: 'lantern-coast', version: 2 });
+        await tx
+          .update(combatStates)
+          .set({ currentHp: 1 })
+          .where(eq(combatStates.characterId, kestrel.id));
+      });
+      const first = await refreshLanternCoast(ownerId);
+      expect(first.refreshed).toBe(true);
+      const after = await loadCharacterDetail(kestrel.id);
+      expect(
+        after.inventory.find((item) => item.id === sword.id)?.baseWeaponData?.modes,
+      ).toHaveLength(3);
+      expect(
+        after.inventory.find((item) => item.id === sword.id)?.enchantments[0]?.spellLevel,
+      ).toBe(15);
+      expect(after.inventory.find((item) => item.id === bow.id)?.enchantments[0]).toMatchObject({
+        spellLevel: 14,
+        notes: 'GM recorded weaker Power',
+      });
+      expect(after.inventory.find((item) => item.id === coat.id)?.baseArmor?.dr).toBe(7);
+      expect(after.inventory.find((item) => item.id === coat.id)?.notes).toBe(
+        'Player fitted custom rings',
+      );
+      expect(after.inventory.some((item) => item.name === 'Cliffgrip boots')).toBe(false);
+      expect(after.inventory.some((item) => item.name === 'Trail pack')).toBe(false);
+      expect(
+        (
+          (await request(ownerId, `/campaigns/${campaignId}/library`)) as {
+            items: { name: string }[];
+          }
+        ).items.some((item) => item.name === 'Trail pack'),
+      ).toBe(false);
+      expect(after.inventory.find((item) => item.id === greaves.id)?.baseArmor?.dr).toBe(2);
+      expect(after.skills.some((skill) => skill.name === 'Ropework')).toBe(false);
+      expect(after.combat?.currentHp).toBe(1);
+      expect(after.earnedPoints).toBe(6);
+      for (const name of [
+        'Shoalwatch brigandine',
+        'Tidewire coif',
+        'Beacon visor',
+        'Dock leather gloves',
+      ])
+        expect(
+          after.inventory.filter((item) => item.name === name),
+          name,
+        ).toHaveLength(1);
+      const [libraryCoat] = await getDb()
+        .select()
+        .from(campaignLibraryItems)
+        .where(eq(campaignLibraryItems.id, coat.libraryItemId));
+      expect(libraryCoat?.armor?.concealable).toBe(true);
+      const added = after.inventory.find((item) => item.name === 'Shoalwatch brigandine');
+      if (!added) throw new Error('Missing added armor');
+      await request(kestrel.ownerId, `/characters/${kestrel.id}/inventory/${added.id}`, 'DELETE');
+      const count = await getDb()
+        .select()
+        .from(entityHistory)
+        .where(eq(entityHistory.campaignId, campaignId));
+      expect((await refreshLanternCoast(ownerId)).refreshed).toBe(false);
+      expect(
+        (await loadCharacterDetail(kestrel.id)).inventory.some((item) => item.name === added.name),
+      ).toBe(false);
+      expect(
+        await getDb().select().from(entityHistory).where(eq(entityHistory.campaignId, campaignId)),
+      ).toHaveLength(count.length);
+    });
+  }, 30000);
   it('keeps renamed source UUID links and tolerates a deleted source with no definitions', async () => {
     await isolated(async (ownerId) => {
       const old = await oldDemo(ownerId);

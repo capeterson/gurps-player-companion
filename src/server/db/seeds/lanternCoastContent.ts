@@ -17,6 +17,7 @@ import { techniqueCreate } from '../../../shared/schemas/technique.ts';
 import { traitCreate } from '../../../shared/schemas/trait.ts';
 import { parseLibraryYaml } from '../../../shared/yaml/library.ts';
 import {
+  LANTERN_ITEM_POWER,
   type SeedCharacter,
   type SeedItem,
   lanternCharacters,
@@ -146,6 +147,7 @@ export async function populateLanternCoast({
         ...(parentId ? { parentId } : {}),
         enchantments:
           item.enchantments?.map((name) => ({
+            spellLevel: LANTERN_ITEM_POWER,
             spellName: name,
             definitionId: definition('enchantments', name).id,
           })) ?? [],
