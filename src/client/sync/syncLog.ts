@@ -2,6 +2,7 @@ import Dexie from 'dexie';
 import { isLibraryEntityClass } from '../../shared/schemas/sync.ts';
 import type { SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { isNetworkErrorMessage } from '../lib/networkErrors.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { newClientId } from './outbox.ts';
 import { packSyncLogEntry } from './syncLogPayload.ts';
@@ -28,6 +29,27 @@ export type NewSyncLogEntry = Omit<SyncLogEntry, 'id' | 'occurredAt'> & {
   id?: string;
   occurredAt?: string;
 };
+
+/** Offline fetch failures are normal; retain HTTP and application diagnostics. */
+export function isNetworkSyncLogEntry(
+  entry: Pick<SyncLogEntry, 'result' | 'reason' | 'details'>,
+): boolean {
+  if (entry.result !== 'failed' && entry.result !== 'retrying') return false;
+  const reason = entry.reason ?? '';
+  if (/\bHTTP \d{3}\b/.test(reason)) return false;
+  // Online-only save diagnostics carry their HTTP status in details instead.
+  if (
+    entry.details !== null &&
+    typeof entry.details === 'object' &&
+    'status' in entry.details &&
+    typeof entry.details.status === 'number'
+  )
+    return false;
+  // Match the complete browser message, including older journal rows whose
+  // payload may be compressed. Never decode bodies just to filter the log.
+  const message = reason.includes(' — ') ? reason.slice(reason.lastIndexOf(' — ') + 3) : reason;
+  return isNetworkErrorMessage(message);
+}
 
 /**
  * Bound a value before it goes into the journal.  Small scalars pass
@@ -68,6 +90,7 @@ export function snapshotValue(value: unknown, maxChars = SYNC_LOG_VALUE_MAX_CHAR
 }
 
 export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
+  if (isNetworkSyncLogEntry(entry)) return;
   try {
     const generation = journalGeneration;
     const db = getLocalDb();
@@ -99,12 +122,13 @@ export async function appendSyncLog(entry: NewSyncLogEntry): Promise<void> {
  * seconds between cursor pages.
  */
 export async function appendSyncLogEntries(entries: readonly NewSyncLogEntry[]): Promise<void> {
-  if (entries.length === 0) return;
+  const loggableEntries = entries.filter((entry) => !isNetworkSyncLogEntry(entry));
+  if (loggableEntries.length === 0) return;
   try {
     const generation = journalGeneration;
     const db = getLocalDb();
     const now = new Date().toISOString();
-    const rows: SyncLogEntry[] = entries.map((entry) => ({
+    const rows: SyncLogEntry[] = loggableEntries.map((entry) => ({
       ...entry,
       id: entry.id ?? newClientId(),
       occurredAt: entry.occurredAt ?? now,

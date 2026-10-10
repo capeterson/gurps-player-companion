@@ -10,6 +10,8 @@
 import { waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { setPwaConnectionControl } from '../lib/api.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import {
   getSyncOrchestrator,
@@ -101,6 +103,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
+  connectionStore.reset();
+  setPwaConnectionControl(false);
   syncStateStore.reset('synced');
   vi.useRealTimers();
   await resetLocalDb();
@@ -821,6 +825,200 @@ describe('cursor pull sync-log values', () => {
 });
 
 describe('whole-cycle failures', () => {
+  it('holds queued edits in manual offline mode and sends same/different-field successors after going online', async () => {
+    await seedCharacter();
+    login();
+    const db = getLocalDb();
+    const sent: Array<{ fieldPath?: string; attemptedValue?: unknown }> = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (!url.includes('/sync/operations')) return cursorResponse();
+      const body = JSON.parse(String(init?.body)) as {
+        operations: Array<{ clientOpId: string; fieldPath?: string; attemptedValue?: unknown }>;
+      };
+      sent.push(...body.operations);
+      return new Response(
+        JSON.stringify({
+          outcomes: body.operations.map((op) => ({
+            clientOpId: op.clientOpId,
+            status: 'applied',
+            newRevision: 2,
+          })),
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 11,
+      prevValue: 10,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'dx',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    connectionStore.setManualOffline(true);
+
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow('Reconnect to sync');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await db.outbox.toArray()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldPath: 'st', attemptedValue: 11 }),
+        expect.objectContaining({ fieldPath: 'dx', attemptedValue: 12 }),
+      ]),
+    );
+
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 13,
+      prevValue: 11,
+    });
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'dx',
+      attemptedValue: 14,
+      prevValue: 12,
+    });
+    connectionStore.setManualOffline(false);
+
+    await getSyncOrchestrator().syncNow();
+
+    expect(sent).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fieldPath: 'st', attemptedValue: 13 }),
+        expect.objectContaining({ fieldPath: 'dx', attemptedValue: 14 }),
+      ]),
+    );
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.characters.get(CHAR_ID)).toMatchObject({ st: 13, dx: 14 });
+  });
+
+  it('keeps a network-failed operation queued without a toast or journal entry across retry', async () => {
+    await seedCharacter();
+    login();
+    setPwaConnectionControl(true);
+    const db = getLocalDb();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+    connectionStore.setManualOffline(true);
+
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow('Reconnect to sync');
+    expect(fetchMock).not.toHaveBeenCalled();
+    connectionStore.setManualOffline(false);
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow('Failed to fetch');
+
+    const retry = (await db.outbox.toArray())[0];
+    expect(retry).toMatchObject({ status: 'transient_retry', deliveryUncertain: true });
+    expect(await db.syncLog.count()).toBe(0);
+    expect(await db.rejectionToasts.count()).toBe(0);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!url.includes('/sync/operations')) return cursorResponse();
+        const body = JSON.parse(String(init?.body)) as {
+          operations: Array<{ clientOpId: string }>;
+        };
+        return new Response(
+          JSON.stringify({
+            outcomes: body.operations.map((op) => ({
+              clientOpId: op.clientOpId,
+              status: 'applied',
+              newRevision: 2,
+            })),
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    await getSyncOrchestrator().syncNow();
+
+    expect(await db.outbox.count()).toBe(0);
+    expect(await db.syncLog.count()).toBeGreaterThan(0);
+    expect(await db.rejectionToasts.count()).toBe(0);
+  });
+
+  it('keeps repeated offline pulls out of the journal without advancing the cursor', async () => {
+    login();
+    const db = getLocalDb();
+    await db.syncCursors.put({ entityClass: 'character', revision: 7 });
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValue(new TypeError('NetworkError when attempting to fetch resource.'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await expect(getSyncOrchestrator().triggerCursorPull()).rejects.toThrow('NetworkError');
+    }
+    expect(await db.syncLog.count()).toBe(0);
+    expect((await db.syncCursors.get('character'))?.revision).toBe(7);
+    expect(await db.syncMeta.get(lastSuccessfulSyncKey())).toBeUndefined();
+
+    fetchMock.mockImplementation(async () => cursorResponse());
+    await getSyncOrchestrator().triggerCursorPull();
+    await waitFor(() => expect(syncStateStore.status.state).toBe('synced'), { timeout: 2_000 });
+    expect((await db.syncMeta.get(lastSuccessfulSyncKey()))?.value).toEqual(expect.any(String));
+  });
+
+  it('retains and retries an offline upload without journalling the connection error', async () => {
+    await seedCharacter();
+    login();
+    const db = getLocalDb();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow('Failed to fetch');
+    expect((await db.characters.get(CHAR_ID))?.st).toBe(12);
+    const op = (await db.outbox.toArray())[0];
+    expect(op).toMatchObject({ status: 'transient_retry', deliveryUncertain: true });
+    expect(await db.syncLog.count()).toBe(0);
+    expect(await db.rejectionToasts.count()).toBe(0);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (!url.includes('/sync/operations')) return cursorResponse();
+        return new Response(
+          JSON.stringify({
+            outcomes: [
+              {
+                clientOpId: op?.clientOpId,
+                status: 'applied',
+                newRevision: 2,
+              },
+            ],
+          }),
+          { headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+    await getSyncOrchestrator().syncNow();
+    expect(await db.outbox.count()).toBe(0);
+    expect((await db.characters.get(CHAR_ID))?.st).toBe(12);
+    expect((await db.syncLog.toArray()).some((entry) => entry.result === 'synced')).toBe(true);
+  });
+
   it('retries a delivery-uncertain operation before its newer same-field successor', async () => {
     await seedCharacter();
     login();

@@ -13,6 +13,7 @@ import {
 } from '../db/dexie.ts';
 import { readSyncEntity, updateSyncEntity } from '../db/syncEntityStore.ts';
 import { ApiError, api } from '../lib/api.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { readActiveUser } from './activeUser.ts';
 import { backoffMs, enqueueFieldPatch, newClientId } from './outbox.ts';
 
@@ -119,10 +120,11 @@ export async function retryImage(upload: LocalMediaUpload) {
 export type RejectMedia = (op: OutboxEntry, reason: string) => Promise<void>;
 /** Runs under a separate cross-tab media lock, never the ordinary drain lock. */
 export async function drainOneImage(userId: string, signal: AbortSignal, reject: RejectMedia) {
+  if (!connectionStore.canAttemptNetwork()) return false;
   const db = getLocalDb();
   const uploads = await db.mediaUploads.where('userId').equals(userId).toArray();
   for (const upload of uploads) {
-    if (signal.aborted) return;
+    if (signal.aborted || !connectionStore.canAttemptNetwork()) return;
     const op = await db.outbox.filter((row) => row.localMediaUploadId === upload.id).first();
     if (
       !op ||
@@ -203,6 +205,7 @@ const warmedThumbnails = new Set<string>();
 
 /** URL metadata is account-scoped. Image response bodies use native caches. */
 export async function warmMediaManifests(signal: AbortSignal) {
+  if (!connectionStore.canAttemptNetwork()) return;
   const db = getLocalDb();
   const characters = await db.characters.toArray();
   const campaigns = await db.campaigns.toArray();
@@ -216,7 +219,7 @@ export async function warmMediaManifests(signal: AbortSignal) {
   ];
   let count = 0;
   for (const id of ids) {
-    if (signal.aborted || count >= 10) return;
+    if (signal.aborted || !connectionStore.canAttemptNetwork() || count >= 10) return;
     const saved = await db.mediaManifests.get(id);
     if (saved?.thumbUrl && !warmedThumbnails.has(saved.thumbUrl) && !signal.aborted) {
       const url = saved.thumbUrl;

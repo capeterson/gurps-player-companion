@@ -42,3 +42,19 @@ export async function expectCharacterNavigationReady(page: Page) {
     })
     .not.toBe('missing');
 }
+
+/** Assign a campaign through both the warning and final confirmation. */
+export async function assignOverviewCampaign(page: Page, campaignName: string) {
+  await page.getByRole('button', { name: 'Edit campaign', exact: true }).click();
+  const warning = page.getByRole('dialog', { name: 'Change character campaign?' });
+  await expect(warning).toBeVisible();
+  await warning.getByRole('button', { name: 'Continue', exact: true }).click();
+
+  const select = page.getByLabel('campaign', { exact: true });
+  await expect(select).toBeVisible();
+  await select.selectOption({ label: campaignName });
+  const confirmation = page.getByRole('dialog', { name: 'Are you sure?' });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: 'Change campaign', exact: true }).click();
+  await expect(page.getByRole('link', { name: campaignName, exact: true })).toBeVisible();
+}

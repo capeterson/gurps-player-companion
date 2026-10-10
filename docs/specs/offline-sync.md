@@ -374,10 +374,11 @@ A middleware in `routes/sync.ts` checks the header on every `/sync/*` route
   No operation is read, applied or rejected. The orchestrator restores each
   claimed op's pre-claim status and attempt count (no delivery uncertainty, no
   rollback, no rejection toast), journals the reason, shows it on the indicator,
-  pauses drain and pull for 60 s, and calls `requestClientUpdate()` to activate
-  the newest service worker and reload (see
-  [architecture.md](architecture.md#stale-build-discovery)). The current build
-  then sends the preserved ops.
+  pauses drain and pull until the user reloads, and calls `requestClientUpdate()`
+  to show the persistent new-version toast with a **Reload** button (see
+  [architecture.md](architecture.md#stale-build-discovery)). Activation and reload
+  happen only after that explicit action; there is no automatic or timed reload.
+  The current build then sends the preserved ops.
 - newer than the server (a rolling deploy or rollback reached an older replica)
   → **503** with `Retry-After: 5`, handled as an ordinary whole-batch failure.
 
@@ -398,8 +399,8 @@ new shape; the reloaded build runs that upgrade before it sends anything.
 | `stale_base` | Same as conflict — `baseRevision` was behind the server. If `latestEntity` shows the field unchanged, the client re-enqueues the op with the fresh revision instead of rolling back (the self-heal below); the server's batch-local fast-forward means a same-client burst now settles in one round trip rather than needing this self-heal per op. |
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
-| network error | Whole batch reverts to `transient_retry`; loop retries, and a `failed` journal entry + a named indicator error record why. |
-| HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and the page force-updates (see *Sync protocol version*). |
+| network error | Whole batch moves to `transient_retry` without reverting local edits; loop retries quietly and connectivity shows offline. Expected browser connection failures do not append `failed` or `retrying` journal entries. |
+| HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and a persistent toast offers Reload when the user is ready (see *Sync protocol version*). |
 
 ## The session must survive a server outage
 
@@ -485,14 +486,64 @@ diagnostics-only, logged by `applyOutcomes` in the orchestrator:
   can't flush the 1,000-row journal; the live retry state (attempt count,
   backoff timing) is always visible via the outbox rows themselves.
 - `failed` — a **whole-cycle** failure: the drain POST or the cursor pull
-  itself errored (dropped connection, 5xx, reverse-proxy/tunnel error), so no
+  itself errored (5xx, reverse-proxy/tunnel response, or application error), so no
   individual operation has an outcome to report. These carry no `entityClass` /
   `entityId` / `command`; `reason` names the failure including its HTTP status
-  and `details` carries the raw error. **This class of failure previously
-  logged nothing anywhere** — no outbox row, no rejection record, no toast —
-  which left the red badge with nothing to point at during a server outage.
+  and `details` carries the raw error.
 
-It is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
+Expected browser connection failures (`Failed to fetch`, Firefox's
+`NetworkError when attempting to fetch resource.`, and Safari's `Load failed`)
+are normal for offline PWA use. Both single and batched journal writes omit their
+`failed` and `retrying` entries, and the dialog filters matching historical
+entries without loading compressed bodies or deleting old debug records. HTTP
+error responses, other application errors and rejected edits remain recorded.
+Connection failures do not set a red cycle error or promote an operation into
+the dialog's **Repeatedly failing** section. The queued row instead says
+**Waiting for connection**, without its raw network message. HTTP and validation
+failures keep their diagnostic/revert affordances. Retry/backoff, delivery
+uncertainty, queued values, cursors and successful-sync timestamps are preserved.
+
+### Intentional offline mode
+
+The sync dialog has one **Go offline** / **Go online** action. The choice is
+device-local (`localStorage` key `gpc:offline-mode:v1`), survives page reloads,
+and propagates through storage events to other tabs on this origin. A browser
+`online` event never overrides an explicit offline choice. Sign-out, account
+changes and signed-out mounts clear it so it cannot block the next account's
+first download. A storage failure leaves the previous choice intact and the
+control reports the problem.
+
+`lib/connectionState.ts` supplies a shared immutable snapshot of the manual
+choice, device connectivity and observed API reachability. `canAttemptNetwork`
+blocks work during intentional/device offline periods; an unreachable origin
+still permits normal orchestrator probes so automatic recovery remains possible.
+`useConnectionStatus` renders that snapshot. Intentional offline mode pauses the
+HTTP outbox, cursor pulls, media uploads/warming, WebSocket connections, theme
+preference sends and page-side service-worker update checks. The PWA's React
+Query online manager also pauses polling and retries. Authenticated API requests
+share the network gate and abort signal; pausing an outstanding upload returns
+its operation to delivery-uncertain retry, preserving predecessor ordering and
+all local intent. Request cancellation for session teardown remains distinct.
+Static shell assets and native image caches retain their existing browser paths.
+The separate admin entry does not enable this PWA API gate and keeps its
+independent online-only behavior.
+
+The icon's quiet slashed orbit identifies **Offline mode — sync paused**; ordinary
+device/reachability offline uses its existing pause mark. **Go online** restores
+HTTP replay, cursor pulls and live updates without a destructive reset.
+**Sync now** and destructive resync are unavailable while offline. A never-
+bootstrapped device with a retained offline choice can choose **Go online** in
+the first-download recovery screen.
+
+An observed fetch failure uses `NetworkUnavailableError`, preserves authentication,
+and marks reachability offline until the next received HTTP response. These
+failures do not generate a sync-error banner or manual-sync error toast. Other
+errors stay actionable. Online read errors use a neutral offline state instead
+of raw network-error alerts; an unopened notifications cache says
+**Notifications unavailable offline** rather than claiming it is empty.
+Debug exports include the connection snapshot as well as physical `onLine`.
+
+The journal is pruned to the newest 1,000 records, eventually: writes never count or trim inline, but schedule a debounced prune (2 s trailing, 10 s max wait), and each cursor page's pull entries are written in one batch. The journal can briefly exceed 1,000 rows during a burst; per-row inline pruning once stalled large library pulls for tens of seconds between pages. `push` and `local` entries snapshot
 the outbox's `previousValue` / `newValue`. Pull entries compare the row in
 Dexie immediately before and after applying the cursor change and snapshot only
 the data fields that actually moved; this means a pending local field protected
@@ -734,8 +785,9 @@ and unmasked, i.e. fully accessible. `purge()` clears the claim.
 Journal writes are best-effort:
 quota or IndexedDB failures never block outbox settlement. Pending state is
 never copied into the log; the sync view reads the authoritative outbox
-directly, including attempt count, backoff timing, and the raw operation
-outcome or HTTP/network error.
+directly, including attempt count and backoff timing. Actionable operation and
+HTTP failures retain their raw diagnostics; network details remain in the
+outbox/debug export rather than error text in the dialog.
 
 **Every event in the dialog expands.** Queued outbox rows and journal entries
 both render as a `<details>` disclosure, **collapsed by default**, holding
@@ -746,14 +798,16 @@ count, and the failure reason. The summary line stays a scannable one-liner.
 muted outline gem when synced with no connected socket, a filled green gem when
 synced with the WebSocket connected, primary-colored rotating arrows while syncing
 around a gem that stays green while the socket is connected,
-a neutral pause mark when offline, and a copper exclamation for an error. Socket
+a neutral pause mark when offline, a slashed orbit for intentional offline mode,
+and a copper exclamation for an error. Socket
 connecting/reconnecting/stopped states retain the ordinary synced gem; HTTP sync
 does not depend on socket connectivity. Only the gem gains success ink when connected;
 the orbit stays muted and still when synced and rotates in primary ink while syncing.
 Offline and error states replace the gem with their respective symbols.
-A known error retains
-priority while offline; its tooltip includes the reason and offline context.
-The offline presentation changes no outbox/replay behavior. The control opens
+A known actionable error retains priority during device/reachability offline;
+its tooltip includes the reason and offline context. Intentional offline mode
+keeps its own icon and leaves actionable errors available inside the dialog.
+The icons preserve the outbox's ordering and retry guarantees. The control opens
 the existing sync log in every state; reduced-motion users get static arrows.
 
 **The indicator's `error` state always carries a reason.** `syncStateStore`
@@ -779,7 +833,8 @@ persistent toast, and the badge should follow the queue.)
 **Every cycle-ending `catch` goes through `reportCycleFailure()`** — the cursor
 pull, the drain POST, *and* `runLoop`'s outer catch (which covers
 `recoverStaleInFlight`, `readDrainableOps`, `applyOutcomes` and Dexie faults).
-It writes the journal entry and sets the named error together, and de-dupes via
+It sets the named error and writes a journal entry for actionable failures;
+expected browser connection errors instead update reachability, and it de-dupes via
 a `WeakSet` so an error reported by the pull path and rethrown into `runLoop`
 isn't logged twice. A bare `syncStateStore.set('error')` anywhere reintroduces
 the unexplained red badge this design exists to remove.
@@ -878,6 +933,13 @@ rule that has been broken at least once.
   blocks cleanup. Confirmation is bound to the login session that requested it.
 
 ## Self-healing & pruning
+
+Overview campaign navigation and assignment choices read `db.campaigns`, warmed
+by the cursor and the online campaign refresher. The edit pencil first opens the
+library-link warning, then reveals the dropdown; a separate final confirmation
+precedes `enqueueFieldPatch`. Canceling either step never changes IndexedDB or the
+outbox. The same flow works offline, and server rejection flashes the visible
+campaign link or editor alongside the persisted rejection toast.
 
 Campaign assignment patches detach all six child library references in the same
 IndexedDB transaction as the parent edit and outbox operation. Trait and skill

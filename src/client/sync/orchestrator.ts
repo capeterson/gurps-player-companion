@@ -61,6 +61,8 @@ import {
   writableSyncEntityTable,
 } from '../db/syncEntityStore.ts';
 import { ApiError, api } from '../lib/api.ts';
+import { connectionStore } from '../lib/connectionState.ts';
+import { isNetworkError } from '../lib/networkErrors.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { clearActiveUser } from './activeUser.ts';
 import { flashBus, makeFlashKey } from './flashBus.ts';
@@ -313,13 +315,14 @@ class SyncOrchestrator {
   /**
    * Set when the server answered 426: this build's sync protocol is too old.
    * Sync pauses (queued operations stay untouched) until the app reloads onto
-   * the current build, or the forced-reload guard window passes.
+   * the current build after the user chooses Reload in the persistent toast.
    */
-  private clientOutdatedUntil = 0;
+  private clientOutdated = false;
   /** Invalidates every response that originated before logout/account switch. */
   private sessionGeneration = 0;
   private sessionAbort = new AbortController();
   private purging = false;
+  private unsubscribeConnection: (() => void) | null = null;
 
   private invalidateSessionWork(): void {
     this.sessionGeneration += 1;
@@ -336,10 +339,10 @@ class SyncOrchestrator {
     if (this.started) return;
     this.started = true;
 
-    if (typeof window !== 'undefined') {
-      window.addEventListener('online', this.onOnline);
-      window.addEventListener('offline', this.onOffline);
-    }
+    this.unsubscribeConnection = connectionStore.subscribe(() => {
+      if (connectionStore.canAttemptNetwork()) this.onOnline();
+      else this.onOffline();
+    });
 
     // Wake the drain loop whenever a new outbox row is added.  Using
     // `liveQuery` over `countPending` is cheaper than scanning the
@@ -367,10 +370,8 @@ class SyncOrchestrator {
     if (!this.started) return;
     this.started = false;
     this.running = false;
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('online', this.onOnline);
-      window.removeEventListener('offline', this.onOffline);
-    }
+    this.unsubscribeConnection?.();
+    this.unsubscribeConnection = null;
     if (this.periodicTimer) clearInterval(this.periodicTimer);
     this.periodicTimer = null;
     if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
@@ -388,8 +389,7 @@ class SyncOrchestrator {
   /** Run an explicit HTTP outbox/cursor cycle and wait for its result. */
   async syncNow(): Promise<void> {
     if (!tokenStore.read()) throw new Error('Sign in to sync');
-    if (typeof navigator !== 'undefined' && navigator.onLine === false)
-      throw new Error('Reconnect to sync');
+    if (!connectionStore.canAttemptNetwork()) throw new Error('Reconnect to sync');
     if (this.recoveryInProgress) throw new Error('A full re-sync is already in progress');
     if (this.isClientOutdated()) throw new Error('App update required before syncing');
     const generation = this.sessionGeneration;
@@ -400,7 +400,7 @@ class SyncOrchestrator {
       tokenStore.read() &&
       !this.recoveryInProgress &&
       !this.isClientOutdated() &&
-      (typeof navigator === 'undefined' || navigator.onLine !== false) &&
+      connectionStore.canAttemptNetwork() &&
       (await readDrainableOps(1, Date.now() + MANUAL_RETRY_WINDOW_MS)).length > 0
     );
     if (!this.sessionIsCurrent(generation) || !tokenStore.read())
@@ -495,7 +495,7 @@ class SyncOrchestrator {
       }
       return false;
     }
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
+    if (!connectionStore.canAttemptNetwork()) return false;
     // Don't flip the indicator to 'syncing' just to *check* for changes —
     // the periodic loop polls every 5s and would otherwise leave the
     // badge perpetually flickering between 'syncing' and 'synced' even
@@ -581,11 +581,9 @@ class SyncOrchestrator {
         await this.handleClientOutdated(err);
         return false;
       }
-      // Leave a trace.  A failing pull produces no outbox row, no
-      // rejection record and no toast, so before this the only symptom
-      // was a red badge telling the user to go read a toast that never
-      // existed.
-      this.markCycleFailed();
+      // Actionable pull failures need a reason without an outbox row or
+      // rejection toast. Expected connection failures only mark offline.
+      if (!isNetworkError(err)) this.markCycleFailed();
       await reportCycleFailure(err, 'Downloading server changes failed', 'pull');
       throw err;
     }
@@ -689,7 +687,7 @@ class SyncOrchestrator {
     if (!tokenStore.read()) {
       throw new Error('Cannot resync without an authenticated session');
     }
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (!connectionStore.canAttemptNetwork()) {
       throw new Error('Cannot resync while offline');
     }
 
@@ -821,6 +819,7 @@ class SyncOrchestrator {
     this.rejectionHousekeepingDone = false;
     // The wiped Dexie no longer belongs to anyone.
     clearActiveUser();
+    connectionStore.reset();
     if (this.bootstrapRetryTimer) clearTimeout(this.bootstrapRetryTimer);
     this.bootstrapRetryTimer = null;
     try {
@@ -910,7 +909,7 @@ class SyncOrchestrator {
         // recoverStaleInFlight, readDrainableOps, applyOutcomes, a
         // Dexie failure. A bare set('error') here would restore exactly
         // the unexplained red badge this whole change exists to remove.
-        this.markCycleFailed();
+        if (!isNetworkError(err)) this.markCycleFailed();
         await reportCycleFailure(err, 'Sync failed');
       }
       // Wait for an outbox change, an online event, or 5s, whichever
@@ -923,7 +922,12 @@ class SyncOrchestrator {
   private mediaWarm: Promise<void> | null = null;
 
   private startMediaWork(): void {
-    if (!this.currentUserId || this.sessionAbort.signal.aborted) return;
+    if (
+      !this.currentUserId ||
+      this.sessionAbort.signal.aborted ||
+      !connectionStore.canAttemptNetwork()
+    )
+      return;
     const userId = this.currentUserId;
     const signal = this.sessionAbort.signal;
     if (!this.mediaWork) {
@@ -960,7 +964,7 @@ class SyncOrchestrator {
     // A session is back (re-login, or a refresh that finally succeeded)
     // -- re-arm the latch so a future loss is reported again.
     this.sessionLostReported = false;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (!connectionStore.canAttemptNetwork()) {
       // Can't drain while offline -- leave the indicator showing
       // 'syncing' if anything is pending so the user knows their
       // edits haven't reached the server yet.
@@ -1030,7 +1034,7 @@ class SyncOrchestrator {
           });
         }
         if (!this.sessionIsCurrent(generation)) return;
-        this.markCycleFailed();
+        if (!isNetworkError(err)) this.markCycleFailed();
         await appendSyncLogEntries(
           ops
             .filter((op) => op.status !== 'transient_retry')
@@ -2713,22 +2717,20 @@ class SyncOrchestrator {
   }
 
   private isClientOutdated(): boolean {
-    // Skip the clock read in the common case; scheduling snapshots elsewhere
-    // depend on the order of Date.now() calls.
-    return this.clientOutdatedUntil !== 0 && Date.now() < this.clientOutdatedUntil;
+    return this.clientOutdated;
   }
 
   /**
    * The server no longer accepts this build's sync protocol. Queued edits
-   * stay in the outbox; the page reloads onto the current build, whose Dexie
-   * upgrades migrate them before they are sent.
+   * stay in the outbox until the user reloads onto the current build, whose
+   * Dexie upgrades migrate them before they are sent.
    */
   private async handleClientOutdated(err: unknown): Promise<void> {
     const alreadyReported = this.isClientOutdated();
-    this.clientOutdatedUntil = Date.now() + CLIENT_OUTDATED_PAUSE_MS;
+    this.clientOutdated = true;
     this.markCycleFailed();
     if (alreadyReported) return;
-    const reason = 'App update required — reloading to sync your changes';
+    const reason = 'App update required — choose Reload to sync your changes';
     await appendSyncLog({
       direction: 'local',
       result: 'failed',
@@ -2813,10 +2815,9 @@ function rollbackSnapshot(
 const reportedFailures = new WeakSet<object>();
 
 /**
- * The single way a whole-cycle failure becomes visible: one journal
- * entry plus a named indicator error.  Every `catch` that ends a sync
- * cycle must go through here — a bare `syncStateStore.set('error')`
- * produces a red badge with nothing behind it.
+ * Actionable cycle failures get a journal entry and named indicator error;
+ * expected connection failures only update reachability. Every cycle-ending
+ * catch goes through here so errors never produce an unexplained red badge.
  */
 async function reportCycleFailure(
   err: unknown,
@@ -2824,6 +2825,10 @@ async function reportCycleFailure(
   direction: 'push' | 'pull' | 'local' = 'local',
   extraDetails?: Record<string, unknown>,
 ): Promise<void> {
+  if (isNetworkError(err)) {
+    connectionStore.markUnavailable();
+    return;
+  }
   if (typeof err === 'object' && err !== null) {
     if (reportedFailures.has(err)) return;
     reportedFailures.add(err);
@@ -2847,9 +2852,6 @@ async function reportCycleFailure(
  * is down" and "my edit was rejected" -- and the user is the one who
  * has to tell those apart when the badge goes red.
  */
-/** Matches the forced-reload guard window in `requestClientUpdate`. */
-const CLIENT_OUTDATED_PAUSE_MS = 60_000;
-
 function isClientOutdatedError(err: unknown): boolean {
   return err instanceof ApiError && err.status === 426;
 }

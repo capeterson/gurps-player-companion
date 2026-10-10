@@ -4,9 +4,17 @@
  */
 
 import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
+import { connectionStore } from './connectionState.ts';
+import { NetworkUnavailableError, isNetworkError } from './networkErrors.ts';
 import { type TokenSnapshot, tokenStore } from './tokenStore.ts';
 
 const API_ROOT = '/api/v1';
+let pwaConnectionControl = false;
+
+/** The separate admin entry keeps its independent online-only request path. */
+export function setPwaConnectionControl(enabled: boolean): void {
+  pwaConnectionControl = enabled;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -79,7 +87,7 @@ async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
 
         let res: Response;
         try {
-          res = await fetch(`${API_ROOT}/auth/refresh`, {
+          res = await fetchApi(`${API_ROOT}/auth/refresh`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
@@ -208,7 +216,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
   if (options.signal) init.signal = options.signal;
   if (options.body !== undefined) init.body = JSON.stringify(options.body);
   if (options.rawBody !== undefined) init.body = options.rawBody;
-  const res = await fetch(`${API_ROOT}${path}`, init);
+  const res = await fetchApi(`${API_ROOT}${path}`, init);
   if (
     options.authenticated !== false &&
     tokens &&
@@ -253,11 +261,42 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
         };
         if (options.signal) retryInit.signal = options.signal;
         if (options.body !== undefined) retryInit.body = JSON.stringify(options.body);
-        return await fetch(`${API_ROOT}${path}`, retryInit);
+        return await fetchApi(`${API_ROOT}${path}`, retryInit);
       }
     }
   }
   return res;
+}
+
+/** A manual pause also cancels in-flight requests; their outcome stays uncertain. */
+async function fetchApi(url: string, init: RequestInit): Promise<Response> {
+  if (!pwaConnectionControl) return await fetch(url, init);
+  if (!connectionStore.canAttemptNetwork()) throw new NetworkUnavailableError();
+  const networkSignal = connectionStore.signal;
+  const callerSignal = init.signal;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  networkSignal.addEventListener('abort', abort, { once: true });
+  callerSignal?.addEventListener('abort', abort, { once: true });
+  if (networkSignal.aborted || callerSignal?.aborted) abort();
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    connectionStore.markReachable();
+    return response;
+  } catch (error) {
+    if (callerSignal?.aborted) throw error;
+    if (networkSignal.aborted || isNetworkError(error)) {
+      connectionStore.markUnavailable();
+      throw new NetworkUnavailableError(
+        networkSignal.aborted ? 'Offline' : error instanceof Error ? error.message : 'Offline',
+        { cause: error },
+      );
+    }
+    throw error;
+  } finally {
+    networkSignal.removeEventListener('abort', abort);
+    callerSignal?.removeEventListener('abort', abort);
+  }
 }
 
 async function parse<T>(res: Response): Promise<T> {

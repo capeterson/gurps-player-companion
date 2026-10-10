@@ -14,6 +14,7 @@ import {
   campaignInvitationNotificationPayload,
   eventNotificationPayload,
 } from '../../shared/schemas/notification.ts';
+import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
 import { useViewportBoundedOverlay } from '../hooks/useViewportBoundedOverlay.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { useDesktopNotificationDelivery } from '../lib/desktopNotifications.ts';
@@ -32,6 +33,7 @@ function isCampaignInvite(n: NotificationOut): boolean {
 export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?: string } = {}) {
   const qc = useQueryClient();
   const toasts = useToasts();
+  const { online } = useConnectionStatus();
   const panelRef = useViewportBoundedOverlay<HTMLDivElement>(true, undefined, {
     constrainHeight: true,
   });
@@ -46,6 +48,7 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
   const me = useQuery({ queryKey: ['auth', 'me'], queryFn: () => api<{ id: string }>('/auth/me') });
   useDesktopNotificationDelivery(me.data?.id, notifications.data);
   const items = notifications.data ?? [];
+  const unavailableOffline = !online && notifications.data === undefined;
   const unread = items.filter((n) => n.readAt === null);
 
   const accept = useMutation({
@@ -132,14 +135,20 @@ export function NotificationsBell({ triggerClassName = '' }: { triggerClassName?
             </button>
           )}
         </div>
-        {notifications.isError && (
-          <QueryReadError
-            label="notifications"
-            error={notifications.error}
-            onRetry={() => void notifications.refetch()}
-          />
+        {unavailableOffline ? (
+          <p className="text-sm text-base-content/60 py-4 text-center">
+            Notifications unavailable offline.
+          </p>
+        ) : (
+          notifications.isError && (
+            <QueryReadError
+              label="notifications"
+              error={notifications.error}
+              onRetry={() => void notifications.refetch()}
+            />
+          )
         )}
-        {items.length === 0 && !notifications.isError ? (
+        {items.length === 0 && !notifications.isError && !unavailableOffline ? (
           <p className="text-sm text-base-content/60 py-4 text-center">You're all caught up.</p>
         ) : items.length > 0 ? (
           <ul className="grid gap-2">

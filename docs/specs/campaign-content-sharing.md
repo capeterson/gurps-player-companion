@@ -528,9 +528,13 @@ Provisional mechanics retain the picked definition's actual campaign provenance.
 Deletion detaches owned copies and retains
 their last effects and source
 version. YAML replacement with a renamed natural key follows the same path;
-recreating the old name cannot reconnect a different UUID. The character assignment UI confirms any move/removal from an existing campaign before
-queueing it, warning that a later rejoin cannot restore detached links. First assignment
-from no campaign does not prompt. Campaign transfers
+recreating the old name cannot reconnect a different UUID. The Overview campaign
+name links to the campaign; its edit pencil first warns that a later rejoin cannot
+restore detached links. Accepting that warning reveals the campaign dropdown.
+Choosing an assignment, move or removal then requires a separate **Are you sure?**
+confirmation naming both campaigns before queueing the local-first change.
+Canceling either step leaves the assignment unchanged. Cached campaign names and
+choices remain available offline. Campaign transfers
 detach all six live library reference types and preserve owned trait/skill rules,
 paid points, levels, variants, modifiers and skill specialties. Retained source
 IDs/campaigns are provenance only. Missing legacy copies remain visibly unresolved.

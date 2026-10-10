@@ -19,6 +19,7 @@
 
 import type { OutboxEntry, RejectionRecord, SyncCursor, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { type ConnectionStatus, connectionStore } from '../lib/connectionState.ts';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import {
   type LocalCharacterAccess,
@@ -36,6 +37,7 @@ export interface SyncDebugDump {
     generatedAt: string;
     userAgent: string;
     onLine: boolean;
+    connection: ConnectionStatus;
     userId: string | null;
     syncIndicatorState: SyncIndicatorState;
     pendingCounts: {
@@ -201,6 +203,7 @@ export async function buildSyncDebugDump(): Promise<SyncDebugDump> {
       generatedAt: new Date().toISOString(),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
       onLine: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      connection: connectionStore.status,
       userId: readUserIdFromToken(),
       syncIndicatorState: syncStateStore.value,
       pendingCounts: {

@@ -328,7 +328,17 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   `src/client/components/markdown/`) used by the adventure log, with a
   raw-markdown/source toggle and sanitized rendering. It has no separate
   Notes destination or duplicate editing surface.
-- **Campaign assignment confirmation.** Moving or removing a character already in a campaign requires confirmation before enqueueing the local-first campaign patch. The dialog explains that owned library copies remain but live links are detached; rejoining does not reconnect them. First assignment from no campaign and unchanged selections do not prompt. Pending confirmation clears when the displayed character or its campaign changes.
+- **Campaign assignment.** Overview shows the campaign as a link with an editor-only
+  edit pencil, or **No campaign** when unassigned. The pencil first opens the
+  library-link warning; **Continue** replaces the link with the campaign dropdown
+  and a cancel action. Choosing a different campaign or **No campaign** then opens
+  **Are you sure?**, naming the old and new campaign. Only **Change campaign**
+  enqueues the local-first patch and returns to the link. First assignment uses
+  the same steps; unchanged selections do not prompt. Canceling the warning
+  retains the link; canceling the final confirmation retains the dropdown and
+  original assignment. Editing clears when the displayed character, its campaign,
+  or write access changes. Names and choices come from Dexie for offline use.
+  `src/client/features/characters/CampaignAssignmentControl.tsx` owns this flow.
 - **Attributes, Secondary & Status cards.** ST/DX/IQ/HT drive HP, FP,
   Will, Per, Basic Speed, Basic Move, Dodge, basic **thrust/swing
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary attributes** card
@@ -1170,6 +1180,14 @@ settings sections; switching sections retains drafts.
   data change). Both times survive journal pruning. The log's **Sync now** button
   runs an HTTP outbox/cursor cycle; successful empty checks refresh Last sync without
   changing Last changes. Failed or interrupted checks leave Last sync unchanged.
+  Expected offline connection failures do not add sync-log entries, and older
+  matching entries are hidden from the activity list. HTTP errors and rejected
+  edits remain visible; unsynced edits keep their normal retry behavior.
+  **Go offline** pauses network work on this device and across its tabs until
+  **Go online** resumes it; the choice survives reload and has a distinct quiet
+  slashed-orbit icon. Offline connection retries appear as waiting rather than
+  repeated failures. Background reads pause and notifications name unavailable
+  offline data without showing raw connection errors.
   Larger diagnostic payloads use device-local gzip storage and load when a
   change opens; closed rows/folds do not format their bodies. Debug
   downloads still export readable JSON.
@@ -1204,7 +1222,8 @@ settings sections; switching sections retains drafts.
 - **New-version prompt**: a long-lived tab polls for a new build and offers a
   persistent "A new version of the app is available" toast with a Reload
   button. The message wraps while Reload and Dismiss remain readable and inside
-  the toast on narrow screens. Never reloads on its own (`SwUpdatePrompt`,
+  the toast on narrow screens. Never reloads on its own, including when sync
+  requires a newer build; edits remain queued until the user chooses Reload (`SwUpdatePrompt`,
   `src/sw/registerSW.ts`).
 - **Styled error recovery**: unknown routes and unexpected router/render errors
   use the app shell rather than React Router's developer fallback. The
@@ -1379,9 +1398,13 @@ src/
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
     lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    lib/connectionState.ts, lib/networkErrors.ts  Device offline choice,
+                 shared reachability and expected fetch-failure classification
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
+    features/characters/CampaignAssignmentControl.tsx  Overview campaign link,
+                 pencil warning, dropdown and final local-first confirmation
     features/settings/AppearanceSection.tsx  Settings theme pickers
     features/settings/NotificationsSection.tsx  Inbox/email controls and explicit desktop opt-in
     features/settings/ExperimentalFeaturesSection.tsx  Account-wide MCP UI opt-in
@@ -1412,7 +1435,8 @@ src/
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
-    hooks/       useDraftField (canonical draft-on-blur), useDraftToggle,
+    hooks/       useConnectionStatus (shared offline mode/reachability),
+                 useDraftField (canonical draft-on-blur), useDraftToggle,
                  useUnsyncedChangesGuard (confirmed session cleanup),
                  useAppHeaderBottom (live sticky-header offset),
                  useSelectedCampaignId (legacy Log/Library campaign URL selection),
@@ -1429,7 +1453,7 @@ src/
     schemas/     Zod schemas — the wire contract (sync.ts is the sync protocol;
                  libraryMechanics.ts validates synced character-owned declarations)
     syncProtocol.ts  Sync protocol version + header; `/sync/*` answers 426 to
-                 an outdated build, which then force-reloads onto the current one
+                 an outdated build, which pauses sync and offers a user-controlled Reload
     format/      number.ts — formatSigned/formatScaled, the shared
                  sign/scale number formatters used by both client display
                  code and shared warning text

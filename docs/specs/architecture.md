@@ -263,17 +263,16 @@ closed against every future release. The *announced worker* is remembered
 separately, so polling won't re-nag about the same build while a genuinely
 newer one still gets through.
 
-**Forced update for an incompatible build.** The prompt above stays optional
-because an old build still syncs correctly. When the server refuses the build's
+**User-controlled update for an incompatible build.** When the server refuses the build's
 sync protocol (HTTP 426 from `/sync/*`, see [offline-sync.md](offline-sync.md#sync-protocol-version)),
-the orchestrator calls `requestClientUpdate()`: it dispatches
-`gpc:client-outdated` (which `SwUpdatePrompt` shows as a persistent
-"Updating the app…" toast with **Reload now**), runs `registration.update()`,
-activates the newest worker with `SKIP_WAITING`, waits until no input, select,
-textarea or contenteditable element has focus (so a `useDraftField` blur commit
-reaches the outbox first), and reloads. A sessionStorage timestamp limits forced
-reloads to one per `FORCED_RELOAD_MIN_INTERVAL_MS` (60 s) per tab, so a server
-still mid-deploy cannot cause a reload loop.
+the orchestrator pauses sync and calls `requestClientUpdate()`. It latches and
+dispatches the same `gpc:sw-update-ready` callback as normal updates, so the
+persistent toast always offers **Reload**. Repeated rejections do not stack
+prompts. Detection, elapsed time, focus changes, input blur and worker activation
+never reload the page. Only clicking Reload runs `registration.update()`,
+activates the newest worker with `SKIP_WAITING`, waits for any focused editor's
+blur commit to settle, and reloads. Queued edits remain intact while the user
+continues working; sync stays paused until the user loads a compatible build.
 
 ## Request lifecycle
 

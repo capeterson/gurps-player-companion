@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OutboxEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
 import { syncStateStore } from '../sync/state.ts';
@@ -53,6 +54,9 @@ afterEach(() => {
   revertFailedOperation.mockReset();
   tokenStore.clear();
   syncStateStore.reset('synced');
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  connectionStore.reset();
 });
 
 describe('SyncStatusIndicator recovery action', () => {
@@ -134,6 +138,40 @@ describe('SyncStatusIndicator recovery action', () => {
     expect(
       screen.getByRole('button', { name: /abandon local changes and re-sync/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows the paused status when going offline and resumes when going online', async () => {
+    const user = userEvent.setup();
+    renderIndicator();
+
+    await user.click(screen.getByLabelText('All changes saved'));
+    expect(screen.getByRole('heading', { name: 'Sync log' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Go offline' }));
+
+    const paused = await screen.findByLabelText('Offline mode — sync paused');
+    expect(paused).toBeVisible();
+    expect(screen.getByText('Offline mode')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Go online' }));
+    expect(await screen.findByLabelText('All changes saved')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Sync now' })).toBeEnabled();
+  });
+
+  it('keeps the current mode and explains when the offline preference cannot be saved', async () => {
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('storage full');
+    });
+    const user = userEvent.setup();
+    renderIndicator();
+    await user.click(screen.getByLabelText('All changes saved'));
+
+    await user.click(screen.getByRole('button', { name: 'Go offline' }));
+
+    expect(
+      await screen.findByText("Couldn't change offline mode — storage full"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('All changes saved')).toBeInTheDocument();
   });
 
   it('opens the sync log in the error state', async () => {
@@ -279,5 +317,31 @@ describe('SyncStatusIndicator recovery action', () => {
     expect(confirmRevert).toBeDefined();
     if (confirmRevert) await user.click(confirmRevert);
     await waitFor(() => expect(revertFailedOperation).toHaveBeenCalledWith('failed-op'));
+  });
+
+  it('keeps a repeated network retry in the waiting list as Waiting for connection', async () => {
+    const networkRetry: OutboxEntry = {
+      clientOpId: 'offline-op',
+      entityClass: 'character',
+      entityId: 'character-1',
+      command: 'patch',
+      coalesceKey: 'character-1|name',
+      fieldPath: 'name',
+      attemptedValue: 'Offline edit',
+      prevValue: 'Server name',
+      validationVersion: 1,
+      status: 'transient_retry',
+      enqueuedAt: new Date().toISOString(),
+      attemptCount: 4,
+      serverReason: 'Failed to fetch',
+      lastError: { name: 'TypeError', message: 'Failed to fetch' },
+      humanName: 'Name',
+    };
+    await getLocalDb().outbox.put(networkRetry);
+    renderIndicator();
+    await userEvent.setup().click(screen.getByLabelText('All changes saved'));
+
+    expect(await screen.findByText(/Waiting for connection/)).toBeInTheDocument();
+    expect(screen.queryByText('Repeatedly failing')).not.toBeInTheDocument();
   });
 });

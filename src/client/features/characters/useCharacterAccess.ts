@@ -133,11 +133,10 @@ export interface CharacterAccessLocal extends CharacterAccess {
  * so the share-gate decision is available offline / on a cold cache
  * without waiting on the network.
  *
- * Callers that also need the *full* campaign list for UI unrelated to
- * the access decision (e.g. a campaign picker) should keep their own
- * REST `useQuery('/campaigns')` — that fetch continues to feed
- * `useMirrorCampaigns` as the online refresher for this Dexie table;
- * it is unrelated to (and unchanged by) this hook.
+ * The sheet keeps a REST `useQuery('/campaigns')` feeding
+ * `useMirrorCampaigns` as the online refresher for this Dexie table.
+ * CampaignAssignmentControl also reads the mirror for its names and
+ * choices, so navigation and assignment remain available offline.
  */
 export function useCharacterAccessLocal(
   character: CharacterDetail | null | undefined,

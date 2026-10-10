@@ -10,8 +10,9 @@
  * guard, freezing the sync badge with no toast to explain it.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { type ApiError, api } from './api.ts';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ApiError, api, apiFetch, setPwaConnectionControl } from './api.ts';
+import { connectionStore } from './connectionState.ts';
 import { tokenStore } from './tokenStore.ts';
 
 function seedTokens() {
@@ -29,13 +30,70 @@ function jsonResponse(status: number, body: unknown = {}) {
   });
 }
 
+beforeEach(() => {
+  connectionStore.reset();
+  setPwaConnectionControl(true);
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  connectionStore.reset();
+  setPwaConnectionControl(false);
   tokenStore.clear();
 });
 
 describe('api refresh-on-401', () => {
+  it('does not apply the PWA manual-offline gate when it is disabled', async () => {
+    setPwaConnectionControl(false);
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    connectionStore.setManualOffline(true);
+
+    await expect(api('/admin/users')).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(connectionStore.status.manualOffline).toBe(true);
+  });
+
+  it('does not send requests in manual offline mode and keeps the session', async () => {
+    seedTokens();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    connectionStore.setManualOffline(true);
+
+    await expect(apiFetch('/characters')).rejects.toMatchObject({
+      name: 'NetworkUnavailableError',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
+  });
+
+  it('aborts an in-flight request when manual offline mode starts and keeps the session', async () => {
+    seedTokens();
+    const captured = { signal: null as AbortSignal | null };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        captured.signal = init?.signal ?? null;
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+      }),
+    );
+
+    const request = apiFetch('/characters');
+    await vi.waitFor(() => expect(captured.signal).not.toBeNull());
+    connectionStore.setManualOffline(true);
+
+    await expect(request).rejects.toMatchObject({ name: 'NetworkUnavailableError' });
+    expect(captured.signal?.aborted).toBe(true);
+    expect(tokenStore.read()).toMatchObject({ refreshToken: 'refresh-1' });
+  });
+
   it('retains the server request ID on API errors', async () => {
     const requestId = '8d952a62-ee65-4faa-bce0-64b55ac56a96';
     vi.stubGlobal(

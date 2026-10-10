@@ -52,6 +52,39 @@ function renderView() {
   );
 }
 
+it('hides historical connection failures while preserving actionable sync errors', async () => {
+  await getLocalDb().syncLog.bulkPut([
+    {
+      id: 'offline-pull',
+      direction: 'pull',
+      result: 'failed',
+      occurredAt: '2026-10-03T19:45:00Z',
+      reason: 'Downloading server changes failed — NetworkError when attempting to fetch resource.',
+    },
+    {
+      id: 'offline-push',
+      direction: 'push',
+      result: 'retrying',
+      occurredAt: '2026-10-03T19:46:00Z',
+      reason: 'Upload will retry — Failed to fetch',
+    },
+    {
+      id: 'server-error',
+      direction: 'pull',
+      result: 'failed',
+      occurredAt: '2026-10-03T19:44:00Z',
+      reason: 'Downloading server changes failed (HTTP 503)',
+    },
+  ]);
+  renderView();
+  expect(
+    await screen.findByText('Downloading server changes failed (HTTP 503)'),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/NetworkError|Failed to fetch/)).not.toBeInTheDocument();
+  // Older records remain available in debug exports; display filtering does not delete them.
+  expect(await getLocalDb().syncLog.count()).toBe(3);
+});
+
 afterEach(async () => {
   vi.restoreAllMocks();
   syncNow.mockReset();

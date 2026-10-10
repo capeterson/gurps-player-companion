@@ -4,7 +4,10 @@ import type { EntityClass } from '../../shared/schemas/sync.ts';
 import type { OutboxEntry, SyncLogEntry } from '../db/dexie.ts';
 import { getLocalDb } from '../db/dexie.ts';
 import { syncEntityTable } from '../db/syncEntityStore.ts';
+import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
 import { useDialogState } from '../hooks/useDialogState.ts';
+import { connectionStore } from '../lib/connectionState.ts';
+import { isNetworkError } from '../lib/networkErrors.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { readUserIdFromToken } from '../lib/tokenStore.ts';
 import { buildSyncDebugDump } from '../sync/debugDump.ts';
@@ -17,6 +20,7 @@ import {
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
 import { resolveLegacyCampaignDependency } from '../sync/outbox.ts';
 import {
+  isNetworkSyncLogEntry,
   isSuccessfulSyncOperation,
   lastChangesSyncKey,
   lastSuccessfulSyncKey,
@@ -41,11 +45,18 @@ interface SyncLogViewProps {
   storageMessage?: string;
 }
 
-export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogViewProps) {
+export function SyncLogView({
+  open,
+  onClose,
+  online: browserOnline,
+  storageMessage,
+}: SyncLogViewProps) {
   const ref = useDialogState(open);
   const toasts = useToasts();
   const status = useSyncStatus();
   const websocket = useSyncWsStatus();
+  const { manualOffline, online: connectionOnline } = useConnectionStatus();
+  const online = browserOnline && connectionOnline;
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!open) return;
@@ -66,7 +77,13 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
     [],
   );
   const log = useLiveQuery(
-    () => getLocalDb().syncLog.orderBy('occurredAt').reverse().limit(1_000).toArray(),
+    () =>
+      getLocalDb()
+        .syncLog.orderBy('occurredAt')
+        .reverse()
+        .filter((entry) => !isNetworkSyncLogEntry(entry))
+        .limit(1_000)
+        .toArray(),
     [],
   );
   // Bulk-read each class once. Never decompress journal bodies to render titles.
@@ -125,9 +142,16 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
   const [working, setWorking] = useState(false);
   const [syncingNow, setSyncingNow] = useState(false);
 
-  const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4);
-  const pending = (outbox ?? []).filter((op) => op.attemptCount < 4);
+  const failures = (outbox ?? []).filter((op) => op.attemptCount >= 4 && !isNetworkRetry(op));
+  const pending = (outbox ?? []).filter((op) => op.attemptCount < 4 || isNetworkRetry(op));
   const recentChanges = combineBursts(combineAcknowledgements(log ?? []));
+  const changeConnectionMode = () => {
+    try {
+      connectionStore.setManualOffline(!manualOffline);
+    } catch (error) {
+      toasts.push(`Couldn't change offline mode — ${errorMessage(error)}`, { kind: 'error' });
+    }
+  };
   const sourceHolds = (outbox ?? []).filter((op) => op.localSourceMigrationUnknown);
   const campaignHolds = (outbox ?? []).filter((op) => op.localCampaignDependencyUnknown);
   const confirmCampaignOrder = async (op: OutboxEntry, wait: boolean) => {
@@ -200,6 +224,7 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
       setNow(Date.now());
       toasts.push('Sync completed', { kind: 'success' });
     } catch (err) {
+      if (isNetworkError(err)) return;
       toasts.push(`Couldn't sync — ${errorMessage(err)}`, { kind: 'error' });
     } finally {
       setSyncingNow(false);
@@ -263,9 +288,9 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 <p className="mt-1 flex items-center gap-2 font-medium">
                   <span
                     aria-hidden="true"
-                    className={`status status-sm ${online && websocket.state === 'connected' ? 'status-success' : 'status-warning'}`}
+                    className={`status status-sm ${online && websocket.state === 'connected' ? 'status-success' : online ? 'status-warning' : 'bg-base-content/40'}`}
                   />
-                  {online ? wsLabel(websocket.state) : 'Offline'}
+                  {manualOffline ? 'Offline mode' : online ? wsLabel(websocket.state) : 'Offline'}
                 </p>
                 {(!online || websocket.state !== 'connected') && (
                   <p className="mt-1 text-xs text-base-content/60">
@@ -375,25 +400,27 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 ))}
               </section>
             )}
-            {status.state === 'error' && status.error && (
-              // The badge that opens this dialog says something is
-              // wrong; this is where it says *what*.  Cycle-level
-              // failures (server down, connection dropped, session
-              // lost) produce no toast and no outbox row, so without
-              // this the dialog looked completely healthy.
-              <section
-                aria-labelledby="sync-current-error-title"
-                className="rounded-box border border-warning/50 bg-warning/10 p-3"
-              >
-                <h3 id="sync-current-error-title" className="font-semibold text-warning">
-                  Sync isn't currently working
-                </h3>
-                <p className="mt-1 text-sm">{status.error.reason}</p>
-                <p className="mt-1 text-xs text-base-content/60">
-                  Last attempt {formatTime(status.error.at)}.
-                </p>
-              </section>
-            )}
+            {status.state === 'error' &&
+              status.error &&
+              !isNetworkSyncLogEntry({ result: 'failed', reason: status.error.reason }) && (
+                // The badge that opens this dialog says something is
+                // wrong; this is where it says *what*.  Cycle-level
+                // failures (server down, connection dropped, session
+                // lost) produce no toast and no outbox row, so without
+                // this the dialog looked completely healthy.
+                <section
+                  aria-labelledby="sync-current-error-title"
+                  className="rounded-box border border-warning/50 bg-warning/10 p-3"
+                >
+                  <h3 id="sync-current-error-title" className="font-semibold text-warning">
+                    Sync isn't currently working
+                  </h3>
+                  <p className="mt-1 text-sm">{status.error.reason}</p>
+                  <p className="mt-1 text-xs text-base-content/60">
+                    Last attempt {formatTime(status.error.at)}.
+                  </p>
+                </section>
+              )}
 
             {failures.length > 0 && (
               <section aria-labelledby="sync-failures-title">
@@ -518,6 +545,14 @@ export function SyncLogView({ open, onClose, online, storageMessage }: SyncLogVi
                 onClick={() => void syncNow()}
               >
                 {syncingNow ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm h-auto whitespace-normal py-2"
+                disabled={working}
+                onClick={changeConnectionMode}
+              >
+                {manualOffline ? 'Go online' : 'Go offline'}
               </button>
               <button
                 type="button"
@@ -1147,7 +1182,8 @@ function PendingDetails({ op, hideValues }: { op: OutboxEntry; hideValues: boole
   rows.push(textRow('Operation', op.command));
   rows.push(textRow('Queued', formatTime(op.enqueuedAt)));
   if (op.attemptCount > 0) rows.push(textRow('Attempts', String(op.attemptCount)));
-  if (op.serverReason) rows.push(textRow('Last error', op.serverReason, 'error'));
+  if (op.serverReason && !isNetworkRetry(op))
+    rows.push(textRow('Last error', op.serverReason, 'error'));
   return <DetailList rows={rows} />;
 }
 
@@ -1232,9 +1268,21 @@ function directionLabel(entry: SyncLogEntry): string {
 }
 
 function statusLabel(op: OutboxEntry): string {
+  if (isNetworkRetry(op)) return 'Waiting for connection';
   if (op.status === 'in_flight') return 'Pushing';
   if (op.status === 'transient_retry') return `Retrying (${op.attemptCount})`;
   return 'Waiting';
+}
+
+function isNetworkRetry(op: OutboxEntry): boolean {
+  return (
+    op.status === 'transient_retry' &&
+    isNetworkSyncLogEntry({
+      result: 'retrying',
+      reason: op.serverReason,
+      details: op.lastError,
+    })
+  );
 }
 
 function formatTime(value: string): string {

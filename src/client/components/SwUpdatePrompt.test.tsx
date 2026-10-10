@@ -5,9 +5,15 @@
  * already been found during startup (before React rendered).
  */
 
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { clearPendingSwUpdate, registerSwLifecycle, swEvents } from '../../sw/registerSW.ts';
+import {
+  clearPendingSwUpdate,
+  registerSwLifecycle,
+  requestClientUpdate,
+  resetClientUpdateForTests,
+  swEvents,
+} from '../../sw/registerSW.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { SwUpdatePrompt } from './SwUpdatePrompt.tsx';
 
@@ -27,6 +33,7 @@ function fireUpdateReady(reload: () => void) {
 
 afterEach(() => {
   clearPendingSwUpdate();
+  resetClientUpdateForTests();
   vi.restoreAllMocks();
 });
 
@@ -81,6 +88,30 @@ describe('SwUpdatePrompt', () => {
     renderPrompt();
     fireUpdateReady(vi.fn());
     fireUpdateReady(vi.fn());
+    expect(screen.getAllByText('A new version of the app is available.')).toHaveLength(1);
+  });
+
+  it('latches a server-required update for a prompt that mounts later and reloads only on click', async () => {
+    const reload = vi.fn();
+    requestClientUpdate({ reload });
+
+    renderPrompt();
+    expect(screen.getByText('A new version of the app is available.')).toBeInTheDocument();
+    expect(reload).not.toHaveBeenCalled();
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    });
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+  });
+
+  it('does not stack repeated server-required update announcements', () => {
+    renderPrompt();
+    act(() => {
+      requestClientUpdate({ reload: vi.fn() });
+      requestClientUpdate({ reload: vi.fn() });
+    });
+
     expect(screen.getAllByText('A new version of the app is available.')).toHaveLength(1);
   });
 

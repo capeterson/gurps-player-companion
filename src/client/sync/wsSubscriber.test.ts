@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getLocalDb, resetLocalDb } from '../db/dexie.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { tokenStore } from '../lib/tokenStore.ts';
 import {
   getSyncWsSubscriber,
@@ -22,6 +23,7 @@ afterEach(async () => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
   vi.useRealTimers();
+  connectionStore.reset();
   await resetLocalDb();
 });
 
@@ -154,6 +156,23 @@ it('reports offline without changing HTTP sync, then reconnects when the browser
   expect(drain).not.toHaveBeenCalled();
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
   window.dispatchEvent(new Event('online'));
+  expect(sockets).toHaveLength(2);
+  expect(subscriber.status.state).toBe('reconnecting');
+});
+
+it('closes and reopens its socket when the user changes manual offline mode', () => {
+  const sockets = installSockets();
+  authenticate();
+  const subscriber = getSyncWsSubscriber();
+  subscriber.start();
+  sockets[0]?.open();
+
+  connectionStore.setManualOffline(true);
+  expect(sockets[0]?.close).toHaveBeenCalledOnce();
+  expect(subscriber.status.state).toBe('offline');
+  expect(sockets).toHaveLength(1);
+
+  connectionStore.setManualOffline(false);
   expect(sockets).toHaveLength(2);
   expect(subscriber.status.state).toBe('reconnecting');
 });

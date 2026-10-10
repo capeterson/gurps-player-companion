@@ -13,7 +13,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { getLocalDb } from '../db/dexie.ts';
+import { useConnectionStatus } from '../hooks/useConnectionStatus.ts';
 import { api } from '../lib/api.ts';
+import { connectionStore } from '../lib/connectionState.ts';
 import { readUserIdFromToken, tokenStore } from '../lib/tokenStore.ts';
 import { isAccountMismatch, writeActiveUser } from '../sync/activeUser.ts';
 import { getSyncOrchestrator } from '../sync/orchestrator.ts';
@@ -27,18 +29,9 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
   const location = useLocation();
   const hasSession = useSyncExternalStore(tokenStore.subscribe, () => tokenStore.hasToken());
   const { error: syncError } = useSyncStatus();
-  const [online, setOnline] = useState(() => navigator.onLine);
+  const { online, manualOffline } = useConnectionStatus();
   const [retrying, setRetrying] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  useEffect(() => {
-    const update = () => setOnline(navigator.onLine);
-    window.addEventListener('online', update);
-    window.addEventListener('offline', update);
-    return () => {
-      window.removeEventListener('online', update);
-      window.removeEventListener('offline', update);
-    };
-  }, []);
   // Seed userId synchronously from the stored JWT so the gate blocks
   // immediately on first render — before /auth/me has had a chance to
   // resolve.  Without this, userId starts as null while the fetch is
@@ -126,6 +119,7 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
     setRetrying(true);
     setBootstrapError(null);
     try {
+      if (manualOffline) connectionStore.setManualOffline(false);
       await getSyncOrchestrator().bootstrap(userId);
     } catch (cause) {
       setBootstrapError(cause instanceof Error ? cause.message : 'The initial download failed.');
@@ -169,10 +163,10 @@ export function SyncBootstrapGate({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 className="btn"
-                disabled={!online || retrying || switching}
+                disabled={(!online && !manualOffline) || retrying || switching}
                 onClick={() => void retry()}
               >
-                {retrying ? 'Retrying…' : 'Retry download'}
+                {retrying ? 'Retrying…' : manualOffline ? 'Go online' : 'Retry download'}
               </button>
             </>
           ) : (

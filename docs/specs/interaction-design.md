@@ -26,6 +26,18 @@ Help pages retain substantive guidance without generic introductory filler. Savi
 accessible labels, keyboard shortcut titles, and calculation/source breakdowns
 remain available where relevant.
 
+The sync dialog offers **Go offline** / **Go online**, and the header identifies
+an intentional pause with a quiet slashed sync orbit. Routine offline connection
+failures are absent from activity rows, error banners and retry warnings; queued
+edits say **Waiting for connection**. HTTP/validation failures retain their
+actionable explanations. Online-only reads use neutral offline availability text
+instead of raw connection-error alerts. See [offline-sync.md](offline-sync.md).
+
+App updates always use the existing persistent toast with a **Reload** button.
+The page never reloads automatically, including after a sync-protocol rejection;
+the user chooses when to interrupt their work. Required updates pause sync and
+retain queued edits until that choice.
+
 ## Character cards
 
 Home, the Characters listing, campaign overview roster, and GM dashboard use
@@ -44,6 +56,18 @@ Long unspaced names in character change summaries wrap inside the GM activity
 feed, including when it appears below the cards on narrow viewports.
 
 ## Identity images and campaign settings
+
+The Overview campaign is a wrapping link beside an **Edit campaign** pencil for
+editors. Unassigned characters show **No campaign**. The pencil opens the existing
+library-link warning; only **Continue** reveals the dropdown and its cancel action.
+A changed selection opens **Are you sure?**, naming the original and proposed
+campaign, before **Change campaign** queues the edit. Canceling that confirmation
+keeps the dropdown on the original value; successful queueing returns to the link.
+First assignment follows the same flow. Readers retain the link without a pencil.
+Campaign names and options read the local mirror, and server rejection flashes
+the visible campaign control. Both dialogs use the shared viewport-bounded
+`ConfirmDialog`; editing and confirmations clear when the character, campaign or
+write access changes.
 
 The Overview Identity panel pairs a compact portrait or neutral silhouette with
 the character name. Below 640px they stack to keep the name input readable;

@@ -69,6 +69,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   requestClientUpdate.mockClear();
   tokenStore.clear();
   resetSyncOrchestratorForTests();
@@ -77,7 +78,7 @@ afterEach(async () => {
 });
 
 describe('sync against a server that refuses this build', () => {
-  it('sends the protocol header, keeps the queued op untouched and forces an update', async () => {
+  it('sends the protocol header, keeps the queued op and asks for a user-controlled update', async () => {
     const fetchMock = vi.fn(async () => outdated());
     vi.stubGlobal('fetch', fetchMock);
     const orchestrator = getSyncOrchestrator() as unknown as Internals;
@@ -100,12 +101,30 @@ describe('sync against a server that refuses this build', () => {
     expect(await db.rejectionToasts.count()).toBe(0);
     expect(requestClientUpdate).toHaveBeenCalledTimes(1);
     expect(syncStateStore.value).toBe('error');
+    expect(await db.syncLog.toArray()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          direction: 'local',
+          result: 'failed',
+          reason: 'App update required — choose Reload to sync your changes',
+        }),
+      ]),
+    );
 
-    // Sync stays paused instead of re-sending the batch every cycle.
+    // Staying on this old build cannot send edits; the persistent prompt
+    // leaves the reload decision to the user, even beyond the old 60s pause.
+    const beyondOldPause = Date.now() + 60_001;
+    vi.spyOn(Date, 'now').mockReturnValue(beyondOldPause);
     await orchestrator.maybeDrainOnce();
     await getSyncOrchestrator().triggerCursorPull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(requestClientUpdate).toHaveBeenCalledTimes(1);
+    expect(await db.outbox.get('op-1')).toMatchObject({
+      status: 'pending',
+      attemptCount: 0,
+      attemptedValue: 'Edited',
+    });
+    expect(await db.characters.get('char-1')).toMatchObject({ name: 'Edited' });
   });
 
   it('handles a 426 from the cursor pull without surfacing a pull failure', async () => {
