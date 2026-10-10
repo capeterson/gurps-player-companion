@@ -166,6 +166,53 @@ test('campaign workspace pages and settings stay within supported form factors',
 
   await dialog.getByRole('button', { name: 'Rules', exact: true }).click();
   await expect(dialog.getByLabel('House rule set')).toBeVisible();
+  await dialog.getByLabel('House rule set').selectOption('custom');
+  await dialog.locator('summary', { hasText: 'General' }).click();
+  const limitationCap = dialog.getByRole('textbox', { name: 'Limitation cap' });
+  const layeringLimits = dialog.getByRole('checkbox', { name: /Enforce armor layering limits/ });
+  const layeringDx = dialog.getByRole('checkbox', { name: /Layered armor reduces DX/ });
+  for (const viewport of [
+    { width: 320, height: 640 },
+    { width: 767, height: 900 },
+    { width: 768, height: 900 },
+    { width: 769, height: 900 },
+    { width: 1280, height: 800 },
+  ]) {
+    await test.step(`house-rule controls at ${viewport.width}×${viewport.height}`, async () => {
+      await page.setViewportSize(viewport);
+      await settleDialogViewport(dialog, modalBox, viewport);
+      const dialogBox = await modalBox.boundingBox();
+      expect(dialogBox).not.toBeNull();
+      if (!dialogBox) return;
+      for (const control of [layeringLimits, layeringDx, limitationCap]) {
+        await control.scrollIntoViewIfNeeded();
+        await expect(control).toBeVisible();
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        if (!box) return;
+        expect(box.x).toBeGreaterThanOrEqual(dialogBox.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width);
+      }
+      await expect(layeringLimits).toBeChecked();
+      await expect(layeringDx).toBeChecked();
+      await expect(limitationCap).toHaveValue('80');
+      const unit = limitationCap.locator('xpath=following-sibling::*[1]');
+      await expect(unit).toHaveText('%');
+      const unitBox = await unit.boundingBox();
+      expect(unitBox).not.toBeNull();
+      if (!unitBox) return;
+      expect(unitBox.x + unitBox.width).toBeLessThanOrEqual(dialogBox.x + dialogBox.width);
+      await expect(dialog.getByText(/The published rule is 80% \(B110\)/)).toBeVisible();
+      if ([320, 768, 1280].includes(viewport.width)) {
+        await captureReviewScreenshot(page, {
+          path: testInfo.outputPath(
+            `campaign-house-rules-${viewport.width}x${viewport.height}.png`,
+          ),
+          animations: 'disabled',
+        });
+      }
+    });
+  }
   await dialog.getByRole('button', { name: 'Members', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Invite', exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();

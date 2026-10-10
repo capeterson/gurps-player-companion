@@ -279,10 +279,20 @@ export interface ArmorLayerStack {
   readonly invalid: boolean;
 }
 
-/** Keep the actual overlapping pieces together, including facing and availability. */
+/** Campaign switches for the two B286 layering rules; both default on. */
+export interface ArmorLayeringRules {
+  /** `houseRules.armorLayeringLimits`: two layers, flexible concealable inner. */
+  readonly limits?: boolean;
+  /** `houseRules.armorLayeringDxPenalty`: −1 DX outside the head. */
+  readonly dxPenalty?: boolean;
+}
+
+/** Keep the actual overlapping pieces together, including facing and availability.
+ * Without the layer limits every stack is valid, so all layers add DR. */
 export function armorLayerStacks(
   items: readonly ArmorItemRow[],
   facing?: ArmorFacing,
+  enforceLimits = true,
 ): ArmorLayerStack[] {
   const equipped = availableEquipment(items).filter((item) => item.isArmor && item.armor);
   const locations = new Set(equipped.flatMap((item) => item.armor?.locations ?? []));
@@ -305,8 +315,9 @@ export function armorLayerStacks(
           items: layers,
           locations: [],
           invalid:
-            layers.length > 2 ||
-            !layers.some((item) => item.armor?.flexible && item.armor.concealable),
+            enforceLimits &&
+            (layers.length > 2 ||
+              !layers.some((item) => item.armor?.flexible && item.armor.concealable)),
         };
         stacks.set(key, stack);
       }
@@ -338,18 +349,21 @@ export function describeArmorLayerStacks(stacks: readonly ArmorLayerStack[]): st
 export function armorLayering(
   items: readonly ArmorItemRow[],
   facing?: ArmorFacing,
+  rules: ArmorLayeringRules = {},
 ): { dxPenalty: number; invalidLocations: string[] } {
-  const stacks = armorLayerStacks(items, facing);
+  const stacks = armorLayerStacks(items, facing, rules.limits ?? true);
   return {
-    dxPenalty: stacks.some(
-      (stack) =>
-        !stack.invalid &&
-        stack.locations.some(
-          (location) => !['skull', 'face', 'eye', 'eyes', 'head'].includes(location),
-        ),
-    )
-      ? 1
-      : 0,
+    dxPenalty:
+      (rules.dxPenalty ?? true) &&
+      stacks.some(
+        (stack) =>
+          !stack.invalid &&
+          stack.locations.some(
+            (location) => !['skull', 'face', 'eye', 'eyes', 'head'].includes(location),
+          ),
+      )
+        ? 1
+        : 0,
     invalidLocations: [
       ...new Set(stacks.filter((stack) => stack.invalid).flatMap((stack) => stack.locations)),
     ],
@@ -359,9 +373,10 @@ export function armorLayering(
 export function aggregateDrByLocation(
   items: readonly ArmorItemRow[],
   facing?: ArmorFacing,
+  enforceLimits = true,
 ): DrByLocationMap {
   const equipped = availableEquipment(items);
-  const invalid = new Set(armorLayering(items, facing).invalidLocations);
+  const invalid = new Set(armorLayering(items, facing, { limits: enforceLimits }).invalidLocations);
   const map: DrByLocationMap = new Map();
   const locations = new Set<string>();
   for (const item of equipped) {
@@ -432,8 +447,9 @@ export function effectiveDrByLocation(
   items: readonly ArmorItemRow[],
   effects: readonly Pick<ResolvedEffectOut, 'target' | 'active' | 'value' | 'hitLocation'>[] = [],
   facing?: ArmorFacing,
+  enforceLimits = true,
 ): DrByLocationMap {
-  const map = aggregateDrByLocation(items, facing);
+  const map = aggregateDrByLocation(items, facing, enforceLimits);
   const drEffects = effects.filter((effect) => effect.active && effect.target === 'dr');
   const locations = new Set<string>([
     ...HIT_LOCATIONS,

@@ -2,7 +2,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { campaignHouseRules } from '../../../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { type LocalCampaign, getLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { TraitsPanel } from './TraitsPanel.tsx';
 
@@ -118,6 +120,44 @@ it('keeps a later selection of the same trait while the first add is pending', a
   await waitFor(() => expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled());
   expect(screen.getByLabelText('Trait name')).toHaveValue('Gifted');
   expect(screen.getByRole('button', { name: 'Pick Gifted' })).toBeVisible();
+});
+
+it('prices selected limitations against the campaign limitation cap', async () => {
+  const db = getLocalDb();
+  await db.campaigns.put({
+    id: pick.campaignId,
+    houseRules: campaignHouseRules.parse({ limitationCapPercent: 50 }),
+  } as LocalCampaign);
+  const original = pick.availableModifiers;
+  pick.availableModifiers = [
+    { name: 'Severe limits', category: 'limitation', costType: 'percent', costValue: -90 },
+  ] as never;
+  try {
+    const character = {
+      id: 'char-1',
+      campaignId: pick.campaignId,
+      traits: [],
+    } as unknown as CharacterDetail;
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ToastProvider>
+          <TraitsPanel character={character} canWrite />
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '+ Add trait' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pick Gifted' }));
+    fireEvent.click(screen.getByRole('button', { name: /Severe limits/ }));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Final point cost')).toHaveTextContent('10 → 5 pts'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(enqueueCreate).toHaveBeenCalledOnce());
+    expect(enqueueCreate.mock.calls[0]?.[0].attemptedValue).toMatchObject({ points: 5 });
+  } finally {
+    pick.availableModifiers = original;
+    await db.campaigns.delete(pick.campaignId);
+  }
 });
 
 const ownedTrait = {

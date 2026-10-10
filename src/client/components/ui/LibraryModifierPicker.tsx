@@ -22,6 +22,8 @@ interface Props {
   selectedNames: readonly string[];
   onToggle: (name: string) => void;
   disabled?: boolean;
+  /** Campaign `houseRules.limitationCapPercent`; the B110 80% when omitted. */
+  limitationCapPercent?: number;
 }
 
 export function LibraryModifierPicker({
@@ -30,6 +32,7 @@ export function LibraryModifierPicker({
   selectedNames,
   onToggle,
   disabled,
+  limitationCapPercent,
 }: Props) {
   const selectedSet = useMemo(() => new Set(selectedNames), [selectedNames]);
 
@@ -37,8 +40,8 @@ export function LibraryModifierPicker({
     const applied = available
       .filter((m) => selectedSet.has(m.name))
       .map((m) => ({ costType: m.costType, costValue: m.costValue }));
-    return computeTraitCost(basePoints, applied);
-  }, [basePoints, available, selectedSet]);
+    return computeTraitCost(basePoints, applied, limitationCapPercent);
+  }, [basePoints, available, selectedSet, limitationCapPercent]);
 
   if (available.length === 0) return null;
 

@@ -4,10 +4,18 @@
  * client-side (for detail expansion).  No imports from server or client code.
  */
 
+import {
+  HOUSE_RULE_DEFINITIONS,
+  type HouseRuleKey,
+  isNumberHouseRule,
+} from '../domain/campaignRules.ts';
 import { skillDisplayName, skillReferenceDisplayName } from '../domain/defenseCalc.ts';
 import { formatSigned } from '../format/number.ts';
+import { campaignHouseRules } from '../schemas/campaign.ts';
 import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
 import type { EntityClass } from '../schemas/sync.ts';
+
+const HOUSE_RULE_DEFAULTS = campaignHouseRules.parse({});
 
 // ---------- field-label maps ----------
 
@@ -475,11 +483,11 @@ function summarizeCampaign(
       msgs.push(`Sheet sharing ${c.newValue ? 'enabled' : 'disabled'}`);
     } else if (c.field === 'houseRules') {
       const oldRules = c.oldValue as
-        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | ({ ruleSet?: string; protectNaturalDr?: boolean } & Record<string, unknown>)
         | null
         | undefined;
       const rules = c.newValue as
-        | { ruleSet?: string; protectNaturalDr?: boolean }
+        | ({ ruleSet?: string; protectNaturalDr?: boolean } & Record<string, unknown>)
         | null
         | undefined;
       if (rules?.ruleSet && rules.ruleSet !== oldRules?.ruleSet) {
@@ -495,7 +503,20 @@ function summarizeCampaign(
           `Natural DR penetration immunity ${rules?.protectNaturalDr !== false ? 'enabled' : 'disabled'} (house rule)`,
         );
       } else {
-        msgs.push('House rules customized');
+        // Keys absent from older rows hold their schema default.
+        const value = (row: typeof rules, key: HouseRuleKey) =>
+          row?.[key] ?? HOUSE_RULE_DEFAULTS[key];
+        const changed = HOUSE_RULE_DEFINITIONS.filter(
+          (rule) => value(rules, rule.key) !== value(oldRules, rule.key),
+        );
+        const [only] = changed;
+        if (changed.length === 1 && only)
+          msgs.push(
+            isNumberHouseRule(only)
+              ? `${only.label} set to ${String(value(rules, only.key))}${only.unit}`
+              : `${only.label} ${value(rules, only.key) ? 'enabled' : 'disabled'}`,
+          );
+        else msgs.push('House rules customized');
       }
     } else if (c.field === 'allowGmCharacterEditing') {
       msgs.push(`GM character editing ${c.newValue ? 'enabled' : 'disabled'}`);

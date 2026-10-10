@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { activeEffectDefinitionCreate } from '../schemas/activeEffects.ts';
+import { type CampaignHouseRules, campaignHouseRules } from '../schemas/campaign.ts';
 import { type LibraryYamlDoc, libraryTraitCreate } from '../schemas/campaignLibrary.ts';
 import { characterCreate } from '../schemas/character.ts';
 import { libraryRaceOut } from '../schemas/race.ts';
@@ -315,6 +316,65 @@ it('warns on illegal torso layers, applies valid torso DX penalty, and exempts h
   expect(friendlyWarning?.message).toContain('Right Leg');
   expect(friendlyWarning?.message).toContain('Eyes');
   expect(friendlyWarning?.message).toContain('Tail Feathers');
+
+  const waived = (
+    inventory: CharacterDetailInput['inventory'],
+    houseRules: Partial<CampaignHouseRules>,
+  ) =>
+    buildCharacterDetail({
+      character,
+      traits: [],
+      skills: [],
+      spells: [],
+      languages: [],
+      techniques: [],
+      inventory,
+      combat: null,
+      campaign: {
+        pointTarget: null,
+        disadvantageCap: null,
+        quirkCap: null,
+        houseRules: campaignHouseRules.parse(houseRules),
+      },
+    });
+  const rigidStack = [
+    armor('Brigandine vest', 'torso', false),
+    armor('Mail shirt', 'torso', false),
+    armor('Padded jack', 'torso', false),
+  ];
+  const freeStack = waived(rigidStack, {
+    armorLayeringLimits: false,
+    armorLayeringDxPenalty: false,
+  });
+  expect(freeStack.derived.effectiveDx).toBe(character.dx);
+  expect(freeStack.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layers' }),
+  );
+  expect(freeStack.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layer_dx' }),
+  );
+
+  const stackWithPenalty = waived(rigidStack, { armorLayeringLimits: false });
+  expect(stackWithPenalty.derived.effectiveDx).toBe(character.dx - 1);
+  expect(stackWithPenalty.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layers' }),
+  );
+  expect(
+    stackWithPenalty.warnings.find((warning) => warning.code === 'inventory.armor_layer_dx')
+      ?.message,
+  ).toContain('“Brigandine vest”, “Mail shirt”, “Padded jack” at Torso, Vitals');
+
+  const limitsWithoutPenalty = waived(
+    [armor('Outer coat', 'torso', false), armor('Concealable undershirt', 'torso', true, true)],
+    { armorLayeringDxPenalty: false },
+  );
+  expect(limitsWithoutPenalty.derived.effectiveDx).toBe(character.dx);
+  expect(limitsWithoutPenalty.warnings).not.toContainEqual(
+    expect.objectContaining({ code: 'inventory.armor_layer_dx' }),
+  );
+  expect(
+    waived(rigidStack, { armorLayeringDxPenalty: false }).warnings.map((warning) => warning.code),
+  ).toContain('inventory.armor_layers');
 });
 
 it('keeps nested carried armor enchantments and shields available through the full builder', () => {

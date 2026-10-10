@@ -5,12 +5,43 @@ import {
 } from '../schemas/campaign.ts';
 
 export type HouseRuleKey = Exclude<keyof CampaignHouseRules, 'ruleSet'>;
+type KeysOfType<T> = {
+  [K in HouseRuleKey]: CampaignHouseRules[K] extends T ? K : never;
+}[HouseRuleKey];
+export type ToggleHouseRuleKey = KeysOfType<boolean>;
+export type NumberHouseRuleKey = KeysOfType<number>;
 
-export interface HouseRuleDefinition {
-  key: HouseRuleKey;
+interface HouseRuleDefinitionBase {
   label: string;
   description: string;
   group: 'General' | 'Combat' | 'Magic' | 'Path magic' | 'Campaign content';
+}
+
+export interface ToggleHouseRuleDefinition extends HouseRuleDefinitionBase {
+  key: ToggleHouseRuleKey;
+  /** Value in the None set. Standard rules a GM may waive are on there. */
+  standard?: boolean;
+  /** Value in the J Talisar set; every toggle is on there unless stated. */
+  jTalisar?: boolean;
+}
+
+export interface NumberHouseRuleDefinition extends HouseRuleDefinitionBase {
+  key: NumberHouseRuleKey;
+  min: number;
+  max: number;
+  unit: string;
+  /** Value in the None set: the published rule. */
+  standard: number;
+  /** Value in the J Talisar set; the published rule unless stated. */
+  jTalisar?: number;
+}
+
+export type HouseRuleDefinition = ToggleHouseRuleDefinition | NumberHouseRuleDefinition;
+
+export function isNumberHouseRule(
+  definition: HouseRuleDefinition,
+): definition is NumberHouseRuleDefinition {
+  return typeof definition.standard === 'number';
 }
 
 export const HOUSE_RULE_DEFINITIONS: readonly HouseRuleDefinition[] = [
@@ -20,6 +51,34 @@ export const HOUSE_RULE_DEFINITIONS: readonly HouseRuleDefinition[] = [
     description:
       'Armor-piercing divisors and Ignore DR reduce worn armor only; innate and skull DR remain intact. Fractional divisors below 1 still increase all DR.',
     group: 'Combat',
+  },
+  {
+    key: 'armorLayeringLimits',
+    label: 'Enforce armor layering limits',
+    description:
+      'At most two pieces of armor may overlap, and the inner one must be flexible and concealable (B286). Turn off to let any armor stack and add its DR.',
+    group: 'Combat',
+    standard: true,
+    jTalisar: false,
+  },
+  {
+    key: 'armorLayeringDxPenalty',
+    label: 'Layered armor reduces DX',
+    description: 'Overlapping armor anywhere but the head gives −1 DX and DX-based skills (B286).',
+    group: 'Combat',
+    standard: true,
+    jTalisar: false,
+  },
+  {
+    key: 'limitationCapPercent',
+    label: 'Limitation cap',
+    description:
+      'The largest net reduction limitations can give a trait’s cost. The published rule is 80% (B110). Applies when traits are added or repriced; existing traits keep their recorded cost.',
+    group: 'General',
+    min: 0,
+    max: 100,
+    unit: '%',
+    standard: 80,
   },
   {
     key: 'enchantedItemPricing',
@@ -160,16 +219,20 @@ export const HOUSE_RULE_DEFINITIONS: readonly HouseRuleDefinition[] = [
   },
 ] as const;
 
-const falseRules = Object.fromEntries(
-  HOUSE_RULE_DEFINITIONS.map(({ key }) => [key, false]),
-) as Record<HouseRuleKey, boolean>;
-
 export const HOUSE_RULE_SET_VALUES: Readonly<Record<'none' | 'j_talisar', CampaignHouseRules>> = {
-  none: campaignHouseRules.parse({ ...falseRules, ruleSet: 'none' }),
+  none: campaignHouseRules.parse(
+    Object.fromEntries([
+      ['ruleSet', 'none'],
+      ...HOUSE_RULE_DEFINITIONS.map((rule) => [rule.key, rule.standard ?? false]),
+    ]),
+  ),
   j_talisar: campaignHouseRules.parse(
     Object.fromEntries([
       ['ruleSet', 'j_talisar'],
-      ...HOUSE_RULE_DEFINITIONS.map(({ key }) => [key, true]),
+      ...HOUSE_RULE_DEFINITIONS.map((rule) => [
+        rule.key,
+        isNumberHouseRule(rule) ? (rule.jTalisar ?? rule.standard) : (rule.jTalisar ?? true),
+      ]),
     ]),
   ),
 };
@@ -183,10 +246,10 @@ export function applyHouseRuleSet(
   return { ...HOUSE_RULE_SET_VALUES[nextSet] };
 }
 
-export function customizeHouseRule(
+export function customizeHouseRule<K extends HouseRuleKey>(
   current: CampaignHouseRules,
-  key: HouseRuleKey,
-  enabled: boolean,
+  key: K,
+  value: CampaignHouseRules[K],
 ): CampaignHouseRules {
-  return { ...campaignHouseRules.parse(current), ruleSet: 'custom', [key]: enabled };
+  return { ...campaignHouseRules.parse(current), ruleSet: 'custom', [key]: value };
 }

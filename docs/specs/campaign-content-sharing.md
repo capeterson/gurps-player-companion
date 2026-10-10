@@ -67,8 +67,12 @@ rites for magical advantages; Medium and material spirits; shield damage;
 Bravery; layered Deflect and Fortify; prohibited Distant Blow and acid magic;
 spell ingredients; Hide Thoughts and Sunbolt interpretations; Path casting,
 curse, dispel, Mystic Symbol, and charm rulings; shield-ready timing; and the
-supplemental perks. Each control carries a concise explanation in the settings
-dialog. None disables every option. The default-on `enforceAttributeCaps`
+supplemental perks. It also waives both armor layering rules and keeps the
+published 80% limitation cap. Each control carries a concise explanation in the
+settings dialog. None disables every house-rule option and keeps the standard
+rules: both armor layering rules on and an 80% limitation cap. A definition's
+`standard` and `jTalisar` values in `campaignRules.ts` decide these presets.
+The default-on `enforceAttributeCaps`
 campaign rule is stored separately and is therefore enabled regardless of
 which house-rule set is selected.
 
@@ -78,6 +82,23 @@ skull DR from armor-piercing divisors and Ignore DR. Worn armor still divides,
 rounded down. Turning it off restores standard B378/M63 penetration of the full
 DR total. Fractional divisors below 1 still increase all protection, with final
 DR 1 for unprotected targets.
+
+Two independent standard rules cover B286 armor layering. Both default on,
+including for campaigns saved before they existed and campaignless characters:
+
+- `houseRules.armorLayeringLimits`: at most two pieces overlap at a location,
+  one of which must be flexible and concealable. An illegal stack leaves that
+  location's armor DR unavailable until corrected. Turning it off lets any
+  number of pieces overlap and sums their DR.
+- `houseRules.armorLayeringDxPenalty`: overlapping armor outside the head gives
+  −1 DX and DX-based skills. With the limits off, any overlap counts.
+
+`houseRules.limitationCapPercent` (integer 0–100, default 80) is the largest net
+reduction percentage modifiers can give a trait's cost (B110). Add-trait
+previews, the pricing resolver, repricing and the server's resolved-pricing
+path all use the campaign's value; recorded trait costs are not recomputed
+when it changes. The settings dialog keeps an out-of-range draft visible and
+refuses to save it.
 
 This is an explicit house rule, not an inferred trait-name mechanic. The
 setting saves with the rest of the settings form through owner-only REST,

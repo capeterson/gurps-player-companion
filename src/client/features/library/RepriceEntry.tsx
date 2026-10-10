@@ -9,6 +9,7 @@ import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { useToasts } from '../../lib/toast.tsx';
 import { flashBus } from '../../sync/flashBus.ts';
 import { enqueueEntityPatch } from '../../sync/outbox.ts';
+import { useCampaignHouseRules } from '../campaigns/useCampaignHouseRules.ts';
 import { PricingResolver } from './PricingResolver.tsx';
 import { useLocalLibrary } from './useLocalLibrary.ts';
 
@@ -33,6 +34,7 @@ export function RepriceEntry({
     [entry.characterId],
   );
   const library = useLocalLibrary(campaignId ?? null);
+  const { limitationCapPercent } = useCampaignHouseRules(campaignId);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toasts = useToasts();
@@ -100,6 +102,7 @@ export function RepriceEntry({
                       points: computeLeveledTraitCost({
                         basePoints: resolution.outputs.points ?? 0,
                         modifiers,
+                        limitationCapPercent,
                         ...(variant ? { variant } : {}),
                       }).total,
                       modifiers,

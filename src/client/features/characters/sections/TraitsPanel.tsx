@@ -25,6 +25,7 @@ import { useExperimentalActiveEffects } from '../../../hooks/useExperimentalActi
 import { intParser } from '../../../lib/parsers.ts';
 import { useToasts } from '../../../lib/toast.tsx';
 import { enqueueDelete } from '../../../sync/outbox.ts';
+import { useCampaignHouseRules } from '../../campaigns/useCampaignHouseRules.ts';
 import { EffectsEditor, effectPreview } from '../../library/EffectsEditor.tsx';
 import { PricingResolver } from '../../library/PricingResolver.tsx';
 import { RepriceEntry } from '../../library/RepriceEntry.tsx';
@@ -112,6 +113,7 @@ function previewLeveledCost(
   level: number | null,
   variant: TraitVariant | null,
   selectedModifiers: ReadonlyArray<{ costType: 'percent' | 'flat'; costValue: number }>,
+  limitationCapPercent: number,
 ): number {
   const leveled = basePoints + (pointsPerLevel ?? 0) * (level ?? 0);
   let withVariant = leveled;
@@ -122,7 +124,7 @@ function previewLeveledCost(
         : Math.floor(leveled * variant.pointCostMultiplier);
   }
   if (variant?.pointCostDelta !== undefined) withVariant += variant.pointCostDelta;
-  return computeTraitCost(withVariant, selectedModifiers);
+  return computeTraitCost(withVariant, selectedModifiers, limitationCapPercent);
 }
 
 function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) {
@@ -156,6 +158,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
     setVariantName(null);
   };
 
+  const { limitationCapPercent } = useCampaignHouseRules(campaignId);
   const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryTraitOut>(
     'traits',
     campaignId,
@@ -194,6 +197,7 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
             ...pickedTrait.availableModifiers.filter((m) => selectedModifiers.includes(m.name)),
             ...resolvedModifiers,
           ],
+          limitationCapPercent,
         )
       : null;
 
@@ -499,8 +503,10 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
                 isLeveled ? parsedLevel : null,
                 selectedVariant,
                 [],
+                limitationCapPercent,
               )
             }
+            limitationCapPercent={limitationCapPercent}
             available={pickedTrait.availableModifiers}
             selectedNames={selectedModifiers}
             onToggle={(modName) => {

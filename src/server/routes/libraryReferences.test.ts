@@ -866,6 +866,54 @@ it('gates incomplete/reference library entries and stores pricing snapshots for 
   });
 });
 
+it('prices resolved trait limitations against the campaign limitation cap', async () => {
+  const owner = await register();
+  for (const [limitationCapPercent, expected] of [
+    [undefined, 2],
+    [50, 5],
+  ] as const) {
+    const campaign = await create(owner.token, '/campaigns', {
+      name: `Limitation cap ${limitationCapPercent ?? 'default'}`,
+      ...(limitationCapPercent === undefined ? {} : { houseRules: { limitationCapPercent } }),
+    });
+    const character = await create(owner.token, '/characters', {
+      name: 'Limited caster',
+      campaignId: campaign.id,
+    });
+    const trait = await create(owner.token, `/campaigns/${campaign.id}/library/traits`, {
+      name: 'Capped Template',
+      key: 'capped-template',
+      kind: 'advantage',
+      basePoints: 4,
+      pointsPerLevel: 3,
+      maxLevel: 5,
+      status: 'complete',
+      role: 'template',
+    });
+    const priced = {
+      ...trait,
+      name: 'Capped Template',
+      calculation: legacyTraitCalculation(4, 3, 5),
+    };
+    const added = await request(owner.token, `/characters/${character.id}/traits`, {
+      name: 'Capped Template',
+      kind: 'advantage',
+      level: 2,
+      libraryTraitId: trait.id,
+      pricingResolution: resolveLibraryPricing(
+        { traits: [priced], items: [], modifiers: [] },
+        definitionReference('traits', priced),
+        { level: 2 },
+      ),
+      modifiers: [
+        { name: 'Severe limits', category: 'limitation', costType: 'percent', costValue: -90 },
+      ],
+    });
+    expect(added.status).toBe(201);
+    expect(((await added.json()) as { trait: { points: number } }).trait.points).toBe(expected);
+  }
+});
+
 for (const cfg of configs) {
   it(`${cfg.kind}: scopes every REST/sync write and preserves copies when membership ends`, async () => {
     const gm = await register();
