@@ -407,6 +407,27 @@ describe('DrSummaryCard', () => {
     expect(bumpHp).not.toHaveBeenCalled();
   });
 
+  it('stacks rigid armor and applies injury when the campaign waives the layering rules', () => {
+    const bumpHp = vi.fn();
+    const character = makeCharacter([
+      { dr: 4, locations: ['torso'] },
+      { dr: 3, locations: ['torso'] },
+    ]);
+    for (const layer of character.inventory) {
+      if (layer.armor) layer.armor = { ...layer.armor, flexible: false, concealable: false };
+    }
+    character.houseRules = campaignHouseRules.parse({ armorLayeringLimits: false });
+    render(<DrSummaryCard character={character} canWrite hpMax={20} bumpHp={bumpHp} />);
+    expect(screen.queryByText(/DR unavailable/)).toBeNull();
+    expect(screen.getByLabelText('Selected effective DR')).toHaveTextContent('7');
+    fireEvent.click(screen.getByRole('button', { name: /Incoming damage/ }));
+    expect(screen.queryByText(/Resolve overlapping armor layers/)).toBeNull();
+    fireEvent.change(screen.getByLabelText('Basic damage'), { target: { value: '12' } });
+    expect(screen.getByText(/12 .* − DR 7/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /^Apply −\d+ HP$/ }));
+    expect(bumpHp).toHaveBeenCalled();
+  });
+
   it.each([
     ['arm_left', 6],
     ['hand_right', 4],

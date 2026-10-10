@@ -2,7 +2,8 @@
  * GURPS 4e trait modifier math (Basic Set p. B102 / B110).
  *
  * The arithmetic itself lives in `traitCost.ts` (single source of
- * truth): percent modifiers sum, the net is clamped at -80%, the
+ * truth): percent modifiers sum, the net is clamped at the campaign's
+ * limitation cap (-80% by default), the
  * result is rounded up, and flat modifiers add afterward.  This module
  * layers the richer `TraitModifier` shape (category, mutex groups) and
  * the group-conflict validator on top.
@@ -32,10 +33,12 @@ export interface ModifiedCost {
 export function computeModifiedCost(
   basePoints: number,
   modifiers: readonly TraitModifier[],
+  limitationCapPercent?: number,
 ): ModifiedCost {
   const breakdown = computeTraitCostBreakdown(
     basePoints,
     modifiers.map((m) => ({ costType: m.costType, costValue: m.costValue })),
+    limitationCapPercent,
   );
   return {
     base: breakdown.base,
@@ -64,6 +67,8 @@ export interface LeveledTraitCostInput {
     readonly pointCostDelta?: number | undefined;
   };
   readonly modifiers?: readonly TraitModifier[];
+  /** Campaign `houseRules.limitationCapPercent`; the B110 80% when omitted. */
+  readonly limitationCapPercent?: number | undefined;
 }
 
 /**
@@ -71,7 +76,7 @@ export interface LeveledTraitCostInput {
  *
  *   1. `leveled = basePoints + level * pointsPerLevel`
  *   2. variant: multiplier (Math.ceil), then flat delta
- *   3. modifiers: percent sum (clamped -80%) + flat sum via computeModifiedCost
+ *   3. modifiers: percent sum (clamped at the limitation cap) + flat sum via computeModifiedCost
  *
  * Returns the breakdown so the UI can show every step.
  */
@@ -94,7 +99,11 @@ export function computeLeveledTraitCost(input: LeveledTraitCostInput): ModifiedC
   if (input.variant?.pointCostDelta !== undefined) {
     variantAdjusted += input.variant.pointCostDelta;
   }
-  const modCost = computeModifiedCost(variantAdjusted, input.modifiers ?? []);
+  const modCost = computeModifiedCost(
+    variantAdjusted,
+    input.modifiers ?? [],
+    input.limitationCapPercent,
+  );
   return { ...modCost, leveled, variantAdjusted };
 }
 

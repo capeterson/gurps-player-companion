@@ -20,6 +20,7 @@ import { inventoryItemCreate } from '../../../shared/schemas/inventory.ts';
 import { traitCreate, traitModifier } from '../../../shared/schemas/trait.ts';
 import type { TraitModifier, TraitVariant } from '../../../shared/schemas/trait.ts';
 import { useDialogState } from '../../hooks/useDialogState.ts';
+import { useCampaignHouseRules } from '../campaigns/useCampaignHouseRules.ts';
 import { useLocalLibrary } from './useLocalLibrary.ts';
 
 /** Saved and previewed results share player-facing labels and units. */
@@ -157,6 +158,7 @@ export function PricingResolver({
   onCancel: () => void;
 }) {
   const library = useLocalLibrary(campaignId);
+  const { limitationCapPercent } = useCampaignHouseRules(campaignId);
   const [applying, setApplying] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [inputs, setInputs] = useState<CalculationInputs>(initial?.inputs ?? {});
@@ -267,6 +269,7 @@ export function PricingResolver({
       points = computeLeveledTraitCost({
         basePoints: resolved.outputs.points ?? 0,
         modifiers: appliedModifiers,
+        limitationCapPercent,
         ...(variant ? { variant } : {}),
       }).total;
     for (const modifier of modifiers) traitModifier.parse(modifier);

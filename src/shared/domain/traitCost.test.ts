@@ -63,4 +63,16 @@ describe('computeTraitCost', () => {
     // 20 * 0.2 must be exactly 4, not 3.999... truncated later.
     expect(computeTraitCost(20, [{ costType: 'percent', costValue: -80 }])).toBe(4);
   });
+
+  it('applies a campaign limitation cap from 0% to 100%', () => {
+    const limited = [{ costType: 'percent' as const, costValue: -90 }];
+    expect(computeTraitCost(20, limited, 50)).toBe(10);
+    expect(computeTraitCost(20, limited, 75)).toBe(5);
+    expect(computeTraitCost(20, limited, 80)).toBe(computeTraitCost(20, limited));
+    expect(computeTraitCost(20, limited, 100)).toBe(2);
+    expect(computeTraitCost(20, [{ costType: 'percent', costValue: -120 }], 100)).toBe(0);
+    expect(computeTraitCost(20, limited, 0)).toBe(20);
+    // The cap limits only the net reduction, never enhancements.
+    expect(computeTraitCost(20, [{ costType: 'percent', costValue: 50 }], 0)).toBe(30);
+  });
 });

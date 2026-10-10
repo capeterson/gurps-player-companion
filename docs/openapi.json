@@ -14103,6 +14103,20 @@
                             "type": "boolean",
                             "default": true
                           },
+                          "armorLayeringLimits": {
+                            "type": "boolean",
+                            "default": true
+                          },
+                          "armorLayeringDxPenalty": {
+                            "type": "boolean",
+                            "default": true
+                          },
+                          "limitationCapPercent": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "default": 80
+                          },
                           "enchantedItemPricing": {
                             "type": "boolean",
                             "default": false
@@ -14307,6 +14321,20 @@
                       "protectNaturalDr": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "armorLayeringLimits": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "armorLayeringDxPenalty": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "limitationCapPercent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "default": 80
                       },
                       "enchantedItemPricing": {
                         "type": "boolean",
@@ -14557,6 +14585,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -14855,6 +14897,20 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
+                        },
                         "enchantedItemPricing": {
                           "type": "boolean",
                           "default": false
@@ -15079,6 +15135,20 @@
                       "protectNaturalDr": {
                         "type": "boolean",
                         "default": true
+                      },
+                      "armorLayeringLimits": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "armorLayeringDxPenalty": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "limitationCapPercent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "default": 80
                       },
                       "enchantedItemPricing": {
                         "type": "boolean",
@@ -15331,6 +15401,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -15696,6 +15780,20 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
+                        },
                         "enchantedItemPricing": {
                           "type": "boolean",
                           "default": false
@@ -16033,6 +16131,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -16425,6 +16537,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -39240,6 +39366,20 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
+                        },
                         "enchantedItemPricing": {
                           "type": "boolean",
                           "default": false
@@ -43013,6 +43153,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -47054,6 +47208,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -53164,6 +53332,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -56950,6 +57132,20 @@
                           "type": "boolean",
                           "default": true
                         },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
+                        },
                         "enchantedItemPricing": {
                           "type": "boolean",
                           "default": false
@@ -60726,6 +60922,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -65405,6 +65615,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -70106,6 +70330,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -73881,6 +74119,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -78194,6 +78446,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -82528,6 +82794,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -86303,6 +86583,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -90245,6 +90539,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -94210,6 +94518,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -97985,6 +98307,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -101872,6 +102208,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -105782,6 +106132,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -109557,6 +109921,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -113463,6 +113841,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",
@@ -117391,6 +117783,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -121166,6 +121572,20 @@
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
+                        },
+                        "armorLayeringLimits": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "armorLayeringDxPenalty": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "limitationCapPercent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100,
+                          "default": 80
                         },
                         "enchantedItemPricing": {
                           "type": "boolean",
@@ -127141,6 +127561,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -131034,6 +131468,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -134813,6 +135261,20 @@
                               "type": "boolean",
                               "default": true
                             },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
+                            },
                             "enchantedItemPricing": {
                               "type": "boolean",
                               "default": false
@@ -138589,6 +139051,20 @@
                             "protectNaturalDr": {
                               "type": "boolean",
                               "default": true
+                            },
+                            "armorLayeringLimits": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "armorLayeringDxPenalty": {
+                              "type": "boolean",
+                              "default": true
+                            },
+                            "limitationCapPercent": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100,
+                              "default": 80
                             },
                             "enchantedItemPricing": {
                               "type": "boolean",

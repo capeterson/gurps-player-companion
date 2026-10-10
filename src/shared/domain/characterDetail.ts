@@ -544,11 +544,19 @@ export function buildCharacterDetail(
   const activeGroups = new Set(activeEffectsEnabled ? (character.activeConditionGroups ?? []) : []);
   const manaLevel: ManaLevel = campaign?.manaLevel ?? 'normal';
   const availability = inventoryAvailability(inventory);
+  const layeringRules = {
+    limits: campaign?.houseRules?.armorLayeringLimits ?? true,
+    dxPenalty: campaign?.houseRules?.armorLayeringDxPenalty ?? true,
+  };
   const layering = armorLayering(
     inventory.map((item) => ({ ...item, armor: item.armor as InventoryItemOut['armor'] })),
+    undefined,
+    layeringRules,
   );
   const layerStacks = armorLayerStacks(
     inventory.map((item) => ({ ...item, armor: item.armor as InventoryItemOut['armor'] })),
+    undefined,
+    layeringRules.limits,
   );
   const itemEnchantments = new Map(
     inventory.map((item) => [

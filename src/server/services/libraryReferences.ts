@@ -18,6 +18,7 @@ import {
 } from '../../shared/domain/skillRules.ts';
 import { normalizeWeaponData } from '../../shared/domain/weaponModes.ts';
 import { pricingResolution } from '../../shared/schemas/calculation.ts';
+import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import { inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { enchantmentRef } from '../../shared/schemas/inventory.ts';
 import { libraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
@@ -466,6 +467,8 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
             basePoints: resolution.outputs.points ?? 0,
             ...(variant ? { variant } : {}),
             modifiers,
+            limitationCapPercent: campaignHouseRules.parse(campaign.houseRules ?? {})
+              .limitationCapPercent,
           }).total;
           if ('level' in resolution.inputs) mutable.level = resolution.inputs.level;
         }

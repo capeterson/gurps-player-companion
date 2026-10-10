@@ -15,8 +15,11 @@ import { useEffect, useRef, useState } from 'react';
 import { MANA_LEVELS, MANA_LEVEL_LABELS, type ManaLevel } from '../../../shared/constants/magic.ts';
 import {
   HOUSE_RULE_DEFINITIONS,
+  type NumberHouseRuleDefinition,
+  type NumberHouseRuleKey,
   applyHouseRuleSet,
   customizeHouseRule,
+  isNumberHouseRule,
 } from '../../../shared/domain/campaignRules.ts';
 import { campaignHouseRules } from '../../../shared/schemas/campaign.ts';
 import type {
@@ -46,6 +49,12 @@ interface Props {
   /** Role of the viewer in this campaign — owner or manager unlocks invitations. */
   viewerRole: CampaignRole;
   onClose: () => void;
+}
+
+function houseRuleNumberFromInput(s: string, rule: NumberHouseRuleDefinition): number | null {
+  const t = s.trim();
+  const n = Number(t);
+  return t !== '' && Number.isInteger(n) && n >= rule.min && n <= rule.max ? n : null;
 }
 
 function nullableIntFromInput(s: string): number | null | 'invalid' {
@@ -103,6 +112,10 @@ export function CampaignSettingsDialog({
   const [houseRules, setHouseRules] = useState<CampaignHouseRules>(() =>
     campaignHouseRules.parse(campaign.houseRules ?? {}),
   );
+  // Raw text of numeric house rules being typed; valid values also update houseRules.
+  const [houseRuleDrafts, setHouseRuleDrafts] = useState<
+    Partial<Record<NumberHouseRuleKey, string>>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<CampaignMemberOut | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -134,6 +147,7 @@ export function CampaignSettingsDialog({
     setExperimentalActiveEffects(campaign.experimentalActiveEffects ?? false);
     setExperimentalTurnTracker(campaign.experimentalTurnTracker ?? false);
     setHouseRules(campaignHouseRules.parse(campaign.houseRules ?? {}));
+    setHouseRuleDrafts({});
     setError(null);
     if (!sameCampaign) setSection(viewerRole === 'owner' ? 'campaign' : 'members');
   }, [open, campaign, viewerRole, onlineAvailable]);
@@ -232,6 +246,17 @@ export function CampaignSettingsDialog({
     if (pt === 'invalid' || dc === 'invalid' || qcVal === 'invalid' || tl === 'invalid') {
       setSection('campaign');
       setError('Caps, point target, and tech level must be non-negative integers (or blank).');
+      return;
+    }
+    const invalidRule = HOUSE_RULE_DEFINITIONS.filter(isNumberHouseRule).find((rule) => {
+      const draft = houseRuleDrafts[rule.key];
+      return draft !== undefined && houseRuleNumberFromInput(draft, rule) === null;
+    });
+    if (invalidRule) {
+      setSection('rules');
+      setError(
+        `${invalidRule.label} must be a whole number from ${invalidRule.min} to ${invalidRule.max}${invalidRule.unit}.`,
+      );
       return;
     }
     update.mutate({
@@ -505,11 +530,12 @@ export function CampaignSettingsDialog({
                     className="select w-full"
                     aria-label="House rule set"
                     value={houseRules.ruleSet}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      setHouseRuleDrafts({});
                       setHouseRules((current) =>
                         applyHouseRuleSet(current, e.target.value as HouseRuleSet),
-                      )
-                    }
+                      );
+                    }}
                   >
                     <option value="none">None</option>
                     <option value="j_talisar">J Talisar</option>
@@ -531,27 +557,61 @@ export function CampaignSettingsDialog({
                       <summary className="collapse-title font-semibold">{group}</summary>
                       <div className="collapse-content space-y-4">
                         {HOUSE_RULE_DEFINITIONS.filter((rule) => rule.group === group).map(
-                          (rule) => (
-                            <label key={rule.key} className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                className="checkbox checkbox-sm mt-0.5"
-                                checked={houseRules[rule.key]}
-                                disabled={houseRules.ruleSet !== 'custom'}
-                                onChange={(e) =>
-                                  setHouseRules((current) =>
-                                    customizeHouseRule(current, rule.key, e.target.checked),
-                                  )
-                                }
-                              />
-                              <span>
+                          (rule) =>
+                            isNumberHouseRule(rule) ? (
+                              <label key={rule.key} className="form-control min-w-0 gap-1.5">
                                 <span className="block text-sm font-medium">{rule.label}</span>
+                                <span className="join w-32">
+                                  <input
+                                    className="input join-item w-full min-w-0 num"
+                                    inputMode="numeric"
+                                    aria-label={rule.label}
+                                    value={
+                                      houseRuleDrafts[rule.key] ?? String(houseRules[rule.key])
+                                    }
+                                    disabled={houseRules.ruleSet !== 'custom'}
+                                    onChange={(e) => {
+                                      const text = e.target.value;
+                                      setHouseRuleDrafts((current) => ({
+                                        ...current,
+                                        [rule.key]: text,
+                                      }));
+                                      const value = houseRuleNumberFromInput(text, rule);
+                                      if (value !== null)
+                                        setHouseRules((current) =>
+                                          customizeHouseRule(current, rule.key, value),
+                                        );
+                                    }}
+                                  />
+                                  <span className="join-item flex items-center border border-base-300 bg-base-200 px-3 text-sm">
+                                    {rule.unit}
+                                  </span>
+                                </span>
                                 <span className="block text-xs text-base-content/60">
                                   {rule.description}
                                 </span>
-                              </span>
-                            </label>
-                          ),
+                              </label>
+                            ) : (
+                              <label key={rule.key} className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  className="checkbox checkbox-sm mt-0.5"
+                                  checked={houseRules[rule.key]}
+                                  disabled={houseRules.ruleSet !== 'custom'}
+                                  onChange={(e) =>
+                                    setHouseRules((current) =>
+                                      customizeHouseRule(current, rule.key, e.target.checked),
+                                    )
+                                  }
+                                />
+                                <span>
+                                  <span className="block text-sm font-medium">{rule.label}</span>
+                                  <span className="block text-xs text-base-content/60">
+                                    {rule.description}
+                                  </span>
+                                </span>
+                              </label>
+                            ),
                         )}
                       </div>
                     </details>
