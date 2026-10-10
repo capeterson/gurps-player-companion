@@ -397,7 +397,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   removed still exist in the DB and contribute to derived totals, but
   have no UI surface — "Revert all" clears them too.)
 - **Traits** (advantages/disadvantages/perks/quirks) with modifier math:
-  percent modifiers sum, the net is clamped at -80% (B110), the result
+  percent modifiers sum, the net is clamped at the campaign's limitation cap
+  (house rule `limitationCapPercent`, default -80%, B110), the result
   rounds against the character (B102), then flat modifiers add.
   Per-level mechanical effects scale by the purchased level, including zero;
   legacy null levels count as one. Flat effects apply independently of level.
@@ -789,6 +790,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     enchantment notes never decide immunity. The selected DR, silhouette labels,
     and incoming-damage result share this policy. Fractional divisors below 1
     increase the complete DR; an unprotected target gets final DR 1 (B110/B379).
+    Two default-on house-rule settings cover B286 armor layering:
+    `armorLayeringLimits` (an outer layer over one flexible, concealable inner
+    layer; off lets armor stack freely) and `armorLayeringDxPenalty` (−1 DX for
+    layering outside the head). The J Talisar set turns both off.
     Presets include (0.5), (0.2), and (0.1). Skull DR 2 never protects against
     toxic damage (B399); torso-scoped innate DR also covers vitals (B47).
     Corrosion uses ×1.5 at face and neck, and damage-type aliases use the same

@@ -264,3 +264,70 @@ it('hydrates newly available remote settings before enabling edits, then preserv
   view.rerender(view.component({ ...campaign, pointTarget: 300 }, true));
   expect(target).toHaveValue('275');
 });
+
+it('turns both armor layering rules off for J Talisar and back on for None', () => {
+  setup();
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  const limits = screen.getByRole('checkbox', { name: /Enforce armor layering limits/ });
+  const dxPenalty = screen.getByRole('checkbox', { name: /Layered armor reduces DX/ });
+  expect(limits).toBeChecked();
+  expect(dxPenalty).toBeChecked();
+
+  const selector = screen.getByRole('combobox', { name: 'House rule set' });
+  fireEvent.change(selector, { target: { value: 'j_talisar' } });
+  expect(limits).not.toBeChecked();
+  expect(dxPenalty).not.toBeChecked();
+
+  fireEvent.change(selector, { target: { value: 'none' } });
+  expect(limits).toBeChecked();
+  expect(dxPenalty).toBeChecked();
+
+  fireEvent.change(selector, { target: { value: 'custom' } });
+  fireEvent.click(dxPenalty);
+  expect(limits).toBeChecked();
+  expect(dxPenalty).not.toBeChecked();
+});
+
+it('saves a custom limitation cap and rejects one outside 0–100%', async () => {
+  vi.mocked(api).mockResolvedValue(campaign);
+  const view = setup();
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  fireEvent.click(screen.getByText('General', { selector: 'summary' }));
+  const cap = screen.getByRole('textbox', { name: 'Limitation cap' });
+  expect(cap).toHaveValue('80');
+
+  const selector = screen.getByRole('combobox', { name: 'House rule set' });
+  fireEvent.change(selector, { target: { value: 'j_talisar' } });
+  expect(cap).toBeDisabled();
+  expect(cap).toHaveValue('80');
+  fireEvent.change(selector, { target: { value: 'custom' } });
+  expect(cap).toBeEnabled();
+
+  fireEvent.change(cap, { target: { value: '150' } });
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Limitation cap must be a whole number from 0 to 100%.',
+  );
+  expect(api).not.toHaveBeenCalled();
+  expect(cap).toHaveValue('150');
+
+  fireEvent.change(cap, { target: { value: '50' } });
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: expect.objectContaining({
+          houseRules: expect.objectContaining({
+            ruleSet: 'custom',
+            limitationCapPercent: 50,
+            armorLayeringLimits: false,
+            armorLayeringDxPenalty: false,
+          }),
+        }),
+      }),
+    ),
+  );
+  await waitFor(() => expect(view.onClose).toHaveBeenCalled());
+});

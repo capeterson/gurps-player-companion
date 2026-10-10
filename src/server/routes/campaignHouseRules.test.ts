@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
-import { HOUSE_RULE_DEFINITIONS } from '../../shared/domain/campaignRules.ts';
+import {
+  HOUSE_RULE_DEFINITIONS,
+  HOUSE_RULE_SET_VALUES,
+} from '../../shared/domain/campaignRules.ts';
 import type { CampaignOut } from '../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
 import type { SyncCursorResponse } from '../../shared/schemas/sync.ts';
@@ -45,7 +48,9 @@ describe('campaign house rules', () => {
     expect(created.status).toBe(201);
     const campaign = (await created.json()) as CampaignOut;
     expect(campaign.houseRules.ruleSet).toBe('j_talisar');
-    for (const { key } of HOUSE_RULE_DEFINITIONS) expect(campaign.houseRules[key]).toBe(true);
+    for (const { key } of HOUSE_RULE_DEFINITIONS)
+      expect(campaign.houseRules[key]).toBe(HOUSE_RULE_SET_VALUES.j_talisar[key]);
+    expect(campaign.houseRules.armorLayeringLimits).toBe(false);
 
     const customized = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
       houseRules: {
@@ -128,7 +133,12 @@ describe('campaign house rules', () => {
       houseRules: { protectNaturalDr: false },
     });
     expect(forbidden.status).toBe(403);
-    for (const houseRules of [{ protectNaturalDr: 'false' }, { unrecognizedRule: true }, null]) {
+    for (const houseRules of [
+      { protectNaturalDr: 'false' },
+      { unrecognizedRule: true },
+      { limitationCapPercent: 150 },
+      null,
+    ]) {
       const invalid = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
         houseRules,
       });

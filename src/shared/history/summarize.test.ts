@@ -1060,6 +1060,42 @@ it('summarizes a campaign house rule change from DB history', () => {
   ).toBe('Natural DR penetration immunity disabled (house rule)');
 });
 
+it('summarizes one changed house rule by its label, treating missing values as defaults', () => {
+  const summary = (oldRules: object, newRules: object) =>
+    summarizeEvent({
+      entityClass: 'campaign',
+      op: 'update',
+      oldRow: { house_rules: oldRules },
+      newRow: { house_rules: newRules },
+    }).summary;
+  expect(
+    summary({ protectNaturalDr: true }, { protectNaturalDr: true, armorLayeringLimits: false }),
+  ).toBe('Enforce armor layering limits disabled');
+  expect(
+    summary({ protectNaturalDr: true }, { protectNaturalDr: true, armorLayeringDxPenalty: false }),
+  ).toBe('Layered armor reduces DX disabled');
+  expect(
+    summary({ protectNaturalDr: true }, { protectNaturalDr: true, limitationCapPercent: 50 }),
+  ).toBe('Limitation cap set to 50%');
+  expect(
+    summary(
+      { protectNaturalDr: true },
+      {
+        protectNaturalDr: true,
+        armorLayeringLimits: true,
+        armorLayeringDxPenalty: true,
+        limitationCapPercent: 80,
+      },
+    ),
+  ).toBe('House rules customized');
+  expect(
+    summary(
+      { protectNaturalDr: true },
+      { protectNaturalDr: true, eyeMissHitsFace: true, forbidAcidMagic: true },
+    ),
+  ).toBe('House rules customized');
+});
+
 it('summarizes a named campaign house-rule set selection', () => {
   expect(
     summarizeEvent({

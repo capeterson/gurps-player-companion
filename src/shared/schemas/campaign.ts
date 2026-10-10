@@ -15,6 +15,12 @@ export const campaignHouseRules = z
   .object({
     ruleSet: houseRuleSet.default('custom'),
     protectNaturalDr: z.boolean().default(true),
+    /** Standard B286 layer limits; on unless a GM waives them. */
+    armorLayeringLimits: z.boolean().default(true),
+    /** Standard B286 −1 DX for layering outside the head. */
+    armorLayeringDxPenalty: z.boolean().default(true),
+    /** Largest net cost reduction from trait limitations, in percent (B110: 80). */
+    limitationCapPercent: z.number().int().min(0).max(100).default(80),
     enchantedItemPricing: z.boolean().default(false),
     eyeMissHitsFace: z.boolean().default(false),
     requireMagicAdvancementRites: z.boolean().default(false),

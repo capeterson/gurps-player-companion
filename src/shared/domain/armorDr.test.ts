@@ -96,6 +96,45 @@ describe('aggregateDrByLocation', () => {
     expect(armorLayering(headLayers)).toEqual({ dxPenalty: 0, invalidLocations: [] });
   });
 
+  it('stacks any armor when a campaign waives the layer limits, keeping the DX rule separate', () => {
+    const layers = [
+      item(4, ['torso'], { flexible: false }),
+      item(3, ['torso'], { flexible: false }),
+      item(2, ['torso']),
+    ];
+    expect(armorLayerStacks(layers, undefined, false).map((stack) => stack.invalid)).toEqual([
+      false,
+    ]);
+    expect(armorLayering(layers, undefined, { limits: false })).toEqual({
+      dxPenalty: 1,
+      invalidLocations: [],
+    });
+    expect(armorLayering(layers, undefined, { limits: false, dxPenalty: false })).toEqual({
+      dxPenalty: 0,
+      invalidLocations: [],
+    });
+    expect(aggregateDrByLocation(layers, undefined, false).get('torso')?.dr).toBe(9);
+    expect(effectiveDrByLocation(layers, [], undefined, false).get('torso')?.dr).toBe(9);
+  });
+
+  it('keeps the layer limits while waiving only the DX penalty', () => {
+    const legal = [
+      item(4, ['torso'], { flexible: false }),
+      item(2, ['torso'], { flexible: true, concealable: true }),
+    ];
+    expect(armorLayering(legal, undefined, { dxPenalty: false })).toEqual({
+      dxPenalty: 0,
+      invalidLocations: [],
+    });
+    const illegal = [
+      item(4, ['torso'], { flexible: false }),
+      item(3, ['torso'], { flexible: false }),
+    ];
+    expect(armorLayering(illegal, undefined, { dxPenalty: false }).invalidLocations).toContain(
+      'torso',
+    );
+  });
+
   it('names the conflicting layers, groups independent conflicts, and explains three-layer stacks', () => {
     const layers = [
       { ...item(4, ['torso'], { flexible: false }), id: 'vest', name: 'Brigandine vest' },

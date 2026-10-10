@@ -81,6 +81,16 @@ describe('findGroupConflicts', () => {
 });
 
 describe('computeLeveledTraitCost', () => {
+  it('applies the campaign limitation cap after level and variant', () => {
+    const modifiers: TraitModifier[] = [
+      { name: 'Costs Fatigue', category: 'limitation', costType: 'percent', costValue: -60 },
+      { name: 'Unreliable', category: 'limitation', costType: 'percent', costValue: -40 },
+    ];
+    const input = { basePoints: 0, pointsPerLevel: 5, level: 4, modifiers };
+    expect(computeLeveledTraitCost(input).total).toBe(4);
+    expect(computeLeveledTraitCost({ ...input, limitationCapPercent: 50 }).total).toBe(10);
+  });
+
   it('non-leveled trait returns base cost', () => {
     const r = computeLeveledTraitCost({ basePoints: 15 });
     expect(r.leveled).toBe(15);

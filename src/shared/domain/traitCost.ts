@@ -6,7 +6,8 @@
  *   - All percentage modifiers SUM to a single net percentage
  *     (enhancements positive, limitations negative).
  *   - The net percentage can never reduce the cost by more than 80%:
- *     treat any net modifier of -81% or worse as -80% (B110).
+ *     treat any net modifier of -81% or worse as -80% (B110). A campaign
+ *     may change the cap (`houseRules.limitationCapPercent`).
  *   - That single percentage is applied ONCE to the base, then rounded
  *     up (Math.ceil), which rounds "against" the character for both
  *     signs: advantages cost more, disadvantages give back fewer
@@ -33,12 +34,14 @@ export interface AppliedTraitModifier {
 
 /** Net percentage modifier can never be worse than -80% (B110). */
 export const LIMITATION_FLOOR_PERCENT = -80 as const;
+/** The published cap as a positive campaign setting value. */
+export const STANDARD_LIMITATION_CAP_PERCENT = -LIMITATION_FLOOR_PERCENT;
 
 export interface TraitCostBreakdown {
   readonly base: number;
   /** Unclamped sum of all percent modifiers. */
   readonly percentSum: number;
-  /** Percent actually applied after the -80% floor. */
+  /** Percent actually applied after the limitation floor (-80% by default). */
   readonly clampedPercent: number;
   readonly flatSum: number;
   readonly total: number;
@@ -47,6 +50,7 @@ export interface TraitCostBreakdown {
 export function computeTraitCostBreakdown(
   base: number,
   applied: readonly AppliedTraitModifier[],
+  limitationCapPercent: number = STANDARD_LIMITATION_CAP_PERCENT,
 ): TraitCostBreakdown {
   let percentSum = 0;
   let flatSum = 0;
@@ -54,7 +58,7 @@ export function computeTraitCostBreakdown(
     if (m.costType === 'percent') percentSum += m.costValue;
     else flatSum += m.costValue;
   }
-  const clampedPercent = Math.max(percentSum, LIMITATION_FLOOR_PERCENT);
+  const clampedPercent = Math.max(percentSum, -limitationCapPercent);
   // Integer math (base * (100 + pct) / 100) avoids binary floating-point
   // error like 0.19999... that would nudge an exact result across the
   // ceil boundary.
@@ -62,6 +66,10 @@ export function computeTraitCostBreakdown(
   return { base, percentSum, clampedPercent, flatSum, total: withPercent + flatSum };
 }
 
-export function computeTraitCost(base: number, applied: readonly AppliedTraitModifier[]): number {
-  return computeTraitCostBreakdown(base, applied).total;
+export function computeTraitCost(
+  base: number,
+  applied: readonly AppliedTraitModifier[],
+  limitationCapPercent?: number,
+): number {
+  return computeTraitCostBreakdown(base, applied, limitationCapPercent).total;
 }

@@ -123,7 +123,10 @@ export function DrSummaryCard({
     setSelectedDefense(null);
     onFacingChange?.(next);
   };
-  const invalidLayers = armorLayering(character.inventory, selectedFacing).invalidLocations;
+  const enforceLayering = character.houseRules?.armorLayeringLimits ?? true;
+  const invalidLayers = armorLayering(character.inventory, selectedFacing, {
+    limits: enforceLayering,
+  }).invalidLocations;
   const known =
     character.libraryEffectsKnown !== false &&
     character.houseRulesKnown !== false &&
@@ -132,7 +135,7 @@ export function DrSummaryCard({
   const validDivisor = !divisor.trim() || parseArmorDivisor(divisor) != null;
   const fatigueType = type.trim().toLowerCase() === 'fat';
   const map = known
-    ? effectiveDrByLocation(character.inventory, character.effects, selectedFacing)
+    ? effectiveDrByLocation(character.inventory, character.effects, selectedFacing, enforceLayering)
     : new Map();
   const custom = [...map.keys()].filter((loc) => !HIT_LOCATIONS.includes(loc as never));
   const dr = resolveDr(type, map.get(location));
@@ -178,7 +181,7 @@ export function DrSummaryCard({
           {!known && (
             <output className="block break-words text-sm text-warning">
               {invalidLayers.includes(location)
-                ? `DR unavailable: resolve overlapping armor layers in Inventory (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, selectedFacing).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
+                ? `DR unavailable: resolve overlapping armor layers in Inventory (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, selectedFacing, enforceLayering).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
                 : `DR unavailable. ${mechanicsUnavailableReason(character)} Reconnect to load the missing rules.`}
             </output>
           )}

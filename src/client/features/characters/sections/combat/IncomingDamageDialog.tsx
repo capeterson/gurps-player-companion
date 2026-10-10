@@ -58,9 +58,10 @@ export function IncomingDamageDialog({
 }: IncomingDamageDialogProps) {
   const ref = useDialogState(open);
   const [basicRaw, setBasicRaw] = useState('');
-  const invalidLayers = armorLayering(character.inventory, facing).invalidLocations.includes(
-    location,
-  );
+  const enforceLayering = character.houseRules?.armorLayeringLimits ?? true;
+  const invalidLayers = armorLayering(character.inventory, facing, {
+    limits: enforceLayering,
+  }).invalidLocations.includes(location);
   const effectsKnown =
     character.libraryEffectsKnown !== false &&
     character.houseRulesKnown !== false &&
@@ -68,8 +69,8 @@ export function IncomingDamageDialog({
   const protectNaturalDr = character.houseRules?.protectNaturalDr ?? true;
 
   const drMap = useMemo(
-    () => effectiveDrByLocation(character.inventory, character.effects, facing),
-    [character.inventory, character.effects, facing],
+    () => effectiveDrByLocation(character.inventory, character.effects, facing, enforceLayering),
+    [character.inventory, character.effects, facing, enforceLayering],
   );
 
   const validBasic = /^\d+$/.test(basicRaw.trim()) && Number.isSafeInteger(Number(basicRaw));
@@ -113,7 +114,7 @@ export function IncomingDamageDialog({
             : '';
   const breakdown = !effectsKnown
     ? invalidLayers
-      ? `Resolve overlapping armor layers in Inventory before applying damage (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, facing).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
+      ? `Resolve overlapping armor layers in Inventory before applying damage (B286). ${describeArmorLayerStacks(armorLayerStacks(character.inventory, facing, enforceLayering).filter((stack) => stack.invalid && stack.locations.includes(location)))}`
       : `${mechanicsUnavailableReason(character)} Reconnect and load the missing rules before applying damage.`
     : basic > 0
       ? `${basic} ${type} − DR ${result.drAtLocation}${divisorText}${
