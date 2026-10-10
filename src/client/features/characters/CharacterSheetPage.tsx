@@ -1796,18 +1796,11 @@ export function CharacterSheetPage() {
             </div>
           )}
           {tab === 'Inventory' && (
-            <FoldSection
-              preferenceKey={`${character.id}:InventoryPanel`}
-              title="Inventory"
-              icon="inventory"
-              forceOpen={anchor?.kind === 'inventory'}
-            >
-              <InventoryPanel
-                character={character}
-                canWrite={canWrite}
-                anchorItemId={anchor?.kind === 'inventory' ? anchor.id : null}
-              />
-            </FoldSection>
+            <InventoryPanel
+              character={character}
+              canWrite={canWrite}
+              anchorItemId={anchor?.kind === 'inventory' ? anchor.id : null}
+            />
           )}
           {tab === 'History' && (
             <FoldSection

@@ -121,6 +121,8 @@ export function SortableHeader<Sort extends string>({
   shortLabel,
   hideButtonOnMobile = false,
   filterable = true,
+  filterLabel,
+  rangeStep,
 }: {
   label: string;
   sort: Exclude<Sort, 'custom'>;
@@ -130,6 +132,8 @@ export function SortableHeader<Sort extends string>({
   shortLabel?: string;
   hideButtonOnMobile?: boolean;
   filterable?: boolean;
+  filterLabel?: string;
+  rangeStep?: number;
 }) {
   const active = preferences.sort === sort;
   return (
@@ -138,6 +142,8 @@ export function SortableHeader<Sort extends string>({
       indicatorClassName={hideButtonOnMobile ? 'hidden sm:inline' : ''}
       column={sort}
       label={label}
+      {...(filterLabel ? { filterLabel } : {})}
+      {...(rangeStep ? { rangeStep } : {})}
       scope="col"
       className={headerClassName}
       aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}

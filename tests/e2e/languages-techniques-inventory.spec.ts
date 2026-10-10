@@ -435,18 +435,20 @@ test('languages, techniques and inventory retain edits and fit their responsive 
 
   // A table-column filter uses the same matching descendants.
   await page.setViewportSize({ width: 1280, height: 900 });
-  await inventory.getByRole('button', { name: 'Item', exact: true }).click();
-  const itemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
-  await itemFilter.getByRole('checkbox', { name: 'Trail rations', exact: true }).check();
+  const itemHeading = inventory
+    .getByRole('columnheader')
+    .filter({ has: page.getByRole('button', { name: 'Sort by Item' }) });
+  await itemHeading.click({ button: 'right' });
+  const itemFilter = page.getByRole('dialog', { name: 'Filter Item type', exact: true });
+  await itemFilter.getByRole('checkbox', { name: 'Weapon', exact: true }).check();
   await itemFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
   await page.setViewportSize({ width: 375, height: 900 });
-  await expect(rations).toBeVisible();
-  await expect(pouch).toBeHidden();
-  await expect(nested).toBeHidden();
-  await expect(lastKit).toBeHidden();
+  await expect(sword).toBeVisible();
+  await expect(nestedBlade).toBeVisible();
+  await expect(rations).toBeHidden();
   await page.setViewportSize({ width: 1280, height: 900 });
-  await inventory.getByRole('button', { name: 'Item', exact: true }).click();
-  const clearItemFilter = page.getByRole('dialog', { name: 'Filter Item', exact: true });
+  await itemHeading.click({ button: 'right' });
+  const clearItemFilter = page.getByRole('dialog', { name: 'Filter Item type', exact: true });
   await clearItemFilter.getByRole('button', { name: 'Clear column filter', exact: true }).click();
   await clearItemFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
   await page.setViewportSize({ width: 375, height: 900 });
@@ -522,7 +524,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
         expect(hit).toBe('Collapse contents');
       }
     } else {
-      await expect(inventory.getByRole('columnheader', { name: 'Qty', exact: true })).toBeVisible();
+      await expect(
+        inventory.getByRole('columnheader', { name: 'Sort by Qty', exact: true }),
+      ).toBeVisible();
     }
     if (width === 375 || width === 1280) {
       await inventory.scrollIntoViewIfNeeded();

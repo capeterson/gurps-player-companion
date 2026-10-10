@@ -1,6 +1,6 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
 import { Pool } from 'pg';
-import { selectCharacterSection } from './character-navigation';
+import { openAddItem, selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
 
 const PASSWORD = 'CorrectHorseBatteryStaple1';
@@ -152,6 +152,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
     await selectCharacterSection(page, 'Inventory');
     const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
     await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
+    await openAddItem(page);
     const location = page.getByLabel('Location');
     await expect(location).toHaveValue('');
     await expect(location.locator('option', { hasText: 'On the player' })).toHaveAttribute(
@@ -162,6 +163,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
       'value',
       'stashed',
     );
+    await page.keyboard.press('Escape');
     const rows = [pack, pouch, caseItem, item].map(({ item: row }) =>
       page.locator(`#inventory-${row.id}`),
     );
@@ -237,6 +239,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
 
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     const stashedName = `Stashed item ${runId}`;
+    await openAddItem(page);
     await page.getByLabel('Item name').fill(stashedName);
     await location.selectOption('stashed');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -246,6 +249,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
 
     const createdName = `Carried and equipped ${runId}`;
     const addForm = location.locator('xpath=ancestor::form');
+    await openAddItem(page);
     await addForm.getByLabel('Item name').fill(createdName);
     await expect(location).toHaveValue('');
     await addForm.getByRole('button', { name: 'More options' }).click();

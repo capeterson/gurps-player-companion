@@ -123,13 +123,11 @@ describe('Inventory location and equipment controls', () => {
 
     expect(screen.queryByText('Worn', { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Worn' })).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole('combobox', { name: 'Filter inventory by tag' })).queryByRole(
-        'option',
-        { name: 'Worn' },
-      ),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Add item' })).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add item' });
+    expect(dialog).toHaveAttribute('open');
     const location = screen.getByRole('combobox', { name: 'Location' });
     expect(location).toHaveValue('');
     expect(within(location).getByRole('option', { name: 'On the player' })).toHaveValue('');
@@ -137,8 +135,9 @@ describe('Inventory location and equipment controls', () => {
     expect(within(location).getByRole('option', { name: 'in Backpack' })).toHaveValue(PACK_ID);
 
     fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Carried knife' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(async () => expect(await db.outbox.count()).toBe(1));
+    await waitFor(() => expect(dialog).not.toHaveAttribute('open'));
     const carriedOp = (await db.outbox.toArray()).find(
       (op) => (op.attemptedValue as { name?: string }).name === 'Carried knife',
     );
@@ -154,9 +153,10 @@ describe('Inventory location and equipment controls', () => {
       equipped: false,
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
     fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Stored knife' } });
     fireEvent.change(location, { target: { value: 'stashed' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(async () => expect(await db.outbox.count()).toBe(2));
     const stashedOp = (await db.outbox.toArray()).find(
       (op) => (op.attemptedValue as { name?: string }).name === 'Stored knife',
@@ -173,11 +173,12 @@ describe('Inventory location and equipment controls', () => {
       equipped: false,
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
     fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Packed knife' } });
     fireEvent.change(location, { target: { value: PACK_ID } });
     fireEvent.click(screen.getByRole('button', { name: 'More options' }));
-    expect(screen.getByLabelText('Equipped')).not.toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(within(dialog).getByLabelText('Equipped')).not.toBeChecked();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
     await waitFor(async () => expect(await db.outbox.count()).toBe(3));
     const packedOp = (await db.outbox.toArray()).find(
       (op) => (op.attemptedValue as { name?: string }).name === 'Packed knife',
@@ -284,19 +285,27 @@ describe('InventoryPanel filtering', () => {
     expect(screen.getByText('1 of 6')).toBeVisible();
   });
 
-  it('filters by item tag with the same ancestor-only hierarchy', () => {
+  it('filters by item type from the Item heading with the same ancestor-only hierarchy', () => {
     renderPanel();
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter inventory by tag' }), {
-      target: { value: 'weapon' },
-    });
+    const itemHeading = within(carried).getByRole('button', { name: 'Sort by Item' }).closest('th');
+    if (!itemHeading) throw new Error('Item heading missing');
+    fireEvent.contextMenu(itemHeading);
+    const menu = screen.getByRole('dialog', { name: 'Filter Item type' });
+    expect(
+      within(menu)
+        .getAllByRole('checkbox')
+        .map((box) => box.closest('label')?.textContent),
+    ).toEqual(['Container', 'Other', 'Weapon']);
+    fireEvent.click(within(menu).getByRole('checkbox', { name: 'Weapon' }));
 
     expect(screen.getByText('Backpack')).toBeVisible();
     expect(screen.getByText('Broadsword')).toBeVisible();
-    expect(screen.queryByText('Apple')).not.toBeInTheDocument();
-    expect(screen.queryByText('Small pouch')).not.toBeInTheDocument();
-    expect(screen.queryByText('Moon Gem')).not.toBeInTheDocument();
-    expect(screen.getByText('1 of 6')).toBeVisible();
+    expect(screen.queryByText('Apple')).not.toBeVisible();
+    expect(screen.queryByText('Small pouch')).not.toBeVisible();
+    expect(screen.getByText('1 column filter active')).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: 'Filter inventory by tag' })).toBeNull();
   });
 
   it('keeps only the matching nested branch and its visible ancestors during search', () => {
@@ -376,5 +385,110 @@ describe('InventoryPanel filtering', () => {
     expect(gemRow).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('region', { name: 'Moon Gem: Weapon' })).toBeVisible();
     expect(screen.getByLabelText('Damage', { exact: true })).toHaveValue('sw+2 cut');
+  });
+});
+
+describe('InventoryPanel sorting and range filters', () => {
+  const priced = (
+    id: string,
+    name: string,
+    quantity: number,
+    cost: number,
+    weight: number,
+    worn = true,
+  ) => ({
+    ...item(id, name, null, { worn }),
+    quantity,
+    cost,
+    weightLbs: weight,
+    effectiveWeightLbs: weight * quantity,
+  });
+  const inventory = [
+    priced('sword', 'Broadsword', 1, 500, 3),
+    priced('bolts', 'Crossbow bolts', 20, 2, 0.06),
+    priced('rations', 'Rations', 6, 2, 0.5),
+    priced('tent', 'Tent', 1, 80, 12, false),
+    priced('bedroll', 'Bedroll', 1, 25, 7, false),
+  ];
+  const names = (table: HTMLElement) =>
+    within(table)
+      .getAllByRole('row')
+      .filter((row) => row.classList.contains('inventory-item-row') && !row.hidden)
+      .map((row) => row.querySelector('.inventory-item-title')?.textContent);
+
+  it('sorts each list independently by the clicked column and reverses on a second click', () => {
+    renderPanel(undefined, { inventory });
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
+    const stashed = screen.getByRole('table', { name: 'Stashed inventory' });
+    expect(names(carried)).toEqual(['Broadsword', 'Crossbow bolts', 'Rations']);
+
+    fireEvent.click(within(carried).getByRole('button', { name: 'Sort by Cost' }));
+    // Cost sorts by price × quantity: 12, 40, 500.
+    expect(names(carried)).toEqual(['Rations', 'Crossbow bolts', 'Broadsword']);
+    expect(within(carried).getByRole('columnheader', { name: /Cost/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    expect(within(carried).getByText('40')).toBeVisible();
+    // Rations and bolts both cost 2 each.
+    expect(within(carried).getAllByText('2 ea')).toHaveLength(2);
+
+    fireEvent.click(within(carried).getByRole('button', { name: 'Sort by Cost' }));
+    expect(names(carried)).toEqual(['Broadsword', 'Crossbow bolts', 'Rations']);
+    expect(within(carried).getByRole('columnheader', { name: /Cost/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+    expect(names(stashed)).toEqual(['Bedroll', 'Tent']);
+
+    fireEvent.click(within(stashed).getByRole('button', { name: 'Sort by Wt' }));
+    fireEvent.click(within(stashed).getByRole('button', { name: 'Sort by Wt' }));
+    expect(names(stashed)).toEqual(['Tent', 'Bedroll']);
+    expect(names(carried)).toEqual(['Broadsword', 'Crossbow bolts', 'Rations']);
+  });
+
+  it('remembers each list sort on this device', () => {
+    const first = renderPanel(undefined, { inventory });
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
+    fireEvent.click(within(carried).getByRole('button', { name: 'Sort by Qty' }));
+    first.unmount();
+
+    renderPanel(undefined, { inventory });
+    expect(names(screen.getByRole('table', { name: 'Carried inventory' }))).toEqual([
+      'Broadsword',
+      'Rations',
+      'Crossbow bolts',
+    ]);
+    expect(names(screen.getByRole('table', { name: 'Stashed inventory' }))).toEqual([
+      'Bedroll',
+      'Tent',
+    ]);
+  });
+
+  it('filters quantity with a range from zero to the list maximum', () => {
+    renderPanel(undefined, { inventory });
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
+
+    fireEvent.contextMenu(within(carried).getByRole('columnheader', { name: /Qty/ }));
+    const menu = screen.getByRole('dialog', { name: 'Filter Qty' });
+    const maximum = within(menu).getByRole('slider', { name: 'Maximum Qty' });
+    expect(maximum).toHaveAttribute('max', '20');
+    expect(within(menu).getByText('All values shown')).toBeVisible();
+
+    fireEvent.change(maximum, { target: { value: '6' } });
+    expect(names(carried)).toEqual(['Broadsword', 'Rations']);
+    expect(within(menu).getByText('0 to 6')).toBeVisible();
+
+    const minimum = within(menu).getByRole('spinbutton', { name: 'Minimum Qty value' });
+    fireEvent.change(minimum, { target: { value: '2' } });
+    fireEvent.blur(minimum);
+    expect(names(carried)).toEqual(['Rations']);
+
+    fireEvent.click(within(menu).getByRole('button', { name: 'Clear column filter' }));
+    expect(names(carried)).toEqual(['Broadsword', 'Crossbow bolts', 'Rations']);
+    expect(names(screen.getByRole('table', { name: 'Stashed inventory' }))).toEqual([
+      'Bedroll',
+      'Tent',
+    ]);
   });
 });

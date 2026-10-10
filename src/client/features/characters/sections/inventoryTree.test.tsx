@@ -1,13 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { CATEGORY_LABELS } from './inventory/itemCategories.ts';
 import {
+  INVENTORY_OTHER_TYPE,
   buildTree,
   descendantsOf,
   eligibleContainers,
   filterInventoryTree,
   flattenDFS,
+  inventoryCostTotals,
+  inventoryTypeLabels,
+  sortInventoryTree,
   validateReparent,
 } from './inventoryTree.ts';
+
+function weapon(): NonNullable<InventoryItemOut['weaponData']> {
+  return {
+    damage: 'sw+1 cut',
+    reach: '1',
+    parry: '0',
+    stRequired: 10,
+    skill: 'Broadsword',
+    db: null,
+    ranged: null,
+    notes: null,
+    alternateModes: [],
+  };
+}
 
 function item(
   id: string,
@@ -111,7 +130,7 @@ describe('filterInventoryTree', () => {
       item('tent', null, 'Tent'),
     ];
 
-    const filtered = filterInventoryTree(items, 'GEM', 'all');
+    const filtered = filterInventoryTree(items, 'GEM');
 
     expect([...filtered.matchedIds]).toEqual(['gem']);
     expect(filtered.byParent.get(null)?.map((entry) => entry.id)).toEqual(['pack']);
@@ -122,31 +141,88 @@ describe('filterInventoryTree', () => {
     expect(filtered.byId.has('tent')).toBe(false);
   });
 
-  it('combines name and tag filters without revealing a matching container contents', () => {
+  it('does not reveal a matching container contents', () => {
     const pack = item('pack', null, 'Weapon pack', true);
     const sword = item('sword', 'pack', 'Broadsword');
-    sword.weaponData = {
-      damage: 'sw+1 cut',
-      reach: '1',
-      parry: '0',
-      stRequired: 10,
-      skill: 'Broadsword',
-      db: null,
-      ranged: null,
-      notes: null,
-      alternateModes: [],
-    };
-    const armor = item('armor', 'pack', 'Weapon harness');
-    armor.isArmor = true;
 
-    const weapons = filterInventoryTree([pack, sword, armor], 'sword', 'weapon');
-    expect([...weapons.matchedIds]).toEqual(['sword']);
-    expect(weapons.byParent.get(null)?.map((entry) => entry.id)).toEqual(['pack']);
-    expect(weapons.byParent.get('pack')?.map((entry) => entry.id)).toEqual(['sword']);
-
-    const matchingContainer = filterInventoryTree([pack, sword, armor], 'pack', 'container');
+    const matchingContainer = filterInventoryTree([pack, sword], 'pack');
     expect([...matchingContainer.matchedIds]).toEqual(['pack']);
     expect(matchingContainer.byParent.get('pack')).toBeUndefined();
+  });
+});
+
+describe('inventoryTypeLabels', () => {
+  it('uses the item category labels and falls back to Other', () => {
+    const sword = item('sword', null, 'Broadsword');
+    sword.weaponData = weapon();
+    sword.enchantments = [{ spellName: 'Puissance' } as InventoryItemOut['enchantments'][number]];
+    const rope = item('rope', null, 'Rope');
+    expect(inventoryTypeLabels(sword)).toEqual([
+      CATEGORY_LABELS.weapon,
+      CATEGORY_LABELS.enchantments,
+    ]);
+    expect(inventoryTypeLabels(rope)).toEqual([INVENTORY_OTHER_TYPE]);
+  });
+
+  it('offers every category the item editor can add', () => {
+    const everything = item('box', null, 'Everything box', true);
+    everything.isArmor = true;
+    everything.weaponData = weapon();
+    everything.powerstoneData = { maxEnergy: 5, currentEnergy: 0 };
+    everything.magicItemData = {
+      spellName: 'Light',
+      spellSkillLevel: 15,
+      mode: 'charged',
+      chargesMax: 1,
+      chargesCurrent: 1,
+    } as InventoryItemOut['magicItemData'];
+    everything.enchantments = [
+      { spellName: 'Fortify' } as InventoryItemOut['enchantments'][number],
+    ];
+    expect(inventoryTypeLabels(everything).sort()).toEqual(Object.values(CATEGORY_LABELS).sort());
+  });
+});
+
+describe('inventoryCostTotals', () => {
+  it('totals price × quantity plus the full value of nested contents', () => {
+    const pack = { ...item('pack', null, 'Pack', true), cost: 60 };
+    const pouch = { ...item('pouch', 'pack', 'Pouch', true), cost: 10, quantity: 1 };
+    const coins = { ...item('coins', 'pouch', 'Coins'), cost: 2, quantity: 40 };
+    const rations = { ...item('rations', 'pack', 'Rations'), cost: 2, quantity: 6 };
+    const totals = inventoryCostTotals([pack, pouch, coins, rations]);
+    expect(totals.get('coins')).toBe(80);
+    expect(totals.get('pouch')).toBe(90);
+    expect(totals.get('pack')).toBe(60 + 90 + 12);
+  });
+});
+
+describe('sortInventoryTree', () => {
+  const pack = { ...item('pack', null, 'Pack', true), cost: 60, quantity: 1 };
+  const gem = { ...item('gem', 'pack', 'Gem'), cost: 500, quantity: 1 };
+  const apple = { ...item('apple', 'pack', 'Apple'), cost: 1, quantity: 3 };
+  const tent = { ...item('tent', null, 'Tent'), cost: 80, quantity: 1 };
+  const bolts = { ...item('bolts', null, 'Bolts'), cost: 2, quantity: 20 };
+  const items = [pack, gem, apple, tent, bolts];
+  const totals = inventoryCostTotals(items);
+  const ids = (byParent: Map<string | null, InventoryItemOut[]>, parent: string | null) =>
+    byParent.get(parent)?.map((entry) => entry.id);
+
+  it('sorts roots and each container by total cost, keeping contents with their container', () => {
+    const { byParent } = buildTree(items);
+    const ascending = sortInventoryTree(byParent, 'cost', false, false, totals);
+    expect(ids(ascending, null)).toEqual(['bolts', 'tent', 'pack']);
+    expect(ids(ascending, 'pack')).toEqual(['apple', 'gem']);
+    const descending = sortInventoryTree(byParent, 'cost', true, false, totals);
+    expect(ids(descending, null)).toEqual(['pack', 'tent', 'bolts']);
+    expect(ids(descending, 'pack')).toEqual(['gem', 'apple']);
+  });
+
+  it('falls back to item name for equal values', () => {
+    const { byParent } = buildTree(items);
+    const byQty = sortInventoryTree(byParent, 'qty', false, false, totals);
+    expect(ids(byQty, null)).toEqual(['pack', 'tent', 'bolts']);
+    const byName = sortInventoryTree(byParent, 'item', true, false, totals);
+    expect(ids(byName, null)).toEqual(['tent', 'pack', 'bolts']);
   });
 });
 

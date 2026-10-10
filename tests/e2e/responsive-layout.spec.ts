@@ -3,6 +3,7 @@ import { test } from './authenticated-fixture';
 import {
   assignOverviewCampaign,
   expectCharacterNavigationReady,
+  openAddItem,
   selectCharacterSection,
 } from './character-navigation';
 import { captureReviewScreenshot } from './review-artifacts';
@@ -537,6 +538,7 @@ test('inline inventory categories toggle and retain populated advanced fields on
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   await selectCharacterSection(page, 'Inventory');
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Reachable item');
   await page.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Reachable item', { exact: true })).toBeVisible();
@@ -579,18 +581,21 @@ test('inventory filters keep matching item ancestry without showing unrelated co
   await selectCharacterSection(page, 'Inventory');
 
   const addForm = page.getByLabel('Item name').locator('xpath=ancestor::form');
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Backpack');
   await addForm.getByRole('button', { name: 'More options' }).click();
   await addForm.getByRole('button', { name: '+ Container', exact: true }).click();
   await addForm.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Backpack', { exact: true })).toBeVisible();
 
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Apple');
   await addForm.getByLabel('Location').selectOption({ label: 'in Backpack' });
   await addForm.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Apple', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('1 contained item')).toBeVisible();
 
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Broadsword');
   await addForm.getByLabel('Location').selectOption({ label: 'in Backpack' });
   await addForm.getByRole('button', { name: 'More options' }).click();
@@ -617,10 +622,17 @@ test('inventory filters keep matching item ancestry without showing unrelated co
   await expect(page.getByText('1 of 3', { exact: true })).toBeVisible();
 
   await search.fill('');
-  await page.getByLabel('Filter inventory by tag').selectOption('weapon');
+  await page
+    .getByRole('table', { name: 'Carried inventory', exact: true })
+    .getByRole('columnheader')
+    .filter({ has: page.getByRole('button', { name: 'Sort by Item' }) })
+    .click({ button: 'right' });
+  const typeFilter = page.getByRole('dialog', { name: 'Filter Item type', exact: true });
+  await typeFilter.getByRole('checkbox', { name: 'Weapon', exact: true }).check();
+  await typeFilter.getByRole('button', { name: 'Close filter', exact: true }).click();
   await expect(page.getByText('Backpack', { exact: true })).toBeVisible();
   await expect(page.getByText('Broadsword', { exact: true })).toBeVisible();
-  await expect(page.getByText('Apple', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Apple', { exact: true })).toBeHidden();
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true);
@@ -667,6 +679,7 @@ test('maintain-payment dialog keeps long resource labels and free-maintenance ac
 
   await selectCharacterSection(page, 'Inventory');
   const powerstoneName = 'The Ancient Granite Tower Powerstone of the Northern Highlands';
+  await openAddItem(page);
   await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: `Edit ${powerstoneName}` }).click();
@@ -774,6 +787,7 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   await expectCharacterNavigationReady(page);
   await selectCharacterSection(page, 'Inventory');
   const powerstoneName = 'PneumonoultramicroscopicsilicovolcanoconiosisUnbreakablePowerstone';
+  await openAddItem(page);
   await page.getByLabel('Item name').fill(powerstoneName);
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: `Edit ${powerstoneName}` }).click();
@@ -781,6 +795,7 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
   await page.getByRole('button', { name: '+ Powerstone', exact: true }).click();
 
   const magicItemName = 'ThaumatologicallyOverengineeredUnbreakableResponsiveWand';
+  await openAddItem(page);
   await page.getByLabel('Item name').fill(magicItemName);
   await page.getByRole('button', { name: /^add$/i }).click();
   await page.getByRole('button', { name: `Edit ${magicItemName}` }).click();

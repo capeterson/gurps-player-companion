@@ -2,7 +2,7 @@ import type { FocusedDetail } from '../../shared/schemas/details.ts';
 import { Table, TableHeader } from '../components/ui/Table.tsx';
 import { InventoryRow } from '../features/characters/sections/InventoryRow.tsx';
 import { InventoryItemDetails } from '../features/characters/sections/inventory/InventoryItemDetails.tsx';
-import { buildTree } from '../features/characters/sections/inventoryTree.ts';
+import { buildTree, inventoryCostTotals } from '../features/characters/sections/inventoryTree.ts';
 import { LibrarySkillDetails, librarySkillMeta } from '../features/library/LibrarySkillDetails.tsx';
 
 export function FocusedDetailsApp({
@@ -15,6 +15,7 @@ export function FocusedDetailsApp({
   const isItem = data.kind === 'inventory_item';
   const title = isItem ? data.item.name : data.skill.name;
   const tree = isItem ? buildTree([data.item, ...data.contents]) : null;
+  const costTotals = isItem ? inventoryCostTotals([data.item, ...data.contents]) : new Map();
   return (
     <main className="min-w-0 p-3 sm:p-5">
       <article className="card border border-base-300/60 bg-base-100">
@@ -56,10 +57,10 @@ export function FocusedDetailsApp({
                     >
                       <thead>
                         <tr>
-                          <TableHeader column="item" label="Item" />
-                          <TableHeader column="qty" label="Qty" />
-                          <TableHeader column="wt" label="Wt" />
-                          <TableHeader column="cost" label="Cost" />
+                          <TableHeader column="item" label="Item" filterLabel="Item type" />
+                          <TableHeader column="qty" label="Qty" rangeStep={1} />
+                          <TableHeader column="wt" label="Wt" rangeStep={0.1} />
+                          <TableHeader column="cost" label="Cost" rangeStep={1} />
                           <th scope="col">
                             <span className="sr-only">Item details</span>
                           </th>
@@ -72,6 +73,7 @@ export function FocusedDetailsApp({
                             item={item}
                             depth={0}
                             byParent={tree?.byParent ?? new Map()}
+                            costTotals={costTotals}
                             isSelected={() => false}
                             onRowClick={() => undefined}
                             canEdit={false}

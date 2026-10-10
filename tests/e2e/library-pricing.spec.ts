@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { selectCharacterSection } from './character-navigation.ts';
+import { openAddItem, selectCharacterSection } from './character-navigation.ts';
 import { captureReviewScreenshot } from './review-artifacts';
 
 const itemRule = (unitCost: number) => ({
@@ -365,6 +365,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   await expect(page.getByRole('button', { name: 'Recalculate points' })).toBeVisible();
   await selectCharacterSection(page, 'Inventory');
   const itemName = page.getByLabel('Item name');
+  await openAddItem(page);
   await itemName.fill('Priced spear');
   await expect(page.getByRole('option', { name: /Priced spear/ })).toHaveCount(1);
   await itemName.fill('Unreviewed spear');

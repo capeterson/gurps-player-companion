@@ -137,4 +137,22 @@ describe('LibraryAutocomplete', () => {
     await waitFor(() => expect(within(dialog).queryByRole('listbox')).not.toBeInTheDocument());
     expect(onPick).not.toHaveBeenCalled();
   });
+
+  it('lets Escape dismiss open suggestions without cancelling an enclosing modal', async () => {
+    render(
+      <dialog open aria-label="Add item">
+        <Harness onPickSpy={vi.fn()} onChangeSpy={vi.fn()} />
+      </dialog>,
+    );
+    const input = screen.getByPlaceholderText('search');
+    fireEvent.change(input, { target: { value: 'a' } });
+    const dialog = screen.getByRole('dialog', { name: 'Add item' });
+    await within(dialog).findByRole('listbox');
+
+    // fireEvent returns false when the handler prevented the default action.
+    expect(fireEvent.keyDown(input, { key: 'Escape' })).toBe(false);
+    await waitFor(() => expect(within(dialog).queryByRole('listbox')).not.toBeInTheDocument());
+    // With no suggestions open, Escape keeps its normal dialog behavior.
+    expect(fireEvent.keyDown(input, { key: 'Escape' })).toBe(true);
+  });
 });

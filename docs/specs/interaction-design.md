@@ -266,7 +266,12 @@ collections use plain headings; details and editors open only on explicit action
 ## Tables are shared architecture
 
 Use `components/ui/Table.tsx` for data tables. `TableHeader` supplies column
-filters; sortable collections compose those with `SortableHeader`. Filtering
+filters; sortable collections compose those with `SortableHeader`. A heading
+with `rangeStep` filters a numeric column with a two-thumb slider from zero to
+the column's current highest value, plus exact minimum/maximum inputs; a thumb
+left at either end leaves that bound open so new extremes are not hidden.
+`filterLabel` names what a heading filters when it differs from the column
+title (Inventory's Item heading filters **Item type**). Filtering
 preferences are device-local and scoped by character/campaign/table identity,
 never server fields or outbox operations. Action columns are ordinary headers.
 
@@ -401,8 +406,13 @@ app's existing daisyUI components and semantic theme colors; avoid bespoke
 palettes, nested decorative cards, and additional display fonts.
 
 Inventory location uses the existing move/drop interaction, with On the player,
-Stashed and nested containers. Quick-add has one Location selector with those
-choices and defaults to On the player. Carried contents inherit their root's
+Stashed and nested containers. One **Add item** button at the right of the
+inventory toolbar opens the add form in a modal dialog; a successful add closes
+it. The form has one Location selector with those choices and defaults to On
+the player. The selection summary and bulk actions (**N selected**, Clear,
+Equipped, Move to, Delete) share that toolbar row with the name search rather
+than adding another bar. Inventory is not folded: the sheet tab already titles
+it, so it renders without a `FoldSection` disclosure. Carried contents inherit their root's
 location. Equipped means worn or wielded for use; there is no additional Worn
 control, filter or status badge. The stored/API `worn` field remains a legacy
 root-location flag for compatibility, not an equipment status. Every applied
@@ -449,7 +459,22 @@ names in the protection-layer breakdown shrink and wrap beside their DR values.
 
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide
-excluded rows without unmounting their editors. Category chips remain the
+excluded rows without unmounting their editors.
+
+On the player and Stashed are sorted and filtered independently. Item, Qty, Wt
+and Cost headings sort with `SortableHeader` (default Item ascending; a second
+click reverses). Sorting reorders each level of the tree: a container moves with
+its contents, and the contents of each container follow the same sort. Ties fall
+back to item name. Each list's sort is a device-local preference per character,
+cleared at logout. Cost shows and sorts by price × quantity; a container's cost
+adds the full value of everything inside it (shown as “+ contents”, like
+weight), and a multi-unit row shows its single-item price as “ea”. Wt sorts by
+the weight the row shows. The Item heading's filter selects item types, derived
+from the item category list (`inventory/itemCategories.ts`) plus **Other** for
+items without a category, so a new category joins the filter automatically.
+Equipped is not a type; it has its own icon. Qty, Wt and Cost filter with the
+shared range filter. There is no separate tag selector in the toolbar. Below
+640px the headings stay visible as one compact row so phones can sort and filter. Category chips remain the
 route to category editors. **+ Category** lives in the item-details editor the
 pencil opens, rather than repeating on every row.
 

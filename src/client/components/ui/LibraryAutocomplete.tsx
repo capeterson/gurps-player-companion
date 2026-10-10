@@ -204,6 +204,8 @@ export function LibraryAutocomplete<T>({
       return;
     }
     if (e.key === 'Escape') {
+      // Dismiss only the suggestions, not an enclosing modal dialog.
+      if (open && options.length > 0) e.preventDefault();
       setOpen(false);
     }
   };

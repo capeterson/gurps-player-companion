@@ -109,7 +109,28 @@
     width: 100%;
   }
 
+  /* Headings stay as one compact row so phones can still sort and filter. */
   .inventory-table > thead {
+    display: block;
+    border-bottom: 1px solid var(--color-base-300);
+  }
+
+  .inventory-table > thead > tr {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px 2px var(--inventory-gutter);
+  }
+
+  .inventory-table > thead > tr > th {
+    padding: 0;
+  }
+
+  .inventory-table > thead > tr > th:first-child {
+    flex: 1;
+  }
+
+  .inventory-table > thead > tr > th:last-child:not(:first-child):not([aria-sort]) {
     display: none;
   }
 
@@ -153,7 +174,8 @@
     color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
   }
 
-  .inventory-weight-breakdown {
+  .inventory-weight-breakdown,
+  .inventory-cost-breakdown {
     display: none;
   }
 
