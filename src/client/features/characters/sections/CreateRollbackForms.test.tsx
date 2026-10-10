@@ -44,3 +44,33 @@ for (const [entityClass, Panel] of [
     client.clear();
   });
 }
+
+it('flashes the visible Add item button when a closed inventory dialog create is rejected', () => {
+  const character = {
+    id: 'character',
+    campaignId: null,
+    inventory: [],
+    skills: [],
+    libraryEffectsKnown: false,
+    encumbrance: { playerWeightLbs: 0, basicLift: 20, level: 0 },
+  } as unknown as CharacterDetail;
+  const client = new QueryClient();
+  const { getByRole, unmount } = render(
+    <QueryClientProvider client={client}>
+      <ToastProvider>
+        <InventoryPanel character={character} canWrite />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  const addItem = getByRole('button', { name: 'Add item' });
+  expect(addItem).toHaveClass('field-rollback-flash');
+  act(() =>
+    flashBus.emit({
+      key: 'character_inventory:character:create',
+      reason: 'Library reference unavailable',
+    }),
+  );
+  expect(addItem).toHaveAttribute('data-flashing', 'true');
+  unmount();
+  client.clear();
+});

@@ -10,6 +10,7 @@
  */
 
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
+import { CATEGORY_LABELS, categories } from './inventory/itemCategories.ts';
 
 export interface InventoryTree {
   /** Children of each node, keyed by parentId (null = root). */
@@ -18,54 +19,98 @@ export interface InventoryTree {
   readonly byId: Map<string, InventoryItemOut>;
 }
 
-export const INVENTORY_FILTER_TAGS = [
-  'all',
-  'weapon',
-  'armor',
-  'container',
-  'powerstone',
-  'magicItem',
-  'enchanted',
-  'equipped',
-] as const;
-
-export type InventoryFilterTag = (typeof INVENTORY_FILTER_TAGS)[number];
-
 export interface FilteredInventoryTree extends InventoryTree {
   /** Items matching the filters directly; ancestor containers are not counted. */
   readonly matchedIds: ReadonlySet<string>;
 }
 
-function hasFilterTag(item: InventoryItemOut, tag: InventoryFilterTag): boolean {
-  switch (tag) {
-    case 'all':
-      return true;
-    case 'weapon':
-      return item.weaponData != null;
-    case 'armor':
-      return item.isArmor;
-    case 'container':
-      return item.isContainer;
-    case 'powerstone':
-      return item.powerstoneData != null;
-    case 'magicItem':
-      return item.magicItemData != null;
-    case 'enchanted':
-      return (item.enchantments?.length ?? 0) > 0;
-    case 'equipped':
-      return item.equipped;
-  }
+/** Type filter value for items without any category. */
+export const INVENTORY_OTHER_TYPE = 'Other';
+
+/** The item's category labels, so new categories join the type filter automatically. */
+export function inventoryTypeLabels(item: InventoryItemOut): string[] {
+  const labels = categories(item).map((category) => CATEGORY_LABELS[category]);
+  return labels.length > 0 ? labels : [INVENTORY_OTHER_TYPE];
+}
+
+export type InventorySort = 'item' | 'qty' | 'wt' | 'cost';
+
+/** Rounded to cents/hundredths so range filters compare what the row shows. */
+const roundForDisplay = (value: number) => Math.round(value * 100) / 100;
+
+/** Price × quantity, plus the full value of everything inside a container. */
+export function inventoryCostTotals(
+  items: readonly InventoryItemOut[],
+): ReadonlyMap<string, number> {
+  const { byParent } = buildTree(items);
+  const totals = new Map<string, number>();
+  const visit = (item: InventoryItemOut, path: ReadonlySet<string>): number => {
+    const known = totals.get(item.id);
+    if (known !== undefined) return known;
+    let total = item.cost * item.quantity;
+    for (const child of byParent.get(item.id) ?? []) {
+      if (!path.has(child.id)) total += visit(child, new Set([...path, child.id]));
+    }
+    totals.set(item.id, total);
+    return total;
+  };
+  for (const item of items) visit(item, new Set([item.id]));
+  return totals;
+}
+
+/** Stashed rows show their own raw weight; carried rows show encumbrance weight. */
+export function inventoryRowWeight(item: InventoryItemOut, stashed: boolean): number {
+  return stashed ? item.weightLbs * item.quantity : item.effectiveWeightLbs;
+}
+
+/** Declarative column values shared by the column filters and their option lists. */
+export function inventoryFilterValues(
+  item: InventoryItemOut,
+  stashed: boolean,
+  costTotals: ReadonlyMap<string, number>,
+) {
+  return {
+    item: inventoryTypeLabels(item),
+    qty: item.quantity,
+    wt: roundForDisplay(inventoryRowWeight(item, stashed)),
+    cost: roundForDisplay(costTotals.get(item.id) ?? item.cost * item.quantity),
+  };
+}
+
+/**
+ * Sort each container's contents (and the roots) by the chosen column.
+ * Containers move with their contents; ties fall back to item name.
+ */
+export function sortInventoryTree(
+  byParent: Map<string | null, InventoryItemOut[]>,
+  sort: InventorySort,
+  descending: boolean,
+  stashed: boolean,
+  costTotals: ReadonlyMap<string, number>,
+): Map<string | null, InventoryItemOut[]> {
+  const value = (item: InventoryItemOut): number =>
+    sort === 'qty'
+      ? item.quantity
+      : sort === 'wt'
+        ? inventoryRowWeight(item, stashed)
+        : (costTotals.get(item.id) ?? item.cost * item.quantity);
+  const byName = (a: InventoryItemOut, b: InventoryItemOut) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
+  const compare = (a: InventoryItemOut, b: InventoryItemOut) => {
+    const primary = sort === 'item' ? byName(a, b) : value(a) - value(b);
+    return (descending ? -primary : primary) || byName(a, b);
+  };
+  return new Map([...byParent].map(([parentId, bucket]) => [parentId, [...bucket].sort(compare)]));
 }
 
 /**
  * Filter inventory without losing the hierarchy needed to locate a match.
- * Only direct matches and their ancestor containers remain; a matching
+ * Only direct name matches and their ancestor containers remain; a matching
  * container does not implicitly reveal any of its non-matching contents.
  */
 export function filterInventoryTree(
   items: readonly InventoryItemOut[],
   query: string,
-  tag: InventoryFilterTag,
 ): FilteredInventoryTree {
   const fullTree = buildTree(items);
   const needle = query.trim().toLocaleLowerCase();
@@ -73,7 +118,7 @@ export function filterInventoryTree(
   const visibleIds = new Set<string>();
 
   for (const item of items) {
-    if (!item.name.toLocaleLowerCase().includes(needle) || !hasFilterTag(item, tag)) continue;
+    if (!item.name.toLocaleLowerCase().includes(needle)) continue;
     matchedIds.add(item.id);
     visibleIds.add(item.id);
 

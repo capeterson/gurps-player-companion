@@ -15,7 +15,7 @@ import { getLocalDb } from '../../../../db/dexie.ts';
 import { ToastProvider } from '../../../../lib/toast.tsx';
 import { flashBus } from '../../../../sync/flashBus.ts';
 import { InventoryRow } from '../InventoryRow.tsx';
-import { buildTree } from '../inventoryTree.ts';
+import { buildTree, inventoryCostTotals } from '../inventoryTree.ts';
 import * as mutations from './itemMutations.ts';
 
 const ID = '0193b3c0-f1f0-7000-8000-00000000a001';
@@ -76,6 +76,7 @@ function Harness({
               item={row}
               depth={0}
               byParent={tree.byParent}
+              costTotals={inventoryCostTotals(items)}
               isSelected={() => false}
               onRowClick={selection}
               canEdit={canEdit}

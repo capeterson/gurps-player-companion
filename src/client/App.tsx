@@ -10,6 +10,7 @@ import { BrandMark } from './components/ui/BrandMark.tsx';
 import { clearAllTableFilters } from './components/ui/Table.tsx';
 import { clearAllAttackTablePreferences } from './features/characters/sections/combat/attackTablePreferences.ts';
 import { clearAllDefenseTablePreferences } from './features/characters/sections/combat/defenseTablePreferences.ts';
+import { clearAllInventoryTablePreferences } from './features/characters/sections/inventoryTablePreferences.ts';
 import { clearAllRollHistory } from './features/characters/sections/rollHistory.ts';
 import { clearAllSkillTablePreferences } from './features/characters/sections/skillTablePreferences.ts';
 import { clearAllSpellTablePreferences } from './features/characters/sections/spellTablePreferences.ts';
@@ -126,6 +127,7 @@ export function App() {
     clearAllRollHistory();
     clearAllAttackTablePreferences();
     clearAllDefenseTablePreferences();
+    clearAllInventoryTablePreferences();
     clearAllSkillTablePreferences();
     clearAllSpellTablePreferences();
     clearAllTraitTablePreferences();

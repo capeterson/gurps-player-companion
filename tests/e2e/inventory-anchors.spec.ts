@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
+import {
+  expectCharacterNavigationReady,
+  openAddItem,
+  selectCharacterSection,
+} from './character-navigation';
 import { captureReviewScreenshot } from './review-artifacts';
 
 test.use({ serviceWorkers: 'block' });
@@ -20,19 +24,22 @@ test('a combat weapon link reveals nested inventory and survives reload', async 
   const path = new URL(page.url()).pathname;
   const addForm = page.getByLabel('Item name').locator('xpath=ancestor::form');
 
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Deep Pack');
   await addForm.getByRole('button', { name: 'More options' }).click();
   await addForm.getByRole('button', { name: '+ Container', exact: true }).click();
   await addForm.getByRole('button', { name: /^add$/i }).click();
   await expect(page.getByText('Deep Pack', { exact: true })).toBeVisible();
 
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Deep Pouch');
   await addForm.getByLabel('Location').selectOption({ label: 'in Deep Pack' });
   await addForm.getByRole('button', { name: 'More options' }).click();
   await addForm.getByRole('button', { name: '+ Container', exact: true }).click();
   await addForm.getByRole('button', { name: /^add$/i }).click();
-  await expect(addForm.getByRole('option', { name: 'in Deep Pouch' })).toBeAttached();
+  await expect(addForm.locator('option', { hasText: 'in Deep Pouch' })).toBeAttached();
 
+  await openAddItem(page);
   await page.getByLabel('Item name').fill('Deep Sword');
   await addForm.getByLabel('Location').selectOption({ label: 'in Deep Pouch' });
   await addForm.getByRole('button', { name: 'More options' }).click();

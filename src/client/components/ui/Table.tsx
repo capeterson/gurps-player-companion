@@ -1,5 +1,6 @@
 /** Shared table filtering. Presentation preferences never enter the API/outbox. */
 import {
+  type CSSProperties,
   type ComponentProps,
   type ReactNode,
   createContext,
@@ -19,7 +20,16 @@ import {
 } from '../../hooks/useViewportBoundedOverlay.ts';
 
 export type TableValues = Readonly<Record<string, string | number | null | readonly string[]>>;
-type Filters = Record<string, string[]>;
+/** Inclusive numeric bounds; `null` leaves that end open so new extremes stay visible. */
+export interface TableRangeFilter {
+  min: number | null;
+  max: number | null;
+}
+type ColumnFilter = string[] | TableRangeFilter;
+type Filters = Record<string, ColumnFilter>;
+const isRangeFilter = (filter: ColumnFilter): filter is TableRangeFilter => !Array.isArray(filter);
+const isBound = (value: unknown): value is number | null =>
+  value === null || (typeof value === 'number' && Number.isFinite(value));
 const PREFIX = 'gpc:table-filters:v1:';
 const valuesFor = (value: TableValues[string] | undefined): readonly string[] =>
   Array.isArray(value) ? value : [value == null ? '—' : String(value)];
@@ -29,12 +39,15 @@ function readFilters(key: string): Filters {
     const parsed: unknown = JSON.parse(localStorage.getItem(PREFIX + key) ?? '{}');
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     return Object.fromEntries(
-      Object.entries(parsed).filter(
-        (entry): entry is [string, string[]] =>
-          Array.isArray(entry[1]) &&
-          entry[1].length > 0 &&
-          entry[1].every((value: unknown) => typeof value === 'string'),
-      ),
+      Object.entries(parsed).filter((entry): entry is [string, ColumnFilter] => {
+        const value: unknown = entry[1];
+        if (Array.isArray(value)) {
+          return value.length > 0 && value.every((item: unknown) => typeof item === 'string');
+        }
+        if (!value || typeof value !== 'object') return false;
+        const { min, max } = value as Record<string, unknown>;
+        return isBound(min) && isBound(max) && (min !== null || max !== null);
+      }),
     );
   } catch {
     return {};
@@ -55,7 +68,7 @@ interface TableState {
   rows: readonly TableValues[];
   setColumnEnabled: (column: string, enabled: boolean) => void;
   register: (id: string, values: TableValues | null) => void;
-  open: (key: string, label: string, trigger: HTMLElement) => void;
+  open: (key: string, label: string, trigger: HTMLElement, rangeStep?: number) => void;
 }
 const TableContext = createContext<TableState | null>(null);
 const skipRegistration = () => {};
@@ -87,6 +100,7 @@ function TableImpl({
     key: string;
     label: string;
     trigger: HTMLElement;
+    rangeStep?: number;
   } | null>(null);
   const [disabledColumns, setDisabledColumns] = useState<readonly string[]>([]);
   const setColumnEnabled = useCallback((column: string, enabled: boolean) => {
@@ -126,7 +140,8 @@ function TableImpl({
     setColumnEnabled,
     rows: filterRows ?? Object.values(registered),
     register: filterRows ? skipRegistration : register,
-    open: (key, label, trigger) => setMenu({ key, label, trigger }),
+    open: (key, label, trigger, rangeStep) =>
+      setMenu({ key, label, trigger, ...(rangeStep ? { rangeStep } : {}) }),
   };
   const closeMenu = useCallback(() => {
     setMenu(null);
@@ -158,7 +173,24 @@ function TableImpl({
             No rows match the column filters.
           </output>
         )}
-      {filterable && menu && (
+      {filterable && menu?.rangeStep && (
+        <ColumnRangeMenu
+          key={menu.key}
+          label={menu.label}
+          trigger={menu.trigger}
+          step={menu.rangeStep}
+          values={state.rows.flatMap((row) => numericValue(row[menu.key]) ?? [])}
+          selected={rangeFilterFor(filters[menu.key])}
+          onChange={(range) => {
+            const next = { ...filters };
+            if (range.min !== null || range.max !== null) next[menu.key] = range;
+            else delete next[menu.key];
+            save(next);
+          }}
+          onClose={closeMenu}
+        />
+      )}
+      {filterable && menu && !menu.rangeStep && (
         <ColumnFilterMenu
           key={menu.key}
           label={menu.label}
@@ -166,10 +198,10 @@ function TableImpl({
           values={[
             ...new Set([
               ...state.rows.flatMap((row) => valuesFor(row[menu.key])),
-              ...(filters[menu.key] ?? []),
+              ...valueFilterFor(filters[menu.key]),
             ]),
           ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))}
-          selected={filters[menu.key] ?? []}
+          selected={valueFilterFor(filters[menu.key])}
           onChange={(selected) => {
             const next = { ...filters };
             if (selected.length) next[menu.key] = selected;
@@ -187,6 +219,8 @@ function TableImpl({
 export function TableHeader({
   column,
   label,
+  filterLabel = label,
+  rangeStep,
   filterable = true,
   indicatorClassName = '',
   children,
@@ -194,6 +228,10 @@ export function TableHeader({
 }: ComponentProps<'th'> & {
   column: string;
   label: string;
+  /** Names what the filter selects when it differs from the heading, e.g. "Item type". */
+  filterLabel?: string;
+  /** Filter this numeric column with a range slider in steps of this size. */
+  rangeStep?: number;
   filterable?: boolean;
   indicatorClassName?: string;
 }) {
@@ -204,9 +242,11 @@ export function TableHeader({
     return () => setEnabled?.(column, true);
   }, [column, filterable, setEnabled]);
   const enabled = filterable && table?.enabled;
-  const active = enabled && Boolean(table.filters[column]?.length);
+  const active = enabled && column in table.filters;
   const open = (element: HTMLElement) => {
-    if (enabled) table.open(column, label, element.querySelector('button') ?? element);
+    if (enabled) {
+      table.open(column, filterLabel, element.querySelector('button') ?? element, rangeStep);
+    }
   };
   return (
     <th
@@ -275,10 +315,29 @@ export function TableFilterScope({ children }: { children: (filtering: boolean) 
 }
 
 function rowMatchesFilters(values: TableValues, filters: Filters) {
-  return Object.entries(filters).every(([key, selected]) =>
-    valuesFor(values[key]).some((value) => selected.includes(value)),
-  );
+  return Object.entries(filters).every(([key, filter]) => {
+    if (!isRangeFilter(filter)) {
+      return valuesFor(values[key]).some((value) => filter.includes(value));
+    }
+    const value = numericValue(values[key]);
+    return (
+      value !== null &&
+      (filter.min === null || value >= filter.min) &&
+      (filter.max === null || value <= filter.max)
+    );
+  });
 }
+
+function numericValue(value: TableValues[string] | undefined): number | null {
+  if (value == null || Array.isArray(value) || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+const valueFilterFor = (filter: ColumnFilter | undefined): string[] =>
+  filter && !isRangeFilter(filter) ? filter : [];
+const rangeFilterFor = (filter: ColumnFilter | undefined): TableRangeFilter =>
+  filter && isRangeFilter(filter) ? filter : { min: null, max: null };
 
 function useFilteredRow(values: TableValues | undefined) {
   const table = useContext(TableContext);
@@ -316,26 +375,21 @@ export function TableRow({
   return <tr {...props} hidden={hidden || filtered} />;
 }
 
-function ColumnFilterMenu({
+/** Shared anchored dialog for column filters: viewport-bounded, focus-trapped, dismissible. */
+function FilterDialog({
   label,
   trigger,
-  values,
-  selected,
-  onChange,
   onClose,
+  children,
 }: {
   label: string;
   trigger: HTMLElement;
-  values: readonly string[];
-  selected: readonly string[];
-  onChange: (values: string[]) => void;
   onClose: () => void;
+  children: ReactNode;
 }) {
-  const [query, setQuery] = useState('');
   const ref = useViewportBoundedOverlay<HTMLDialogElement>();
-  const inputRef = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => {
-    inputRef.current?.focus();
+    ref.current?.querySelector<HTMLInputElement>('input')?.focus();
     const position = () => {
       const element = ref.current;
       if (!element) return;
@@ -375,7 +429,6 @@ function ColumnFilterMenu({
       window.visualViewport?.removeEventListener('scroll', position);
     };
   }, [trigger, ref, onClose]);
-  const normalized = query.toLocaleLowerCase();
   return createPortal(
     <dialog
       open
@@ -416,8 +469,32 @@ function ColumnFilterMenu({
           ✕
         </button>
       </div>
+      {children}
+    </dialog>,
+    document.body,
+  );
+}
+
+function ColumnFilterMenu({
+  label,
+  trigger,
+  values,
+  selected,
+  onChange,
+  onClose,
+}: {
+  label: string;
+  trigger: HTMLElement;
+  values: readonly string[];
+  selected: readonly string[];
+  onChange: (values: string[]) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const normalized = query.toLocaleLowerCase();
+  return (
+    <FilterDialog label={label} trigger={trigger} onClose={onClose}>
       <input
-        ref={inputRef}
         type="search"
         className="input input-sm w-full shrink-0"
         aria-label={`Search ${label} values`}
@@ -462,8 +539,142 @@ function ColumnFilterMenu({
           <p className="text-sm">No matching values.</p>
         )}
       </div>
-    </dialog>,
-    document.body,
+    </FilterDialog>
+  );
+}
+
+/** Snap to the step grid without binary floating-point residue (0.1 + 0.2). */
+function snap(value: number, step: number): number {
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
+  return Number((Math.round(value / step) * step).toFixed(decimals));
+}
+
+const formatBound = (value: number) =>
+  value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+
+/** Two-thumb slider from zero to the column's current highest value, plus exact inputs. */
+function ColumnRangeMenu({
+  label,
+  trigger,
+  step,
+  values,
+  selected,
+  onChange,
+  onClose,
+}: {
+  label: string;
+  trigger: HTMLElement;
+  step: number;
+  values: readonly number[];
+  selected: TableRangeFilter;
+  onChange: (range: TableRangeFilter) => void;
+  onClose: () => void;
+}) {
+  const highest = Math.max(0, ...values, selected.min ?? 0, selected.max ?? 0);
+  const top = Math.max(step, snap(Math.ceil(highest / step) * step, step));
+  const low = Math.min(selected.min ?? 0, top);
+  const high = Math.min(selected.max ?? top, top);
+  const [lowDraft, setLowDraft] = useState<string | null>(null);
+  const [highDraft, setHighDraft] = useState<string | null>(null);
+  const apply = (nextLow: number, nextHigh: number) => {
+    const [min, max] = nextLow <= nextHigh ? [nextLow, nextHigh] : [nextHigh, nextLow];
+    // A thumb resting at either end leaves that side open, so a later
+    // heavier/pricier item is not silently excluded.
+    onChange({ min: min <= 0 ? null : min, max: max >= top ? null : max });
+  };
+  const commit = (draft: string | null, side: 'low' | 'high') => {
+    if (draft === null) return;
+    const parsed = Number(draft);
+    if (draft.trim() !== '' && Number.isFinite(parsed)) {
+      const bounded = Math.max(0, Math.min(parsed, top));
+      if (side === 'low') apply(bounded, high);
+      else apply(low, bounded);
+    }
+    if (side === 'low') setLowDraft(null);
+    else setHighDraft(null);
+  };
+  const percent = (value: number) => `${(value / top) * 100}%`;
+  const filtered = selected.min !== null || selected.max !== null;
+  return (
+    <FilterDialog label={label} trigger={trigger} onClose={onClose}>
+      <p className="text-xs text-base-content/60">
+        {filtered ? `${formatBound(low)} to ${formatBound(high)}` : 'All values shown'}
+      </p>
+      <button
+        type="button"
+        className="btn btn-ghost btn-xs self-start shrink-0"
+        onClick={() => onChange({ min: null, max: null })}
+      >
+        Clear column filter
+      </button>
+      <div
+        className="table-range-slider"
+        style={
+          {
+            '--range-low': percent(low),
+            '--range-high': percent(high),
+          } as CSSProperties
+        }
+      >
+        <input
+          type="range"
+          min={0}
+          max={top}
+          step={step}
+          value={low}
+          aria-label={`Minimum ${label}`}
+          // Keep the low thumb reachable when both thumbs rest at the top.
+          style={low >= top ? { zIndex: 2 } : undefined}
+          onChange={(event) => apply(Math.min(Number(event.target.value), high), high)}
+        />
+        <input
+          type="range"
+          min={0}
+          max={top}
+          step={step}
+          value={high}
+          aria-label={`Maximum ${label}`}
+          onChange={(event) => apply(low, Math.max(Number(event.target.value), low))}
+        />
+      </div>
+      <div className="flex justify-between text-xs text-base-content/60 num">
+        <span>0</span>
+        <span>{formatBound(top)}</span>
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <input
+          type="number"
+          inputMode="decimal"
+          className="input input-sm w-0 min-w-0 flex-1 num"
+          min={0}
+          max={top}
+          step={step}
+          aria-label={`Minimum ${label} value`}
+          value={lowDraft ?? String(low)}
+          onChange={(event) => setLowDraft(event.target.value)}
+          onBlur={() => commit(lowDraft, 'low')}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commit(lowDraft, 'low');
+          }}
+        />
+        <span className="text-base-content/60">to</span>
+        <input
+          type="number"
+          inputMode="decimal"
+          className="input input-sm w-0 min-w-0 flex-1 num"
+          min={0}
+          max={top}
+          step={step}
+          aria-label={`Maximum ${label} value`}
+          value={highDraft ?? String(high)}
+          onChange={(event) => setHighDraft(event.target.value)}
+          onBlur={() => commit(highDraft, 'high')}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commit(highDraft, 'high');
+          }}
+        />
+      </div>
+    </FilterDialog>
   );
 }
 

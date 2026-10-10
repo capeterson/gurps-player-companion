@@ -13,35 +13,9 @@ import { getLocalDb } from '../../../../db/dexie.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { enqueueFieldPatches } from '../../../../sync/outbox.ts';
 
-export const CATEGORY_LABELS = {
-  armor: 'Armor',
-  weapon: 'Weapon',
-  container: 'Container',
-  powerstone: 'Powerstone',
-  magicItem: 'Magic item',
-  enchantments: 'Enchantments',
-} as const;
-export type ItemCategory = keyof typeof CATEGORY_LABELS;
+export { CATEGORY_LABELS, type ItemCategory, categories } from './itemCategories.ts';
+import { CATEGORY_LABELS, type ItemCategory, categories } from './itemCategories.ts';
 export type ItemSection = ItemCategory | 'basics' | 'add';
-
-export function categories(item: InventoryItemUpdate): ItemCategory[] {
-  return (Object.keys(CATEGORY_LABELS) as ItemCategory[]).filter((category) => {
-    switch (category) {
-      case 'armor':
-        return item.isArmor;
-      case 'weapon':
-        return item.weaponData != null;
-      case 'container':
-        return item.isContainer;
-      case 'powerstone':
-        return item.powerstoneData != null;
-      case 'magicItem':
-        return item.magicItemData != null;
-      case 'enchantments':
-        return (item.enchantments?.length ?? 0) > 0;
-    }
-  });
-}
 
 /** Read/modify/write in the same IndexedDB transaction. Two inputs editing
  * different properties of armor/weaponData must never overwrite one another

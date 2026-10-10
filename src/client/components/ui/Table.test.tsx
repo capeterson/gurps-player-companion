@@ -19,9 +19,11 @@ const firstRow = rows.find((row) => row.name === 'Ash') ?? {
 function Fixture({
   preferenceKey = 'test:traits',
   filterable = true,
+  rangePoints = false,
 }: {
   preferenceKey?: string;
   filterable?: boolean;
+  rangePoints?: boolean;
 }) {
   return (
     <Table aria-label="Traits" preferenceKey={preferenceKey} filterable={filterable}>
@@ -29,7 +31,7 @@ function Fixture({
         <tr>
           <TableHeader column="name" label="Trait" />
           <TableHeader column="kind" label="Type" />
-          <TableHeader column="points" label="Points" />
+          <TableHeader column="points" label="Points" {...(rangePoints ? { rangeStep: 1 } : {})} />
         </tr>
       </thead>
       {rows.map((row) => (
@@ -262,4 +264,50 @@ it('ignores malformed stored preferences and remains usable when storage reads o
   expect(screen.getByText(/could not remember table filters/i)).toBeVisible();
   getItem.mockRestore();
   setItem.mockRestore();
+});
+
+it('filters a numeric column by an open-ended range and persists the bounds', () => {
+  const view = render(<Fixture rangePoints />);
+  const points = openFilter('Points');
+  const minimum = within(points).getByRole('slider', { name: 'Minimum Points' });
+  const maximum = within(points).getByRole('slider', { name: 'Maximum Points' });
+  expect(minimum).toHaveAttribute('min', '0');
+  expect(maximum).toHaveAttribute('max', '10');
+  expect(within(points).queryByRole('checkbox')).not.toBeInTheDocument();
+
+  fireEvent.change(minimum, { target: { value: '6' } });
+  expect(screen.getByRole('row', { name: /Cedar/ })).toBeVisible();
+  expect(screen.getByLabelText('Ash unsaved editor').closest('tbody')).toHaveAttribute('hidden');
+  // A blank value is not a number, so it never matches a range.
+  expect(screen.getByLabelText('Empty unsaved editor').closest('tbody')).toHaveAttribute('hidden');
+  expect(screen.getByRole('columnheader', { name: /Points/ })).toHaveTextContent('⏷');
+  // The maximum thumb rests at the top, so that end stays open.
+  expect(JSON.parse(localStorage.getItem('gpc:table-filters:v1:test:traits') ?? '{}')).toEqual({
+    points: { min: 6, max: null },
+  });
+
+  fireEvent.change(minimum, { target: { value: '0' } });
+  fireEvent.change(maximum, { target: { value: '5' } });
+  expect(screen.getByRole('row', { name: /Ash/ })).toBeVisible();
+  expect(screen.getByLabelText('Cedar unsaved editor').closest('tbody')).toHaveAttribute('hidden');
+  fireEvent.keyDown(points, { key: 'Escape' });
+  view.unmount();
+
+  render(<Fixture rangePoints />);
+  expect(screen.getByRole('row', { name: /Birch/ })).toBeVisible();
+  expect(screen.getByLabelText('Cedar unsaved editor').closest('tbody')).toHaveAttribute('hidden');
+  const reopened = openFilter('Points');
+  expect(within(reopened).getByText('0 to 5')).toBeVisible();
+  fireEvent.click(within(reopened).getByRole('button', { name: 'Clear column filter' }));
+  expect(screen.getByRole('row', { name: /Cedar/ })).toBeVisible();
+});
+
+it('ignores a stored range filter with no bounds', () => {
+  localStorage.setItem(
+    'gpc:table-filters:v1:test:traits',
+    JSON.stringify({ points: { min: null, max: null }, kind: { min: 'x' } }),
+  );
+  render(<Fixture rangePoints />);
+  expect(screen.queryByText(/column filters? active/)).not.toBeInTheDocument();
+  expect(screen.getByRole('row', { name: /Empty/ })).toBeVisible();
 });

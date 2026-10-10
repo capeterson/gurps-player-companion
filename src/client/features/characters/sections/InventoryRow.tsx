@@ -25,7 +25,7 @@ import { InventoryItemDetails } from './inventory/InventoryItemDetails.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
 import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
 import { readContainerExpanded, writeContainerExpanded } from './inventoryContainerState.ts';
-import { descendantsOf } from './inventoryTree.ts';
+import { descendantsOf, inventoryFilterValues } from './inventoryTree.ts';
 
 export interface InventoryRowProps {
   item: InventoryItemOut;
@@ -33,6 +33,8 @@ export interface InventoryRowProps {
   ancestorHidden?: boolean;
   depth: number;
   byParent: Map<string | null, InventoryItemOut[]>;
+  /** Price × quantity including container contents, keyed by item id. */
+  costTotals: ReadonlyMap<string, number>;
   isSelected: (id: string) => boolean;
   onRowClick: (id: string, e: MouseEvent) => void;
   canEdit: boolean;
@@ -65,6 +67,7 @@ export function InventoryRow(props: InventoryRowProps) {
     ancestorHidden = false,
     depth,
     byParent,
+    costTotals,
     isSelected,
     onRowClick,
     canEdit,
@@ -84,14 +87,8 @@ export function InventoryRow(props: InventoryRowProps) {
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
   const columnFiltersActive = useTableFiltersActive();
   const matchesRow = useTableRowMatches();
-  const filterValues = (entry: InventoryItemOut) => ({
-    item: entry.name,
-    qty: entry.quantity,
-    wt: formatEquipmentNumber(
-      inStashed ? entry.weightLbs * entry.quantity : entry.effectiveWeightLbs,
-    ),
-    cost: formatEquipmentNumber(entry.cost),
-  });
+  const filterValues = (entry: InventoryItemOut) =>
+    inventoryFilterValues(entry, Boolean(inStashed), costTotals);
   // Retain a matching descendant's ancestry. Hidden rows remain mounted to
   // preserve open editor drafts.
   function subtreeMatches(entry: InventoryItemOut): boolean {
@@ -236,6 +233,9 @@ export function InventoryRow(props: InventoryRowProps) {
   const weightDelta = netWeight - grossWeight;
   // Ignore floating-point noise while retaining small, meaningful weight changes.
   const weightModified = !inStashed && Math.abs(weightDelta) >= 0.00001;
+  const ownCost = item.cost * item.quantity;
+  const totalCost = costTotals.get(item.id) ?? ownCost;
+  const contentsCost = totalCost - ownCost;
 
   return (
     <Fragment>
@@ -477,8 +477,31 @@ export function InventoryRow(props: InventoryRowProps) {
         <td
           data-label="Cost"
           className="inventory-cost num text-right text-base-content/75 align-top sm:align-middle"
+          title={[
+            item.quantity === 1
+              ? `${formatEquipmentNumber(item.cost)}`
+              : `${item.quantity} × ${formatEquipmentNumber(item.cost)} = ${formatEquipmentNumber(ownCost)}`,
+            contentsCost > 0 ? ` + ${formatEquipmentNumber(contentsCost)} contents` : '',
+            contentsCost > 0 || item.quantity !== 1
+              ? ` = ${formatEquipmentNumber(totalCost)} total`
+              : '',
+          ].join('')}
         >
-          {formatEquipmentNumber(item.cost)}
+          <span className="inline-flex items-baseline justify-end gap-1.5">
+            {contentsCost > 0 ? (
+              <span className="inventory-cost-breakdown text-[11px] text-base-content/60">
+                {formatEquipmentNumber(ownCost)}{' '}
+                <span className="italic text-info">+ contents</span>
+              </span>
+            ) : (
+              item.quantity > 1 && (
+                <span className="inventory-cost-breakdown text-[11px] text-base-content/60">
+                  {formatEquipmentNumber(item.cost)} ea
+                </span>
+              )
+            )}
+            <span>{formatEquipmentNumber(totalCost)}</span>
+          </span>
         </td>
         {!canEdit && (
           <td className="text-right align-top sm:align-middle">

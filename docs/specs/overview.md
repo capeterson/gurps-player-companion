@@ -173,7 +173,8 @@ Right-click a data column heading (or use Alt-click / Shift+F10 on its button)
 to open a searchable checklist of exact values. Plain, unsorted headings also
 open the checklist on click; existing sorting buttons retain click-to-sort.
 Selected values within one column match any selection; filters across columns
-combine. Headers mark active filters, and a table-level **Clear all filters**
+combine. Numeric headings may use a range filter instead (slider from zero to the
+column's highest value, with open ends), as Inventory's Qty, Wt and Cost do. Headers mark active filters, and a table-level **Clear all filters**
 control stays available even when no rows match. Clearing a column restores all
 its values. Options include the source rows supplied by the table even when search
 or folding hides them; paginated admin tables filter the currently loaded page.
@@ -596,11 +597,16 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   On the player, Stashed, or inside a container; nested contents inherit their
   root's carried/stashed location. Equipped means worn or wielded for use and
   is the only equipment status; there is no separate Worn toggle or badge.
-  Quick-add defaults to On the player. Both encumbrance summaries
-  use player-carried weight, excluding stashed items; the raw weight total covers all items. A compact filter
-  combines case-insensitive item-name substring matching with a category/status
-  tag (weapon, armor, container, powerstone, magic item, enchanted, or
-  equipped). Results retain the ancestor containers needed to locate matching
+  The **Add item** button opens the add form in a modal; its location defaults to
+  On the player. The section is not folded, and the selection's bulk actions share
+  the toolbar row with search and Add item. Both encumbrance summaries
+  use player-carried weight, excluding stashed items; the raw weight total covers all items.
+  On the player and Stashed each sort independently by Item, Qty, Wt or Cost
+  (price × quantity, including a container's contents); contents sort within their
+  container, and each list's sort is remembered per character on this device and
+  cleared on logout (`inventoryTablePreferences.ts`). The toolbar search matches item
+  names case-insensitively; column filters select item types (the item categories
+  plus Other) and Qty/Wt/Cost ranges. Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Containers
   start collapsed; their expanded/collapsed choice is remembered per character and
   container in device-local `localStorage`, never synced. A collapsed container
@@ -1377,7 +1383,10 @@ src/
       characters/joinCharacterMechanics.ts, mechanicsUnavailableReason.ts and MechanicsUnavailable.tsx  Owned rule joins and named calculation blockers shared by player and GM views
       characters/sheetAnchors.ts, SheetAnchorLink.tsx and InventoryAnchorLink.tsx  Stable entry hashes and routed source/equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
-                                      structured Range inputs and transactional JSON-property mutations
+                                      structured Range inputs, transactional JSON-property mutations
+                                      and itemCategories (the category list behind tags and type filters)
+      characters/sections/inventoryTree.ts and inventoryTablePreferences.ts  Inventory tree filtering,
+                                      per-list sorting, cost rollups and device-local sort choices
       characters/sections/  Sheet-panel form plumbing shared across
                  Traits/Skills/Spells/Languages/Techniques/Inventory:
                  LanguagesPanel and TechniquesPanel (compact summary tables

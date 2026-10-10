@@ -58,3 +58,13 @@ export async function assignOverviewCampaign(page: Page, campaignName: string) {
   await confirmation.getByRole('button', { name: 'Change campaign', exact: true }).click();
   await expect(page.getByRole('link', { name: campaignName, exact: true })).toBeVisible();
 }
+
+/** Open the inventory Add item dialog unless it is already open. */
+export async function openAddItem(page: Page) {
+  const dialog = page.getByRole('dialog', { name: 'Add item' });
+  if (!(await dialog.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: 'Add item', exact: true }).click();
+  }
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
