@@ -34,10 +34,7 @@ import { createSyncWsHandler } from './routes/syncWs.ts';
 import { durableIdempotency } from './services/idempotency.ts';
 import { mediaAdmission } from './services/media/admission.ts';
 import { mediaConfig } from './services/media/config.ts';
-import { startMediaMaintenance } from './services/media/maintenance.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
-import { startNotificationMaintenance } from './services/notificationMaintenance.ts';
-import { startUserPurgeMaintenance } from './services/userPurge.ts';
 import { attachStaticHandler } from './static.ts';
 
 function acceptsGzip(value: string): boolean {
@@ -53,13 +50,15 @@ function acceptsGzip(value: string): boolean {
   return (qualities.get('gzip') ?? qualities.get('*') ?? 0) > 0;
 }
 
+/**
+ * Builds the request graph only. Server entrypoints start background maintenance
+ * (`startBackgroundMaintenance` in index.ts); scripts that reuse the API in-process,
+ * such as seeds and contract generators, must be able to exit after closing the DB.
+ */
 export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   if (mediaConfig().backend === 'local' && config.environment === 'production')
     throw new Error('Local media storage is forbidden in production');
   const app = createOpenApiApp();
-  startMediaMaintenance();
-  startUserPurgeMaintenance(config.environment);
-  startNotificationMaintenance(config.environment);
 
   // Generate correlation IDs at the trusted server boundary. Never accept a
   // caller-supplied ID: the response header can be shown to a user safely and

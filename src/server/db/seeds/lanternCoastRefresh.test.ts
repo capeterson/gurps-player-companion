@@ -22,6 +22,7 @@ import { withAudit } from '../auditContext.ts';
 import { closeDb, getDb, runInDbTransaction } from '../client.ts';
 import {
   campaignLibraryItems,
+  campaigns,
   characterTraits,
   characters,
   combatStates,
@@ -34,6 +35,7 @@ import { lanternCharacters } from './lanternCoastData.ts';
 import equipmentV2 from './lanternCoastEquipmentV2.json';
 import { refreshLanternCoast } from './lanternCoastRefresh.ts';
 import legacy from './lanternCoastV1.json';
+import contentV3 from './lanternCoastV3Text.json';
 
 configureIntegrationTestEnvironment();
 afterAll(closeDb);
@@ -323,6 +325,140 @@ describe('Lantern Coast explicit content refresh', () => {
       ).toHaveLength(count.length);
     });
   }, 30000);
+  it('upgrades V3 copy, races and builds once while preserving customized values', async () => {
+    await isolated(async (ownerId) => {
+      const { campaignId } = await seedLanternCoast(ownerId);
+      const path = `/campaigns/${campaignId}`;
+      const library = (await request(ownerId, `${path}/library`)) as Record<
+        string,
+        { id: string; name: string; key: string }[]
+      >;
+      const entry = (section: string, name: string) => {
+        const found = library[section]?.find((row) => row.name === name);
+        if (!found) throw new Error(`Missing ${section} ${name}`);
+        return found;
+      };
+      const v3 = contentV3.library as Record<string, Record<string, Record<string, unknown>>>;
+      const quayblade = entry('skills', 'Quayblade');
+      const poise = entry('traits', 'Breakwater Poise');
+      const lives = library.sources?.find((book) => book.name === 'Greyhaven Lives and Vows');
+      if (!lives) throw new Error('Missing source');
+      // Untouched V3 text upgrades; a GM's own wording is preserved.
+      await request(ownerId, `${path}/library/skills/${quayblade.id}`, 'PATCH', {
+        description: v3.skills?.[quayblade.key]?.description,
+      });
+      await request(ownerId, `${path}/library/traits/${poise.id}`, 'PATCH', {
+        description: v3.traits?.[poise.key]?.description,
+      });
+      await request(ownerId, `${path}/library/skills/${entry('skills', 'Reedbow').id}`, 'PATCH', {
+        description: 'Our table’s own reedbow notes.',
+      });
+      await request(ownerId, `${path}/library/sources/${lives.id}`, 'PATCH', {
+        notes: v3.sources?.lantern_lives?.notes,
+        edition: v3.sources?.lantern_lives?.edition,
+      });
+      await request(ownerId, path, 'PATCH', { description: contentV3.campaign.description });
+      await request(
+        ownerId,
+        `${path}/library/spells/${entry('spells', 'Hush the Bell').id}`,
+        'DELETE',
+      );
+
+      const roster = await getDb()
+        .select()
+        .from(characters)
+        .where(eq(characters.campaignId, campaignId));
+      const byName = (name: string) => {
+        const row = roster.find((character) => character.name === name);
+        if (!row) throw new Error(`Missing ${name}`);
+        return row;
+      };
+      const kestrel = byName('Kestrel Vale');
+      const iona = byName('Iona Reedwake');
+      const orin = byName('Orin Bellstrand');
+      const bram = byName('Bram Stonebridge');
+      const before = await loadCharacterDetail(kestrel.id);
+      const skill = (name: string) => before.skills.find((row) => row.name === name);
+      const kestrelPath = `/characters/${kestrel.id}`;
+      await request(kestrel.ownerId, kestrelPath, 'PATCH', { dx: 13 });
+      await request(bram.ownerId, `/characters/${bram.id}`, 'PATCH', { st: 18 });
+      await request(kestrel.ownerId, `${kestrelPath}/skills/${skill('Quayblade')?.id}`, 'PATCH', {
+        points: 8,
+      });
+      await request(kestrel.ownerId, `${kestrelPath}/skills/${skill('Reedbow')?.id}`, 'PATCH', {
+        points: 9,
+      });
+      const runningShot = before.techniques.find((row) => row.name === 'Running Shot');
+      await request(kestrel.ownerId, `${kestrelPath}/techniques/${runningShot?.id}`, 'DELETE');
+      const ownedPoise = before.traits.find((row) => row.name === 'Breakwater Poise');
+      await request(kestrel.ownerId, `${kestrelPath}/traits/${ownedPoise?.id}`, 'PATCH', {
+        notes: v3.traits?.[poise.key]?.description,
+      });
+      const human = {
+        race: {
+          selection: { raceId: null, variantKey: null, lensIds: [], formKey: null },
+          snapshot: null,
+        },
+      };
+      await request(iona.ownerId, `/characters/${iona.id}`, 'PATCH', human);
+      await request(orin.ownerId, `/characters/${orin.id}`, 'PATCH', {
+        race: {
+          selection: {
+            raceId: entry('races', 'Selkie-blooded').id,
+            variantKey: null,
+            lensIds: [],
+            formKey: null,
+          },
+          snapshot: null,
+        },
+      });
+      await withAudit(ownerId, undefined, async (tx) => {
+        await tx.delete(demoSeedUpdates).where(eq(demoSeedUpdates.campaignId, campaignId));
+        await tx.insert(demoSeedUpdates).values({ campaignId, seed: 'lantern-coast', version: 3 });
+      });
+
+      expect((await refreshLanternCoast(ownerId)).refreshed).toBe(true);
+      const after = (await request(ownerId, `${path}/library`)) as typeof library & {
+        sources: { name: string; notes: string; edition: string }[];
+      };
+      const upgraded = (section: string, name: string) =>
+        (after[section]?.find((row) => row.name === name) as { description?: string } | undefined)
+          ?.description;
+      expect(upgraded('skills', 'Quayblade')).toContain('**Penalty:**');
+      expect(upgraded('traits', 'Breakwater Poise')).toContain('**On the sheet:**');
+      expect(upgraded('skills', 'Reedbow')).toBe('Our table’s own reedbow notes.');
+      expect(after.spells?.some((row) => row.name === 'Hush the Bell')).toBe(true);
+      expect(after.sources.find((book) => book.name === 'Greyhaven Lives and Vows')).toMatchObject({
+        edition: 'First edition',
+      });
+      expect(after.sources.filter((book) => book.name === 'Greyhaven Lives and Vows')).toHaveLength(
+        1,
+      );
+      const [campaign] = await getDb().select().from(campaigns).where(eq(campaigns.id, campaignId));
+      expect(campaign?.description).not.toBe(contentV3.campaign.description);
+
+      const sheet = await loadCharacterDetail(kestrel.id);
+      expect(sheet.dx).toBe(14);
+      expect(sheet.skills.find((row) => row.name === 'Quayblade')?.points).toBe(12);
+      expect(sheet.skills.find((row) => row.name === 'Reedbow')?.points).toBe(9);
+      expect(sheet.techniques.some((row) => row.name === 'Running Shot')).toBe(true);
+      expect(sheet.traits.find((row) => row.name === 'Breakwater Poise')?.notes).toContain(
+        '**On the sheet:**',
+      );
+      expect((await loadCharacterDetail(bram.id)).st).toBe(18);
+      expect((await loadCharacterDetail(iona.id)).race?.snapshot?.name).toBe('Selkie-blooded');
+      expect((await loadCharacterDetail(orin.id)).race?.snapshot?.name).toBe('Selkie-blooded');
+
+      const count = await getDb()
+        .select()
+        .from(entityHistory)
+        .where(eq(entityHistory.campaignId, campaignId));
+      expect((await refreshLanternCoast(ownerId)).refreshed).toBe(false);
+      expect(
+        await getDb().select().from(entityHistory).where(eq(entityHistory.campaignId, campaignId)),
+      ).toHaveLength(count.length);
+    });
+  }, 60000);
   it('keeps renamed source UUID links and tolerates a deleted source with no definitions', async () => {
     await isolated(async (ownerId) => {
       const old = await oldDemo(ownerId);
@@ -453,7 +589,7 @@ describe('Lantern Coast explicit content refresh', () => {
       ).toBe(false);
       const refreshedForaging = detail.skills.find((entry) => entry.id === old.ownedForagingId);
       expect(refreshedForaging?.points).toBe(4);
-      expect(refreshedForaging?.notes).toContain('during an hour of careful searching');
+      expect(refreshedForaging?.notes).toContain('Ledge gardens of samphire');
       const logs = adventureLogOut.array().parse(await request(old.playerId, `${old.path}/log`));
       expect(logs.filter((entry) => entry.visibility === 'private')).toHaveLength(3);
       expect(logs.find((entry) => entry.id === old.logId)?.body).toBe(

@@ -3,7 +3,7 @@ import { withAudit } from '../auditContext.ts';
 import { getDb } from '../client.ts';
 import { demoSeedUpdates } from '../schema.ts';
 
-export const LANTERN_SEED_VERSION = 3;
+export const LANTERN_SEED_VERSION = 4;
 export const LANTERN_SEED_KEY = 'lantern-coast';
 
 export async function lanternSeedIsCurrent(campaignId: string, version = LANTERN_SEED_VERSION) {

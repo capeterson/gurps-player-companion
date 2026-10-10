@@ -36,29 +36,31 @@ Sign in as a player to edit that player's sheet. The GM sees every sheet;
 The Lantern Coast uses TL3, normal mana, a 250-point budget, a 50-point
 disadvantage cap, a five-quirk cap, attribute-cap enforcement, and the **None**
 house-rule set. Character sheets are shared initially; turn tracking is enabled.
-The party is deliberately in the middle of an adventure, with unspent points,
-partially depleted resources, and manual conditions to inspect.
-Fresh sheets have 12–15 skills and 6–8 traits apiece, including career training,
-professional privileges, obligations and personal habits. Each stays within the
-250-point starting budget plus six points awarded in the existing sessions,
-the 50-point disadvantage cap and the five-point quirk cap.
+The party is deliberately in the middle of an adventure, with partially depleted
+resources and manual conditions to inspect. Fresh sheets have 12–15 skills and 6–8
+traits apiece, including career training, professional privileges, obligations and
+personal habits. Each spends 250 of its 256 points (the starting budget plus six
+awarded in the existing sessions), leaving only the recent award unspent, within the
+50-point disadvantage cap and the five-point quirk cap.
 
 | Fixture | Useful cases |
 | --- | --- |
-| Kestrel | Three sword modes, an ST11 bow with ordinary/bodkin shots, shield defenses, mail under brigandine, coif/cap, a front visor and limb armor, an enchanted sword, two Coastal Foraging specializations, a zero-point defaulted skill, a skill action with contextual modifiers and an unlocked benefit, a bought-up False Lantern Step, sign language, an active six-round ward |
-| Mira | Fire-treated quilt under a mantle and layered head armor, Tideglass attunement (the app’s Magery gate), structured Beacon Resonance prerequisites, learned TL, six spells including maintenance and Very Hard difficulty, discounted casting costs, a partly charged and an empty powerstone, a partly depleted wand, FP below one-third, kneeling, an inactive sense effect |
-| Bram | Innate DR, enchanted inner mail and separate front/back plates, head and limb armor, a carried spare mantle, axe hook/spike/close-haft modes, a bought-up Hook the Haft technique, worn containers and heavy stashed salvage, HP below one-third, Reeling, an expired potion effect linked to an inventory item |
-| Iona | IQ-based tide piloting, quilt under a front apron and backplate, head/leg armor, a weighted rescue line with fixed Range/minimum and a melee lash, left-hand buckler with a blocking enchantment, tide-flat foraging |
-| Sable | Fire-treated quilt under a mantle with two competing Warden's Stitches, head/hand armor, TL3 marsh distilling and care, four original spells, enchanted nested distiller roll, an active ward, and a partly charged focus |
-| Orin | Quilt under a front-only apron with corrosion-specific DR, head/hand armor, signal skill bonuses from trait and equipped beads, TL3 winchcraft, tools and externally stashed spare parts |
+| Kestrel | Human (the default race), Running Shot and Breakwater Bind techniques, three sword modes, an ST11 bow with ordinary/bodkin shots, shield defenses, mail under brigandine, coif/cap, a front visor and limb armor, an enchanted sword, two Coastal Foraging specializations, a zero-point defaulted skill, a skill action with contextual modifiers and an unlocked benefit, a bought-up False Lantern Step, sign language, an active six-round ward |
+| Mira | The Tide-touched race lens on Human, eight spells including Fogbank Lantern and Keeper's Lamp, fire-treated quilt under a mantle and layered head armor, Tideglass attunement (the app’s Magery gate), structured Beacon Resonance prerequisites, learned TL, six spells including maintenance and Very Hard difficulty, discounted casting costs, a partly charged and an empty powerstone, a partly depleted wand, FP below one-third, kneeling, an inactive sense effect |
+| Bram | Three techniques (Hook the Haft, Low Haft Sweep, Breakwater Bind), innate DR, enchanted inner mail and separate front/back plates, head and limb armor, a carried spare mantle, axe hook/spike/close-haft modes, a bought-up Hook the Haft technique, worn containers and heavy stashed salvage, HP below one-third, Reeling, an expired potion effect linked to an inventory item |
+| Iona | Selkie-blooded race with a Seal form alternate form, Tidesong language, Tether Snare technique, IQ-based tide piloting, quilt under a front apron and backplate, head/leg armor, a weighted rescue line with fixed Range/minimum and a melee lash, left-hand buckler with a blocking enchantment, tide-flat foraging |
+| Sable | Tideglass attunement 2, six spells, Reedmarsh Cant, fire-treated quilt under a mantle with two competing Warden's Stitches, head/hand armor, TL3 marsh distilling and care, four original spells, enchanted nested distiller roll, an active ward, and a partly charged focus |
+| Orin | Fogward Shoalborn race variant with a race-only Current Riding projection, Low Haft Sweep, quilt under a front-only apron with corrosion-specific DR, head/hand armor, signal skill bonuses from trait and equipped beads, TL3 winchcraft, tools and externally stashed spare parts |
 | Inventory | Quantities, equipped/worn distinctions, external storage, and three-level nesting: trail pack → oilskin pouch → compass/chart; satchel → medical kit → bandages |
-| Campaign library | 30 traits, 48 skills and 26 items, plus spells, languages, techniques, styles, mechanical enchantments, active effects, sourcebooks, and standalone modifiers; portable YAML v13 with saved library links and owned mechanics on the sheets |
+| Campaign library | 30 traits, 48 skills, 26 items, 16 spells with prerequisite chains, seven techniques, three styles, five languages, three races (Shoalborn with a Fogward variant, Selkie-blooded with a Seal form, the Tide-touched lens), four standalone modifiers, mechanical enchantments, active effects and sourcebooks; portable YAML v15 with saved library links and owned mechanics on the sheets |
 | Adventure log | Five shared entries for sessions 0–4 and three private entries per character for sessions 0, 3 and 4; distinct personal clues, locations, Markdown paragraphs/lists/table/quote examples, and the original six-point XP award total |
 | Encounter | Six PCs, a wounded raider, a hidden captive, turn order, and a three-round effect with maintenance cost; the encounter effect is a tracker reminder, not a linked sheet bonus |
 | History and sync | Real API writes from seven actors, audited changes, positive revisions, and owned mechanics for offline character use |
 
 All adventure prose, rules descriptions, costs and equipment profiles are original
-synthetic fixtures. They draw on broad sourcebook patterns, not published entries
+to this campaign. Player-facing copy is written in-world: each library entry opens
+with a short description, then lists what the sheet calculates, how long a task
+takes, and its penalties. They draw on broad sourcebook patterns, not published entries
 or stat blocks. This is not an authoritative GURPS rules catalog. The mage trait
 retains the `Magery` keyword so the existing spell-level/mana gate works, with
 original pricing and an original campaign training bonus. Skill descriptions explain
@@ -255,3 +257,22 @@ continues to skip an existing Lantern campaign and does not perform this refresh
 ./scripts/dev-worktree.sh exec -T app bun test src/server/db/seeds/lanternCoastRefresh.test.ts
 ./scripts/dev-worktree.sh exec -T app bun run test:acceptance:mcp-seed
 ```
+
+## Optional artwork
+
+Portraits and a campaign cover are uploaded when matching files exist in
+`bootstrap/lantern_coast_art/` and media storage is enabled. Supported formats are
+WebP, PNG and JPEG (10 MiB maximum); the media pipeline sanitizes and resizes them.
+
+| File (any supported extension) | Attached to |
+| --- | --- |
+| `cover.webp` | The Lantern Coast campaign cover |
+| `kestrel-vale.webp` | Kestrel Vale |
+| `mira-ashfall.webp` | Mira Ashfall |
+| `bram-stonebridge.webp` | Bram Stonebridge |
+| `iona-reedwake.webp` | Iona Reedwake |
+| `sable-fenwick.webp` | Sable Fenwick |
+| `orin-bellstrand.webp` | Orin Bellstrand |
+
+Missing files are skipped. Artwork applies when a campaign is first seeded; the
+refresh command does not replace existing portraits or covers.

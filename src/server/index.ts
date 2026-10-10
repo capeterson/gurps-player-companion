@@ -3,13 +3,24 @@ import { createApp } from './app.ts';
 import { type AppConfig, loadConfig } from './config.ts';
 import { closeDb } from './db/client.ts';
 import { beginDraining } from './lifecycle.ts';
-import { stopMediaMaintenance } from './services/media/maintenance.ts';
-import { stopNotificationMaintenance } from './services/notificationMaintenance.ts';
-import { stopUserPurgeMaintenance } from './services/userPurge.ts';
+import { startMediaMaintenance, stopMediaMaintenance } from './services/media/maintenance.ts';
+import {
+  startNotificationMaintenance,
+  stopNotificationMaintenance,
+} from './services/notificationMaintenance.ts';
+import { startUserPurgeMaintenance, stopUserPurgeMaintenance } from './services/userPurge.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
+
+/** Server-process work only; each starter is idempotent and skips the test environment. */
+export function startBackgroundMaintenance(config: AppConfig): void {
+  startMediaMaintenance();
+  startUserPurgeMaintenance(config.environment);
+  startNotificationMaintenance(config.environment);
+}
 
 export function startServer(config: AppConfig) {
   const app = createApp(config);
+  startBackgroundMaintenance(config);
   return Bun.serve({
     port: config.port,
     hostname: config.host,

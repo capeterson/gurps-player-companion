@@ -144,11 +144,20 @@ function normalize(value: unknown) {
     'warnings',
     'capabilities',
   ]);
+  // Racial contribution IDs are derived: a character ID prefix plus a stable hash
+  // of the race component key (characterDetail racialId).
+  const prefixes = new Map([...labels].map(([id, label]) => [id.slice(0, 24), label]));
+  const reference = (id: string) => {
+    const label = labels.get(id);
+    if (label) return `ref:${label}`;
+    const owner = prefixes.get(id.slice(0, 24));
+    return owner ? `ref:${owner}#${id.slice(24)}` : id;
+  };
   const visit = (entry: unknown, key = ''): unknown => {
     if (typeof entry === 'string')
       return entry.replace(
         /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
-        (id) => (labels.has(id) ? `ref:${labels.get(id)}` : id),
+        reference,
       );
     if (Array.isArray(entry)) {
       const result = entry.map((child) => visit(child));
@@ -352,6 +361,15 @@ describe('Lantern Coast MCP seed acceptance', () => {
           );
         }
       }
+      // Race choices travel through the same MCP character update as other fields.
+      expect(
+        Object.fromEntries(sheets.map((sheet) => [sheet.name, sheet.race?.snapshot?.name ?? null])),
+      ).toMatchObject({
+        'Iona Reedwake': 'Selkie-blooded',
+        'Orin Bellstrand': 'Fogward Shoalborn',
+        'Mira Ashfall': 'Human · Tide-touched',
+        'Kestrel Vale': null,
+      });
       for (const expected of lanternSharedLogs) {
         const saved = logs.find(
           (log) => log.visibility === 'campaign' && log.title === expected.title,

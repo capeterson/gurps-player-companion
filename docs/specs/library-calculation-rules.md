@@ -303,7 +303,10 @@ The Lantern Coast bootstrap uses only original fixture definitions. Its four
 fictional sourcebooks have distinct non-default abbreviations (`LCGV`, `LCST`,
 `LCTR`, `LCQO`), and every imported entry links to a sourcebook UUID, section locator,
 completeness status and definition role. Its 30 traits and 48 skills describe
-practical coastal tasks, training and personal obligations in original prose.
+practical coastal tasks, training and personal obligations in original prose:
+an in-world opening plus a Markdown list of sheet effects, task time and penalties.
+Spells state effects and prerequisites, techniques state their default and cap, and
+three races demonstrate a complete variant, an alternate form and a lens.
 Structured defaults, prerequisites, conditional task modifiers, timed actions and
 selected level benefits use supported declarations. Social access and vows remain
 explicitly manual rather than receiving invented universal bonuses; action previews

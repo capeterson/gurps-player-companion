@@ -702,7 +702,7 @@ mechanism for sharing content between campaigns or seeding a new one.
   creates The Lantern Coast from the synthetic `bootstrap/lantern_coast.yaml`
   plus six populated character fixtures. Its owner, manager, and member accounts, private/shared
   logs, and hidden-NPC encounter exercise the same permissions as normal API
-  writes. Its eleven library categories use four fictional sourcebooks (`LCGV`,
+  writes. Its twelve library categories, including races, use four original sourcebooks (`LCGV`,
   `LCST`, `LCTR`, `LCQO`) and current calculation/pricing snapshots, weapon modes,
   structured Range, prerequisites and procedures. The 26-item catalog equips
   all six sheets with legal layered armor and typed/directional protection;

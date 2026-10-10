@@ -6,8 +6,10 @@
 
 import { createApp } from './app.ts';
 import { loadConfig } from './config.ts';
+import { startBackgroundMaintenance } from './index.ts';
 
 const config = loadConfig();
 const app = createApp(config);
+startBackgroundMaintenance(config);
 
 export default app;

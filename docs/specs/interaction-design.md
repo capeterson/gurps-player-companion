@@ -340,6 +340,9 @@ appear directly below the column heading. A numeric **Entries** column remains
 visible at every width and uses the shared heading interactions for sorting and
 filtering the linked-entry totals.
 Fold chevrons and counts retain their width; description excerpts stay truncated.
+Collapsed library rows show Markdown descriptions as plain text: list, heading and
+quote markers, strong emphasis, code ticks and link targets are removed, while other
+punctuation is kept as written.
 Help and About prose wraps long external links inside its content column.
 Focused library form fields retain their draft and stay below the sticky toolbar
 after rotation, visual-viewport resizing, and keyboard focus changes. Only an
