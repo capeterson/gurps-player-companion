@@ -172,9 +172,7 @@ describe('inventoryTypeLabels', () => {
     everything.magicItemData = {
       spellName: 'Light',
       spellSkillLevel: 15,
-      mode: 'charged',
-      chargesMax: 1,
-      chargesCurrent: 1,
+      mode: 'powered',
     } as InventoryItemOut['magicItemData'];
     everything.enchantments = [
       { spellName: 'Fortify' } as InventoryItemOut['enchantments'][number],
