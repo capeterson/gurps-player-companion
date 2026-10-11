@@ -110,7 +110,11 @@ function renderPanel(
 }
 
 function row(name: string): HTMLElement {
-  const element = screen.getByText(name, { exact: true }).closest('tr');
+  // Item titles only: the Move to menu also lists container names.
+  const element = screen
+    .getAllByText(name, { exact: true })
+    .find((node) => node.classList.contains('inventory-item-title'))
+    ?.closest('tr');
   if (!element) throw new Error(`Expected a row for ${name}`);
   return element;
 }
@@ -368,7 +372,7 @@ describe('Inventory group by type', () => {
       within(carried)
         .getAllByRole('rowheader')
         .map((header) => header.textContent),
-    ).toEqual(['Container', 'Weapon', 'Other']);
+    ).toEqual(['Weapon', 'Container', 'Other']);
     // Nested items are listed in their own type with their container named.
     expect(within(row('Broadsword')).getByText('in Backpack')).toBeVisible();
     expect(within(row('Moon Gem')).getByText('in Small pouch')).toBeVisible();
