@@ -191,3 +191,11 @@ export function totalPowerstoneEnergy(items: readonly PowerstoneInventoryInput[]
   }
   return total;
 }
+
+/**
+ * Skill for casting from a magic item: the item's Power is the caster's base
+ * skill, at -5 in low-mana areas (M19, Using Magic Items).
+ */
+export function magicItemSkill(power: number, mana: ManaLevel): number {
+  return power - (mana === 'low' ? 5 : 0);
+}

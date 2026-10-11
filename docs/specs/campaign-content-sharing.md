@@ -480,7 +480,7 @@ publication page. Ordinary forms preserve definition keys without a key input;
 **Match another edition** chooses an existing named definition's stable key.
 
 Equipment editors cover armor, weapon modes and held side, containers,
-powerstone capacity/starting energy, magic-item modes/charges/energy, and attached
+powerstone capacity/starting energy, magic-item modes/energy, and attached
 enchantment levels and notes. Editing an unrelated field preserves dormant
 container values and imported optional facets. Linked enchantment mechanics are
 the source definition's snapshot; **Make independent** retains that snapshot and
@@ -611,11 +611,11 @@ mechanism for sharing content between campaigns or seeding a new one.
   magic-item shape as character inventory rows (`src/shared/schemas/inventory.ts`):
   `isContainer`, `hideawayCapacityLbs`, `weightReductionPercent`,
   `powerstoneData` (nullable; `maxEnergy`/`currentEnergy`/`notes`), and
-  `magicItemData` (nullable; `spellName`/`spellSkillLevel`/`mode`/`chargesMax`/
-  `chargesCurrent`/`energyCost`/`notes`). These pass through the library →
+  `magicItemData` (nullable; `spellName`/`spellSkillLevel`/`mode`/`energyCost`/
+  `notes`; legacy `charged` input reads as `powered` without charge counts). These pass through the library →
   character copy path (`InventoryPanel.onPickLibraryItem`/`onCreate`) verbatim,
   the same way `armor`/`weaponData` already did — a picked powerstone or magic
-  item arrives on the character's inventory row with its template charge state.
+  item arrives on the character's inventory row with its template energy state.
 - **Languages (v4):** the `library.languages` section carries
   `{ name, description?, source?, isSignLanguage }`. Like `spells`, the key is
   **optional rather than defaulted**, so a `replace` import of a pre-v4

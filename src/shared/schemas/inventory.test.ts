@@ -29,8 +29,8 @@ describe('powerstoneData', () => {
 });
 
 describe('magicItemData', () => {
-  it('accepts a charged item with current ≤ max', () => {
-    expect(() =>
+  it('reads a legacy charged item as a user-powered item without charge counts', () => {
+    expect(
       magicItemData.parse({
         spellName: 'Fireball',
         spellSkillLevel: 15,
@@ -38,22 +38,19 @@ describe('magicItemData', () => {
         chargesMax: 10,
         chargesCurrent: 7,
       }),
-    ).not.toThrow();
+    ).toEqual({ spellName: 'Fireball', spellSkillLevel: 15, mode: 'powered' });
   });
 
-  it('rejects chargesCurrent > chargesMax', () => {
+  it('rejects unknown modes and other unknown fields', () => {
     expect(() =>
-      magicItemData.parse({
-        spellName: 'Fireball',
-        spellSkillLevel: 15,
-        mode: 'charged',
-        chargesMax: 10,
-        chargesCurrent: 999,
-      }),
+      magicItemData.parse({ spellName: 'Light', spellSkillLevel: 12, mode: 'wand' }),
+    ).toThrow();
+    expect(() =>
+      magicItemData.parse({ spellName: 'Light', spellSkillLevel: 12, mode: 'powered', uses: 3 }),
     ).toThrow();
   });
 
-  it('accepts powered/continuous items without charge fields', () => {
+  it('accepts powered and always-on items', () => {
     expect(() =>
       magicItemData.parse({
         spellName: 'Light',

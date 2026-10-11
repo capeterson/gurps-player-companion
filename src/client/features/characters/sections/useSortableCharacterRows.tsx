@@ -136,6 +136,18 @@ export function SortableHeader<Sort extends string>({
   rangeStep?: number;
 }) {
   const active = preferences.sort === sort;
+  const alignRight = headerClassName.includes('text-right');
+  // Only the active column shows its direction; idle columns reveal ↕ on
+  // hover/focus. Right-aligned columns put the glyph before the label so the
+  // label's edge, not the glyph, lines up with the values below.
+  const indicator = (
+    <span
+      aria-hidden="true"
+      className={active ? '' : 'opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60'}
+    >
+      {active ? (preferences.descending ? '↓' : '↑') : '↕'}
+    </span>
+  );
   return (
     <TableHeader
       filterable={filterable}
@@ -150,13 +162,14 @@ export function SortableHeader<Sort extends string>({
     >
       <button
         type="button"
-        className={`btn btn-ghost btn-xs h-auto min-h-0 whitespace-nowrap px-1 py-1 font-semibold ${hideButtonOnMobile ? 'hidden sm:inline-flex' : ''} ${headerClassName.includes('text-right') ? 'w-full justify-end' : 'justify-start'}`}
+        className={`group btn btn-ghost btn-xs -mx-1 h-auto min-h-0 gap-1 whitespace-nowrap px-1 py-1 font-semibold ${hideButtonOnMobile ? 'hidden sm:inline-flex' : ''} ${alignRight ? 'w-[calc(100%+0.5rem)] justify-end' : 'justify-start'}`}
         onClick={() => onSort(sort)}
         aria-label={`Sort by ${label}`}
       >
+        {alignRight && indicator}
         <span className={shortLabel ? 'hidden sm:inline' : undefined}>{label}</span>
         {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
-        <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
+        {!alignRight && indicator}
       </button>
     </TableHeader>
   );

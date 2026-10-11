@@ -56,9 +56,8 @@ import { ActiveConditionsPanel } from './sections/ActiveConditionsPanel.tsx';
 import { HistoryPanel } from './sections/HistoryPanel.tsx';
 import { InventoryPanel } from './sections/InventoryPanel.tsx';
 import { LanguagesPanel } from './sections/LanguagesPanel.tsx';
-import { MagicItemsPanel, PowerstonesPanel } from './sections/PowerstonesPanel.tsx';
+import { MagicSection } from './sections/MagicSection.tsx';
 import { SkillsPanel } from './sections/SkillsPanel.tsx';
-import { SpellsPanel } from './sections/SpellsPanel.tsx';
 import { TechniquesPanel } from './sections/TechniquesPanel.tsx';
 import { TraitsPanel } from './sections/TraitsPanel.tsx';
 import { CombatStatusProvider } from './sections/combat/CombatStatusProvider.tsx';
@@ -1783,17 +1782,12 @@ export function CharacterSheetPage() {
             </div>
           )}
           {tab === 'Magic' && character.libraryEffectsKnown !== false && (
-            <div className="min-w-0 space-y-6">
-              <SpellsPanel
-                character={character}
-                canWrite={canWrite}
-                anchorSpellId={anchor?.kind === 'spell' ? anchor.id : null}
-              />
-              <div className="grid min-w-0 items-start gap-6 border-t border-base-300 pt-5 xl:grid-cols-2">
-                <PowerstonesPanel character={character} canWrite={canWrite} />
-                <MagicItemsPanel character={character} canWrite={canWrite} />
-              </div>
-            </div>
+            <MagicSection
+              key={character.id}
+              character={character}
+              canWrite={canWrite}
+              anchorSpellId={anchor?.kind === 'spell' ? anchor.id : null}
+            />
           )}
           {tab === 'Inventory' && (
             <InventoryPanel

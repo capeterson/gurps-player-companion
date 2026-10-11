@@ -374,8 +374,8 @@ export function InventoryPanel({
         : null;
     const weaponFromLibrary =
       linkedLibraryId && pickedLibraryItem?.weaponData ? pickedLibraryItem.weaponData : null;
-    // Powerstone/magic-item charge state is part of the library template
-    // (authors set currentEnergy/chargesCurrent to full); copied verbatim,
+    // Powerstone energy and magic-item data are part of the library template
+    // (authors set currentEnergy to full); copied verbatim,
     // same as armor/weapon.
     const powerstoneFromLibrary =
       linkedLibraryId && pickedLibraryItem?.powerstoneData

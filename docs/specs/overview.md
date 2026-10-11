@@ -565,15 +565,25 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   with confirmed deletion. Closing either disclosure preserves drafts. Languages
   and Techniques use the shared filterable table and their outer fold heading
   without repeating inner titles. See [interaction-design.md](interaction-design.md).
-- **Magic**: a full-width shared spell table, **mana level** from campaign,
-  and compact **powerstones / magic items** tables with Inventory links. There
-  are no outer collection folds or nested description cards. Spells show college,
-  difficulty, points, rollable level, discounted energy cost/upkeep and casting
-  time, with search, sorting and column filters. Names open read-only Markdown
+- **Magic**: a full-width shared spell table, an **Item spells** table for
+  spells granted by owned magic items, and a compact **powerstones** table, each
+  with Inventory links where items are involved. There are no outer collection
+  folds or nested description cards. The spell toolbar shows count, points and
+  Magery level; only abnormal or unknown mana, or missing Magery, adds a notice.
+  Spells show college/difficulty/points metadata, rollable level, casting time,
+  duration, and Maintain/Cast buttons that carry the discounted upkeep and cost,
+  with sorting and column filters. One search box above the Spells heading
+  filters both spells and item spells. Names open read-only Markdown
   reference dialogs; pencils open retained inline editors. Add spell starts
   closed. Spell anchors reveal filtered rows without opening editing.
-  Below 640px names/levels remain aligned, costs/time become metadata, and
-  mutation actions share a horizontal row. Cast/Maintain open a separate
+  Below 640px names/levels remain aligned, time/duration become metadata, and
+  right-aligned actions share a horizontal row. Item spells roll at the item's
+  Power (−5 in low mana, M19). Using an item costs the same energy as a normal
+  casting of its spell (M19), so **Cast N** opens the energy payment dialog at the
+  item's recorded cost; always-on items cost nothing and have no cast action.
+  Uncarried items and no-mana zones hold item casting. Magic items have no
+  charges (a former "charged" mode had no rules basis and was removed).
+  Cast/Maintain open a separate
   Source/Available/Spend payment table, whose confirmation names the energy spent.
   Rolling and energy payment remain separate, with no automatic spell resolution.
   Every dialog fits the dynamic viewport; long names wrap without page scrolling.

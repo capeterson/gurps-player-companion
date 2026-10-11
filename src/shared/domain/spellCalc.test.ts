@@ -9,6 +9,7 @@ import {
   effectiveMaintenanceCost,
   hasMagery,
   mageryLevel,
+  magicItemSkill,
   manaSkillModifier,
   spellFpRecovery,
   totalPowerstoneEnergy,
@@ -256,5 +257,14 @@ describe('totalPowerstoneEnergy', () => {
         { powerstoneData: { currentEnergy: 7 } },
       ]),
     ).toBe(10);
+  });
+});
+
+describe('magicItemSkill', () => {
+  it("uses the item's Power, at -5 only in low mana (M19)", () => {
+    expect(magicItemSkill(15, 'normal')).toBe(15);
+    expect(magicItemSkill(15, 'low')).toBe(10);
+    expect(magicItemSkill(15, 'high')).toBe(15);
+    expect(magicItemSkill(15, 'very_high')).toBe(15);
   });
 });

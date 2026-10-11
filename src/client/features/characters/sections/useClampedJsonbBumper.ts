@@ -1,9 +1,8 @@
 /**
- * useClampedJsonbBumper — shared state machine behind the powerstone
- * "charge" and magic-item "charges" +/-/Max controls in
- * PowerstonesPanel.tsx.  Both rows patch a whole JSONB field as a
- * single unit (the field validator parses the entire object shape, so
- * a partial patch would fail validation) and both need the same
+ * useClampedJsonbBumper — state machine behind the powerstone energy
+ * +/-/Max controls in PowerstonesPanel.tsx.  The row patches a whole
+ * JSONB field as a single unit (the field validator parses the entire
+ * object shape, so a partial patch would fail validation) and needs the same
  * latest-intended-ref trick as the HP/FP bumpers
  * (`sections/usePoolBumpers.ts`): two rapid taps must compound against
  * the value the first tap already committed to, not the stale
@@ -21,7 +20,7 @@ export interface UseClampedJsonbBumperOptions<T> {
   /** Whole-object field being patched, e.g. 'powerstoneData'. */
   readonly fieldPath: string;
   readonly humanName: string;
-  /** Current value of the clamped counter (e.g. currentEnergy / chargesCurrent). */
+  /** Current value of the clamped counter (e.g. a powerstone's currentEnergy). */
   readonly current: number;
   readonly max: number;
   readonly canWrite: boolean;

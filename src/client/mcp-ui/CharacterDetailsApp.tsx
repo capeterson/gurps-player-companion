@@ -4,8 +4,8 @@ import { Stat, StatCard } from '../components/ui/StatCard.tsx';
 import { CharacterIdentityDetails } from '../features/characters/CharacterIdentityDetails.tsx';
 import { InventoryPanel } from '../features/characters/sections/InventoryPanel.tsx';
 import { LanguagesPanel } from '../features/characters/sections/LanguagesPanel.tsx';
+import { MagicSection } from '../features/characters/sections/MagicSection.tsx';
 import { SkillsPanel } from '../features/characters/sections/SkillsPanel.tsx';
-import { SpellsPanel } from '../features/characters/sections/SpellsPanel.tsx';
 import { TechniquesPanel } from '../features/characters/sections/TechniquesPanel.tsx';
 import { TraitsPanel } from '../features/characters/sections/TraitsPanel.tsx';
 
@@ -158,7 +158,7 @@ export function CharacterDetailsApp({
           <TechniquesPanel character={data} canWrite={false} />
         </div>
       )}
-      {section === 'Magic' && <SpellsPanel character={data} canWrite={false} />}
+      {section === 'Magic' && <MagicSection character={data} canWrite={false} />}
       {section === 'Inventory' && <InventoryPanel character={data} canWrite={false} />}
     </main>
   );

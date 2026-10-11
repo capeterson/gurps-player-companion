@@ -277,7 +277,7 @@ export function TableHeader({
         (enabled ? (
           <button
             type="button"
-            className="btn btn-ghost btn-xs h-auto min-h-0 px-1 py-1 font-semibold"
+            className="btn btn-ghost btn-xs -mx-1 h-auto min-h-0 px-1 py-1 font-semibold"
             onClick={(event) => open(event.currentTarget)}
           >
             {label}

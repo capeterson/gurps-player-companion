@@ -126,19 +126,32 @@ owned technique's calculation.
 
 ## Magic collections
 
-Magic uses a full-width shared Spells table and plain section headings, without
-outer folds, nested cards, or per-spell Description disclosures. One toolbar
-shows the spell count, points, and an owner-only Add spell action. The retained
-add form starts closed. Search matches spell names, colleges, and notes; column
-headings sort and expose the shared exact-value filters. Sorting preferences are
-device-local and cleared at logout.
+Magic uses a full-width shared Spells table, then Item spells and Powerstones,
+with matching display headings and without outer folds, nested cards, or
+per-spell Description disclosures. One toolbar shows the spell count, points,
+Magery level, and an owner-only Add spell action. Normal mana with Magery needs
+no notice; abnormal or unknown mana and missing Magery show one alert above the
+table. The retained add form starts closed, with the spell picker on its own row
+and the remaining fields sharing one label baseline. One search box sits above
+the Spells heading and filters both tables: known spells by name, college, and
+notes, and item spells by spell name, item name, and notes. Each table shows its
+own no-match row. Column headings sort and expose the shared exact-value
+filters. Only the active sort column shows its direction (idle columns reveal it
+on hover or focus), and right-aligned headings place the glyph before the label
+so labels line up with their values. Sorting preferences are device-local and
+cleared at logout.
 
-Spell summaries show name, college/difficulty, points, rollable level, effective
-casting cost, effective upkeep, and recorded casting time. Points become name
-metadata below 1024px; time moves into metadata below 1280px. Below 640px the
-name and level stay aligned, costs/time wrap below the name, and Cast/Maintain/
-Edit occupy one horizontal action row. Long names wrap; there is no page-wide
-horizontal scroller. A free upkeep is 0, while absent upkeep is an em dash.
+Spell tables use fixed column widths. Summaries show the name with
+college/difficulty/points metadata, rollable level, casting time, duration,
+Upkeep and Cost. For owners, the Upkeep and Cost cells hold outlined **Maintain
+N** and soft primary **Cast N** buttons carrying the discounted energy; a spell
+without upkeep leaves its Upkeep slot empty, so Cast and Edit keep one column in
+every row. Read-only viewers see the plain numbers. Time and duration move into
+metadata below 1024px. Below 640px the name and level stay aligned and
+Maintain/Cast/Edit occupy one right-aligned action row. Actions are compact with
+a fine pointer and keep 44px targets on coarse pointers. Long names wrap; there
+is no page-wide horizontal scroller. A free upkeep is 0, while absent upkeep is
+an em dash. An unlearned legacy spell shows “Unlearned” in its metadata.
 
 The name opens a bounded, read-only reference dialog with rendered Markdown,
 prerequisites, duration, base-to-effective costs, and level modifiers. Its
@@ -162,11 +175,21 @@ dialog while keeping its payment and cancellation actions reachable.
 Unknown campaign mana and unlearned legacy spells still hold casting. Existing
 mana, failure-cost, powerstone, and fatigue rules are unchanged.
 
-Powerstones and Magic items use compact shared tables with plain headings and
-Inventory links for full editing. Existing drain/recharge/Max and Use/Refill
-controls remain outbox-backed. An empty Magic items section is absent.
-Below 640px, adjustment controls move to their own row so long item names retain
-the available width beside energy or charges.
+Item spells lists each owned magic item's spell, with the item as an Inventory
+link and a rollable level at the item's Power, −5 in low mana (M19; Magery does
+not apply). Using an item costs the same energy as a normal casting of its spell
+(M19): the Cost cell holds **Cast N** with the item's recorded energy, opening the
+shared energy payment dialog without the caster's next-turn FP recovery reminder.
+An unrecorded cost shows an em dash; its dialog starts empty and asks for the
+spell's normal cost rather than offering a free cast. Always-on items show "Always on" and have no cast
+action. Items not carried, unknown mana, and no-mana zones hold casting. There are
+no item charges. An empty Item spells section is absent.
+
+Powerstones use a compact fixed-width table with a display heading and stored
+energy total, Inventory links, a charge bar beside `current / max`, and a joined
+drain/recharge/Max group that remains outbox-backed. Below 640px, adjustment
+controls move to their own right-aligned row so long item names retain the
+available width beside their energy.
 
 Adventure-log Markdown tables keep a readable 36rem minimum width and scroll
 horizontally inside the log body or raw-Markdown preview. This local scroller
@@ -562,7 +585,7 @@ are inspected alongside bounding-box and overlap assertions.
 | Table filters and grouped row lifetime | `src/client/components/ui/Table.tsx` |
 | Skill/trait summary and editor references | `src/client/features/characters/sections/SkillsPanel.tsx`, `SkillPointsBreakdown.tsx`, `TraitsPanel.tsx` |
 | Spells, reference and energy payment | `src/client/features/characters/sections/SpellsPanel.tsx`, `CastSpellDialog.tsx`, `spellTablePreferences.ts` |
-| Stored energy and magic items | `src/client/features/characters/sections/PowerstonesPanel.tsx` |
+| Magic tab, shared search, stored energy and item spells | `src/client/features/characters/sections/MagicSection.tsx`, `PowerstonesPanel.tsx`, `ItemSpellsPanel.tsx`, `magicActionStyles.ts` |
 | Languages and techniques | `src/client/features/characters/sections/LanguagesPanel.tsx`, `TechniquesPanel.tsx` |
 | Inventory responsive item layout | `src/client/features/characters/sections/InventoryPanel.tsx`, `InventoryRow.tsx`, `inventory/inventory.css` |
 | Draft serialization and rollback feedback | `src/client/hooks/useDraftField.ts`, `src/client/features/characters/sections/useEntityRowPatch.ts` |

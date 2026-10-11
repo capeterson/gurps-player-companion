@@ -557,12 +557,11 @@ library:
     });
 
     const wand = doc.library.items.find((i) => i.name === 'Wand of Light');
+    // Legacy "charged" wands import as ordinary user-powered items (M19).
     expect(wand?.magicItemData).toEqual({
       spellName: 'Light',
       spellSkillLevel: 18,
-      mode: 'charged',
-      chargesMax: 20,
-      chargesCurrent: 20,
+      mode: 'powered',
     });
   });
 

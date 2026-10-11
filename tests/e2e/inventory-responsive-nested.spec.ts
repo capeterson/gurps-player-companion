@@ -544,7 +544,6 @@ test('nested inventory names and expanded item controls stay in view at supporte
       .click();
     const magicItem = page.getByRole('region', { name: `${LANGUAGE_ITEM}: Magic item` });
     await expect(magicItem.getByLabel('Activation').locator('option')).toHaveText([
-      'Uses charges',
       'Uses energy',
       'Always on',
     ]);

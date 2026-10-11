@@ -263,13 +263,10 @@ library:
       weightLbs: 1
       cost: 3000
       description: |
-        A carved wand that casts Fireball on command.  Recharges only
-        by returning it to an enchanter; track remaining charges in the
-        item's magic-item metadata.
+        A carved wand that casts Fireball on command.  The user pays
+        Fireball's normal energy cost for each casting (M19).
       source: M-16
       magicItemData:
         spellName: Fireball
         spellSkillLevel: 20
-        mode: charged
-        chargesMax: 10
-        chargesCurrent: 10
+        mode: powered

@@ -176,9 +176,7 @@ export function addCategory(id: string, category: ItemCategory, spellName = '') 
           magicItemData: {
             spellName: spellName.trim(),
             spellSkillLevel: 15,
-            mode: 'charged',
-            chargesMax: 10,
-            chargesCurrent: 10,
+            mode: 'powered',
           },
         };
       case 'enchantments':
