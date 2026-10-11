@@ -149,8 +149,8 @@ test('long inventories move rows without dragging and group by type', async ({
 
     await expect(carried.getByRole('rowheader')).toHaveText([
       'Armor',
-      'Container',
       'Weapon',
+      'Container',
       'Other',
     ]);
     const dagger = carried.getByRole('row').filter({ hasText: 'Belt dagger' });
