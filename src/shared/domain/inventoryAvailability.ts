@@ -29,6 +29,32 @@ export function inventoryAvailability(items: readonly AvailabilityItem[]) {
   return result;
 }
 
+/** Location only: whether an item's containment path ends on the player.
+ * Unlike availability this ignores quantity; Equipped is valid only here. */
+export function inventoryOnPlayer(items: readonly AvailabilityItem[]) {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const result = new Map<string | undefined, boolean>();
+  function onPlayer(item: AvailabilityItem, seen: Set<AvailabilityItem>): boolean {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    if (item.parentId) {
+      const parent = byId.get(item.parentId);
+      return parent != null && onPlayer(parent, seen);
+    }
+    return item.worn !== false && !item.externalLocation;
+  }
+  for (const item of items) result.set(item.id, onPlayer(item, new Set()));
+  return result;
+}
+
+/** Equipped items whose location is off the player; writes must not leave any. */
+export function equippedOffPlayer<T extends AvailabilityItem & { id: string }>(
+  items: readonly T[],
+): T[] {
+  const location = inventoryOnPlayer(items);
+  return items.filter((item) => item.equipped && !location.get(item.id));
+}
+
 export function availableEquipment<T extends AvailabilityItem>(items: readonly T[]): T[] {
   const keyed = items.map((item, index) => ({ ...item, id: item.id ?? `legacy-${index}` }));
   const availability = inventoryAvailability(keyed);

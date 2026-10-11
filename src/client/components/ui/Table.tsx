@@ -26,6 +26,12 @@ export interface TableRangeFilter {
   max: number | null;
 }
 type ColumnFilter = string[] | TableRangeFilter;
+/** A presentation-only alternative offered beside a column's value filter. */
+export interface TableColumnGrouping {
+  label: string;
+  active: boolean;
+  onChange: (active: boolean) => void;
+}
 type Filters = Record<string, ColumnFilter>;
 const isRangeFilter = (filter: ColumnFilter): filter is TableRangeFilter => !Array.isArray(filter);
 const isBound = (value: unknown): value is number | null =>
@@ -68,7 +74,13 @@ interface TableState {
   rows: readonly TableValues[];
   setColumnEnabled: (column: string, enabled: boolean) => void;
   register: (id: string, values: TableValues | null) => void;
-  open: (key: string, label: string, trigger: HTMLElement, rangeStep?: number) => void;
+  open: (
+    key: string,
+    label: string,
+    trigger: HTMLElement,
+    rangeStep?: number,
+    grouping?: TableColumnGrouping,
+  ) => void;
 }
 const TableContext = createContext<TableState | null>(null);
 const skipRegistration = () => {};
@@ -101,6 +113,7 @@ function TableImpl({
     label: string;
     trigger: HTMLElement;
     rangeStep?: number;
+    grouping?: TableColumnGrouping;
   } | null>(null);
   const [disabledColumns, setDisabledColumns] = useState<readonly string[]>([]);
   const setColumnEnabled = useCallback((column: string, enabled: boolean) => {
@@ -140,8 +153,14 @@ function TableImpl({
     setColumnEnabled,
     rows: filterRows ?? Object.values(registered),
     register: filterRows ? skipRegistration : register,
-    open: (key, label, trigger, rangeStep) =>
-      setMenu({ key, label, trigger, ...(rangeStep ? { rangeStep } : {}) }),
+    open: (key, label, trigger, rangeStep, grouping) =>
+      setMenu({
+        key,
+        label,
+        trigger,
+        ...(rangeStep ? { rangeStep } : {}),
+        ...(grouping ? { grouping } : {}),
+      }),
   };
   const closeMenu = useCallback(() => {
     setMenu(null);
@@ -202,6 +221,7 @@ function TableImpl({
             ]),
           ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))}
           selected={valueFilterFor(filters[menu.key])}
+          {...(menu.grouping ? { grouping: menu.grouping } : {})}
           onChange={(selected) => {
             const next = { ...filters };
             if (selected.length) next[menu.key] = selected;
@@ -221,6 +241,7 @@ export function TableHeader({
   label,
   filterLabel = label,
   rangeStep,
+  grouping,
   filterable = true,
   indicatorClassName = '',
   children,
@@ -232,6 +253,8 @@ export function TableHeader({
   filterLabel?: string;
   /** Filter this numeric column with a range slider in steps of this size. */
   rangeStep?: number;
+  /** Offer grouping rows by this column's values in its filter menu. */
+  grouping?: TableColumnGrouping;
   filterable?: boolean;
   indicatorClassName?: string;
 }) {
@@ -245,7 +268,13 @@ export function TableHeader({
   const active = enabled && column in table.filters;
   const open = (element: HTMLElement) => {
     if (enabled) {
-      table.open(column, filterLabel, element.querySelector('button') ?? element, rangeStep);
+      table.open(
+        column,
+        filterLabel,
+        element.querySelector('button') ?? element,
+        rangeStep,
+        grouping,
+      );
     }
   };
   return (
@@ -389,7 +418,10 @@ function FilterDialog({
 }) {
   const ref = useViewportBoundedOverlay<HTMLDialogElement>();
   useLayoutEffect(() => {
-    ref.current?.querySelector<HTMLInputElement>('input')?.focus();
+    (
+      ref.current?.querySelector<HTMLInputElement>('input[type="search"]') ??
+      ref.current?.querySelector<HTMLInputElement>('input')
+    )?.focus();
     const position = () => {
       const element = ref.current;
       if (!element) return;
@@ -480,6 +512,7 @@ function ColumnFilterMenu({
   trigger,
   values,
   selected,
+  grouping,
   onChange,
   onClose,
 }: {
@@ -487,13 +520,32 @@ function ColumnFilterMenu({
   trigger: HTMLElement;
   values: readonly string[];
   selected: readonly string[];
+  grouping?: TableColumnGrouping;
   onChange: (values: string[]) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
+  // The menu opens from a snapshot of the header; mirror the choice locally.
+  const [grouped, setGrouped] = useState(grouping?.active ?? false);
   const normalized = query.toLocaleLowerCase();
   return (
     <FilterDialog label={label} trigger={trigger} onClose={onClose}>
+      {grouping && (
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-field border border-base-300 p-2 text-sm">
+          <input
+            type="checkbox"
+            role="switch"
+            aria-checked={grouped}
+            className="toggle toggle-sm toggle-primary shrink-0"
+            checked={grouped}
+            onChange={(event) => {
+              setGrouped(event.target.checked);
+              grouping.onChange(event.target.checked);
+            }}
+          />
+          <span className="min-w-0 break-words">{grouping.label}</span>
+        </label>
+      )}
       <input
         type="search"
         className="input input-sm w-full shrink-0"

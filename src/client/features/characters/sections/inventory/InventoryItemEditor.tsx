@@ -91,9 +91,10 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
     case 'armor':
       return [
         number('armor.dr', 'DR'),
+        // Layering (B286) needs both flags on an inner layer, so neither hides.
         check('armor.flexible', 'Flexible armor'),
+        check('armor.concealable', 'Concealable inner layer'),
         number('weightReductionPercent', 'Lighten weight reduction (%)', true),
-        check('armor.concealable', 'Concealable inner layer', true),
         number('armor.drCrushing', 'Crushing DR', true, true),
         number('armor.db', 'Armor defense bonus', true, true),
         ...Object.entries(DR_TYPES).map(([key, label]) =>

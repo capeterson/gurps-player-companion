@@ -50489,6 +50489,7 @@
           }
         ],
         "summary": "Update an inventory item (owner only)",
+        "description": "Update an inventory item (owner only). Equipping an item that is not on the player is rejected; moving an item off the player unequips it and its contents.",
         "parameters": [
           {
             "schema": {
@@ -50558,8 +50559,7 @@
                     "maxLength": 160
                   },
                   "worn": {
-                    "type": "boolean",
-                    "default": false
+                    "type": "boolean"
                   },
                   "equipped": {
                     "type": "boolean",
@@ -56420,7 +56420,7 @@
             }
           },
           "400": {
-            "description": "Invalid inventory containment",
+            "description": "Invalid inventory containment or equipped item off the player",
             "content": {
               "application/json": {
                 "schema": {
@@ -124518,6 +124518,7 @@
           }
         ],
         "summary": "Add an inventory item (owner only)",
+        "description": "Add an inventory item (owner only). Equipped means worn or wielded, so an equipped item must be on the player: at the root with `worn` true and no external location, or inside a container on the player. Omitted `worn` defaults to true for an equipped root item.",
         "parameters": [
           {
             "schema": {
@@ -124578,8 +124579,7 @@
                     "maxLength": 160
                   },
                   "worn": {
-                    "type": "boolean",
-                    "default": false
+                    "type": "boolean"
                   },
                   "equipped": {
                     "type": "boolean",
@@ -130443,7 +130443,7 @@
             }
           },
           "400": {
-            "description": "Invalid inventory containment",
+            "description": "Invalid inventory containment or equipped item off the player",
             "content": {
               "application/json": {
                 "schema": {

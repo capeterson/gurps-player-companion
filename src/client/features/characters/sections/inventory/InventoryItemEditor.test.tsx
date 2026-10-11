@@ -213,6 +213,22 @@ describe('inline inventory editing', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Armor DR 6');
   });
 
+  it('shows Flexible and Concealable without More options and saves Concealable', async () => {
+    const user = await setup({ armor: armorData.parse({ dr: 2, locations: ['torso'] }) });
+    const editor = await armorEditor(user);
+    expect(editor.getByRole('button', { name: 'More options' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(editor.getByRole('checkbox', { name: 'Flexible armor' })).toBeVisible();
+    const concealable = editor.getByRole('checkbox', { name: 'Concealable inner layer' });
+    expect(concealable).toBeVisible();
+    expect(concealable).not.toBeChecked();
+    await user.click(concealable);
+    await waitFor(async () => expect((await stored()).armor?.concealable).toBe(true));
+    expect(concealable).toBeChecked();
+  });
+
   it('promotes individual populated advanced fields, including zero; cleared fields can hide again', async () => {
     const user = await setup({
       armor: armorData.parse({ dr: 2, drCrushing: 0, typedDr: { burn: 3 } }),

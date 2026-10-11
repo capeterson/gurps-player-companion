@@ -607,21 +607,33 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   On the player, Stashed, or inside a container; nested contents inherit their
   root's carried/stashed location. Equipped means worn or wielded for use and
   is the only equipment status; there is no separate Worn toggle or badge.
+  Equipped is valid only on the player: REST/MCP and sync reject equipping an
+  item off the player (an equipped root item created without `worn` defaults onto
+  the player), a move off the player unequips the item and its contents, and
+  migration 0071 cleared earlier off-player Equipped flags.
   The **Add item** button opens the add form in a modal; its location defaults to
   On the player. The section is not folded, and the selection's bulk actions share
-  the toolbar row with search and Add item. Both encumbrance summaries
+  the toolbar row with search and Add item. While items are selected that toolbar
+  sticks below the sheet header, so **Move to** (On the player, Stashed or a
+  container) moves rows from anywhere in a long list without dragging. Collapsing a
+  container or type section deselects what it hides, including a deep-linked
+  item's highlight, and pressing outside the panel clears the selection and highlight. Both encumbrance summaries
   use player-carried weight, excluding stashed items; the raw weight total covers all items.
   On the player and Stashed each sort independently by Item, Qty, Wt or Cost
   (price × quantity, including a container's contents); contents sort within their
   container, and each list's sort is remembered per character on this device and
   cleared on logout (`inventoryTablePreferences.ts`). The toolbar search matches item
   names case-insensitively; column filters select item types (the item categories
-  plus Other) and Qty/Wt/Cost ranges. Results retain the ancestor containers needed to locate matching
+  plus Other) and Qty/Wt/Cost ranges. The Item type filter's **Group by type** switch shows
+  a list as folding type sections instead of its container tree: presentation only, never
+  API containers or drop targets, with each item once under its first category and its
+  container named on the row. Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Containers
   start collapsed; their expanded/collapsed choice is remembered per character and
   container in device-local `localStorage`, never synced. A collapsed container
   shows a category-style count badge for every recursively contained item.
-  Filter-driven ancestor expansion is temporary and does not change the saved choice. Equipped
+  Filter-driven ancestor expansion is temporary and does not change the saved choice.
+  A deep link opens its ancestors without locking them; collapsing one dismisses the link. Equipped
   armor and active innate DR are aggregated per hit location on the Combat tab's Defense &
   Damage Resistance card. Each enchanted armor layer expands its base DR into nested enchantment
   contributions; highest-only conflicts are resolved across every equipped layer
@@ -654,6 +666,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   applies to armor typed DR, crushing DR, defense bonus, facing and notes;
   weapon ST, shield DB, structured ranged range (fixed yards or ST multiplier), alternate modes and notes; powerstone and
   magic-item notes; enchantment details; and basic notes/external location.
+  Armor's **Flexible armor** and **Concealable inner layer** checkboxes are never
+  hidden, because a valid inner layer needs both (B286).
   Armor retains every canonical and custom hit location. Weapons retain
   damage, reach, parry, governing skill, optional shield side, ranged stats,
   and alternate attack modes. Powerstones and magic items retain their charge/energy state

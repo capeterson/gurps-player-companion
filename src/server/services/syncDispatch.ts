@@ -1,7 +1,11 @@
 import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailability.ts';
 import { campaignMediaPatch } from '../../shared/schemas/media.ts';
 import { prepareActiveEffects } from './activeEffects.ts';
-import { assertEmptyInventoryContainer, assertInventoryContainer } from './inventoryContainment.ts';
+import {
+  assertEmptyInventoryContainer,
+  assertInventoryContainer,
+  enforceEquippedOnPlayer,
+} from './inventoryContainment.ts';
 import { lockLibraryReferenceScope, prepareLibraryReference } from './libraryReferences.ts';
 import { prepareMediaAttachment } from './media/service.ts';
 import { prepareRace } from './races.ts';
@@ -888,6 +892,7 @@ async function dispatchInventory(
       )
       .returning();
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
+    await enforceEquippedOnPlayer(tx, characterId, created.equipped ? [created.id] : []);
     return appliedOutcome(op, Number(created.revision));
   }
 
@@ -928,7 +933,7 @@ async function dispatchInventory(
   // Validation and the write must share this transaction; otherwise two
   // concurrent reparent operations can both approve a cycle.
   await lockLibraryReferenceScope(tx, characterId, ctx.userId);
-  return await patchEntity({
+  const outcome = await patchEntity({
     op,
     userId: ctx.userId,
     entityClass: 'character_inventory',
@@ -972,6 +977,16 @@ async function dispatchInventory(
       }
     },
   });
+  if (outcome.status !== 'applied') return outcome;
+  // Same rule as REST: equipping off the player is rejected, and a move off
+  // the player unequips. The outcome keeps the patch's own revision, so the
+  // cursor still delivers any later unequip to this device.
+  const equips =
+    op.fieldPath === undefined
+      ? (op.attemptedValue as { equipped?: unknown } | null)?.equipped === true
+      : op.fieldPath === 'equipped' && op.attemptedValue === true;
+  await enforceEquippedOnPlayer(tx, characterId, equips ? [op.entityId] : []);
+  return outcome;
 }
 
 async function assertNoCycle(

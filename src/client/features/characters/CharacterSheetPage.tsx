@@ -1794,6 +1794,14 @@ export function CharacterSheetPage() {
               character={character}
               canWrite={canWrite}
               anchorItemId={anchor?.kind === 'inventory' ? anchor.id : null}
+              onDismissAnchor={() => {
+                // Stay on Inventory once the link no longer selects the tab.
+                setTab('Inventory');
+                navigate(
+                  { pathname: location.pathname, search: location.search, hash: '' },
+                  { replace: true },
+                );
+              }}
             />
           )}
           {tab === 'History' && (

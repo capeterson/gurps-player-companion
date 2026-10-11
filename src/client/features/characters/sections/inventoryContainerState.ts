@@ -25,3 +25,29 @@ export function writeContainerExpanded(
     // in-memory disclosure still works for the current render.
   }
 }
+
+const GROUP_PREFIX = 'gpc:inventory-type-group-expanded';
+
+/** Type sections are a view, not containers; they start open. */
+export function readTypeGroupExpanded(characterId: string, list: string, type: string): boolean {
+  try {
+    return (
+      window.localStorage.getItem(`${GROUP_PREFIX}:${characterId}:${list}:${type}`) !== 'false'
+    );
+  } catch {
+    return true;
+  }
+}
+
+export function writeTypeGroupExpanded(
+  characterId: string,
+  list: string,
+  type: string,
+  expanded: boolean,
+): void {
+  try {
+    window.localStorage.setItem(`${GROUP_PREFIX}:${characterId}:${list}:${type}`, String(expanded));
+  } catch {
+    // The in-memory disclosure still works for the current render.
+  }
+}

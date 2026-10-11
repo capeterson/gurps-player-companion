@@ -92,6 +92,16 @@
   overflow-wrap: anywhere;
 }
 
+/* Type sections are headings over the list, not containers: they keep the
+   item column's start and draw no indent guides. */
+.inventory-table .inventory-type-group-row > th {
+  padding-block: 0.375rem;
+  background-color: color-mix(in oklch, var(--color-base-content) 6%, transparent);
+  color: var(--color-base-content);
+  font-weight: 600;
+  text-align: left;
+}
+
 /* Below the sheet's small breakpoint each item is a compact two-line row:
    name and chips on the left, weight over quantity/cost on the right, then
    the edit action. Editors take the full width so fields are never clipped
@@ -258,6 +268,20 @@
   }
 
   .inventory-table .inventory-editor-row[hidden] {
+    display: none;
+  }
+
+  .inventory-table .inventory-type-group-row,
+  .inventory-table .inventory-type-group-row > th {
+    display: block;
+    width: 100%;
+  }
+
+  .inventory-table .inventory-type-group-row > th {
+    padding-left: var(--inventory-gutter);
+  }
+
+  .inventory-table > tbody[hidden] {
     display: none;
   }
 }

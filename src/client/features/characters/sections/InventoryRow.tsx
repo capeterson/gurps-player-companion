@@ -51,7 +51,22 @@ export interface InventoryRowProps {
   // confusing -100% reduction breakdown.
   inStashed?: boolean;
   equipmentAvailability?: ReadonlyMap<string | undefined, { carried: boolean; equipped: boolean }>;
+  /** Collapsing a container deselects (and un-highlights) its contents. */
+  onCollapse?: (containerId: string) => void;
+  /** Type sections list every item as its own row, without container nesting. */
+  flat?: boolean;
+  /** The container holding this item, shown when `flat` hides the nesting. */
+  containerName?: string | null;
 }
+
+export const CATEGORY_ICONS: Record<ItemCategory, AppIconName> = {
+  armor: 'defense',
+  weapon: 'combat',
+  container: 'inventory',
+  powerstone: 'powerstone',
+  magicItem: 'magicItem',
+  enchantments: 'modifier',
+};
 
 function locationSummary(locations: string[]): string {
   if (locations.length === 0) return '—';
@@ -80,10 +95,13 @@ export function InventoryRow(props: InventoryRowProps) {
     drag,
     inStashed,
     equipmentAvailability,
+    onCollapse,
+    flat = false,
+    containerName,
   } = props;
   const children = byParent.get(item.id) ?? [];
   const isRoot = item.parentId === null;
-  const hasChildren = item.isContainer && children.length > 0;
+  const hasChildren = !flat && item.isContainer && children.length > 0;
   const [open, setOpen] = useState(() => readContainerExpanded(item.characterId, item.id));
   const columnFiltersActive = useTableFiltersActive();
   const matchesRow = useTableRowMatches();
@@ -94,16 +112,17 @@ export function InventoryRow(props: InventoryRowProps) {
   function subtreeMatches(entry: InventoryItemOut): boolean {
     return (
       matchesRow(filterValues(entry)) ||
-      (entry.isContainer && (byParent.get(entry.id) ?? []).some(subtreeMatches))
+      (!flat && entry.isContainer && (byParent.get(entry.id) ?? []).some(subtreeMatches))
     );
   }
   const filteredOut = !subtreeMatches(item);
   // Indent guides are drawn in CSS from the depth, so they need no per-row
   // sibling bookkeeping and stay correct while filtering or collapsing.
   const rowStyle = { '--inventory-depth': depth } as CSSProperties;
-  const contentsForcedOpen =
-    columnFiltersActive || expandContainers || Boolean(revealContainers?.has(item.id));
-  const contentsOpen = contentsForcedOpen || open;
+  // Filters hold matching contents open. A deep link only reveals its target:
+  // the container can still be collapsed, which dismisses the link.
+  const contentsForcedOpen = columnFiltersActive || expandContainers;
+  const contentsOpen = contentsForcedOpen || Boolean(revealContainers?.has(item.id)) || open;
   const contentsVisited = useRef(false);
   if (contentsOpen) contentsVisited.current = true;
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
@@ -128,14 +147,7 @@ export function InventoryRow(props: InventoryRowProps) {
     triggerRef.current?.focus();
   }
   function categoryIcon(category: ItemCategory, children: ReactNode) {
-    const icons: Record<ItemCategory, AppIconName> = {
-      armor: 'defense',
-      weapon: 'combat',
-      container: 'inventory',
-      powerstone: 'powerstone',
-      magicItem: 'magicItem',
-      enchantments: 'modifier',
-    };
+    const icons = CATEGORY_ICONS;
     return (
       <InfoTooltip
         ariaLabel={`${CATEGORY_LABELS[category]}${canEdit ? ' settings' : ''} for ${item.name}`}
@@ -274,11 +286,10 @@ export function InventoryRow(props: InventoryRowProps) {
                   type="button"
                   onClick={(e) => {
                     stop(e);
-                    setOpen((before) => {
-                      const next = !before;
-                      writeContainerExpanded(item.characterId, item.id, next);
-                      return next;
-                    });
+                    const next = !contentsOpen;
+                    setOpen(next);
+                    writeContainerExpanded(item.characterId, item.id, next);
+                    if (!next) onCollapse?.(item.id);
                   }}
                   className="inventory-slot inventory-expand btn btn-ghost btn-xs text-base-content/60"
                   aria-expanded={contentsOpen}
@@ -410,6 +421,11 @@ export function InventoryRow(props: InventoryRowProps) {
           {isRoot && !item.worn && item.externalLocation && (
             <div className="inventory-item-detail text-base-content/60 text-xs mt-0.5">
               {item.externalLocation}
+            </div>
+          )}
+          {flat && containerName && (
+            <div className="inventory-item-detail text-base-content/60 text-xs mt-0.5">
+              in {containerName}
             </div>
           )}
           {(item.enchantmentBreakdown?.length ?? 0) > 0 && (

@@ -789,6 +789,177 @@ describe('inventory sub-resource CRUD', () => {
   });
 });
 
+describe('equipped items stay on the player', () => {
+  type Item = { id: string; equipped: boolean; worn: boolean; parentId: string | null };
+
+  async function createItem(token: string, characterId: string, body: Record<string, unknown>) {
+    return app.request(`/api/v1/characters/${characterId}/inventory`, {
+      method: 'POST',
+      headers: jsonHeaders(token),
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function createdItem(token: string, characterId: string, body: Record<string, unknown>) {
+    const res = await createItem(token, characterId, body);
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { item: Item }).item;
+  }
+
+  async function inventory(token: string, characterId: string): Promise<Item[]> {
+    const res = await app.request(`/api/v1/characters/${characterId}`, {
+      headers: bearer(token),
+    });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { inventory: Item[] }).inventory;
+  }
+
+  async function sync(token: string, operation: Record<string, unknown>) {
+    const res = await app.request('/api/v1/sync/operations', {
+      method: 'POST',
+      headers: jsonHeaders(token),
+      body: JSON.stringify({
+        operations: [
+          {
+            clientOpId: crypto.randomUUID(),
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+            ...operation,
+          },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { outcomes: Array<{ status: string; reason?: string }> })
+      .outcomes[0];
+  }
+
+  it('REST rejects creating or equipping an item off the player', async () => {
+    const { accessToken } = await registerUser('inv-equip-rest-reject');
+    const character = await createCharacter(accessToken);
+    const id = character.id as string;
+    const stashedEquipped = await createItem(accessToken, id, {
+      name: 'Stashed sword',
+      worn: false,
+      equipped: true,
+    });
+    expect(stashedEquipped.status).toBe(400);
+    expect(await stashedEquipped.text()).toContain('Equipped items must be on the player');
+    const chest = await createdItem(accessToken, id, { name: 'Chest', isContainer: true });
+    const inChest = await createItem(accessToken, id, {
+      name: 'Boxed helmet',
+      parentId: chest.id,
+      equipped: true,
+    });
+    expect(inChest.status).toBe(400);
+
+    const stashed = await createdItem(accessToken, id, { name: 'Spare dagger', worn: false });
+    const equip = await app.request(`/api/v1/characters/${id}/inventory/${stashed.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ equipped: true }),
+    });
+    expect(equip.status).toBe(400);
+    expect(await equip.text()).toContain('Equipped items must be on the player');
+    const items = await inventory(accessToken, id);
+    expect(items.map((item) => item.equipped)).toEqual([false, false]);
+  });
+
+  it('REST defaults an equipped root item onto the player', async () => {
+    const { accessToken } = await registerUser('inv-equip-rest-default');
+    const character = await createCharacter(accessToken);
+    const item = await createdItem(accessToken, character.id as string, {
+      name: 'Shield',
+      equipped: true,
+    });
+    expect(item).toMatchObject({ worn: true, equipped: true });
+    const plain = await createdItem(accessToken, character.id as string, { name: 'Rope' });
+    expect(plain).toMatchObject({ worn: false, equipped: false });
+  });
+
+  it('REST unequips an item and its contents when they move off the player', async () => {
+    const { accessToken } = await registerUser('inv-equip-rest-move');
+    const character = await createCharacter(accessToken);
+    const id = character.id as string;
+    const harness = await createdItem(accessToken, id, {
+      name: 'Harness',
+      isContainer: true,
+      worn: true,
+      equipped: true,
+    });
+    const knife = await createdItem(accessToken, id, {
+      name: 'Belt knife',
+      parentId: harness.id,
+      equipped: true,
+    });
+    const sword = await createdItem(accessToken, id, { name: 'Sword', worn: true, equipped: true });
+    const moved = await app.request(`/api/v1/characters/${id}/inventory/${harness.id}`, {
+      method: 'PATCH',
+      headers: jsonHeaders(accessToken),
+      body: JSON.stringify({ worn: false }),
+    });
+    expect(moved.status).toBe(200);
+    const { item, character: detail } = (await moved.json()) as {
+      item: Item;
+      character: { inventory: Item[] };
+    };
+    expect(item).toMatchObject({ worn: false, equipped: false });
+    const byId = new Map(detail.inventory.map((entry) => [entry.id, entry]));
+    expect(byId.get(knife.id)?.equipped).toBe(false);
+    expect(byId.get(sword.id)?.equipped).toBe(true);
+  });
+
+  it('sync rejects equipping off the player and unequips items moved off it', async () => {
+    const { accessToken } = await registerUser('inv-equip-sync');
+    const character = await createCharacter(accessToken);
+    const id = character.id as string;
+    const rejectedCreate = await sync(accessToken, {
+      entityClass: 'character_inventory',
+      entityId: crypto.randomUUID(),
+      parentId: id,
+      command: 'create',
+      attemptedValue: { characterId: id, name: 'Stashed bow', worn: false, equipped: true },
+    });
+    expect(rejectedCreate).toMatchObject({
+      status: 'rejected',
+      reason: 'Equipped items must be on the player',
+    });
+
+    const chest = await createdItem(accessToken, id, { name: 'Chest', isContainer: true });
+    const spare = await createdItem(accessToken, id, { name: 'Spare dagger', worn: false });
+    const rejectedPatch = await sync(accessToken, {
+      entityClass: 'character_inventory',
+      entityId: spare.id,
+      parentId: id,
+      command: 'patch',
+      fieldPath: 'equipped',
+      attemptedValue: true,
+    });
+    expect(rejectedPatch).toMatchObject({
+      status: 'rejected',
+      reason: 'Equipped items must be on the player',
+    });
+
+    const helmet = await createdItem(accessToken, id, {
+      name: 'Helmet',
+      worn: true,
+      equipped: true,
+    });
+    const moved = await sync(accessToken, {
+      entityClass: 'character_inventory',
+      entityId: helmet.id,
+      parentId: id,
+      command: 'patch',
+      fieldPath: 'parentId',
+      attemptedValue: chest.id,
+    });
+    expect(moved?.status).toBe('applied');
+    const items = new Map((await inventory(accessToken, id)).map((item) => [item.id, item]));
+    expect(items.get(helmet.id)).toMatchObject({ parentId: chest.id, equipped: false });
+    expect(items.get(spare.id)?.equipped).toBe(false);
+  });
+});
+
 // ===================== COMBAT =====================
 
 describe('combat state upsert', () => {

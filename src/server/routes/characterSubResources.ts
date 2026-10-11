@@ -2,6 +2,7 @@ import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailabi
 import {
   assertEmptyInventoryContainer,
   assertInventoryContainer,
+  enforceEquippedOnPlayer,
 } from '../services/inventoryContainment.ts';
 /**
  * Sub-resource CRUD for a character: traits, skills, inventory, combat.
@@ -752,6 +753,8 @@ router.openapi(
     tags: ['characters'],
     security: [{ bearerAuth: [] }],
     summary: 'Add an inventory item (owner only)',
+    description:
+      'Add an inventory item (owner only). Equipped means worn or wielded, so an equipped item must be on the player: at the root with `worn` true and no external location, or inside a container on the player. Omitted `worn` defaults to true for an equipped root item.',
     request: {
       params: z.object({ id: uuid }),
       body: { required: true, content: { 'application/json': { schema: inventoryItemCreate } } },
@@ -765,7 +768,7 @@ router.openapi(
           },
         },
       },
-      400: errorResponse('Invalid inventory containment'),
+      400: errorResponse('Invalid inventory containment or equipped item off the player'),
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
       503: errorResponse('Character campaign changed; retry this edit'),
@@ -796,6 +799,7 @@ router.openapi(
           ),
         )
         .returning();
+      if (row) await enforceEquippedOnPlayer(tx, id, row.equipped ? [row.id] : []);
       return row;
     });
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
@@ -819,6 +823,8 @@ router.openapi(
     tags: ['characters'],
     security: [{ bearerAuth: [] }],
     summary: 'Update an inventory item (owner only)',
+    description:
+      'Update an inventory item (owner only). Equipping an item that is not on the player is rejected; moving an item off the player unequips it and its contents.',
     request: {
       params: z.object({ id: uuid, itemId: uuid }),
       body: { required: true, content: { 'application/json': { schema: inventoryItemUpdate } } },
@@ -832,7 +838,7 @@ router.openapi(
           },
         },
       },
-      400: errorResponse('Invalid inventory containment'),
+      400: errorResponse('Invalid inventory containment or equipped item off the player'),
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
       503: errorResponse('Character campaign changed; retry this edit'),
@@ -867,6 +873,7 @@ router.openapi(
         .set(await prepareLibraryReference(tx, user.id, id, 'items', updates, itemId))
         .where(and(eq(inventoryItems.id, itemId), eq(inventoryItems.characterId, id)))
         .returning();
+      if (row) await enforceEquippedOnPlayer(tx, id, body.equipped === true ? [row.id] : []);
       return row;
     });
     if (!updated) throw new HTTPException(404, { message: 'item not found' });
