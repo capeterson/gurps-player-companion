@@ -35,6 +35,7 @@ test('B269 campaign controls, combat preview and actual rolls agree without chan
     data: {
       name: 'Pride’s Remedy',
       equipped: true,
+      worn: true,
       enchantments: [{ spellName: 'Puissance', notes: 'Recorded enchantment; no synthetic bonus' }],
       weaponData: { damage: 'sw+4 cut', skill: 'Broadsword' },
     },
