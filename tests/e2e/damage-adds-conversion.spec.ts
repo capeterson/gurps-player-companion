@@ -1,4 +1,5 @@
-import { expect, test } from './authenticated-fixture';
+import { expect } from '@playwright/test';
+import { test } from './authenticated-fixture';
 import { selectCharacterSection } from './character-navigation';
 import { attachReviewScreenshot } from './review-artifacts';
 
@@ -88,6 +89,14 @@ test('B269 campaign controls, combat preview and actual rolls agree without chan
       result.dice.reduce((total: number, die: number) => total + die, enabled ? 1 : 5),
     );
     expect(result.damageType).toBe('cut');
+    await expect(roll.getByText(`${formula} cut`, { exact: true })).toBeVisible();
+    await expect(roll.getByRole('button', { name: 'Roll again', exact: true })).toBeVisible();
+    const faces = roll.locator('span.h-9.w-9');
+    await expect(faces).toHaveCount(enabled ? 3 : 2);
+    for (const face of await faces.all()) await expect(face).toBeVisible();
+    await expect(
+      roll.locator('p.num').filter({ hasText: new RegExp(`^${result.total}$`) }),
+    ).toBeVisible();
     await attachReviewScreenshot(
       page,
       testInfo,
