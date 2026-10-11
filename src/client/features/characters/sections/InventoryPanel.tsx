@@ -1,4 +1,7 @@
-import { inventoryAvailability } from '../../../../shared/domain/inventoryAvailability.ts';
+import {
+  inventoryAvailability,
+  inventoryOnPlayer,
+} from '../../../../shared/domain/inventoryAvailability.ts';
 import { formatEquipmentNumber } from '../../../../shared/format/number.ts';
 import type { PricingResolution } from '../../../../shared/schemas/calculation.ts';
 import { Table } from '../../../components/ui/Table.tsx';
@@ -47,9 +50,12 @@ import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
+import { InventoryTypeGroup } from './inventory/InventoryTypeGroup.tsx';
 import {
   type InventoryList,
+  readInventoryGroupByType,
   readInventoryTablePreferences,
+  saveInventoryGroupByType,
   saveInventoryTablePreferences,
 } from './inventoryTablePreferences.ts';
 import {
@@ -58,6 +64,8 @@ import {
   descendantsOf,
   filterInventoryTree,
   flattenDFS,
+  groupInventoryByType,
+  inventoryComparator,
   inventoryCostTotals,
   inventoryFilterValues,
   sortInventoryTree,
@@ -93,10 +101,13 @@ export function InventoryPanel({
   character,
   canWrite,
   anchorItemId,
+  onDismissAnchor,
 }: {
   character: CharacterDetail;
   canWrite: boolean;
   anchorItemId?: string | null;
+  /** Clears a deep-linked item's highlight, as deselecting does for a selection. */
+  onDismissAnchor?: () => void;
 }) {
   const characterId = character.id;
   const campaignId = character.campaignId ?? null;
@@ -115,6 +126,14 @@ export function InventoryPanel({
     stashed: readInventoryTablePreferences(characterId, 'stashed'),
   }));
   const [sortSaveFailed, setSortSaveFailed] = useState(false);
+  const [groupedByType, setGroupedByType] = useState(() => ({
+    worn: readInventoryGroupByType(characterId, 'worn'),
+    stashed: readInventoryGroupByType(characterId, 'stashed'),
+  }));
+  function groupByType(list: InventoryList, grouped: boolean) {
+    setGroupedByType((before) => ({ ...before, [list]: grouped }));
+    if (!saveInventoryGroupByType(characterId, list, grouped)) setSortSaveFailed(true);
+  }
   function sortBy(list: InventoryList, sort: InventorySort) {
     const current = sorts[list];
     const next: TablePreferences<InventorySort> = {
@@ -175,16 +194,54 @@ export function InventoryPanel({
   }, [items, anchorItemId]);
   const carriedRoots = (wornByParent.get(null) ?? []).filter((r) => r.worn);
   const stashedRoots = (stashedByParent.get(null) ?? []).filter((r) => !r.worn);
+  // Type sections list direct matches only; nesting context is the container name.
+  function typeGroups(list: InventoryList) {
+    if (!groupedByType[list]) return null;
+    const stashed = list === 'stashed';
+    const listed = flattenDFS(
+      stashed ? stashedRoots : carriedRoots,
+      stashed ? stashedByParent : wornByParent,
+    ).filter((item) => !filterActive || filteredTree.matchedIds.has(item.id));
+    const { sort, descending } = sorts[list];
+    return groupInventoryByType(listed, inventoryComparator(sort, descending, stashed, costTotals));
+  }
+  const wornGroups = typeGroups('worn');
+  const stashedGroups = typeGroups('stashed');
 
   // Range selection follows the displayed order of each list.
-  const orderedIds = useMemo(
-    () =>
-      [...flattenDFS(carriedRoots, wornByParent), ...flattenDFS(stashedRoots, stashedByParent)].map(
-        (i) => i.id,
-      ),
-    [carriedRoots, stashedRoots, wornByParent, stashedByParent],
-  );
-  const { selectedIds, isSelected, handleClick, clear, count } = useRangeSelect(orderedIds);
+  const orderedIds = [
+    ...(wornGroups?.flatMap((group) => group.items) ?? flattenDFS(carriedRoots, wornByParent)),
+    ...(stashedGroups?.flatMap((group) => group.items) ??
+      flattenDFS(stashedRoots, stashedByParent)),
+  ].map((i) => i.id);
+  const { selectedIds, isSelected, handleClick, clear, replace, count } =
+    useRangeSelect(orderedIds);
+
+  // Collapsing a container or type section deselects what it hides, including
+  // a deep-linked item's highlight.
+  function deselectWithin(ids: ReadonlySet<string>) {
+    const kept = [...selectedIds].filter((id) => !ids.has(id));
+    if (kept.length !== selectedIds.size) replace(kept);
+    if (anchorItemId && ids.has(anchorItemId)) onDismissAnchor?.();
+  }
+
+  // A press anywhere outside the panel (portaled overlays included, via the
+  // React tree) clears the selection and any deep-link highlight.
+  const pressedInside = useRef(false);
+  const dismissOutside = useRef(() => {});
+  dismissOutside.current = () => {
+    if (selectedIds.size > 0) clear();
+    if (anchorItemId) onDismissAnchor?.();
+  };
+  useEffect(() => {
+    const onPointerDown = () => {
+      const inside = pressedInside.current;
+      pressedInside.current = false;
+      if (!inside) dismissOutside.current();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, []);
 
   // Add-item dialog state
   const [addOpen, setAddOpen] = useState(false);
@@ -220,6 +277,10 @@ export function InventoryPanel({
   const [pickedLibraryItem, setPickedLibraryItem] = useState<LibraryItemOut | null>(null);
 
   const containers = useMemo(() => items.filter((i) => i.isContainer), [items]);
+  const onPlayer = useMemo(() => inventoryOnPlayer(items), [items]);
+  // Equipped is valid only on the player.
+  const newLocationOnPlayer =
+    newLocation === '' || (newLocation !== 'stashed' && onPlayer.get(newLocation) === true);
 
   const { fetchOptions, allSources, setAllSources } = useLibraryFetcher<LibraryItemOut>(
     'items',
@@ -266,8 +327,11 @@ export function InventoryPanel({
       }));
   }
 
+  // Unequips go first: the server unequips anything moved off the player, so
+  // a later unequip would arrive against a newer revision.
   async function patchMany(id: string, patch: InventoryItemUpdate, label: string): Promise<void> {
     await enqueueFieldPatches([
+      ...clearUnavailableEquipment([id], patch),
       ...Object.entries(patch).map(([field, value]) => ({
         entityClass: 'character_inventory' as const,
         entityId: id,
@@ -277,7 +341,6 @@ export function InventoryPanel({
         flashKey: makeFlashKey('character_inventory', id, field),
         characterId,
       })),
-      ...clearUnavailableEquipment([id], patch),
     ]);
   }
 
@@ -292,6 +355,7 @@ export function InventoryPanel({
           'Move selected items on the player and set positive quantities before equipping them',
         );
       await enqueueFieldPatches([
+        ...clearUnavailableEquipment(ids, patch),
         ...ids.flatMap((id) =>
           Object.entries(patch).map(([field, value]) => ({
             entityClass: 'character_inventory' as const,
@@ -303,7 +367,6 @@ export function InventoryPanel({
             characterId,
           })),
         ),
-        ...clearUnavailableEquipment(ids, patch),
       ]);
       toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
     } catch (err) {
@@ -423,7 +486,7 @@ export function InventoryPanel({
         parentId: parent,
         externalLocation: null,
         worn: newLocation === '',
-        equipped: newEquipped,
+        equipped: newEquipped && newLocationOnPlayer,
         isContainer: newIsContainer,
         // Gated on the facet, not just the pick: encumbrance applies
         // these to carried root items regardless of isContainer, so a pick
@@ -592,26 +655,53 @@ export function InventoryPanel({
   const stashedWeight = stashedSubtree.reduce((acc, i) => acc + i.weightLbs * i.quantity, 0);
   const stashedCost = stashedSubtree.reduce((acc, i) => acc + i.cost * i.quantity, 0);
 
+  const equipmentAvailability = inventoryAvailability(items);
+  const skillNames = character.skills.map((s) => skillDisplayName(s.name, s.specialization));
+  function rowProps(inStashed: boolean) {
+    return {
+      byParent: inStashed ? stashedByParent : wornByParent,
+      costTotals,
+      equipmentAvailability,
+      isSelected,
+      onRowClick: handleClick,
+      canEdit: canWrite,
+      campaignId,
+      skillNames,
+      fetchEnchantmentOptions: fetchEnchantments,
+      expandContainers: filterActive,
+      revealContainers,
+      highlightItemId: anchorItemId ?? null,
+      onCollapse: (containerId: string) =>
+        deselectWithin(descendantsOf(containerId, tree.byParent)),
+      ...(canWrite ? { drag: dragApi } : {}),
+      ...(inStashed ? { inStashed: true } : {}),
+    };
+  }
+
   function renderRows(rootList: InventoryItemOut[], opts: { inStashed?: boolean } = {}): ReactNode {
-    return rootList.map((r) => (
-      <InventoryRow
-        key={r.id}
-        item={r}
-        depth={0}
-        byParent={opts.inStashed ? stashedByParent : wornByParent}
-        costTotals={costTotals}
-        equipmentAvailability={inventoryAvailability(items)}
-        isSelected={isSelected}
-        onRowClick={handleClick}
-        canEdit={canWrite}
-        campaignId={campaignId}
-        skillNames={character.skills.map((s) => skillDisplayName(s.name, s.specialization))}
-        fetchEnchantmentOptions={fetchEnchantments}
-        expandContainers={filterActive}
-        revealContainers={revealContainers}
-        highlightItemId={anchorItemId ?? null}
-        {...(canWrite ? { drag: dragApi } : {})}
-        {...(opts.inStashed ? { inStashed: true } : {})}
+    const shared = rowProps(Boolean(opts.inStashed));
+    return (
+      <tbody>
+        {rootList.map((r) => (
+          <InventoryRow key={r.id} {...shared} item={r} depth={0} />
+        ))}
+      </tbody>
+    );
+  }
+
+  function renderGroups(list: InventoryList, groups: ReturnType<typeof typeGroups>): ReactNode {
+    const shared = rowProps(list === 'stashed');
+    return groups?.map((group) => (
+      <InventoryTypeGroup
+        key={group.type}
+        characterId={characterId}
+        list={list}
+        group={group}
+        byId={tree.byId}
+        revealItemId={anchorItemId ?? null}
+        forceOpen={filterActive}
+        onCollapse={deselectWithin}
+        rowProps={shared}
       />
     ));
   }
@@ -625,6 +715,11 @@ export function InventoryPanel({
           sort="item"
           preferences={sorts[list]}
           onSort={(sort) => sortBy(list, sort)}
+          grouping={{
+            label: 'Group by type',
+            active: groupedByType[list],
+            onChange: (grouped) => groupByType(list, grouped),
+          }}
         />
         <SortableHeader<InventorySort>
           label="Qty"
@@ -658,7 +753,12 @@ export function InventoryPanel({
   );
 
   return (
-    <section className="card border border-base-300/60 bg-base-100 rounded-2xl overflow-visible">
+    <section
+      className="card border border-base-300/60 bg-base-100 rounded-2xl overflow-visible"
+      onPointerDownCapture={() => {
+        pressedInside.current = true;
+      }}
+    >
       {character.libraryEffectsKnown !== false && (
         <header className="flex flex-wrap items-baseline gap-2 border-b border-base-300/60 px-2 py-2 sm:px-5 sm:py-3 text-sm">
           <span className="num text-base-content/60">
@@ -751,7 +851,18 @@ export function InventoryPanel({
       )}
 
       {(items.length > 0 || canWrite) && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-base-300/60 px-2 sm:px-5 py-2">
+        // While items are selected the toolbar sticks below the header, so
+        // Move to stays in reach of rows far down a long inventory.
+        <div
+          className={`flex flex-wrap items-center gap-2 border-b border-base-300/60 px-2 sm:px-5 py-2 ${
+            canWrite && count > 0 ? 'sticky z-20 bg-base-100 shadow-sm' : ''
+          }`}
+          style={
+            canWrite && count > 0
+              ? { top: 'calc(var(--sheet-sticky-offset, 1rem) - 1rem)' }
+              : undefined
+          }
+        >
           {items.length > 0 && (
             <>
               <input
@@ -966,7 +1077,7 @@ export function InventoryPanel({
                   className="table table-zebra inventory-table"
                 >
                   {tableHead('worn')}
-                  <tbody>{renderRows(carriedRoots)}</tbody>
+                  {wornGroups ? renderGroups('worn', wornGroups) : renderRows(carriedRoots)}
                 </Table>
               </div>
             )}
@@ -1053,7 +1164,9 @@ export function InventoryPanel({
                   className="table table-zebra inventory-table"
                 >
                   {tableHead('stashed')}
-                  <tbody>{renderRows(stashedRoots, { inStashed: true })}</tbody>
+                  {stashedGroups
+                    ? renderGroups('stashed', stashedGroups)
+                    : renderRows(stashedRoots, { inStashed: true })}
                 </Table>
               </div>
             )}
@@ -1251,10 +1364,19 @@ export function InventoryPanel({
                   <input
                     type="checkbox"
                     className="checkbox checkbox-sm"
-                    checked={newEquipped}
+                    checked={newEquipped && newLocationOnPlayer}
+                    disabled={!newLocationOnPlayer}
+                    aria-describedby={
+                      newLocationOnPlayer ? undefined : 'inventory-add-equipped-note'
+                    }
                     onChange={(e) => setNewEquipped(e.target.checked)}
                   />
                   <span>Equipped</span>
+                  {!newLocationOnPlayer && (
+                    <span id="inventory-add-equipped-note" className="text-base-content/60">
+                      Only items on the player can be equipped.
+                    </span>
+                  )}
                 </label>
                 {campaignId && (
                   <div className="min-w-[16rem] flex-1">

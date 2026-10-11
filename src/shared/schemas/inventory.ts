@@ -450,8 +450,10 @@ export const inventoryItemCreate = z.object({
   notes: z.string().max(20_000).nullable().optional(),
   parentId: uuid.nullable().optional(),
   externalLocation: z.string().max(160).trim().nullable().optional(),
-  /** Legacy location flag, not a separate wearing/equipment status. */
-  worn: z.boolean().default(false),
+  /** Legacy root location flag (true = on the player, false = stashed), not a
+   * separate wearing status. Omitted, it follows `equipped` for a root item. */
+  worn: z.boolean().optional(),
+  /** Worn or wielded for use; valid only for items on the player. */
   equipped: z.boolean().default(false),
   isContainer: z.boolean().default(false),
   hideawayCapacityLbs: z.number().min(0).max(1_000_000).default(0),

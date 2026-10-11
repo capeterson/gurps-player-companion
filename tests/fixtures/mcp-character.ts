@@ -98,6 +98,7 @@ export function mcpCharacter() {
           ...inventoryItemCreate.parse({ name: 'Travelling pack', isContainer: true, worn: true }),
           id: bagId,
           characterId,
+          worn: true,
           parentId: null,
           notes: null,
           externalLocation: null,
@@ -120,6 +121,7 @@ export function mcpCharacter() {
           }),
           id: bladeId,
           characterId,
+          worn: true,
           parentId: bagId,
           notes: 'A **balanced** blade.',
           weaponData: weaponData.parse({

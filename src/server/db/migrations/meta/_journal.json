@@ -498,6 +498,13 @@
       "when": 1800025000000,
       "tag": "0070_remove_magic_item_charges",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1800026000000,
+      "tag": "0071_equipped_requires_on_player",
+      "breakpoints": true
     }
   ]
 }

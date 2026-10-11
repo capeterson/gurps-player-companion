@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { InventoryItemOut } from '../../../../shared/schemas/inventory.ts';
 import { getLocalDb, resetLocalDb } from '../../../db/dexie.ts';
@@ -58,7 +59,11 @@ function item(
 
 function renderPanel(
   anchorItemId?: string,
-  options: { canWrite?: boolean; inventory?: InventoryItemOut[] } = {},
+  options: {
+    canWrite?: boolean;
+    inventory?: InventoryItemOut[];
+    onDismissAnchor?: () => void;
+  } = {},
 ) {
   const inventory = options.inventory ?? [
     item(PACK_ID, 'Backpack', null, { container: true }),
@@ -77,17 +82,41 @@ function renderPanel(
     encumbrance: { playerWeightLbs: 0, basicLift: 20, level: 0 },
   } as unknown as CharacterDetail;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <ToastProvider>
+  // The sheet clears its URL hash when the panel dismisses a deep link.
+  function Sheet() {
+    const [anchor, setAnchor] = useState(anchorItemId ?? null);
+    return (
+      <>
+        <button type="button">Outside the inventory</button>
         <InventoryPanel
           character={character}
           canWrite={options.canWrite ?? false}
-          anchorItemId={anchorItemId ?? null}
+          anchorItemId={anchor}
+          onDismissAnchor={() => {
+            options.onDismissAnchor?.();
+            setAnchor(null);
+          }}
         />
+      </>
+    );
+  }
+  return render(
+    <QueryClientProvider client={client}>
+      <ToastProvider>
+        <Sheet />
       </ToastProvider>
     </QueryClientProvider>,
   );
+}
+
+function row(name: string): HTMLElement {
+  // Item titles only: the Move to menu also lists container names.
+  const element = screen
+    .getAllByText(name, { exact: true })
+    .find((node) => node.classList.contains('inventory-item-title'))
+    ?.closest('tr');
+  if (!element) throw new Error(`Expected a row for ${name}`);
+  return element;
 }
 
 beforeEach(async () => {
@@ -210,14 +239,189 @@ describe('Inventory location and equipment controls', () => {
         equipped: false,
       });
     });
-    expect(
-      (await getLocalDb().outbox.toArray()).map((op) => [op.fieldPath, op.attemptedValue]),
-    ).toEqual(
+    const ops = (await getLocalDb().outbox.orderBy('enqueuedAt').toArray()).map((op) => [
+      op.fieldPath,
+      op.attemptedValue,
+    ]);
+    expect(ops).toEqual(
       expect.arrayContaining([
         ['worn', false],
         ['equipped', false],
       ]),
     );
+    // The unequip is sent before the move, which the server would otherwise
+    // answer by unequipping first and making this patch stale.
+    expect(ops.findIndex(([field]) => field === 'equipped')).toBeLessThan(
+      ops.findIndex(([field]) => field === 'worn'),
+    );
+  });
+
+  it('only offers Equipped in the add form for a location on the player', async () => {
+    const db = getLocalDb();
+    const stashedChest = item('chest', 'Chest', null, { container: true, worn: false });
+    await db.characterInventory.bulkPut([
+      { ...item(PACK_ID, 'Backpack', null, { container: true }), revision: 1 },
+      { ...stashedChest, revision: 1 },
+    ]);
+    renderPanel(undefined, {
+      canWrite: true,
+      inventory: [item(PACK_ID, 'Backpack', null, { container: true }), stashedChest],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add item' }));
+    const dialog = screen.getByRole('dialog', { name: 'Add item' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'More options' }));
+    const equipped = within(dialog).getByRole('checkbox', { name: 'Equipped' });
+    fireEvent.click(equipped);
+    expect(equipped).toBeChecked();
+    expect(within(dialog).queryByText('Only items on the player can be equipped.')).toBeNull();
+
+    const location = within(dialog).getByRole('combobox', { name: 'Location' });
+    fireEvent.change(location, { target: { value: 'chest' } });
+    expect(equipped).toBeDisabled();
+    expect(equipped).not.toBeChecked();
+    expect(within(dialog).getByText('Only items on the player can be equipped.')).toBeVisible();
+    fireEvent.change(location, { target: { value: PACK_ID } });
+    expect(equipped).toBeEnabled();
+    expect(equipped).toBeChecked();
+
+    fireEvent.change(location, { target: { value: 'stashed' } });
+    fireEvent.change(within(dialog).getByLabelText('Item name'), {
+      target: { value: 'Spare shield' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await waitFor(async () => expect(await db.outbox.count()).toBe(1));
+    expect((await db.outbox.toArray())[0]?.attemptedValue).toMatchObject({
+      name: 'Spare shield',
+      worn: false,
+      equipped: false,
+    });
+  });
+});
+
+describe('Inventory selection dismissal', () => {
+  it('collapsing a container deselects its contents and clears a deep link inside it', () => {
+    const onDismissAnchor = vi.fn();
+    renderPanel('gem', { canWrite: true, onDismissAnchor });
+    expect(row('Moon Gem')).toHaveClass('outline-primary');
+    fireEvent.click(screen.getByText('Apple', { exact: true }));
+    expect(row('Apple')).toHaveAttribute('aria-selected', 'true');
+
+    const backpack = row('Backpack');
+    fireEvent.click(within(backpack).getByRole('button', { name: 'Collapse contents' }));
+
+    expect(onDismissAnchor).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Apple', { exact: true })).not.toBeVisible();
+    expect(screen.getByText('Moon Gem', { exact: true })).not.toBeVisible();
+    expect(within(backpack).getByLabelText('4 contained items')).toBeVisible();
+    fireEvent.click(within(backpack).getByRole('button', { name: 'Expand contents' }));
+    expect(row('Apple')).toHaveAttribute('aria-selected', 'false');
+    expect(row('Moon Gem')).not.toHaveClass('outline-primary');
+  });
+
+  it('keeps a selection outside the collapsed container', () => {
+    renderPanel(undefined, { canWrite: true });
+    const backpack = row('Backpack');
+    fireEvent.click(within(backpack).getByRole('button', { name: 'Expand contents' }));
+    fireEvent.click(screen.getByText('Tent', { exact: true }));
+    fireEvent.click(screen.getByText('Apple', { exact: true }), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeVisible();
+    fireEvent.click(within(backpack).getByRole('button', { name: 'Collapse contents' }));
+    expect(screen.getByText('1 selected')).toBeVisible();
+    expect(row('Tent')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('a press outside the panel clears the selection and a deep-link highlight', () => {
+    const onDismissAnchor = vi.fn();
+    renderPanel('tent', { canWrite: true, onDismissAnchor });
+    fireEvent.click(screen.getByText('Backpack', { exact: true }));
+    expect(screen.getByText('1 selected')).toBeVisible();
+
+    // Presses inside the panel, including its toolbar, keep the selection.
+    fireEvent.pointerDown(screen.getByRole('searchbox', { name: 'Filter inventory' }));
+    expect(screen.getByText('1 selected')).toBeVisible();
+    expect(onDismissAnchor).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside the inventory' }));
+    expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+    expect(row('Backpack')).toHaveAttribute('aria-selected', 'false');
+    expect(onDismissAnchor).toHaveBeenCalledTimes(1);
+    expect(row('Tent')).not.toHaveClass('outline-primary');
+  });
+});
+
+describe('Inventory group by type', () => {
+  function openItemTypeMenu(tableName: string) {
+    const table = screen.getByRole('table', { name: tableName });
+    const heading = within(table).getByRole('button', { name: 'Sort by Item' }).closest('th');
+    if (!heading) throw new Error('Item heading missing');
+    fireEvent.contextMenu(heading);
+    return screen.getByRole('dialog', { name: 'Filter Item type' });
+  }
+
+  it('groups each list into folding type sections that are not containers', () => {
+    const first = renderPanel(undefined, { canWrite: true });
+    const menu = openItemTypeMenu('Carried inventory');
+    const toggle = within(menu).getByRole('switch', { name: 'Group by type' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked();
+    fireEvent.click(within(menu).getByRole('button', { name: 'Close filter' }));
+
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
+    expect(
+      within(carried)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Weapon', 'Container', 'Other']);
+    // Nested items are listed in their own type with their container named.
+    expect(within(row('Broadsword')).getByText('in Backpack')).toBeVisible();
+    expect(within(row('Moon Gem')).getByText('in Small pouch')).toBeVisible();
+    expect(within(carried).queryByRole('button', { name: 'Expand contents' })).toBeNull();
+    // The other list keeps its own choice.
+    const stashed = screen.getByRole('table', { name: 'Stashed inventory' });
+    expect(within(stashed).queryAllByRole('rowheader')).toHaveLength(0);
+
+    fireEvent.click(screen.getByText('Broadsword', { exact: true }));
+    fireEvent.click(screen.getByText('Apple', { exact: true }), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeVisible();
+    fireEvent.click(within(carried).getByRole('button', { name: 'Collapse Weapon' }));
+    expect(screen.getByText('Broadsword', { exact: true })).not.toBeVisible();
+    expect(within(carried).getByLabelText('1 item')).toBeVisible();
+    expect(screen.getByText('1 selected')).toBeVisible();
+    expect(row('Apple')).toHaveAttribute('aria-selected', 'true');
+
+    first.unmount();
+    renderPanel(undefined, { canWrite: true });
+    const remembered = screen.getByRole('table', { name: 'Carried inventory' });
+    expect(within(remembered).getAllByRole('rowheader')).toHaveLength(3);
+    expect(screen.getByText('Broadsword', { exact: true })).not.toBeVisible();
+    expect(within(remembered).getByRole('button', { name: 'Expand Weapon' })).toBeVisible();
+  });
+
+  it('reveals a deep-linked item in a collapsed section and shows only search matches', () => {
+    window.localStorage.setItem(`gurps:inventoryGroupByType:${CHARACTER_ID}:worn`, 'true');
+    window.localStorage.setItem(
+      `gpc:inventory-type-group-expanded:${CHARACTER_ID}:worn:Other`,
+      'false',
+    );
+    const linked = renderPanel('gem');
+    expect(screen.getByText('Moon Gem', { exact: true })).toBeVisible();
+    linked.unmount();
+
+    renderPanel();
+    expect(screen.getByText('Moon Gem', { exact: true })).not.toBeVisible();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter inventory' }), {
+      target: { value: 'gem' },
+    });
+    const carried = screen.getByRole('table', { name: 'Carried inventory' });
+    expect(screen.getByText('Moon Gem', { exact: true })).toBeVisible();
+    expect(screen.queryByText('Backpack', { exact: true })).not.toBeInTheDocument();
+    expect(
+      within(carried)
+        .getAllByRole('rowheader')
+        .filter((header) => !header.closest('tbody')?.hidden)
+        .map((header) => header.textContent),
+    ).toEqual(['Other']);
   });
 });
 
@@ -332,7 +536,7 @@ describe('InventoryPanel filtering', () => {
     expect(screen.getByText('1 of 6')).toBeVisible();
   });
 
-  it('retains nested selection and an open editor when an ancestor is collapsed', () => {
+  it('deselects nested items but retains an open editor when an ancestor is collapsed', () => {
     const pouchWeapon = item('gem', 'Moon Gem', 'pouch', { weapon: true });
     pouchWeapon.weaponData = {
       damage: 'sw+1 cut',
@@ -382,7 +586,7 @@ describe('InventoryPanel filtering', () => {
     fireEvent.click(within(packRow).getByRole('button', { name: 'Expand contents' }));
 
     expect(gemRow).toBeVisible();
-    expect(gemRow).toHaveAttribute('aria-selected', 'true');
+    expect(gemRow).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('region', { name: 'Moon Gem: Weapon' })).toBeVisible();
     expect(screen.getByLabelText('Damage', { exact: true })).toHaveValue('sw+2 cut');
   });

@@ -201,7 +201,8 @@ export function inventoryInsertValues(
     notes: body.notes ?? null,
     parentId: body.parentId ?? null,
     externalLocation: body.externalLocation ?? null,
-    worn: body.worn ?? false,
+    // An equipped item must be on the player, so it is carried unless told otherwise.
+    worn: body.worn ?? (body.equipped === true && !body.parentId && !body.externalLocation),
     equipped: body.equipped ?? false,
     isContainer: body.isContainer ?? false,
     hideawayCapacityLbs: String(body.hideawayCapacityLbs ?? 0),

@@ -294,7 +294,9 @@ with `rangeStep` filters a numeric column with a two-thumb slider from zero to
 the column's current highest value, plus exact minimum/maximum inputs; a thumb
 left at either end leaves that bound open so new extremes are not hidden.
 `filterLabel` names what a heading filters when it differs from the column
-title (Inventory's Item heading filters **Item type**). Filtering
+title (Inventory's Item heading filters **Item type**). A heading's `grouping`
+adds a presentation-only switch above that filter's values (Inventory's
+**Group by type**); the table owner decides what grouping renders. Filtering
 preferences are device-local and scoped by character/campaign/table identity,
 never server fields or outbox operations. Action columns are ordinary headers.
 
@@ -434,10 +436,18 @@ inventory toolbar opens the add form in a modal dialog; a successful add closes
 it. The form has one Location selector with those choices and defaults to On
 the player. The selection summary and bulk actions (**N selected**, Clear,
 Equipped, Move to, Delete) share that toolbar row with the name search rather
-than adding another bar. Inventory is not folded: the sheet tab already titles
+than adding another bar. While anything is selected, that toolbar sticks below
+the sheet's sticky header and status bar, so selecting a row far down a long
+list and choosing **Move to** never needs a drag or a scroll back to the top.
+Selection, like a deep link's highlight, belongs to what is visible: collapsing a
+container or type section deselects the items it hides and clears a deep link
+inside it, and a press anywhere outside the inventory panel (portaled overlays
+from the panel count as inside) clears both. A deep link reveals its target's
+containers without locking them open. Inventory is not folded: the sheet tab already titles
 it, so it renders without a `FoldSection` disclosure. Carried contents inherit their root's
-location. Equipped means worn or wielded for use; there is no additional Worn
-control, filter or status badge. The stored/API `worn` field remains a legacy
+location. Equipped means worn or wielded for use and is valid only on the
+player; the add form disables Equipped for a Stashed or stashed-container
+location. There is no additional Worn control, filter or status badge. The stored/API `worn` field remains a legacy
 root-location flag for compatibility, not an equipment status. Every applied
 category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
 Magic item, Enchantments); no category is hidden by a priority icon. Category
@@ -495,8 +505,17 @@ weight), and a multi-unit row shows its single-item price as “ea”. Wt sorts 
 the weight the row shows. The Item heading's filter selects item types, derived
 from the item category list (`inventory/itemCategories.ts`) plus **Other** for
 items without a category, so a new category joins the filter automatically.
-Equipped is not a type; it has its own icon. Qty, Wt and Cost filter with the
-shared range filter. There is no separate tag selector in the toolbar. Below
+Equipped is not a type; it has its own icon. The same filter menu's **Group by
+type** switch replaces a list's container tree with folding type sections
+(category order, then Other). Each item appears once, under its first category,
+wherever it is nested, with its container named (“in Backpack”) on the row.
+Sections are a view only: they are never drop targets, move targets or API
+containers. Like containers they fold with a chevron, show their item count when
+collapsed, remember the fold per character, list and type on this device, open
+while searching or filtering, and open to reveal a deep-linked item; searching
+lists only direct matches. Each list keeps its own grouping choice as a
+device-local preference cleared at logout, and sections follow the list's sort.
+Qty, Wt and Cost filter with the shared range filter. There is no separate tag selector in the toolbar. Below
 640px the headings stay visible as one compact row so phones can sort and filter. Category chips remain the
 route to category editors. **+ Category** lives in the item-details editor the
 pencil opens, rather than repeating on every row.

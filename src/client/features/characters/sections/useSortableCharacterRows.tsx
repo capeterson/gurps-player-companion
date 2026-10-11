@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TableHeader } from '../../../components/ui/Table.tsx';
+import { type TableColumnGrouping, TableHeader } from '../../../components/ui/Table.tsx';
 import type { TablePreferences } from './tablePreferences.ts';
 
 type Comparator<Row> = (left: Row, right: Row) => number;
@@ -123,6 +123,7 @@ export function SortableHeader<Sort extends string>({
   filterable = true,
   filterLabel,
   rangeStep,
+  grouping,
 }: {
   label: string;
   sort: Exclude<Sort, 'custom'>;
@@ -134,6 +135,7 @@ export function SortableHeader<Sort extends string>({
   filterable?: boolean;
   filterLabel?: string;
   rangeStep?: number;
+  grouping?: TableColumnGrouping;
 }) {
   const active = preferences.sort === sort;
   const alignRight = headerClassName.includes('text-right');
@@ -156,6 +158,7 @@ export function SortableHeader<Sort extends string>({
       label={label}
       {...(filterLabel ? { filterLabel } : {})}
       {...(rangeStep ? { rangeStep } : {})}
+      {...(grouping ? { grouping } : {})}
       scope="col"
       className={headerClassName}
       aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}

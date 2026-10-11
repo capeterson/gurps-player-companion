@@ -57714,7 +57714,7 @@
     },
     {
       "name": "character_inventory",
-      "description": "create: Add an inventory item (owner only)\ndelete: Delete an inventory item (owner only). Children are reparented to the item parent.\nupdate: Update an inventory item (owner only)",
+      "description": "create: Add an inventory item (owner only). Equipped means worn or wielded, so an equipped item must be on the player: at the root with `worn` true and no external location, or inside a container on the player. Omitted `worn` defaults to true for an equipped root item.\ndelete: Delete an inventory item (owner only). Children are reparented to the item parent.\nupdate: Update an inventory item (owner only). Equipping an item that is not on the player is rejected; moving an item off the player unequips it and its contents.",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -57801,8 +57801,7 @@
                     ]
                   },
                   "worn": {
-                    "type": "boolean",
-                    "default": false
+                    "type": "boolean"
                   },
                   "equipped": {
                     "type": "boolean",
@@ -59149,8 +59148,7 @@
                     ]
                   },
                   "worn": {
-                    "type": "boolean",
-                    "default": false
+                    "type": "boolean"
                   },
                   "equipped": {
                     "type": "boolean",

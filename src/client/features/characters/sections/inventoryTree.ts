@@ -88,6 +88,17 @@ export function sortInventoryTree(
   stashed: boolean,
   costTotals: ReadonlyMap<string, number>,
 ): Map<string | null, InventoryItemOut[]> {
+  const compare = inventoryComparator(sort, descending, stashed, costTotals);
+  return new Map([...byParent].map(([parentId, bucket]) => [parentId, [...bucket].sort(compare)]));
+}
+
+/** The column sort shared by container contents and type sections; ties use the name. */
+export function inventoryComparator(
+  sort: InventorySort,
+  descending: boolean,
+  stashed: boolean,
+  costTotals: ReadonlyMap<string, number>,
+): (a: InventoryItemOut, b: InventoryItemOut) => number {
   const value = (item: InventoryItemOut): number =>
     sort === 'qty'
       ? item.quantity
@@ -96,11 +107,39 @@ export function sortInventoryTree(
         : (costTotals.get(item.id) ?? item.cost * item.quantity);
   const byName = (a: InventoryItemOut, b: InventoryItemOut) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-  const compare = (a: InventoryItemOut, b: InventoryItemOut) => {
+  return (a, b) => {
     const primary = sort === 'item' ? byName(a, b) : value(a) - value(b);
     return (descending ? -primary : primary) || byName(a, b);
   };
-  return new Map([...byParent].map(([parentId, bucket]) => [parentId, [...bucket].sort(compare)]));
+}
+
+export interface InventoryTypeGroup {
+  /** An item category label, or Other. */
+  readonly type: string;
+  readonly items: readonly InventoryItemOut[];
+}
+
+/**
+ * Type sections for one list. Presentation only: every item appears once,
+ * under its first category, wherever it is nested. Sections never become
+ * containers, and empty sections are omitted.
+ */
+export function groupInventoryByType(
+  items: readonly InventoryItemOut[],
+  compare: (a: InventoryItemOut, b: InventoryItemOut) => number,
+): InventoryTypeGroup[] {
+  const order = [...Object.values(CATEGORY_LABELS), INVENTORY_OTHER_TYPE] as string[];
+  const byType = new Map<string, InventoryItemOut[]>();
+  for (const item of items) {
+    const type = inventoryTypeLabels(item)[0] ?? INVENTORY_OTHER_TYPE;
+    const bucket = byType.get(type);
+    if (bucket) bucket.push(item);
+    else byType.set(type, [item]);
+  }
+  return order.flatMap((type) => {
+    const bucket = byType.get(type);
+    return bucket ? [{ type, items: [...bucket].sort(compare) }] : [];
+  });
 }
 
 /**
