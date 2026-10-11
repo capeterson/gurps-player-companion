@@ -3,6 +3,7 @@ import type { DamageDice } from '../constants/damage.ts';
 import {
   type DamageMode,
   canTargetVitals,
+  convertDamageAdds,
   formatDamageDice,
   minBasicDamageFor,
   parseDamageSpec,
@@ -208,4 +209,75 @@ describe('minBasicDamageFor', () => {
     expect(minBasicDamageFor('IMP')).toBe(1);
     expect(minBasicDamageFor(null)).toBe(0);
   });
+});
+
+describe('B269 Modifying Dice + Adds', () => {
+  it.each([
+    [2, 5, 3, 1],
+    [1, 6, 2, 2],
+    [2, 7, 4, 0],
+    [2, 8, 4, 1],
+    [2, 11, 5, 0],
+    [2, 3, 2, 3],
+    [2, -1, 2, -1],
+  ])('converts %id%+i into %id%+i', (dice, adds, finalDice, finalAdds) => {
+    const converted = convertDamageAdds({ dice, adds });
+    expect(converted).toEqual({ dice: finalDice, adds: finalAdds });
+    expect(convertDamageAdds(converted)).toEqual(converted);
+  });
+
+  it('resolves Raphaël’s ST 15 swing and Pride’s Remedy without changing the source', () => {
+    const [mode] = parseDamageSpec('sw+4 cut');
+    if (!mode) throw new Error('Missing mode');
+    const thrust = { dice: 1, adds: 1 };
+    const swing = { dice: 2, adds: 1 };
+    expect(resolveDamage(mode, thrust, swing)?.dice).toEqual({ dice: 2, adds: 5 });
+    expect(resolveDamage(mode, thrust, swing, { convertAddsToDice: true })?.dice).toEqual({
+      dice: 3,
+      adds: 1,
+    });
+    expect(mode.raw).toBe('sw+4 cut');
+    expect(swing).toEqual({ dice: 2, adds: 1 });
+  });
+
+  it('uses original basic dice for per-die bonuses and converts only after all adds', () => {
+    const [mode] = parseDamageSpec('sw+4 cut');
+    if (!mode) throw new Error('Missing mode');
+    const result = resolveDamage(
+      mode,
+      { dice: 1, adds: 1 },
+      { dice: 2, adds: 1 },
+      {
+        perDieBonus: 2,
+        flatBonus: 2,
+        convertAddsToDice: true,
+      },
+    );
+    // 2d+1 +4 + (2 original dice ×2) +2 = 2d+11 -> 5d.
+    expect(result?.dice).toEqual({ dice: 5, adds: 0 });
+  });
+
+  it('converts explicit dice after bonuses, retaining type and divisor in separate modes', () => {
+    const modes = parseDamageSpec('2d+3(2) cut / 1d+3 burn');
+    const before = JSON.stringify(modes);
+    const resolved = modes.map((mode) =>
+      resolveDamage(mode, null, null, {
+        flatBonus: 1,
+        convertAddsToDice: true,
+      }),
+    );
+    expect(resolved).toMatchObject([
+      { dice: { dice: 3, adds: 0 }, type: 'cut', armorDivisor: '2' },
+      { dice: { dice: 2, adds: 0 }, type: 'burn', armorDivisor: null },
+    ]);
+    expect(JSON.stringify(modes)).toBe(before);
+  });
+
+  it.each(['2d+5x2 cut', 'special', '2d+5 cut + 1d burn', '2d+5 cut ×2'])(
+    'leaves unsupported compound/multiplier notation unresolved: %s',
+    (raw) => {
+      for (const mode of parseDamageSpec(raw))
+        expect(resolveDamage(mode, null, null, { convertAddsToDice: true })).toBeNull();
+    },
+  );
 });

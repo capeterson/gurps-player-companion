@@ -14,6 +14,8 @@ export type HouseRuleSet = z.infer<typeof houseRuleSet>;
 export const campaignHouseRules = z
   .object({
     ruleSet: houseRuleSet.default('custom'),
+    /** B269: omission follows the selected ruleset; explicit false is retained. */
+    convertDamageAddsToDice: z.boolean().optional(),
     protectNaturalDr: z.boolean().default(true),
     /** Standard B286 layer limits; on unless a GM waives them. */
     armorLayeringLimits: z.boolean().default(true),

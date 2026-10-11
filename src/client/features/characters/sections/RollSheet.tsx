@@ -29,7 +29,7 @@ import {
   HIT_LOCATION_AIM_PENALTY,
   type HitLocation,
 } from '../../../../shared/constants/hitLocations.ts';
-import { minBasicDamageFor } from '../../../../shared/domain/damageParse.ts';
+import { convertDamageAdds, minBasicDamageFor } from '../../../../shared/domain/damageParse.ts';
 import {
   type CritKind,
   evaluateRoll,
@@ -158,9 +158,11 @@ export function RollSheet({ request, characterId, onClose }: RollSheetProps) {
     request.baseTarget + modifier + ruleBonus + rangeMod + aimMod + locationMod,
   );
   // For damage rolls the modifier is flat adds on top of the dice.
-  const effectiveDice = damage
-    ? { dice: damage.dice.dice, adds: damage.dice.adds + modifier }
-    : null;
+  const baseDice = damage?.unconvertedDice ?? damage?.dice;
+  const modifiedDice = baseDice ? { dice: baseDice.dice, adds: baseDice.adds + modifier } : null;
+  // Re-resolve from the original adds, never feed converted dice back into B269.
+  const effectiveDice =
+    modifiedDice && damage?.unconvertedDice ? convertDamageAdds(modifiedDice) : modifiedDice;
   const damageSuffix = damage
     ? `${damage.damageType ? ` ${damage.damageType}` : ''}${damage.armorDivisor ? ` (${damage.armorDivisor})` : ''}`
     : '';

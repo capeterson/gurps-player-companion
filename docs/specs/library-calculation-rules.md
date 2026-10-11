@@ -229,6 +229,14 @@ Power/mana-gated Lighten declaration. No mana also suspends manual resolved
 Lighten, Hideaway and armor Deflect fields. Ordinary sample backpacks record 40 lb
 storage capacity in notes and have no Hideaway.
 
+Final weapon damage uses the shared `damageParse.ts` resolver: ST-based and
+explicit dice receive applicable flat and per-die bonuses before optional B269
+adds-to-dice conversion. Per-die bonuses use the original basic dice count.
+Campaign `convertDamageAddsToDice` overrides the J Talisar default; conversion
+changes roll distribution. Separate parsed damage modes retain types/divisors,
+and unsupported composite/multiplier notation stays raw. Inventory strings,
+enchantments and the ST table are never rewritten to implement conversion.
+
 Weapon modes optionally record `weaponSt` separately from `stRequired`, and
 `strengthKind` distinguishes ordinary, bow, crossbow and natural attacks.
 Ordinary melee ST-based damage caps ST at 3× MinST (B270); natural weapons are

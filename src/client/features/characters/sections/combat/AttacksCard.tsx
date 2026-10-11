@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatDamageDice, parseDerivedDamage } from '../../../../../shared/constants/damage.ts';
+import { convertsDamageAddsToDice } from '../../../../../shared/domain/campaignRules.ts';
 import { combatAdjustments } from '../../../../../shared/domain/combatAdjustments.ts';
 import {
   canTargetVitals,
@@ -314,8 +315,6 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                       thrust,
                       swing,
                     );
-                    const resolved = resolveDamage(mode, bases.thrust, bases.swing);
-                    if (!resolved) return line.damage ?? '—';
                     const damageEffects = weaponEffectsForRow(
                       effects,
                       w.id,
@@ -324,10 +323,11 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                       line.modeKey,
                       line.weaponMode ? (line.weaponMode.skill ?? null) : (wd.skill ?? null),
                     );
-                    return formatDamageDice({
-                      ...resolved.dice,
-                      adds: resolved.dice.adds + effectTotal(damageEffects),
+                    const resolved = resolveDamage(mode, bases.thrust, bases.swing, {
+                      flatBonus: effectTotal(damageEffects),
+                      convertAddsToDice: convertsDamageAddsToDice(character.houseRules),
                     });
+                    return resolved ? formatDamageDice(resolved.dice) : (line.damage ?? '—');
                   }),
                   reach: lines.map((line) => line.reach ?? '—'),
                 }}
@@ -422,10 +422,13 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     thrust,
                     swing,
                   );
-                  const resolved = mode ? resolveDamage(mode, bases.thrust, bases.swing) : null;
-                  const finalDice = resolved
-                    ? { ...resolved.dice, adds: resolved.dice.adds + effectTotal(damageEffects) }
+                  const resolved = mode
+                    ? resolveDamage(mode, bases.thrust, bases.swing, {
+                        flatBonus: effectTotal(damageEffects),
+                        convertAddsToDice: convertsDamageAddsToDice(character.houseRules),
+                      })
                     : null;
+                  const finalDice = resolved?.dice ?? null;
                   const dice = finalDice ? formatDamageDice(finalDice) : null;
                   const effectiveDivisor = w.effectiveArmorDivisor ?? resolved?.armorDivisor;
                   const divisor = effectiveDivisor ? ` (${effectiveDivisor})` : '';
@@ -560,6 +563,9 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                                 baseTarget: 0,
                                 damage: {
                                   dice: finalDice,
+                                  ...(convertsDamageAddsToDice(character.houseRules)
+                                    ? { unconvertedDice: resolved.unconvertedDice }
+                                    : {}),
                                   damageType: resolved.type,
                                   armorDivisor:
                                     effectiveDivisor == null ? null : String(effectiveDivisor),
@@ -578,7 +584,10 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                         {resolved && finalDice && (
                           <ModifierBreakdown
                             baseLabel="Parsed damage"
-                            baseValue={formatDamageDice(resolved.dice)}
+                            baseValue={formatDamageDice({
+                              ...resolved.unconvertedDice,
+                              adds: resolved.unconvertedDice.adds - effectTotal(damageEffects),
+                            })}
                             weaponEffects={damageEffects}
                             finalValue={formatDamageDice(finalDice)}
                           />
