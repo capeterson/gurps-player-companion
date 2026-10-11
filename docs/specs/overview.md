@@ -903,7 +903,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     edits, and are not server-synced (`combat/attackTablePreferences.ts`). New
     equipped weapons append to custom order. Resolved damage dice (ST
     thrust/swing + the weapon's modifiers + weapon-scoped damage effects, or
-    fixed dice + weapon-scoped damage effects) are **tappable buttons that
+    fixed dice + weapon-scoped damage effects) apply optional B269 **Convert damage
+    adds to dice** last. Its stored override defaults on for J Talisar and off
+    otherwise; explicit false survives readback/import. Per-die bonuses use the
+    original basic dice. Types/divisors and separate modes remain independent;
+    unsupported expressions and recorded weapon/enchantment data stay unchanged.
+    The same dice power combat displays, previews and rolls. Damage chips are **tappable buttons that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
     1-point floor from B378), reach, an ST-shortfall badge/caption
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
@@ -930,6 +935,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     The **damage** variant (triggered by a `RollRequest.damage` payload,
     e.g. from an Attacks card damage chip) rolls NdM+adds instead of
     3d6-vs-target: the stepper adjusts flat adds, presets are hidden,
+    and B269-enabled requests retain the pre-conversion damage so situational
+    changes convert once after all adds,
     and the result shows the individual dice plus total with no
     success/crit call. The sheet's Skills and Magic tabs share the same
     roll sheet (`.RollSheet` / `RollableRow` live under `sections/`) so

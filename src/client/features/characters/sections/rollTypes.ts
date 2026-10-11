@@ -19,6 +19,8 @@ export interface RollPreset {
 /** Payload turning a RollRequest into a damage roll (NdM+adds, no target). */
 export interface DamageRollSpec {
   readonly dice: DamageDice;
+  /** When B269 is enabled, retain all pre-conversion adds for situational changes. */
+  readonly unconvertedDice?: DamageDice;
   readonly damageType: string | null;
   readonly armorDivisor: string | null;
 }

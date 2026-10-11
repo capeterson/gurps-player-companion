@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
+import { normalizeHouseRuleSettings } from '../../shared/domain/campaignRules.ts';
 import {
   addMemberRequest,
   campaignCreate,
@@ -202,7 +202,7 @@ router.openapi(
           disadvantageCap: body.disadvantageCap ?? null,
           quirkCap: body.quirkCap ?? 5,
           ...(body.houseRules !== undefined
-            ? { houseRules: applyHouseRuleSet(body.houseRules, body.houseRules.ruleSet) }
+            ? { houseRules: normalizeHouseRuleSettings(body.houseRules) }
             : {}),
           ...(body.manaLevel !== undefined ? { manaLevel: body.manaLevel } : {}),
           ...(body.techLevel !== undefined ? { techLevel: body.techLevel } : {}),
@@ -302,7 +302,7 @@ router.openapi(
             ...body,
             ...(body.houseRules === undefined
               ? {}
-              : { houseRules: applyHouseRuleSet(body.houseRules, body.houseRules.ruleSet) }),
+              : { houseRules: normalizeHouseRuleSettings(body.houseRules) }),
           }),
         )
         .where(eq(campaigns.id, id))

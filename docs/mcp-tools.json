@@ -3099,6 +3099,9 @@
                           ],
                           "default": "custom"
                         },
+                        "convertDamageAddsToDice": {
+                          "type": "boolean"
+                        },
                         "protectNaturalDr": {
                           "type": "boolean",
                           "default": true
@@ -3370,6 +3373,9 @@
                           "custom"
                         ],
                         "default": "custom"
+                      },
+                      "convertDamageAddsToDice": {
+                        "type": "boolean"
                       },
                       "protectNaturalDr": {
                         "type": "boolean",
@@ -3653,6 +3659,9 @@
                           "custom"
                         ],
                         "default": "custom"
+                      },
+                      "convertDamageAddsToDice": {
+                        "type": "boolean"
                       },
                       "protectNaturalDr": {
                         "type": "boolean",
@@ -4198,6 +4207,9 @@
                           "custom"
                         ],
                         "default": "custom"
+                      },
+                      "convertDamageAddsToDice": {
+                        "type": "boolean"
                       },
                       "protectNaturalDr": {
                         "type": "boolean",
@@ -39751,6 +39763,9 @@
                               "custom"
                             ],
                             "default": "custom"
+                          },
+                          "convertDamageAddsToDice": {
+                            "type": "boolean"
                           },
                           "protectNaturalDr": {
                             "type": "boolean",

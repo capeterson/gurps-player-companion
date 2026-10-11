@@ -797,3 +797,53 @@ describe('AttacksCard', () => {
     expect(openRoll.mock.calls[1]?.[0].attack.canTargetVitals).toBe(true);
   });
 });
+
+it.each([false, true])(
+  'displays and rolls Pride’s Remedy with conversion %s without editing inventory',
+  (enabled) => {
+    const character = makeCharacter('sw+4 cut', { name: 'Pride’s Remedy' });
+    character.derived = { ...character.derived, effectiveSt: 15, thrust: '1d+1', swing: '2d+1' };
+    character.houseRules = {
+      ruleSet: 'j_talisar',
+      convertDamageAddsToDice: enabled,
+    } as CharacterDetail['houseRules'];
+    const original = JSON.stringify(character.inventory);
+    const openRoll = vi.fn();
+    render(<AttacksCard character={character} openRoll={openRoll} />);
+    fireEvent.click(screen.getByRole('button', { name: enabled ? '3d+1 cut' : '2d+5 cut' }));
+    expect(openRoll.mock.calls.at(-1)?.[0].damage.dice).toEqual(
+      enabled ? { dice: 3, adds: 1 } : { dice: 2, adds: 5 },
+    );
+    expect(JSON.stringify(character.inventory)).toBe(original);
+  },
+);
+
+it('converts fixed dice after weapon bonuses and keeps a fire component separate', () => {
+  const character = makeCharacter('2d+3(2) cut / 1d+3 burn');
+  character.houseRules = { ruleSet: 'j_talisar' } as CharacterDetail['houseRules'];
+  character.effects = [
+    {
+      target: 'weapon_damage',
+      value: 1,
+      active: true,
+      matchedInventoryItemIds: ['w1'],
+      sourceName: 'Bonus',
+      sourceId: 'bonus',
+      sourceKind: 'trait',
+    },
+  ] as CharacterDetail['effects'];
+  const openRoll = vi.fn();
+  render(<AttacksCard character={character} openRoll={openRoll} />);
+  fireEvent.click(screen.getByRole('button', { name: '3d cut (2)' }));
+  expect(openRoll.mock.calls.at(-1)?.[0].damage).toMatchObject({
+    dice: { dice: 3, adds: 0 },
+    damageType: 'cut',
+    armorDivisor: '2',
+  });
+  fireEvent.click(screen.getByRole('button', { name: '2d burn' }));
+  expect(openRoll.mock.calls.at(-1)?.[0].damage).toMatchObject({
+    dice: { dice: 2, adds: 0 },
+    damageType: 'burn',
+    armorDivisor: null,
+  });
+});

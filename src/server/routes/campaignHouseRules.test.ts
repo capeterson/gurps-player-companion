@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import {
   HOUSE_RULE_DEFINITIONS,
   HOUSE_RULE_SET_VALUES,
+  convertsDamageAddsToDice,
 } from '../../shared/domain/campaignRules.ts';
 import type { CampaignOut } from '../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../shared/schemas/character.ts';
@@ -65,6 +66,68 @@ describe('campaign house rules', () => {
     expect(saved.houseRules.forbidAcidMagic).toBe(false);
     expect(saved.houseRules.forbidDistantBlow).toBe(true);
     expect(saved.houseRules.eyeMissHitsFace).toBe(true);
+  });
+
+  it('retains explicit B269 overrides in named presets through REST, cursor, details and YAML import/export', async () => {
+    const owner = await user();
+    const campaign = (await (
+      await request(owner.accessToken, '/campaigns', 'POST', {
+        name: 'B269 overrides',
+        houseRules: { ruleSet: 'j_talisar', convertDamageAddsToDice: false },
+      })
+    ).json()) as CampaignOut;
+    expect(campaign.houseRules).toMatchObject({
+      ruleSet: 'j_talisar',
+      convertDamageAddsToDice: false,
+    });
+    expect(convertsDamageAddsToDice(campaign.houseRules)).toBe(false);
+    for (const [ruleSet, enabled] of [
+      ['none', true],
+      ['j_talisar', false],
+    ] as const) {
+      const updated = await request(owner.accessToken, `/campaigns/${campaign.id}`, 'PATCH', {
+        houseRules: { ruleSet, convertDamageAddsToDice: enabled },
+      });
+      expect(updated.status).toBe(200);
+      const read = (await (
+        await request(owner.accessToken, `/campaigns/${campaign.id}`)
+      ).json()) as CampaignOut;
+      expect(read.houseRules).toMatchObject({ ruleSet, convertDamageAddsToDice: enabled });
+      const exported = await request(owner.accessToken, `/campaigns/${campaign.id}/library/export`);
+      const yaml = await exported.text();
+      expect(parseLibraryYaml(yaml).campaign?.houseRules?.convertDamageAddsToDice).toBe(enabled);
+      const imported = await request(
+        owner.accessToken,
+        `/campaigns/${campaign.id}/library/import`,
+        'POST',
+        {
+          yaml,
+          applyCampaignSettings: true,
+        },
+      );
+      expect(imported.status).toBe(200);
+      expect(
+        (await (await request(owner.accessToken, `/campaigns/${campaign.id}`)).json()).houseRules,
+      ).toMatchObject({ ruleSet, convertDamageAddsToDice: enabled });
+    }
+    const cursor = await request(owner.accessToken, '/sync/cursor', 'POST', {
+      cursors: [{ entityClass: 'campaign', sinceRevision: campaign.revision }],
+    });
+    expect(
+      ((await cursor.json()) as SyncCursorResponse).changes.find(
+        (change) => change.entityId === campaign.id,
+      ),
+    ).toMatchObject({
+      data: { houseRules: { ruleSet: 'j_talisar', convertDamageAddsToDice: false } },
+    });
+    const character = (await (
+      await request(owner.accessToken, '/characters', 'POST', {
+        name: 'Raphaël',
+        st: 15,
+        campaignId: campaign.id,
+      })
+    ).json()) as CharacterDetail;
+    expect(character.houseRules.convertDamageAddsToDice).toBe(false);
   });
 
   it('defaults on; owner updates persist in REST, cursor, character details, history, and YAML', async () => {
@@ -135,6 +198,7 @@ describe('campaign house rules', () => {
     expect(forbidden.status).toBe(403);
     for (const houseRules of [
       { protectNaturalDr: 'false' },
+      { convertDamageAddsToDice: 'false' },
       { unrecognizedRule: true },
       { limitationCapPercent: 150 },
       null,

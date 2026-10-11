@@ -76,6 +76,27 @@ The default-on `enforceAttributeCaps`
 campaign rule is stored separately and is therefore enabled regardless of
 which house-rule set is selected.
 
+**Convert damage adds to dice** is the optional B269 “Modifying Dice + Adds”
+rule. `houseRules.convertDamageAddsToDice` is an optional stored boolean;
+the effective value is `convertDamageAddsToDice ?? (ruleSet === 'j_talisar')`.
+Legacy J Talisar records without the field are therefore on; other legacy records
+and campaignless characters are off. Explicit true/false overrides survive API
+normalization, readback, cursor replication, and YAML settings import/export,
+including when the stored preset remains J Talisar or None. Selecting a named
+bundle deliberately loads its default; switching to Custom preserves the current
+effective value. The checkbox shows that effective value. The help text states
+that conversion changes the roll distribution.
+
+Weapon damage resolves ST and all bonuses before conversion. Every +7 becomes
++2d, followed by +1d for a remainder of at least +4, subtracting 4 adds. Smaller
+positive and negative adds stay unchanged. Per-die bonuses use the original basic
+dice count. Combat chips, table filters, the roll dialog preview and actual rolls
+share the resolved dice. Situational roll adds re-resolve from the retained
+pre-conversion damage. Parsed slash-separated modes remain independent with
+their types and armor divisors; unsupported composite or multiplier notation is
+left as raw text without conversion. Neither the ST table nor weapon/enchantment
+records are rewritten.
+
 `houseRules.protectNaturalDr` remains on in the legacy/default Custom state. It
 exempts innate DR (all active `dr` effects, including tough skin) and natural
 skull DR from armor-piercing divisors and Ignore DR. Worn armor still divides,

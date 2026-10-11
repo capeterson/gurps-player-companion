@@ -18,6 +18,7 @@ import {
   type NumberHouseRuleDefinition,
   type NumberHouseRuleKey,
   applyHouseRuleSet,
+  convertsDamageAddsToDice,
   customizeHouseRule,
   isNumberHouseRule,
 } from '../../../shared/domain/campaignRules.ts';
@@ -596,7 +597,11 @@ export function CampaignSettingsDialog({
                                 <input
                                   type="checkbox"
                                   className="checkbox checkbox-sm mt-0.5"
-                                  checked={houseRules[rule.key]}
+                                  checked={
+                                    rule.key === 'convertDamageAddsToDice'
+                                      ? convertsDamageAddsToDice(houseRules)
+                                      : houseRules[rule.key]
+                                  }
                                   disabled={houseRules.ruleSet !== 'custom'}
                                   onChange={(e) =>
                                     setHouseRules((current) =>

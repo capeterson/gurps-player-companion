@@ -271,3 +271,29 @@ describe('RollSheet', () => {
     expect(screen.queryByText('1d-4 imp')).not.toBeInTheDocument();
   });
 });
+
+it('rolls the converted preview and re-resolves situational adds from the original damage', () => {
+  vi.spyOn(Math, 'random').mockReturnValue(0);
+  const request: RollRequest = {
+    label: 'Pride’s Remedy damage',
+    baseTarget: 0,
+    damage: {
+      dice: { dice: 3, adds: 1 },
+      unconvertedDice: { dice: 2, adds: 5 },
+      damageType: 'cut',
+      armorDivisor: '2',
+    },
+  };
+  render(<RollSheet request={request} characterId="char-1" onClose={() => {}} />);
+  expect(screen.getByLabelText('Damage formula 3d+1 cut (2)')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Roll 3d+1' }));
+  expect(screen.getByText('3d+1 cut (2)')).toBeVisible();
+  const history = renderHook(() => useRollHistory('char-1'));
+  expect(history.result.current[0]).toMatchObject({ dice: [1, 1, 1], total: 4 });
+  fireEvent.click(screen.getByLabelText('Increase damage adds'));
+  fireEvent.click(screen.getByLabelText('Increase damage adds'));
+  // 2d+5 +2 = 2d+7 -> 4d; converting already converted 3d+1 would give 3d+3.
+  expect(screen.getByLabelText('Damage formula 4d cut (2)')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Roll 4d' }));
+  expect(history.result.current[0]).toMatchObject({ dice: [1, 1, 1, 1], total: 4 });
+});

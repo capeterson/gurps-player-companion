@@ -6,7 +6,7 @@ import {
 
 export type HouseRuleKey = Exclude<keyof CampaignHouseRules, 'ruleSet'>;
 type KeysOfType<T> = {
-  [K in HouseRuleKey]: CampaignHouseRules[K] extends T ? K : never;
+  [K in HouseRuleKey]-?: NonNullable<CampaignHouseRules[K]> extends T ? K : never;
 }[HouseRuleKey];
 export type ToggleHouseRuleKey = KeysOfType<boolean>;
 export type NumberHouseRuleKey = KeysOfType<number>;
@@ -44,7 +44,19 @@ export function isNumberHouseRule(
   return typeof definition.standard === 'number';
 }
 
+/** Effective B269 policy, including legacy campaigns with no stored override. */
+export function convertsDamageAddsToDice(rules?: Partial<CampaignHouseRules> | null): boolean {
+  return rules?.convertDamageAddsToDice ?? rules?.ruleSet === 'j_talisar';
+}
+
 export const HOUSE_RULE_DEFINITIONS: readonly HouseRuleDefinition[] = [
+  {
+    key: 'convertDamageAddsToDice',
+    label: 'Convert damage adds to dice',
+    description:
+      'Use the optional Modifying Dice + Adds rule (B269): each +7 becomes +2d, then a remaining +4 or more becomes +1d with 4 subtracted from the adds. Apply per-die bonuses using the original basic dice first. This changes the roll distribution, rather than merely formatting the same roll.',
+    group: 'Combat',
+  },
   {
     key: 'protectNaturalDr',
     label: 'Armor penetration leaves natural DR intact',
@@ -242,7 +254,12 @@ export function applyHouseRuleSet(
   nextSet: HouseRuleSet,
 ): CampaignHouseRules {
   const normalized = campaignHouseRules.parse(current);
-  if (nextSet === 'custom') return { ...normalized, ruleSet: 'custom' };
+  if (nextSet === 'custom')
+    return {
+      ...normalized,
+      convertDamageAddsToDice: convertsDamageAddsToDice(normalized),
+      ruleSet: 'custom',
+    };
   return { ...HOUSE_RULE_SET_VALUES[nextSet] };
 }
 
@@ -251,5 +268,19 @@ export function customizeHouseRule<K extends HouseRuleKey>(
   key: K,
   value: CampaignHouseRules[K],
 ): CampaignHouseRules {
-  return { ...campaignHouseRules.parse(current), ruleSet: 'custom', [key]: value };
+  return {
+    ...campaignHouseRules.parse(current),
+    convertDamageAddsToDice: convertsDamageAddsToDice(current),
+    ruleSet: 'custom',
+    [key]: value,
+  };
+}
+
+/** Normalize API/import preset bundles without discarding the optional B269 override. */
+export function normalizeHouseRuleSettings(current: CampaignHouseRules): CampaignHouseRules {
+  if (current.ruleSet === 'custom') return campaignHouseRules.parse(current);
+  const preset = applyHouseRuleSet(current, current.ruleSet);
+  return current.convertDamageAddsToDice === undefined
+    ? preset
+    : { ...preset, convertDamageAddsToDice: current.convertDamageAddsToDice };
 }

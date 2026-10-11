@@ -116,19 +116,50 @@ export function parseDamageSpec(raw: string): DamageMode[] {
   return modes;
 }
 
+/** B269 optional conversion. Only positive, integral adds are convertible. */
+export function convertDamageAdds(damage: DamageDice): DamageDice {
+  if (!Number.isSafeInteger(damage.adds) || damage.adds < 4) return damage;
+  const pairs = Math.floor(damage.adds / 7);
+  const remainder = damage.adds % 7;
+  return {
+    dice: damage.dice + pairs * 2 + (remainder >= 4 ? 1 : 0),
+    adds: remainder >= 4 ? remainder - 4 : remainder,
+  };
+}
+
+export interface DamageResolutionOptions {
+  readonly flatBonus?: number;
+  /** B269: use the basic dice count before any adds are converted. */
+  readonly perDieBonus?: number;
+  readonly convertAddsToDice?: boolean;
+}
+
 /**
  * Resolve a parsed `DamageMode` against a character's thrust/swing
- * dice, folding the mode's `+N`/`-N` add into the result. Explicit
- * dice modes (e.g. "2d(2) pi") pass through unchanged (their own adds
- * are already baked into `base`). Returns `null` only for an
- * unresolvable base, which should not occur for anything
- * `parseDamageSpec` produced.
+ * dice, folding the mode's adds and supplied bonuses into the result, then
+ * optionally converting positive adds under B269. Explicit dice receive the
+ * same bonuses and conversion. Returns null for an unavailable base or, when
+ * conversion is enabled, unsupported compound/multiplier notation. Retains the
+ * pre-conversion damage for situational roll modifiers.
  */
 export function resolveDamage(
   mode: DamageMode,
   thrust: DamageDice | null,
   swing: DamageDice | null,
-): { dice: DamageDice; type: string | null; armorDivisor: string | null } | null {
+  options: DamageResolutionOptions = {},
+): {
+  dice: DamageDice;
+  unconvertedDice: DamageDice;
+  type: string | null;
+  armorDivisor: string | null;
+} | null {
+  // The lenient parser can retain prose after the first dice token. Do not
+  // reinterpret a compound or multiplied expression as one typed damage roll.
+  if (
+    options.convertAddsToDice &&
+    /(?:\b\d+d\b|(?:^|\s)[+×*]|\bx\s*\d|\b(?:thr|sw)(?=[+\s-]))/i.test(mode.type ?? '')
+  )
+    return null;
   let dice: DamageDice;
   if (mode.base === 'thr') {
     if (!thrust) return null;
@@ -142,7 +173,14 @@ export function resolveDamage(
     return null;
   }
 
-  return { dice, type: mode.type, armorDivisor: mode.armorDivisor };
+  // Resolve all bonuses once, before optional conversion. Never mutate the base.
+  dice = {
+    dice: dice.dice,
+    adds: dice.adds + (options.flatBonus ?? 0) + dice.dice * (options.perDieBonus ?? 0),
+  };
+  const unconvertedDice = dice;
+  if (options.convertAddsToDice) dice = convertDamageAdds(dice);
+  return { dice, unconvertedDice, type: mode.type, armorDivisor: mode.armorDivisor };
 }
 
 /**

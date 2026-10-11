@@ -45,7 +45,7 @@ import { modifierEntity, sourceEntity } from './campaignLibraryEntities.ts';
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import { applyHouseRuleSet } from '../../shared/domain/campaignRules.ts';
+import { normalizeHouseRuleSettings } from '../../shared/domain/campaignRules.ts';
 import { canonicalLibraryKey } from '../../shared/domain/libraryIdentity.ts';
 import { calculationKey } from '../../shared/schemas/calculation.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
@@ -607,10 +607,7 @@ router.openapi(
         ...(checked.data.houseRules === undefined
           ? {}
           : {
-              houseRules: applyHouseRuleSet(
-                checked.data.houseRules,
-                checked.data.houseRules.ruleSet,
-              ),
+              houseRules: normalizeHouseRuleSettings(checked.data.houseRules),
             }),
       };
     }

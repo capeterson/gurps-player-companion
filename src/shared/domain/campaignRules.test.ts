@@ -4,8 +4,10 @@ import {
   HOUSE_RULE_DEFINITIONS,
   HOUSE_RULE_SET_VALUES,
   applyHouseRuleSet,
+  convertsDamageAddsToDice,
   customizeHouseRule,
   isNumberHouseRule,
+  normalizeHouseRuleSettings,
 } from './campaignRules.ts';
 
 describe('campaign house-rule sets', () => {
@@ -62,5 +64,32 @@ describe('campaign house-rule sets', () => {
     expect(custom.forbidAcidMagic).toBe(false);
     expect(custom.forbidDistantBlow).toBe(true);
     expect(custom.eyeMissHitsFace).toBe(true);
+  });
+});
+
+describe('optional damage-adds policy', () => {
+  it.each(['none', 'custom', 'j_talisar'] as const)(
+    'defaults legacy %s records by ruleset',
+    (ruleSet) => {
+      const rules = campaignHouseRules.parse({ ruleSet });
+      expect(rules.convertDamageAddsToDice).toBeUndefined();
+      expect(convertsDamageAddsToDice(rules)).toBe(ruleSet === 'j_talisar');
+      for (const value of [false, true]) {
+        const explicit = campaignHouseRules.parse({ ruleSet, convertDamageAddsToDice: value });
+        expect(convertsDamageAddsToDice(explicit)).toBe(value);
+        expect(convertsDamageAddsToDice(normalizeHouseRuleSettings(explicit))).toBe(value);
+      }
+    },
+  );
+  it('defaults campaignless and empty legacy settings off', () => {
+    expect(convertsDamageAddsToDice()).toBe(false);
+    expect(convertsDamageAddsToDice(campaignHouseRules.parse({}))).toBe(false);
+  });
+  it('keeps an inherited J Talisar value when customizing another option', () => {
+    const legacy = campaignHouseRules.parse({ ruleSet: 'j_talisar' });
+    expect(convertsDamageAddsToDice(applyHouseRuleSet(legacy, 'custom'))).toBe(true);
+    expect(convertsDamageAddsToDice(customizeHouseRule(legacy, 'forbidAcidMagic', false))).toBe(
+      true,
+    );
   });
 });

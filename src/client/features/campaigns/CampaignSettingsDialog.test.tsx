@@ -331,3 +331,57 @@ it('saves a custom limitation cap and rejects one outside 0–100%', async () =>
   );
   await waitFor(() => expect(view.onClose).toHaveBeenCalled());
 });
+
+it.each([
+  ['j_talisar', undefined, true],
+  ['custom', undefined, false],
+  ['none', undefined, false],
+  ['j_talisar', false, false],
+  ['custom', true, true],
+] as const)(
+  'shows the effective damage conversion for %s with override %s',
+  (ruleSet, override, enabled) => {
+    setup('owner', {
+      ...campaign,
+      houseRules: campaignHouseRules.parse({
+        ruleSet,
+        ...(override === undefined ? {} : { convertDamageAddsToDice: override }),
+      }),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+    const control = screen.getByRole('checkbox', { name: /Convert damage adds to dice/ });
+    if (enabled) expect(control).toBeChecked();
+    else expect(control).not.toBeChecked();
+    expect(screen.getByText(/This changes the roll distribution/)).toBeInTheDocument();
+  },
+);
+
+it('saves an explicit disabled conversion and retains it through a refetch', async () => {
+  vi.mocked(api).mockResolvedValue(campaign);
+  const view = setup('owner', {
+    ...campaign,
+    houseRules: campaignHouseRules.parse({ ruleSet: 'j_talisar' }),
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Rules' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'House rule set' }), {
+    target: { value: 'custom' },
+  });
+  const control = screen.getByRole('checkbox', { name: /Convert damage adds to dice/ });
+  expect(control).toBeChecked();
+  fireEvent.click(control);
+  view.rerender(
+    view.component({ ...campaign, houseRules: campaignHouseRules.parse({ ruleSet: 'j_talisar' }) }),
+  );
+  expect(control).not.toBeChecked();
+  fireEvent.click(screen.getByRole('button', { name: /Save/ }));
+  await waitFor(() =>
+    expect(api).toHaveBeenCalledWith(
+      '/campaigns/campaign',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          houseRules: expect.objectContaining({ convertDamageAddsToDice: false }),
+        }),
+      }),
+    ),
+  );
+});
