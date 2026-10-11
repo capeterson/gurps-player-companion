@@ -41,7 +41,7 @@ test('B269 campaign controls, combat preview and actual rolls agree without chan
     },
   });
   expect(weaponResponse.status()).toBe(201);
-  const originalWeapon = await weaponResponse.json();
+  const originalWeapon = (await weaponResponse.json()).item;
 
   await page.goto(`/campaigns/${campaign.id}`);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -110,7 +110,7 @@ test('B269 campaign controls, combat preview and actual rolls agree without chan
     { headers },
   );
   expect(saved.status()).toBe(200);
-  const weapon = await saved.json();
+  const weapon = (await saved.json()).item;
   expect(weapon.weaponData).toEqual(originalWeapon.weaponData);
   expect(weapon.enchantments).toEqual(originalWeapon.enchantments);
 });
