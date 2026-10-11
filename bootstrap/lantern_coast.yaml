@@ -4956,17 +4956,16 @@ library:
     magicItemData:
       spellName: Glimmer Shoal
       spellSkillLevel: 16
-      mode: charged
-      chargesMax: 9
-      chargesCurrent: 3
+      mode: powered
+      energyCost: 2
     key: items_10
     sourceKey: lantern_outfits
     status: complete
     role: definition
     description: |-
-      A slim wand of polished tideglass, charged with Glimmer Shoal.
+      A slim wand of polished tideglass, enchanted with Glimmer Shoal.
 
-      - **Effect:** casts Glimmer Shoal at skill 16 without spending the user's energy; each casting uses one charge.
+      - **Effect:** casts Glimmer Shoal at skill 16; the user pays the spell's normal 2 energy.
     calculation:
       version: 1
       inputs: []

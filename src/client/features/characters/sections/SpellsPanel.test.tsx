@@ -7,7 +7,7 @@ import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { enqueueCreate, enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
-import { SpellsPanel } from './SpellsPanel.tsx';
+import { MagicSection } from './MagicSection.tsx';
 
 const enqueueCreateMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const enqueueDeleteMock = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
@@ -94,7 +94,7 @@ function renderPanel(
     </QueryClientProvider>
   );
   return render(
-    <SpellsPanel
+    <MagicSection
       character={character}
       canWrite={canWrite}
       {...(anchorSpellId !== null ? { anchorSpellId } : {})}
@@ -142,11 +142,11 @@ describe('SpellsPanel reading and table controls', () => {
     expect(dialog).not.toBeVisible();
   });
 
-  it('filters by searchable spell details and sorts visible rows by points', () => {
+  it('filters by searchable spell details and sorts visible rows by cost', () => {
     const spells = [
-      makeSpell(SPELL_ONE, 'Cinder Veil', 4),
-      makeSpell(SPELL_TWO, 'Ember Step', 1),
-      makeSpell(SPELL_ZERO, 'Flame Ward', 2),
+      makeSpell(SPELL_ONE, 'Cinder Veil', 4, 5),
+      makeSpell(SPELL_TWO, 'Ember Step', 1, 1),
+      makeSpell(SPELL_ZERO, 'Flame Ward', 2, 3),
     ];
     renderPanel(makeCharacter(spells), false);
     const table = screen.getByRole('table', { name: 'Spells' });
@@ -161,7 +161,7 @@ describe('SpellsPanel reading and table controls', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.change(search, { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Sort by Points' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Cost' }));
     const groups = [...table.querySelectorAll('tbody[aria-label]')];
     expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
       'Ember Step',
@@ -468,6 +468,105 @@ describe('SpellsPanel row drafts', () => {
     await act(async () => resolveFirst?.());
     await waitFor(() => expect(attempted).toEqual(['Flame Burst', 'Meteor']));
     expect(name).toHaveValue('Meteor');
+  });
+});
+
+describe('Magic section search', () => {
+  it('sits above the spells heading and filters spells and item spells together', () => {
+    const wand = {
+      id: '0193b3c0-f1f0-7000-8000-00000000a2f1',
+      characterId: CHARACTER_ID,
+      name: 'Ash wand',
+      quantity: 1,
+      parentId: null,
+      externalLocation: null,
+      worn: true,
+      notes: null,
+      powerstoneData: null,
+      magicItemData: {
+        spellName: 'Flame Lance',
+        spellSkillLevel: 15,
+        mode: 'powered',
+        energyCost: 2,
+      },
+    };
+    renderPanel(
+      makeCharacter([makeSpell(SPELL_ONE, 'Fireball'), makeSpell(SPELL_TWO, 'Ice Shield')], {
+        inventory: [wand],
+      } as unknown as Partial<CharacterDetail>),
+    );
+    const search = screen.getByRole('searchbox', { name: 'Search spells' });
+    expect(screen.getAllByRole('searchbox')).toHaveLength(1);
+    const heading = screen.getByRole('heading', { name: 'Spells' });
+    expect(search.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.change(search, { target: { value: 'ice' } });
+    expect(screen.getByRole('rowgroup', { name: 'Ice Shield' })).toBeVisible();
+    expect(screen.queryByRole('rowgroup', { name: 'Fireball' })).not.toBeInTheDocument();
+    expect(screen.getByText('No item spells match your search.')).toBeVisible();
+
+    fireEvent.change(search, { target: { value: 'ash wand' } });
+    expect(screen.getByRole('rowgroup', { name: 'Flame Lance from Ash wand' })).toBeVisible();
+    expect(screen.getByText('No spells match your search.')).toBeVisible();
+
+    fireEvent.change(search, { target: { value: 'flame' } });
+    expect(screen.getByRole('rowgroup', { name: 'Flame Lance from Ash wand' })).toBeVisible();
+    expect(screen.queryByRole('rowgroup', { name: 'Ice Shield' })).not.toBeInTheDocument();
+  });
+});
+
+describe('SpellsPanel row layout', () => {
+  it('puts Maintain before Cast with each energy cost on its button', () => {
+    renderPanel(
+      makeCharacter(
+        [makeSpell(SPELL_ONE, 'Fireball', 2, 3, 1), makeSpell(SPELL_TWO, 'Ice Shield', 2, 2, null)],
+        { traits: [{ name: 'Magery', level: 2 }] } as unknown as Partial<CharacterDetail>,
+      ),
+    );
+    expect(screen.getByText(/2 spells · 4 points · Magery 2/)).toBeVisible();
+    expect(screen.queryByText('Normal mana')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sort by Points' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by Duration' })).toBeInTheDocument();
+
+    const fireball = screen.getByRole('rowgroup', { name: 'Fireball' });
+    const summary = within(fireball).getAllByRole('row')[0];
+    if (!summary) throw new Error('Missing Fireball summary row');
+    const labels = within(summary)
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'));
+    expect(labels).toEqual([
+      'Read Fireball',
+      'Roll Fireball',
+      'Maintain Fireball',
+      'Cast Fireball',
+      'Edit Fireball',
+    ]);
+    expect(within(summary).getByRole('button', { name: 'Maintain Fireball' })).toHaveTextContent(
+      'Maintain1',
+    );
+    expect(within(summary).getByRole('button', { name: 'Cast Fireball' })).toHaveTextContent(
+      'Cast3',
+    );
+    expect(summary).toHaveTextContent('Fire · IQ/H · 2 pts');
+    const iceShield = within(screen.getByRole('rowgroup', { name: 'Ice Shield' })).getAllByRole(
+      'row',
+    )[0];
+    if (!iceShield) throw new Error('Missing Ice Shield summary row');
+    expect(
+      within(iceShield).queryByRole('button', { name: 'Maintain Ice Shield' }),
+    ).not.toBeInTheDocument();
+    expect(within(iceShield).getByRole('button', { name: 'Cast Ice Shield' })).toBeVisible();
+  });
+
+  it('shows plain upkeep and cost values to read-only viewers', () => {
+    renderPanel(makeCharacter([makeSpell(SPELL_ONE, 'Fireball', 2, 3, 1)]), false);
+    const summary = within(screen.getByRole('rowgroup', { name: 'Fireball' })).getAllByRole(
+      'row',
+    )[0];
+    if (!summary) throw new Error('Missing Fireball summary row');
+    expect(within(summary).queryByRole('button', { name: /Cast|Maintain/ })).toBeNull();
+    const cells = within(summary).getAllByRole('cell');
+    expect(cells.slice(-2).map((cell) => cell.textContent)).toEqual(['1', '3']);
   });
 });
 

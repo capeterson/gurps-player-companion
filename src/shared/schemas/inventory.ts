@@ -258,16 +258,18 @@ export const powerstoneData = z
   });
 
 /**
- * Magic-item metadata -- attached to an inventory item that casts a
- * spell.  Three modes:
- *   `charged`     - a wand-style item with chargesCurrent of N uses
- *   `powered`     - draws from the user's FP/HP each cast (energyCost)
- *   `continuous`  - always-on, no per-use cost
+ * Magic-item metadata -- attached to an inventory item that holds a spell
+ * (M19, Using Magic Items). Two modes:
+ *   `powered`     - the user casts the spell, paying the same energy as a
+ *                   normal casting (`energyCost`, net of any Power, M57)
+ *   `continuous`  - "always on": casts the spell on the wearer at no
+ *                   energy cost while worn or carried
  *
- * `spellSkillLevel` is fixed at the enchanter's skill at creation, so
- * casting from a magic item is independent of the user's own Magery.
+ * `spellSkillLevel` is the item's Power, used as the caster's base skill
+ * (-5 in low mana), so casting from a magic item is independent of the
+ * user's own Magery.
  */
-export const magicItemMode = z.enum(['charged', 'powered', 'continuous']);
+export const magicItemMode = z.enum(['powered', 'continuous']);
 
 export const enchantmentApplicability = z.enum(['weapon', 'armor', 'shield', 'any']);
 export const enchantmentEffectTarget = z.enum([
@@ -369,27 +371,27 @@ export const enchantmentRef = z
   })
   .strict();
 
-export const magicItemData = z
+const magicItemFields = z
   .object({
     spellName: z.string().min(1).max(160),
     spellSkillLevel: z.number().int().min(0).max(40),
     mode: magicItemMode,
-    chargesMax: z.number().int().min(0).max(1000).nullable().optional(),
-    chargesCurrent: z.number().int().min(0).max(1000).nullable().optional(),
     energyCost: z.number().int().min(0).max(99).nullable().optional(),
     notes: z.string().max(2000).nullable().optional(),
   })
-  .strict()
-  .refine(
-    // chargesCurrent must not exceed chargesMax when both are present.
-    // Either field may legitimately be absent on `powered` / `continuous`
-    // items; we only enforce the inequality when both are non-null.
-    (d) => d.chargesCurrent == null || d.chargesMax == null || d.chargesCurrent <= d.chargesMax,
-    {
-      message: 'chargesCurrent must not exceed chargesMax',
-      path: ['chargesCurrent'],
-    },
-  );
+  .strict();
+
+/**
+ * Rows, queued edits and YAML written before the unsupported "charged" mode
+ * was removed are read as ordinary user-powered items without charge counts.
+ */
+function withoutLegacyCharges(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const { chargesMax: _max, chargesCurrent: _current, ...rest } = value as Record<string, unknown>;
+  return rest.mode === 'charged' ? { ...rest, mode: 'powered' } : rest;
+}
+
+export const magicItemData = z.preprocess(withoutLegacyCharges, magicItemFields);
 
 export const enchantmentContribution = z.object({
   /** Optional for compatibility with character details cached before this field existed. */

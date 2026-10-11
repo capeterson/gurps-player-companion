@@ -370,9 +370,8 @@ test('spell list and reference dialog stay contained across mobile, tablet, and 
   const spellRow = page.getByRole('rowgroup', { name: spellName });
   await expect(spellRow).toBeVisible();
 
-  const spellSection = page
-    .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Known spells' }) });
+  const spellSection = page.getByRole('region', { name: 'Spellbook' });
+  await expect(spellSection).toBeVisible();
   await expect(spellSection.locator('.overflow-x-auto')).toHaveCount(0);
 
   for (const width of [320, 390, 639, 640, 641, 1023, 1024, 1025, 1279, 1280, 1281]) {
@@ -385,7 +384,7 @@ test('spell list and reference dialog stay contained across mobile, tablet, and 
     expect(tableBox.x + tableBox.width).toBeLessThanOrEqual(width + 1);
     const summaryRow = spellRow.getByRole('row').first();
     const firstCell = summaryRow.locator('td').first();
-    const levelCell = summaryRow.locator('td').nth(2);
+    const levelCell = summaryRow.locator('td').nth(1);
     const firstCellBox = await firstCell.boundingBox();
     const levelCellBox = await levelCell.boundingBox();
     if (!firstCellBox || !levelCellBox) throw new Error(`Spell columns are missing at ${width}px`);
@@ -491,6 +490,210 @@ test('spell list and reference dialog stay contained across mobile, tablet, and 
 
   const maintainableRow = page.getByRole('rowgroup', { name: maintainableSpellName });
   await expect(maintainableRow).toBeVisible();
+  // Maintain precedes Cast, so Cast keeps the same column in every spell row.
+  const maintainBox = await maintainableRow
+    .getByRole('button', { name: `Maintain ${maintainableSpellName}` })
+    .boundingBox();
+  const maintainableCastBox = await maintainableRow
+    .getByRole('button', { name: `Cast ${maintainableSpellName}` })
+    .boundingBox();
+  const plainCastBox = await page
+    .getByRole('rowgroup', { name: spellName })
+    .getByRole('button', { name: `Cast ${spellName}` })
+    .boundingBox();
+  if (!maintainBox || !maintainableCastBox || !plainCastBox)
+    throw new Error('Spell row actions have no bounds at 640px');
+  expect(maintainBox.x + maintainBox.width).toBeLessThanOrEqual(maintainableCastBox.x);
+  expect(Math.abs(maintainableCastBox.x - plainCastBox.x)).toBeLessThanOrEqual(1);
+  // Level header label and chip share a right edge, and every Cast action
+  // sits on one right edge, across the layout breakpoints.
+  for (const width of [639, 640, 1023, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const spellsTable = page.getByRole('table', { name: 'Spells' });
+    const levelLabelRight = await spellsTable
+      .locator('thead th')
+      .nth(1)
+      .evaluate((header) => {
+        const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          if (node.textContent?.trim() === 'Level') {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return range.getBoundingClientRect().right;
+          }
+        }
+        return null;
+      });
+    const chipBox = await maintainableRow
+      .getByRole('row')
+      .first()
+      .locator('td')
+      .nth(1)
+      .getByRole('button', { name: `Roll ${maintainableSpellName}` })
+      .boundingBox();
+    if (levelLabelRight === null || !chipBox)
+      throw new Error(`Level header label or chip has no bounds at ${width}px`);
+    expect(
+      Math.abs(levelLabelRight - (chipBox.x + chipBox.width)),
+      `Level label vs chip right edge at ${width}px`,
+    ).toBeLessThanOrEqual(3);
+
+    const castButtons = spellsTable.locator('button:visible', { hasText: /^Cast/ });
+    expect(await castButtons.count(), `visible Cast buttons at ${width}px`).toBeGreaterThanOrEqual(
+      2,
+    );
+    const rights = (await castButtons.evaluateAll((buttons) =>
+      buttons.map((button) => button.getBoundingClientRect().right),
+    )) as number[];
+    for (const right of rights) {
+      expect(
+        Math.abs(right - (rights[0] ?? right)),
+        `Cast right edges at ${width}px`,
+      ).toBeLessThanOrEqual(1);
+    }
+  }
+  await page.setViewportSize({ width: 640, height: 800 });
+
+  // A magic item's spell appears in "Item spells"; casting it costs the
+  // spell's normal energy (M19) through the shared payment dialog.
+  const itemToken = await page.evaluate(
+    () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
+  );
+  const itemCharacterId = new URL(characterUrl).pathname.split('/')[2];
+  const itemResponse = await page.request.post(`/api/v1/characters/${itemCharacterId}/inventory`, {
+    headers: { Authorization: `Bearer ${itemToken}` },
+    data: {
+      name: 'Responsive ash wand',
+      worn: true,
+      magicItemData: {
+        spellName: 'Light',
+        spellSkillLevel: 15,
+        mode: 'powered',
+        energyCost: 1,
+      },
+    },
+  });
+  expect(itemResponse.ok(), await itemResponse.text()).toBeTruthy();
+  await page.reload();
+  await selectCharacterSection(page, 'Magic');
+  const itemSpells = page.getByRole('table', { name: 'Item spells' });
+  await expect(itemSpells).toBeVisible();
+  const itemRow = itemSpells.getByRole('rowgroup', { name: 'Light from Responsive ash wand' });
+  await expect(itemRow).toBeVisible();
+  await expect(itemRow).not.toContainText(/charge/i);
+  const itemCast = itemRow.getByRole('button', { name: 'Cast Light from Responsive ash wand' });
+  await expect(itemCast).toHaveText(/Cast\s*1/);
+  await itemCast.click();
+  const itemDialog = page.getByRole('dialog', { name: 'Cast Light from Responsive ash wand' });
+  await expect(itemDialog.getByRole('button', { name: 'Pay 1 energy' })).toBeEnabled();
+  await itemDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(itemDialog).not.toBeVisible();
+
+  // Timing and powerstone energy values stay on one line on wide layouts.
+  const stoneResponse = await page.request.post(`/api/v1/characters/${itemCharacterId}/inventory`, {
+    headers: { Authorization: `Bearer ${itemToken}` },
+    data: {
+      name: 'Responsive amber focus',
+      worn: true,
+      powerstoneData: { currentEnergy: 3, maxEnergy: 5 },
+    },
+  });
+  expect(stoneResponse.ok(), await stoneResponse.text()).toBeTruthy();
+  await page.reload();
+  await selectCharacterSection(page, 'Magic');
+  const singleLine = (text: string, scope: import('@playwright/test').Locator) =>
+    scope
+      .getByText(text, { exact: true })
+      .locator('visible=true')
+      .first()
+      .evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const tops = [...range.getClientRects()].map((rect) => rect.top);
+        return tops.length === 0 ? Number.POSITIVE_INFINITY : Math.max(...tops) - Math.min(...tops);
+      });
+  for (const width of [1024, 1600]) {
+    await page.setViewportSize({ width, height: 800 });
+    const timeCell = page
+      .getByRole('rowgroup', { name: maintainableSpellName })
+      .getByRole('row')
+      .first()
+      .getByText('40 seconds', { exact: true })
+      .locator('visible=true')
+      .first();
+    await expect(timeCell).toBeVisible();
+    expect(
+      await timeCell.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const tops = [...range.getClientRects()].map((rect) => rect.top);
+        return tops.length === 0 ? Number.POSITIVE_INFINITY : Math.max(...tops) - Math.min(...tops);
+      }),
+      `Time text vertical spread at ${width}px`,
+    ).toBeLessThan(2);
+    expect(
+      await singleLine('3 / 5', page.getByRole('table', { name: 'Powerstones' })),
+      `energy text vertical spread at ${width}px`,
+    ).toBeLessThan(2);
+  }
+
+  // Right-aligned Item spells headers line up with their values.
+  await page.setViewportSize({ width: 1024, height: 800 });
+  const itemTable = page.getByRole('table', { name: 'Item spells' });
+  const textRight = (scope: import('@playwright/test').Locator, text: string | RegExp) =>
+    scope
+      .getByText(text, typeof text === 'string' ? { exact: true } : {})
+      .locator('visible=true')
+      .first()
+      .evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return Math.max(...[...range.getClientRects()].map((rect) => rect.right));
+      });
+  const costHeaderRight = await textRight(itemTable.locator('thead'), 'Cost');
+  const itemCastBox = await itemRow
+    .getByRole('button', { name: 'Cast Light from Responsive ash wand' })
+    .boundingBox();
+  if (!itemCastBox) throw new Error('Item spell Cast button has no bounds at 1024px');
+  expect(
+    Math.abs(costHeaderRight - (itemCastBox.x + itemCastBox.width)),
+    'Item spells Cost header vs Cast right edge at 1024px',
+  ).toBeLessThanOrEqual(3);
+  const itemLevelHeaderRight = await textRight(itemTable.locator('thead'), 'Level');
+  const itemChipBox = await itemRow
+    .getByRole('button', { name: 'Roll Light from Responsive ash wand' })
+    .boundingBox();
+  if (!itemChipBox) throw new Error('Item spell level chip has no bounds at 1024px');
+  expect(
+    Math.abs(itemLevelHeaderRight - (itemChipBox.x + itemChipBox.width)),
+    'Item spells Level header vs chip right edge at 1024px',
+  ).toBeLessThanOrEqual(3);
+  await page.setViewportSize({ width: 640, height: 800 });
+
+  // One shared search box sits above the Spells heading and filters both tables.
+  for (const width of [390, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const search = page.getByRole('searchbox', { name: 'Search spells' });
+    await expect(search).toHaveCount(1);
+    const searchBox = await search.boundingBox();
+    const headingBox = await page
+      .getByRole('heading', { name: 'Spells', exact: true })
+      .boundingBox();
+    if (!searchBox || !headingBox)
+      throw new Error(`Search or Spells heading has no bounds at ${width}px`);
+    expect(
+      searchBox.y + searchBox.height,
+      `search above heading at ${width}px`,
+    ).toBeLessThanOrEqual(headingBox.y + 1);
+    await search.fill('ash wand');
+    await expect(itemRow).toBeVisible();
+    await expect(page.getByRole('rowgroup', { name: spellName })).toBeHidden();
+    await expect(page.getByRole('rowgroup', { name: maintainableSpellName })).toBeHidden();
+    await search.fill('');
+    await expect(page.getByRole('rowgroup', { name: spellName })).toBeVisible();
+    await expect(page.getByRole('rowgroup', { name: maintainableSpellName })).toBeVisible();
+  }
+  await page.setViewportSize({ width: 640, height: 800 });
   await maintainableRow.getByRole('button', { name: `Edit ${maintainableSpellName}` }).click();
   const maintainableNameInput = page.getByLabel(`${maintainableSpellName} name`);
   await expect(maintainableNameInput).toBeVisible();
@@ -822,7 +1025,9 @@ test('long powerstone and magic-item rows stack their controls on a 320px viewpo
           ]);
           return tableBox && cellBox ? cellBox.width / tableBox.width : 0;
         })
-        .toBeGreaterThanOrEqual(0.6);
+        // Below 640px the controls stack under the row, leaving the label most
+        // of the table; from 640px the Cost and action columns sit inline.
+        .toBeGreaterThanOrEqual(width < 640 ? 0.6 : 0.4);
     }
     if (width === 320 || width === 640) {
       await captureReviewScreenshot(page, {

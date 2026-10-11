@@ -627,8 +627,6 @@ describe('inline inventory editing', () => {
     await user.click(screen.getByRole('button', { name: 'Weapon settings for Coat' }));
     expect(screen.getByLabelText('Shield side')).toHaveTextContent('All directions');
     await user.click(screen.getByRole('button', { name: 'Magic item settings for Coat' }));
-    expect(screen.getByLabelText('Activation')).toHaveTextContent(
-      'Uses chargesUses energyAlways on',
-    );
+    expect(screen.getByLabelText('Activation')).toHaveTextContent('Uses energyAlways on');
   });
 });

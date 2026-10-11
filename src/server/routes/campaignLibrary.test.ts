@@ -1746,9 +1746,8 @@ library:
         magicItemData: {
           spellName: 'Shocking Touch',
           spellSkillLevel: 16,
-          mode: 'charged',
-          chargesMax: 5,
-          chargesCurrent: 5,
+          mode: 'powered',
+          energyCost: 2,
         },
       }),
     });

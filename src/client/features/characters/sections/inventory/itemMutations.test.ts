@@ -198,16 +198,22 @@ describe('inline inventory local mutations', () => {
     await expect(writeItemPath(ID, 'weaponData.stRequired', 2.5, 'ST required')).rejects.toThrow();
   });
 
-  it('requires a real spell name when adding a magic item and preserves charge state on unrelated edits', async () => {
+  it('requires a real spell name when adding a magic item and preserves its energy cost on unrelated edits', async () => {
     await seed();
     await expect(addCategory(ID, 'magicItem')).rejects.toThrow();
     await addCategory(ID, 'magicItem', 'Light');
-    await writeItemPath(ID, 'magicItemData.chargesCurrent', 3, 'Charges');
+    expect((await read()).magicItemData).toEqual({
+      spellName: 'Light',
+      spellSkillLevel: 15,
+      mode: 'powered',
+    });
+    await writeItemPath(ID, 'magicItemData.energyCost', 1, 'Energy cost');
     await writeItemPath(ID, 'magicItemData.notes', 'Silver wand', 'Notes');
     expect((await read()).magicItemData).toMatchObject({
       spellName: 'Light',
-      chargesCurrent: 3,
-      chargesMax: 10,
+      mode: 'powered',
+      energyCost: 1,
+      notes: 'Silver wand',
     });
   });
 

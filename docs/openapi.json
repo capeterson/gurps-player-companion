@@ -8458,22 +8458,9 @@
                   "mode": {
                     "type": "string",
                     "enum": [
-                      "charged",
                       "powered",
                       "continuous"
                     ]
-                  },
-                  "chargesMax": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 1000
-                  },
-                  "chargesCurrent": {
-                    "type": "integer",
-                    "nullable": true,
-                    "minimum": 0,
-                    "maximum": 1000
                   },
                   "energyCost": {
                     "type": "integer",
@@ -9837,22 +9824,9 @@
                     "mode": {
                       "type": "string",
                       "enum": [
-                        "charged",
                         "powered",
                         "continuous"
                       ]
-                    },
-                    "chargesMax": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 1000
-                    },
-                    "chargesCurrent": {
-                      "type": "integer",
-                      "nullable": true,
-                      "minimum": 0,
-                      "maximum": 1000
                     },
                     "energyCost": {
                       "type": "integer",
@@ -20814,22 +20788,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -27491,22 +27452,9 @@
                       "mode": {
                         "type": "string",
                         "enum": [
-                          "charged",
                           "powered",
                           "continuous"
                         ]
-                      },
-                      "chargesMax": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
-                      },
-                      "chargesCurrent": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
                       },
                       "energyCost": {
                         "type": "integer",
@@ -28329,22 +28277,9 @@
                             "mode": {
                               "type": "string",
                               "enum": [
-                                "charged",
                                 "powered",
                                 "continuous"
                               ]
-                            },
-                            "chargesMax": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
-                            },
-                            "chargesCurrent": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
                             },
                             "energyCost": {
                               "type": "integer",
@@ -29290,22 +29225,9 @@
                       "mode": {
                         "type": "string",
                         "enum": [
-                          "charged",
                           "powered",
                           "continuous"
                         ]
-                      },
-                      "chargesMax": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
-                      },
-                      "chargesCurrent": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
                       },
                       "energyCost": {
                         "type": "integer",
@@ -30125,22 +30047,9 @@
                             "mode": {
                               "type": "string",
                               "enum": [
-                                "charged",
                                 "powered",
                                 "continuous"
                               ]
-                            },
-                            "chargesMax": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
-                            },
-                            "chargesCurrent": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
                             },
                             "energyCost": {
                               "type": "integer",
@@ -41459,22 +41368,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -45250,22 +45146,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -49308,22 +49191,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -51211,22 +51081,9 @@
                       "mode": {
                         "type": "string",
                         "enum": [
-                          "charged",
                           "powered",
                           "continuous"
                         ]
-                      },
-                      "chargesMax": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
-                      },
-                      "chargesCurrent": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
                       },
                       "energyCost": {
                         "type": "integer",
@@ -52040,22 +51897,9 @@
                             "mode": {
                               "type": "string",
                               "enum": [
-                                "charged",
                                 "powered",
                                 "continuous"
                               ]
-                            },
-                            "chargesMax": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
-                            },
-                            "chargesCurrent": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
                             },
                             "energyCost": {
                               "type": "integer",
@@ -55434,22 +55278,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -59237,22 +59068,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -63031,22 +62849,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -67727,22 +67532,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -72444,22 +72236,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -76237,22 +76016,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -80567,22 +80333,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -84917,22 +84670,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -88710,22 +88450,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -92669,22 +92396,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -96650,22 +96364,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -100443,22 +100144,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -104347,22 +104035,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -108273,22 +107948,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -112066,22 +111728,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -115989,22 +115638,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -119933,22 +119569,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -123726,22 +123349,9 @@
                               "mode": {
                                 "type": "string",
                                 "enum": [
-                                  "charged",
                                   "powered",
                                   "continuous"
                                 ]
-                              },
-                              "chargesMax": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              "chargesCurrent": {
-                                "type": "integer",
-                                "nullable": true,
-                                "minimum": 0,
-                                "maximum": 1000
                               },
                               "energyCost": {
                                 "type": "integer",
@@ -125491,22 +125101,9 @@
                       "mode": {
                         "type": "string",
                         "enum": [
-                          "charged",
                           "powered",
                           "continuous"
                         ]
-                      },
-                      "chargesMax": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
-                      },
-                      "chargesCurrent": {
-                        "type": "integer",
-                        "nullable": true,
-                        "minimum": 0,
-                        "maximum": 1000
                       },
                       "energyCost": {
                         "type": "integer",
@@ -126323,22 +125920,9 @@
                             "mode": {
                               "type": "string",
                               "enum": [
-                                "charged",
                                 "powered",
                                 "continuous"
                               ]
-                            },
-                            "chargesMax": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
-                            },
-                            "chargesCurrent": {
-                              "type": "integer",
-                              "nullable": true,
-                              "minimum": 0,
-                              "maximum": 1000
                             },
                             "energyCost": {
                               "type": "integer",
@@ -129717,22 +129301,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -133627,22 +133198,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -137423,22 +136981,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",
@@ -141217,22 +140762,9 @@
                                   "mode": {
                                     "type": "string",
                                     "enum": [
-                                      "charged",
                                       "powered",
                                       "continuous"
                                     ]
-                                  },
-                                  "chargesMax": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
-                                  },
-                                  "chargesCurrent": {
-                                    "type": "integer",
-                                    "nullable": true,
-                                    "minimum": 0,
-                                    "maximum": 1000
                                   },
                                   "energyCost": {
                                     "type": "integer",

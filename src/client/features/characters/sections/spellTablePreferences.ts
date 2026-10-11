@@ -1,8 +1,8 @@
 import { tablePreferencesCodec } from './tablePreferences.ts';
-export type SpellSort = 'custom' | 'name' | 'points' | 'level' | 'cost' | 'upkeep' | 'time';
+export type SpellSort = 'custom' | 'name' | 'level' | 'time' | 'duration' | 'upkeep' | 'cost';
 const codec = tablePreferencesCodec<SpellSort>(
   'gurps:spellTable:',
-  ['name', 'points', 'level', 'cost', 'upkeep', 'time'],
+  ['name', 'level', 'time', 'duration', 'upkeep', 'cost'],
   'name',
 );
 export const readSpellTablePreferences = codec.read;

@@ -5,10 +5,15 @@ import { inventoryAvailability } from '../../../../shared/domain/inventoryAvaila
 import {
   characterMagicTraits,
   hasMagery,
+  magicItemSkill,
   spellFpRecovery,
 } from '../../../../shared/domain/spellCalc.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
-import type { InventoryItemOut, PowerstoneData } from '../../../../shared/schemas/inventory.ts';
+import type {
+  InventoryItemOut,
+  MagicItemData,
+  PowerstoneData,
+} from '../../../../shared/schemas/inventory.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
 import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { useDialogState } from '../../../hooks/useDialogState.ts';
@@ -17,14 +22,25 @@ import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatch, newBatchId } from '../../../sync/outbox.ts';
 import { useCombatPatch } from './useCombatPatch.ts';
 
-interface CastSpellDialogProps {
-  character: CharacterDetail;
-  spell: SpellOut;
-  /** 'cast' pays the casting cost; 'maintain' pays the per-interval
-   * maintenance cost to keep an already-running spell up. */
-  mode?: 'cast' | 'maintain';
-  onClose(): void;
+/** A magic item whose user casts its spell, paying a normal casting's energy (M19). */
+export interface ItemSpellSource {
+  item: InventoryItemOut;
+  data: MagicItemData;
 }
+
+type CastSpellDialogProps = {
+  character: CharacterDetail;
+  onClose(): void;
+} & (
+  | {
+      spell: SpellOut;
+      /** 'cast' pays the casting cost; 'maintain' pays the per-interval
+       * maintenance cost to keep an already-running spell up. */
+      mode?: 'cast' | 'maintain';
+      itemSource?: never;
+    }
+  | { itemSource: ItemSpellSource; spell?: never; mode?: never }
+);
 
 interface Allocation {
   fromFp: number;
@@ -93,19 +109,32 @@ export function CastSpellDialog({
   character,
   spell,
   mode = 'cast',
+  itemSource,
   onClose,
 }: CastSpellDialogProps) {
   const ref = useDialogState(true);
   const toasts = useToasts();
   const patchCombat = useCombatPatch(character);
 
-  const maintaining = mode === 'maintain';
-  const seedCost = maintaining ? (spell.effectiveMaintenanceCost ?? 0) : spell.effectiveCost;
+  // Defined whenever no item is the source (enforced by the props union).
+  const spellOut = spell as SpellOut;
+  const maintaining = !itemSource && mode === 'maintain';
+  const spellName = itemSource ? itemSource.data.spellName : spellOut.name;
+  const seedCost = itemSource
+    ? (itemSource.data.energyCost ?? 0)
+    : maintaining
+      ? (spellOut.effectiveMaintenanceCost ?? 0)
+      : spellOut.effectiveCost;
   // Energy actually spent this casting.  Seeded from the discounted
   // cost but editable: a critical success costs 0, an ordinary failure
   // costs 1, a critical failure costs the full base cost (B236), and
   // Area / Missile spells scale their cost per casting.
-  const [energyRaw, setEnergyRaw] = useState(String(seedCost));
+  // An item without a recorded cost must not look free: the player enters
+  // the spell's normal casting cost before paying (M19).
+  const costUnrecorded = itemSource != null && itemSource.data.energyCost == null;
+  const seedRaw = costUnrecorded ? '' : String(seedCost);
+  const [energyRaw, setEnergyRaw] = useState(seedRaw);
+  const costEntered = energyRaw.trim() !== '';
   const cost = clamp(Number(energyRaw), 0, 999);
   // A powerstone only powers a spell if the caster is touching it
   // (M69). Carried stones are candidates; the player confirms physical touch.
@@ -133,8 +162,8 @@ export function CastSpellDialog({
   // Re-seed the editable amount if the discounted cost itself shifts
   // (e.g. user edits base cost while the dialog is open in another tab).
   useEffect(() => {
-    setEnergyRaw(String(seedCost));
-  }, [seedCost]);
+    setEnergyRaw(seedRaw);
+  }, [seedRaw]);
 
   // Re-suggest the allocation whenever the amount to spend or the pool
   // sizes shift.
@@ -143,8 +172,9 @@ export function CastSpellDialog({
   }, [cost, fpAvailable, hpAvailable, stones]);
 
   const allocated = totalAllocation(alloc);
+  // Next-turn FP recovery applies to the caster's own spells, not to powering an item.
   const recovery =
-    mode === 'cast'
+    !itemSource && mode === 'cast'
       ? spellFpRecovery(
           character.manaLevel,
           hasMagery(characterMagicTraits(character)),
@@ -177,6 +207,7 @@ export function CastSpellDialog({
       toasts.push('Use only one powerstone per casting (M69).', { kind: 'error' });
       return;
     }
+    if (!costEntered) return;
     if (allocated !== cost) {
       toasts.push(`Allocate exactly ${cost} energy (currently ${allocated}).`, { kind: 'error' });
       return;
@@ -216,10 +247,9 @@ export function CastSpellDialog({
         });
       }
       const verb = maintaining ? 'Maintained' : 'Cast';
+      const subject = itemSource ? `${spellName} from ${itemSource.item.name}` : spellName;
       toasts.push(
-        (cost === 0
-          ? `${verb} ${spell.name} (free).`
-          : `${verb} ${spell.name} for ${cost} energy.`) +
+        (cost === 0 ? `${verb} ${subject} (free).` : `${verb} ${subject} for ${cost} energy.`) +
           (recovery > 0
             ? ` If spent on your turn, at the start of your next turn restore ${recovery} FP manually (up to your maximum).`
             : ''),
@@ -237,49 +267,75 @@ export function CastSpellDialog({
     <dialog
       ref={ref}
       className="modal"
-      aria-label={`${maintaining ? 'Maintain' : 'Cast'} ${spell.name}`}
+      aria-label={
+        itemSource
+          ? `Cast ${spellName} from ${itemSource.item.name}`
+          : `${maintaining ? 'Maintain' : 'Cast'} ${spellName}`
+      }
       onClose={onClose}
       onCancel={onClose}
     >
       <div className="modal-box w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] max-h-[calc(var(--dialog-viewport-height,100dvh)-3rem)] overflow-y-auto bg-base-100 border border-base-300/60 rounded-2xl max-w-xl">
         <h3 className="break-words font-display text-2xl">
-          {maintaining ? `Maintain ${spell.name}` : spell.name}
+          {maintaining ? `Maintain ${spellName}` : spellName}
         </h3>
-        <p className="text-sm text-base-content/70 mt-1 [overflow-wrap:anywhere]">
-          {spell.college ?? 'No college'} · IQ/{spell.difficulty} · effective skill{' '}
-          <span className="num text-base-content">{spell.level ?? '—'}</span>
-          {character.manaLevel !== 'normal' && (
-            <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
-          )}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm [overflow-wrap:anywhere] sm:grid-cols-4">
-          <div>
-            <p className="label-eyebrow">{maintaining ? 'Base upkeep' : 'Base cost'}</p>
-            <p className="num text-xl">
-              {maintaining ? (spell.maintenanceCost ?? 0) : spell.baseEnergyCost}
+        {itemSource ? (
+          <>
+            <p className="text-sm text-base-content/70 mt-1 [overflow-wrap:anywhere]">
+              From {itemSource.item.name} · skill{' '}
+              <span className="num text-base-content">
+                {magicItemSkill(itemSource.data.spellSkillLevel, character.manaLevel)}
+              </span>
+              {character.manaLevel !== 'normal' && (
+                <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
+              )}
             </p>
-          </div>
-          <div>
-            <p className="label-eyebrow">After discount</p>
-            <p className="num text-xl text-primary">{seedCost}</p>
-          </div>
-          <div>
-            <p className="label-eyebrow">{maintaining ? 'Cast cost' : 'Maintain'}</p>
-            <p className="num text-xl">
-              {maintaining
-                ? spell.effectiveCost
-                : spell.effectiveMaintenanceCost != null
-                  ? spell.effectiveMaintenanceCost
-                  : '—'}
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <p className="label-eyebrow">Energy cost</p>
+                <p className="num text-xl text-primary">{costUnrecorded ? '—' : seedCost}</p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-base-content/70 mt-1 [overflow-wrap:anywhere]">
+              {spellOut.college ?? 'No college'} · IQ/{spellOut.difficulty} · effective skill{' '}
+              <span className="num text-base-content">{spellOut.level ?? '—'}</span>
+              {character.manaLevel !== 'normal' && (
+                <> · {MANA_LEVEL_LABELS[character.manaLevel].toLowerCase()}</>
+              )}
             </p>
-          </div>
-          <div>
-            <p className="label-eyebrow">{maintaining ? 'Duration' : 'Casting time'}</p>
-            <p className="text-base-content/80">
-              {(maintaining ? spell.duration : spell.castingTime) ?? '—'}
-            </p>
-          </div>
-        </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 text-sm [overflow-wrap:anywhere] sm:grid-cols-4">
+              <div>
+                <p className="label-eyebrow">{maintaining ? 'Base upkeep' : 'Base cost'}</p>
+                <p className="num text-xl">
+                  {maintaining ? (spellOut.maintenanceCost ?? 0) : spellOut.baseEnergyCost}
+                </p>
+              </div>
+              <div>
+                <p className="label-eyebrow">After discount</p>
+                <p className="num text-xl text-primary">{seedCost}</p>
+              </div>
+              <div>
+                <p className="label-eyebrow">{maintaining ? 'Cast cost' : 'Maintain'}</p>
+                <p className="num text-xl">
+                  {maintaining
+                    ? spellOut.effectiveCost
+                    : spellOut.effectiveMaintenanceCost != null
+                      ? spellOut.effectiveMaintenanceCost
+                      : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="label-eyebrow">{maintaining ? 'Duration' : 'Casting time'}</p>
+                <p className="text-base-content/80">
+                  {(maintaining ? spellOut.duration : spellOut.castingTime) ?? '—'}
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="divider my-3" />
 
@@ -294,23 +350,30 @@ export function CastSpellDialog({
               onChange={(e) => setEnergyRaw(e.target.value)}
             />
           </label>
-          <p className="text-xs text-base-content/60">
-            {maintaining
-              ? 'Paid once per duration interval; a maintenance of 0 keeps the spell up for free.'
-              : character.manaLevel === 'very_high'
-                ? 'Critical success costs 0. Every failure is critical and costs the full base cost; a rolled critical failure causes a spectacular disaster.'
-                : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
-                  'base cost; Area and Missile spells scale with size.'}
-          </p>
+          {costUnrecorded && (
+            <p className="text-xs text-base-content/60">
+              This item has no recorded cost. Enter the spell&apos;s normal casting cost.
+            </p>
+          )}
+          {!itemSource && (
+            <p className="text-xs text-base-content/60">
+              {maintaining
+                ? 'Paid once per duration interval; a maintenance of 0 keeps the spell up for free.'
+                : character.manaLevel === 'very_high'
+                  ? 'Critical success costs 0. Every failure is critical and costs the full base cost; a rolled critical failure causes a spectacular disaster.'
+                  : 'Critical success costs 0, a failure costs 1, a critical failure costs the full ' +
+                    'base cost; Area and Missile spells scale with size.'}
+            </p>
+          )}
         </div>
-        {!maintaining && (
+        {!maintaining && !itemSource && (
           <p className="text-xs text-base-content/50 mb-2">
             Resisted spells: effective skill is capped at 16 against the subject&apos;s resistance
             unless the resistance is higher (Rule of 16, B349).
           </p>
         )}
         <p className="label-eyebrow mb-2">Draw {cost} energy from</p>
-        {character.manaLevel === 'very_high' && (
+        {character.manaLevel === 'very_high' && !itemSource && (
           <p className="text-xs text-base-content/70 mb-2">
             Pay all energy now.{' '}
             {mode === 'maintain'
@@ -398,16 +461,18 @@ export function CastSpellDialog({
           <button
             type="button"
             className="btn btn-primary w-full sm:w-auto"
-            disabled={casting || remaining !== 0}
+            disabled={casting || !costEntered || remaining !== 0}
             onClick={() => void performCast()}
           >
             {casting
               ? 'Paying…'
-              : cost === 0
-                ? maintaining
-                  ? 'Record free maintenance'
-                  : 'Record free cast'
-                : `Pay ${cost} energy`}
+              : !costEntered
+                ? 'Enter energy cost'
+                : cost === 0
+                  ? maintaining
+                    ? 'Record free maintenance'
+                    : 'Record free cast'
+                  : `Pay ${cost} energy`}
           </button>
         </div>
       </div>

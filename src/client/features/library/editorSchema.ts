@@ -138,8 +138,6 @@ const LABELS: Record<string, string> = {
   currentEnergy: 'Starting energy',
   spellName: 'Spell',
   spellSkillLevel: 'Casting skill',
-  chargesMax: 'Maximum charges',
-  chargesCurrent: 'Starting charges',
   energyCost: 'Energy cost',
   spellLevel: 'Item Power',
   level: 'Level',

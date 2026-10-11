@@ -5,6 +5,7 @@ import {
   characterCanCast,
   characterMagicTraits,
   hasMagery,
+  mageryLevel,
 } from '../../../../shared/domain/spellCalc.ts';
 import type { LibrarySpellOut } from '../../../../shared/schemas/campaignLibrary.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
@@ -20,6 +21,11 @@ import { useFlashGroup } from '../../../hooks/useFlashGroup.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import { ModifierBreakdownContent, skillEffectsForRow } from './combat/weaponEffectView.tsx';
+import {
+  MAGIC_ACTION_CLASS,
+  MAGIC_CAST_CLASS,
+  MAGIC_ICON_ACTION_CLASS,
+} from './magicActionStyles.ts';
 import type { RollRequest } from './rollTypes.ts';
 import {
   type SpellSort,
@@ -129,7 +135,7 @@ function AddSpellForm({ characterId, campaignId, canWrite, submission }: AddSpel
   return (
     <form
       {...flashProps}
-      className="field-rollback-flash grid grid-cols-2 gap-2 rounded border border-base-300 bg-base-100/40 p-3 sm:flex sm:flex-wrap sm:items-end"
+      className="field-rollback-flash grid grid-cols-2 items-end gap-2 rounded border border-base-300 bg-base-100/40 p-3 sm:grid-cols-[minmax(0,1fr)_5rem_4.5rem_4.5rem_auto]"
       onSubmit={(e) => {
         e.preventDefault();
         if (!name.trim()) return;
@@ -150,7 +156,7 @@ function AddSpellForm({ characterId, campaignId, canWrite, submission }: AddSpel
         });
       }}
     >
-      <div className="form-control col-span-2 min-w-0 sm:flex-1 sm:min-w-[10rem]">
+      <div className="form-control col-span-2 min-w-0 sm:col-span-5">
         <span className="label-text text-xs" id="add-spell-name-label">
           Spell
         </span>
@@ -194,7 +200,7 @@ function AddSpellForm({ characterId, campaignId, canWrite, submission }: AddSpel
           />
         )}
       </div>
-      <label className="form-control col-span-2 min-w-0 sm:w-32">
+      <label className="form-control col-span-2 min-w-0 sm:col-span-1">
         <span className="label-text text-xs">College</span>
         <input
           className="input input-bordered input-sm w-full min-w-0"
@@ -215,7 +221,7 @@ function AddSpellForm({ characterId, campaignId, canWrite, submission }: AddSpel
           ))}
         </select>
       </label>
-      <label className="form-control min-w-0 sm:w-16">
+      <label className="form-control min-w-0">
         <span className="label-text text-xs">Pts</span>
         <input
           className="input input-bordered input-sm num w-full min-w-0"
@@ -223,7 +229,7 @@ function AddSpellForm({ characterId, campaignId, canWrite, submission }: AddSpel
           onChange={(e) => setPoints(e.target.value)}
         />
       </label>
-      <label className="form-control min-w-0 sm:w-16">
+      <label className="form-control min-w-0">
         <span className="label-text text-xs">Cost</span>
         <input
           className="input input-bordered input-sm num w-full min-w-0"
@@ -260,12 +266,18 @@ interface SpellRowProps {
 function spellFilterValues(spell: SpellOut) {
   return {
     name: spell.name,
-    points: spell.points,
     level: spell.level,
-    cost: spell.effectiveCost,
-    upkeep: spell.effectiveMaintenanceCost,
     time: spell.castingTime,
+    duration: spell.duration,
+    upkeep: spell.effectiveMaintenanceCost,
+    cost: spell.effectiveCost,
   };
+}
+
+const SPELL_COLUMN_COUNT = 7;
+
+function pluralPoints(points: number) {
+  return `${points} ${points === 1 ? 'pt' : 'pts'}`;
 }
 
 function SpellRow({
@@ -335,40 +347,50 @@ function SpellRow({
     characterId,
   });
   const editorId = useId();
-  const actions = (
-    <>
-      <button
-        type="button"
-        className="btn btn-soft btn-sm min-h-11 px-2 text-primary"
-        onClick={() => onCast(spell, 'cast')}
-        disabled={!rowCastable}
-        aria-label={`Cast ${spell.name}`}
-      >
-        Cast
-      </button>
-      {spell.maintenanceCost != null && (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm min-h-11 px-2"
-          onClick={() => onCast(spell, 'maintain')}
-          disabled={!rowCastable}
-          aria-label={`Maintain ${spell.name}`}
-        >
-          Maintain
-        </button>
-      )}
-      <button
-        type="button"
-        className="btn btn-ghost btn-sm btn-square min-h-11 min-w-11"
-        onClick={onToggle}
-        aria-label={`${expanded ? 'Done editing' : 'Edit'} ${spell.name}`}
-        aria-expanded={expanded}
-        aria-controls={editorId}
-      >
-        <AppIcon name={expanded ? 'chevronDown' : 'edit'} size={16} />
-      </button>
-    </>
+  const maintainable = spell.maintenanceCost != null;
+  const upkeep = spell.effectiveMaintenanceCost;
+  const maintainButton = maintainable ? (
+    <button
+      type="button"
+      className={`${MAGIC_ACTION_CLASS} btn-outline min-w-28`}
+      onClick={() => onCast(spell, 'maintain')}
+      disabled={!rowCastable}
+      aria-label={`Maintain ${spell.name}`}
+      title={`${upkeep ?? 0} energy per interval`}
+    >
+      <span>Maintain</span>
+      <span className="num">{upkeep}</span>
+    </button>
+  ) : null;
+  const castButton = (
+    <button
+      type="button"
+      className={MAGIC_CAST_CLASS}
+      onClick={() => onCast(spell, 'cast')}
+      disabled={!rowCastable}
+      aria-label={`Cast ${spell.name}`}
+      title={`${spell.effectiveCost} energy`}
+    >
+      <span>Cast</span>
+      <span className="num">{spell.effectiveCost}</span>
+    </button>
   );
+  const editButton = (
+    <button
+      type="button"
+      className={MAGIC_ICON_ACTION_CLASS}
+      onClick={onToggle}
+      aria-label={`${expanded ? 'Done editing' : 'Edit'} ${spell.name}`}
+      aria-expanded={expanded}
+      aria-controls={editorId}
+    >
+      <AppIcon name={expanded ? 'chevronDown' : 'edit'} size={16} />
+    </button>
+  );
+  const timing = [
+    spell.castingTime ? `${spell.castingTime} to cast` : null,
+    spell.duration ? `lasts ${spell.duration}` : null,
+  ].filter(Boolean);
   return (
     <TableBody
       {...(!highlighted ? { filterValues: spellFilterValues(spell) } : {})}
@@ -384,32 +406,28 @@ function SpellRow({
         <td className="min-w-0 [overflow-wrap:anywhere]">
           <button
             type="button"
-            className="min-h-11 text-left font-medium hover:text-primary hover:underline"
+            className="text-left font-medium hover:text-primary hover:underline pointer-coarse:min-h-11"
             onClick={onReference}
             aria-label={`Read ${spell.name}`}
           >
             {spell.name}
           </button>
           <span className="block text-xs text-base-content/70">
-            {spell.college ?? 'No college'} · IQ/{spell.difficulty}
-            <span className="lg:hidden">
-              {' '}
-              · {spell.points} {spell.points === 1 ? 'pt' : 'pts'}
+            {spell.college ?? 'No college'} · IQ/{spell.difficulty} · {pluralPoints(spell.points)}
+            {spell.level == null && <span className="text-warning"> · Unlearned</span>}
+          </span>
+          {timing.length > 0 && (
+            <span className="block text-xs text-base-content/70 lg:hidden">
+              {timing.join(' · ')}
             </span>
-          </span>
-          <span className="mt-1 block text-xs text-base-content/70 sm:hidden">
-            Cost {spell.effectiveCost} · Upkeep {spell.effectiveMaintenanceCost ?? '—'} ·{' '}
-            {spell.castingTime ?? 'Time not recorded'}
-          </span>
-          <span className="hidden text-xs text-base-content/70 sm:block xl:hidden">
-            {spell.castingTime ?? 'Time not recorded'}
-          </span>
-          {spell.level == null && (
-            <span className="block text-xs text-warning">No points invested — cannot cast</span>
+          )}
+          {!canWrite && (
+            <span className="block text-xs text-base-content/70 sm:hidden">
+              Cost {spell.effectiveCost} · Upkeep {upkeep ?? '—'}
+            </span>
           )}
         </td>
-        <td className="num hidden text-right lg:table-cell">{spell.points}</td>
-        <td className="num text-right">
+        <td className="text-right">
           <RollLevelChip
             level={manaKnown ? spell.level : null}
             name={spell.name}
@@ -423,37 +441,34 @@ function SpellRow({
             onRoll={(level) => onRoll({ label: spell.name, baseTarget: level })}
           />
         </td>
-        <td
-          className="num hidden text-right sm:table-cell"
-          aria-label={`${spell.name} effective cost`}
-        >
-          {spell.effectiveCost}
+        <td className="hidden text-sm break-words lg:table-cell">
+          <span className="block min-w-24">{spell.castingTime ?? '—'}</span>
         </td>
-        <td
-          className="num hidden text-right sm:table-cell"
-          aria-label={`${spell.name} effective upkeep`}
-        >
-          {spell.effectiveMaintenanceCost ?? '—'}
+        <td className="hidden text-sm break-words lg:table-cell">
+          <span className="block min-w-24">{spell.duration ?? '—'}</span>
         </td>
-        <td className="hidden text-xs [overflow-wrap:anywhere] xl:table-cell">
-          {spell.castingTime ?? '—'}
+        <td className="num hidden text-right sm:table-cell">
+          {canWrite ? maintainButton : (upkeep ?? '—')}
         </td>
-        <td className="hidden sm:table-cell">
-          {canWrite && (
-            <div className="flex flex-wrap items-center justify-end gap-1">{actions}</div>
-          )}
+        <td className="num hidden text-right sm:table-cell">
+          {canWrite ? castButton : spell.effectiveCost}
         </td>
+        {canWrite && <td className="hidden px-1 text-right sm:table-cell">{editButton}</td>}
       </tr>
       {canWrite && (
         <tr className="sm:hidden">
-          <td colSpan={7} className="pt-0">
-            <div className="flex flex-wrap items-center gap-1">{actions}</div>
+          <td colSpan={SPELL_COLUMN_COUNT} className="pt-0">
+            <div className="flex flex-wrap items-center justify-end gap-1">
+              {maintainButton}
+              {castButton}
+              {editButton}
+            </div>
           </td>
         </tr>
       )}
       {canWrite && (
         <tr id={editorId} hidden={!expanded}>
-          <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
+          <td colSpan={SPELL_COLUMN_COUNT} className="bg-base-200 p-3 sm:p-4">
             <div className="mb-3 flex justify-end">
               <button type="button" className="btn btn-ghost btn-sm min-h-11" onClick={onToggle}>
                 Done
@@ -623,19 +638,19 @@ function manaNotice(
 ) {
   if (!manaKnown) {
     return {
-      tone: 'text-base-content/60',
+      tone: 'alert-info',
       text: 'Campaign mana level not synced yet — casting is disabled until it loads.',
     };
   }
   if (mana === 'none') {
     return {
-      tone: 'text-error',
+      tone: 'alert-error',
       text: 'This campaign is a no-mana zone: spells cannot be cast at all here.',
     };
   }
   if (mana === 'low') {
     return {
-      tone: characterHasMagery ? 'text-base-content/60' : 'text-warning',
+      tone: characterHasMagery ? 'alert-info' : 'alert-warning',
       text: characterHasMagery
         ? 'Low mana: −5 to every spell is already included in the levels below.'
         : 'Low mana (−5 already included below) — and without Magery this character cannot cast here at all.',
@@ -643,7 +658,7 @@ function manaNotice(
   }
   if (mana === 'high' || mana === 'very_high') {
     return {
-      tone: 'text-base-content/60',
+      tone: 'alert-info',
       text:
         mana === 'very_high'
           ? 'Very high mana: pay energy up front. Mages recover personal FP spent casting on their own turn at the start of their next turn; Maintenance FP, HP and powerstone energy are not refunded. Every failure is critical; a rolled critical failure causes a spectacular disaster.'
@@ -652,7 +667,7 @@ function manaNotice(
   }
   if (!characterHasMagery) {
     return {
-      tone: 'text-warning',
+      tone: 'alert-warning',
       text:
         'No Magery trait detected. In normal mana only characters with Magery (even Magery 0) ' +
         'can cast spells, and spells have no default skill. Levels below assume Magery 0 — add ' +
@@ -662,41 +677,32 @@ function manaNotice(
   return null;
 }
 
-export function SpellsPanel({
-  character,
-  canWrite,
-  anchorSpellId = null,
-}: {
+interface SpellsPanelProps {
   character: CharacterDetail;
   canWrite: boolean;
   anchorSpellId?: string | null;
-}) {
-  return (
-    <SpellsTable
-      key={character.id}
-      character={character}
-      canWrite={canWrite}
-      anchorSpellId={anchorSpellId}
-    />
-  );
+  /** The Magic section's shared search, which also filters item spells. */
+  query: string;
+  onQueryChange(query: string): void;
+}
+
+export function SpellsPanel({ anchorSpellId = null, ...props }: SpellsPanelProps) {
+  return <SpellsTable key={props.character.id} anchorSpellId={anchorSpellId} {...props} />;
 }
 
 function SpellsTable({
   character,
   canWrite,
   anchorSpellId,
-}: {
-  character: CharacterDetail;
-  canWrite: boolean;
-  anchorSpellId: string | null;
-}) {
+  query,
+  onQueryChange: setQuery,
+}: SpellsPanelProps & { anchorSpellId: string | null }) {
   const [casting, setCasting] = useState<{ spell: SpellOut; mode: 'cast' | 'maintain' } | null>(
     null,
   );
   const [referenceId, setReferenceId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [query, setQuery] = useState('');
   const [revealedAnchor, setRevealedAnchor] = useState<string | null>(null);
   const revealingAnchor = !!anchorSpellId && anchorSpellId !== revealedAnchor;
   useEffect(() => {
@@ -708,7 +714,7 @@ function SpellsTable({
       setQuery('');
       setRevealedAnchor(anchorSpellId);
     }
-  }, [anchorSpellId, revealingAnchor]);
+  }, [anchorSpellId, revealingAnchor, setQuery]);
   const addId = useId();
   const submission = useAddEntityForm({
     entityClass: 'character_spell',
@@ -724,12 +730,12 @@ function SpellsTable({
       savePreferences: saveSpellTablePreferences,
       comparators: {
         name: (a, b) => compareTableText(a.name, b.name),
-        points: (a, b) => a.points - b.points,
         level: (a, b) => compareOptionalLevel(a.level, b.level),
         cost: (a, b) => a.effectiveCost - b.effectiveCost,
         upkeep: (a, b) =>
           compareOptionalLevel(a.effectiveMaintenanceCost, b.effectiveMaintenanceCost),
         time: (a, b) => compareTableText(a.castingTime ?? '', b.castingTime ?? ''),
+        duration: (a, b) => compareTableText(a.duration ?? '', b.duration ?? ''),
       },
       matchesSearch: (spell, search) =>
         `${spell.name} ${spell.college ?? ''} ${spell.notes ?? ''}`
@@ -749,7 +755,9 @@ function SpellsTable({
   useEffect(() => {
     setPendingRoll((pending) => (pending?.context === rollContext ? pending : null));
   }, [rollContext]);
-  const characterHasMagery = hasMagery(characterMagicTraits(character));
+  const magicTraits = characterMagicTraits(character);
+  const characterHasMagery = hasMagery(magicTraits);
+  const magery = characterHasMagery ? mageryLevel(magicTraits) : null;
   const notice = manaNotice(character.manaLevel, character.manaLevelKnown, characterHasMagery);
   const castable = characterCanCast(character);
   const reference = character.spells.find((spell) => spell.id === referenceId);
@@ -765,6 +773,7 @@ function SpellsTable({
           <p className="text-xs text-base-content/60">
             {character.spells.length} {character.spells.length === 1 ? 'spell' : 'spells'} ·{' '}
             {totalPoints} points
+            {magery != null && <> · Magery {magery}</>}
           </p>
         </div>
         {canWrite && (
@@ -787,19 +796,9 @@ function SpellsTable({
           submission={submission}
         />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <input
-          type="search"
-          aria-label="Search spells"
-          placeholder="Search spells…"
-          className="input input-sm min-h-11 w-full min-w-0 sm:max-w-sm"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <p className={`text-xs ${notice?.tone ?? 'text-base-content/60'}`}>
-          {notice?.text ?? 'Normal mana'}
-        </p>
-      </div>
+      {notice && (
+        <div className={`alert alert-soft py-2 text-sm ${notice.tone}`}>{notice.text}</div>
+      )}
       {saveFailed && (
         <p className="text-xs text-warning">
           Spell sorting works, but could not be remembered on this device.
@@ -815,50 +814,58 @@ function SpellsTable({
           aria-label="Spells"
         >
           <caption className="sr-only">
-            Character spells. Names open reference details. Levels open rolls. Costs are energy
-            after skill discounts.
+            Character spells. Names open reference details. Levels open rolls. Upkeep and cost are
+            energy after skill discounts.
           </caption>
           <thead>
             <tr>
-              <SortableHeader label="Spell" sort="name" preferences={preferences} onSort={sortBy} />
               <SortableHeader
-                label="Points"
-                sort="points"
+                label="Spell"
+                sort="name"
                 preferences={preferences}
                 onSort={sortBy}
-                headerClassName="hidden w-16 text-right lg:table-cell"
+                headerClassName="w-full"
               />
               <SortableHeader
                 label="Level"
                 sort="level"
                 preferences={preferences}
                 onSort={sortBy}
-                headerClassName="w-14 text-right"
+                headerClassName="w-16 text-right"
               />
               <SortableHeader
-                label="Cost"
-                sort="cost"
+                label="Time"
+                sort="time"
                 preferences={preferences}
                 onSort={sortBy}
-                headerClassName="hidden w-16 text-right sm:table-cell"
+                headerClassName="hidden w-28 lg:table-cell"
+              />
+              <SortableHeader
+                label="Duration"
+                sort="duration"
+                preferences={preferences}
+                onSort={sortBy}
+                headerClassName="hidden w-28 lg:table-cell"
               />
               <SortableHeader
                 label="Upkeep"
                 sort="upkeep"
                 preferences={preferences}
                 onSort={sortBy}
-                headerClassName="hidden w-20 text-right sm:table-cell"
+                headerClassName="hidden w-36 text-right sm:table-cell"
               />
               <SortableHeader
-                label="Casting time"
-                sort="time"
+                label="Cost"
+                sort="cost"
                 preferences={preferences}
                 onSort={sortBy}
-                headerClassName="hidden w-28 xl:table-cell"
+                headerClassName="hidden w-28 text-right sm:table-cell"
               />
-              <th scope="col" className={`hidden sm:table-cell ${canWrite ? 'w-48' : 'w-0 p-0'}`}>
-                <span className="sr-only">Actions</span>
-              </th>
+              {canWrite && (
+                <th scope="col" className="hidden w-14 sm:table-cell">
+                  <span className="sr-only">Edit</span>
+                </th>
+              )}
             </tr>
           </thead>
           {sortedRows.map((spell) => (
@@ -886,7 +893,7 @@ function SpellsTable({
           {visibleRows.length === 0 && (
             <TableBody>
               <tr>
-                <td colSpan={7} className="py-5 text-center text-base-content/60">
+                <td colSpan={SPELL_COLUMN_COUNT} className="py-5 text-center text-base-content/60">
                   No spells match your search.
                 </td>
               </tr>

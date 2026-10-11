@@ -2,8 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
-import { MagicItemsPanel, PowerstonesPanel } from './PowerstonesPanel.tsx';
+import { ItemSpellsPanel } from './ItemSpellsPanel.tsx';
+import { PowerstonesPanel } from './PowerstonesPanel.tsx';
 
+vi.mock('../../../lib/toast.tsx', () => ({ useToasts: () => ({ push: vi.fn() }) }));
 vi.mock('../../../sync/outbox.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../sync/outbox.ts')>()),
   enqueueFieldPatch: vi.fn().mockResolvedValue(undefined),
@@ -26,7 +28,7 @@ function item(id: string, name: string, overrides: Record<string, unknown> = {})
     notes: null,
     parentId: null,
     externalLocation: null,
-    worn: false,
+    worn: true,
     equipped: false,
     isContainer: false,
     hideawayCapacityLbs: 0,
@@ -48,14 +50,8 @@ function item(id: string, name: string, overrides: Record<string, unknown> = {})
 const stone = item(STONE_ID, 'Amber focus', {
   powerstoneData: { currentEnergy: 3, maxEnergy: 5, notes: 'A compact reserve' },
 });
-const chargedWand = item(WAND_ID, 'Ash wand', {
-  magicItemData: {
-    spellName: 'Light',
-    spellSkillLevel: 15,
-    mode: 'charged',
-    chargesCurrent: 2,
-    chargesMax: 4,
-  },
+const wand = item(WAND_ID, 'Ash wand', {
+  magicItemData: { spellName: 'Light', spellSkillLevel: 15, mode: 'powered', energyCost: 1 },
 });
 const poweredTalisman = item(TALISMAN_ID, 'Sun talisman', {
   magicItemData: {
@@ -68,9 +64,19 @@ const poweredTalisman = item(TALISMAN_ID, 'Sun talisman', {
 const continuousRing = item(RING_ID, 'Glow ring', {
   magicItemData: { spellName: 'Glow', spellSkillLevel: 13, mode: 'continuous' },
 });
+const STASHED_ID = '0193b3c0-f1f0-7000-8000-00000000a106';
+const stashedWand = item(STASHED_ID, 'Stashed wand', {
+  externalLocation: 'At home',
+  magicItemData: { spellName: 'Spark', spellSkillLevel: 12, mode: 'powered' },
+});
 const character = {
   id: CHARACTER_ID,
-  inventory: [stone, chargedWand, poweredTalisman, continuousRing],
+  derived: { hp: 10, fp: 10 },
+  combat: null,
+  manaLevel: 'normal',
+  manaLevelKnown: true,
+  traits: [],
+  inventory: [stone, wand, poweredTalisman, continuousRing, stashedWand],
 } as unknown as CharacterDetail;
 
 beforeEach(() => {
@@ -110,44 +116,75 @@ describe('compact powerstone and magic-item summaries', () => {
     );
   });
 
-  it('offers charge controls only for charged magic items and preserves their outbox patches', () => {
-    render(<MagicItemsPanel character={character} canWrite />);
-    expect(screen.getByRole('table', { name: 'Magic items' })).toBeVisible();
-    expect(screen.getByText('Ash wand')).toBeVisible();
-    expect(screen.getByText('Light').closest('em')?.parentElement).toHaveTextContent(
-      'casts Light at skill 15 · charged',
+  it('lists item spells at item Power with a normal-cost Cast for user-cast items', () => {
+    render(<ItemSpellsPanel character={character} canWrite />);
+    const table = screen.getByRole('table', { name: 'Item spells' });
+    expect(table).toBeVisible();
+    const wandRow = screen.getByRole('rowgroup', { name: 'Light from Ash wand' });
+    expect(wandRow).toHaveTextContent('Ash wand');
+    expect(wandRow).not.toHaveTextContent(/charge/i);
+    expect(screen.getByRole('button', { name: 'Roll Light from Ash wand' })).toHaveTextContent(
+      '15',
     );
-    expect(screen.getByText(/powered by user/)).toBeVisible();
-    expect(screen.getByText(/always-on/)).toBeVisible();
-    expect(screen.getAllByRole('button', { name: 'Use one charge from Ash wand' })).toHaveLength(2);
-    expect(screen.queryByRole('button', { name: /Sun talisman/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Glow ring/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('rowgroup', { name: 'Glow from Glow ring' })).toHaveTextContent(
+      'Glow ring · Always on',
+    );
+    expect(screen.queryByRole('button', { name: /^Cast .* from Glow ring$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Refill|Recharge .* wand/ })).toBeNull();
+    const stashed = screen.getByRole('rowgroup', { name: 'Spark from Stashed wand' });
+    expect(stashed).toHaveTextContent('Not carried');
+    const stashedCast = screen.getAllByRole('button', { name: 'Cast Spark from Stashed wand' })[0];
+    expect(stashedCast).toBeDisabled();
+    expect(stashedCast).toHaveTextContent('Cast—');
 
-    const useCharge = screen.getAllByRole('button', { name: 'Use one charge from Ash wand' })[0];
-    if (!useCharge) throw new Error('Missing magic-item charge action');
-    fireEvent.click(useCharge);
-    expect(enqueueFieldPatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        entityClass: 'character_inventory',
-        entityId: WAND_ID,
-        fieldPath: 'magicItemData',
-        attemptedValue: {
-          spellName: 'Light',
-          spellSkillLevel: 15,
-          mode: 'charged',
-          chargesCurrent: 1,
-          chargesMax: 4,
-        },
-        characterId: CHARACTER_ID,
-      }),
+    const castWand = screen.getAllByRole('button', { name: 'Cast Light from Ash wand' })[0];
+    if (!castWand) throw new Error('Missing item cast action');
+    expect(castWand).toHaveTextContent('Cast1');
+    fireEvent.click(castWand);
+    expect(screen.getByRole('dialog', { name: 'Cast Light from Ash wand' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay 1 energy' })).toBeEnabled();
+    expect(enqueueFieldPatch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    const castTalisman = screen.getAllByRole('button', {
+      name: 'Cast Sunlight from Sun talisman',
+    })[0];
+    if (!castTalisman) throw new Error('Missing powered item cast action');
+    expect(castTalisman).toHaveTextContent('Cast2');
+    fireEvent.click(castTalisman);
+    expect(
+      screen.getByRole('dialog', { name: 'Cast Sunlight from Sun talisman' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pay 2 energy' })).toBeEnabled();
+  });
+
+  it('holds item casting in a no-mana zone', () => {
+    render(<ItemSpellsPanel character={{ ...character, manaLevel: 'none' }} canWrite />);
+    expect(screen.getAllByRole('button', { name: 'Cast Light from Ash wand' })[0]).toBeDisabled();
+    expect(
+      screen.getAllByRole('button', { name: 'Cast Sunlight from Sun talisman' })[0],
+    ).toBeDisabled();
+  });
+
+  it('applies the low-mana -5 to item Power (M19)', () => {
+    render(<ItemSpellsPanel character={{ ...character, manaLevel: 'low' }} canWrite />);
+    expect(screen.getByRole('button', { name: 'Roll Light from Ash wand' })).toHaveTextContent(
+      '10',
     );
+  });
+
+  it('omits the section when no magic item is owned', () => {
+    const { container } = render(
+      <ItemSpellsPanel character={{ ...character, inventory: [stone] }} canWrite />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('keeps manual controls out of the read-only view', () => {
     render(
       <>
         <PowerstonesPanel character={character} canWrite={false} />
-        <MagicItemsPanel character={character} canWrite={false} />
+        <ItemSpellsPanel character={character} canWrite={false} />
       </>,
     );
     expect(screen.getByText('Amber focus')).toBeVisible();
@@ -159,10 +196,9 @@ describe('compact powerstone and magic-item summaries', () => {
       screen.queryByRole('button', { name: 'Recharge 1 to Amber focus' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Use one charge from Ash wand' }),
+      screen.queryByRole('button', { name: 'Cast Light from Ash wand' }),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Recharge Ash wand to full' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Roll Light from Ash wand' })).toBeVisible();
+    expect(screen.getByRole('rowgroup', { name: 'Light from Ash wand' })).toHaveTextContent('1');
   });
 });

@@ -400,9 +400,6 @@ export function InventoryRow(props: InventoryRowProps) {
                     Magic
                     <span className="text-base-content/70 text-[10px] ml-1">
                       {item.magicItemData.spellName}
-                      {item.magicItemData.mode === 'charged' &&
-                        item.magicItemData.chargesCurrent != null &&
-                        ` ${item.magicItemData.chargesCurrent}/${item.magicItemData.chargesMax ?? '—'}`}
                     </span>
                   </>,
                 )}

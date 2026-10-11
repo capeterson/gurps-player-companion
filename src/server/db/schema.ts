@@ -849,7 +849,7 @@ export const inventoryItems = pgTable(
     /** Powerstone metadata (max/current charge), validated by
      * `powerstoneData` (src/shared/schemas/inventory.ts).  Null = not a powerstone. */
     powerstoneData: jsonb('powerstone_data').$type<PowerstoneData>(),
-    /** Magic-item metadata (linked spell, charges, mode), validated by
+    /** Magic-item metadata (linked spell, mode, energy cost), validated by
      * `magicItemData` (src/shared/schemas/inventory.ts).  Null = mundane item. */
     magicItemData: jsonb('magic_item_data').$type<MagicItemData>(),
     /** Enchantment list (multi-enchant items), validated by `enchantmentRef`

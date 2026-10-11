@@ -155,26 +155,13 @@ function fieldSpecs(item: InventoryItemOut, section: ItemSection): ItemFieldSpec
         {
           path: 'magicItemData.mode',
           label: 'Activation',
-          choices: ['charged', 'powered', 'continuous'],
+          choices: ['powered', 'continuous'],
           choiceLabels: {
-            charged: 'Uses charges',
             powered: 'Uses energy',
             continuous: 'Always on',
           },
         },
-        // Keep populated fields visible even after the activation mode changes.
-        number(
-          'magicItemData.chargesCurrent',
-          'Current charges',
-          item.magicItemData?.mode !== 'charged',
-          true,
-        ),
-        number(
-          'magicItemData.chargesMax',
-          'Maximum charges',
-          item.magicItemData?.mode !== 'charged',
-          true,
-        ),
+        // Keep a populated cost visible even after the activation mode changes.
         number(
           'magicItemData.energyCost',
           'Energy cost',

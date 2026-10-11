@@ -5,7 +5,7 @@ import { buildSpellOut } from '../../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import { getLocalDb } from '../../../db/dexie.ts';
 import { CastSpellDialog } from './CastSpellDialog.tsx';
-import { SpellsPanel } from './SpellsPanel.tsx';
+import { MagicSection } from './MagicSection.tsx';
 
 const push = vi.fn();
 vi.mock('../../../lib/toast.tsx', () => ({ useToasts: () => ({ push }) }));
@@ -57,7 +57,7 @@ describe('very high mana spending', () => {
     }
     const panel = (changed: boolean) => (
       <QueryClientProvider client={client}>
-        <SpellsPanel
+        <MagicSection
           character={{
             ...props.character,
             spells: [props.spell],
@@ -80,7 +80,7 @@ describe('very high mana spending', () => {
     const client = new QueryClient();
     const panel = (manaLevel: CharacterDetail['manaLevel'], manaLevelKnown = true) => (
       <QueryClientProvider client={client}>
-        <SpellsPanel
+        <MagicSection
           character={{ ...props.character, spells: [props.spell], manaLevel, manaLevelKnown }}
           canWrite={false}
         />
@@ -103,7 +103,7 @@ describe('very high mana spending', () => {
     const client = new QueryClient();
     const view = render(
       <QueryClientProvider client={client}>
-        <SpellsPanel
+        <MagicSection
           character={{
             ...props.character,
             spells: [props.spell],
@@ -121,7 +121,7 @@ describe('very high mana spending', () => {
     );
     view.rerender(
       <QueryClientProvider client={client}>
-        <SpellsPanel character={{ ...props.character, spells: [props.spell] }} canWrite={false} />
+        <MagicSection character={{ ...props.character, spells: [props.spell] }} canWrite={false} />
       </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
@@ -133,7 +133,7 @@ describe('very high mana spending', () => {
     const props = fixture();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <SpellsPanel character={{ ...props.character, spells: [props.spell] }} canWrite={false} />
+        <MagicSection character={{ ...props.character, spells: [props.spell] }} canWrite={false} />
       </QueryClientProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Roll Light' }));
@@ -373,3 +373,50 @@ describe('very high mana spending', () => {
   });
 });
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+describe('powered magic item casting', () => {
+  it('pays the item energy from FP without a caster recovery reminder', async () => {
+    const { character } = fixture(true, 3, 5, 10);
+    const item = {
+      id: 'talisman',
+      name: 'Sun talisman',
+    } as unknown as CharacterDetail['inventory'][number];
+    const data = {
+      spellName: 'Sunlight',
+      spellSkillLevel: 14,
+      mode: 'powered' as const,
+      energyCost: 2,
+    };
+    const close = vi.fn();
+    render(<CastSpellDialog character={character} itemSource={{ item, data }} onClose={close} />);
+    const dialog = screen.getByRole('dialog', { name: 'Cast Sunlight from Sun talisman' });
+    expect(dialog).toHaveTextContent('From Sun talisman · skill 14');
+    expect(screen.queryByText(/restore .* FP/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Rule of 16/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 2 energy' }));
+    await waitFor(() => expect(close).toHaveBeenCalled());
+    expect((await getLocalDb().characterCombat.get(id))?.currentFp).toBe(3);
+    expect(push.mock.calls.at(-1)?.[0]).toBe('Cast Sunlight from Sun talisman for 2 energy.');
+  });
+});
+
+describe('magic item without a recorded cost', () => {
+  it('asks for the energy cost instead of offering a free cast', () => {
+    const { character } = fixture(true, 3, 5, 10);
+    const item = {
+      id: 'ring',
+      name: 'Plain ring',
+    } as unknown as CharacterDetail['inventory'][number];
+    const data = { spellName: 'Sunlight', spellSkillLevel: 14, mode: 'powered' as const };
+    render(
+      <CastSpellDialog character={character} itemSource={{ item, data }} onClose={() => {}} />,
+    );
+    expect(screen.getByText(/no recorded cost/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Record free cast' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter energy cost' })).toBeDisabled();
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Energy to spend' }), {
+      target: { value: '2' },
+    });
+    expect(screen.getByRole('button', { name: 'Pay 2 energy' })).toBeEnabled();
+  });
+});

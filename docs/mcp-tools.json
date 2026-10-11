@@ -10024,33 +10024,8 @@
                                     "mode": {
                                       "type": "string",
                                       "enum": [
-                                        "charged",
                                         "powered",
                                         "continuous"
-                                      ]
-                                    },
-                                    "chargesMax": {
-                                      "anyOf": [
-                                        {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 1000
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "chargesCurrent": {
-                                      "anyOf": [
-                                        {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 1000
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
                                       ]
                                     },
                                     "energyCost": {
@@ -24585,33 +24560,8 @@
                           "mode": {
                             "type": "string",
                             "enum": [
-                              "charged",
                               "powered",
                               "continuous"
-                            ]
-                          },
-                          "chargesMax": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "chargesCurrent": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
                             ]
                           },
                           "energyCost": {
@@ -25987,33 +25937,8 @@
                           "mode": {
                             "type": "string",
                             "enum": [
-                              "charged",
                               "powered",
                               "continuous"
-                            ]
-                          },
-                          "chargesMax": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "chargesCurrent": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
                             ]
                           },
                           "energyCost": {
@@ -42441,33 +42366,8 @@
                                     "mode": {
                                       "type": "string",
                                       "enum": [
-                                        "charged",
                                         "powered",
                                         "continuous"
-                                      ]
-                                    },
-                                    "chargesMax": {
-                                      "anyOf": [
-                                        {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 1000
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
-                                      ]
-                                    },
-                                    "chargesCurrent": {
-                                      "anyOf": [
-                                        {
-                                          "type": "integer",
-                                          "minimum": 0,
-                                          "maximum": 1000
-                                        },
-                                        {
-                                          "type": "null"
-                                        }
                                       ]
                                     },
                                     "energyCost": {
@@ -49676,33 +49576,8 @@
                           "mode": {
                             "type": "string",
                             "enum": [
-                              "charged",
                               "powered",
                               "continuous"
-                            ]
-                          },
-                          "chargesMax": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "chargesCurrent": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
                             ]
                           },
                           "energyCost": {
@@ -51876,33 +51751,8 @@
                             "mode": {
                               "type": "string",
                               "enum": [
-                                "charged",
                                 "powered",
                                 "continuous"
-                              ]
-                            },
-                            "chargesMax": {
-                              "anyOf": [
-                                {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 1000
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "chargesCurrent": {
-                              "anyOf": [
-                                {
-                                  "type": "integer",
-                                  "minimum": 0,
-                                  "maximum": 1000
-                                },
-                                {
-                                  "type": "null"
-                                }
                               ]
                             },
                             "energyCost": {
@@ -58835,33 +58685,8 @@
                           "mode": {
                             "type": "string",
                             "enum": [
-                              "charged",
                               "powered",
                               "continuous"
-                            ]
-                          },
-                          "chargesMax": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "chargesCurrent": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
                             ]
                           },
                           "energyCost": {
@@ -60208,33 +60033,8 @@
                           "mode": {
                             "type": "string",
                             "enum": [
-                              "charged",
                               "powered",
                               "continuous"
-                            ]
-                          },
-                          "chargesMax": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "chargesCurrent": {
-                            "anyOf": [
-                              {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000
-                              },
-                              {
-                                "type": "null"
-                              }
                             ]
                           },
                           "energyCost": {
