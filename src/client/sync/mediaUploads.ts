@@ -14,6 +14,7 @@ import {
 import { readSyncEntity, updateSyncEntity } from '../db/syncEntityStore.ts';
 import { ApiError, api } from '../lib/api.ts';
 import { connectionStore } from '../lib/connectionState.ts';
+import { assertWritableSession } from '../lib/guestSession.ts';
 import { readActiveUser } from './activeUser.ts';
 import { backoffMs, enqueueFieldPatch, newClientId } from './outbox.ts';
 
@@ -23,6 +24,7 @@ export async function enqueueImage(
   blob: Blob,
   replacesUploadId?: string,
 ): Promise<void> {
+  assertWritableSession();
   if (!blob.size || blob.size > MEDIA_INPUT_BYTES)
     throw new Error('Choose an image no larger than 10 MiB');
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type))
@@ -95,6 +97,7 @@ export async function enqueueImage(
 }
 
 export async function removeImage(targetType: MediaTarget, targetId: string) {
+  assertWritableSession();
   const db = getLocalDb();
   await db.transaction('rw', ALL_STORE_NAMES, async () => {
     await enqueueFieldPatch({

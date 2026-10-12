@@ -142,6 +142,11 @@ A campaign (`campaigns` table) has one **owner** and a set of
 | `manager` | Invite at the `member` tier, cancel pending invitations, remove members (`requireCampaignAdmin`), use the GM dashboard/change feed, and edit player-owned characters when `allowGmCharacterEditing` is enabled. Cannot add members directly, change roles, promote to manager, transfer ownership, or edit campaign settings / the library — those are owner-only. |
 | `member` | Belongs to the campaign; can read shared content and their own character. |
 
+Credential-less system accounts (`users.system_role`) that run the guest
+preview cannot be added, invited or made owner of any campaign; member and
+invitation lookups skip them and a database trigger refuses them outside preview
+provisioning. See [preview-mode.md](preview-mode.md).
+
 Authorization is centralized in `src/server/auth/permissions.ts`:
 `loadCampaignOr403`, `requireCampaignOwner`, `requireCampaignAdmin`
 (owner **or** manager), `requireCampaignMember`. The owner short-circuits every

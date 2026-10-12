@@ -380,7 +380,8 @@ router.openapi(
     const campaign = await requireCampaignOwner(id, user.id);
     const db = getDb();
     const found = await db.select().from(users).where(eq(users.email, body.email));
-    const target = found[0];
+    // System preview accounts are not addable; the database refuses them too.
+    const target = found[0]?.systemRole ? undefined : found[0];
     if (!target) throw new HTTPException(404, { message: 'user not found' });
     // Fast-path pre-check; the unique index on (campaign_id, user_id)
     // is the authoritative arbiter — two concurrent add-member requests

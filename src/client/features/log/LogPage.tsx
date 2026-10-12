@@ -14,6 +14,7 @@ import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api } from '../../lib/api.ts';
+import { useIsGuestSession } from '../../lib/guestSession.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
 import { useCampaignCharactersList, useCharactersList } from '../characters/useCharacterDetail.ts';
 
@@ -172,6 +173,7 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
  * the page just renders the log for that campaign.
  */
 export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
+  const guest = useIsGuestSession();
   const qc = useQueryClient();
   const campaigns = useQuery({
     queryKey: ['campaigns'],
@@ -628,7 +630,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
               ))}
             </select>
           )}
-          {editor.kind === 'hidden' ? (
+          {editor.kind === 'hidden' && !guest ? (
             <button
               type="button"
               className="btn btn-primary btn-sm"

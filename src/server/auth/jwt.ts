@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT, decodeJwt, jwtVerify } from 'jose';
 import { loadConfig } from '../config.ts';
 
 export interface AccessTokenPayload {
@@ -15,6 +15,15 @@ export interface RefreshTokenPayload {
   readonly authVersion: number;
   readonly authTime: number;
 }
+
+/** A read-only preview session. It has no refresh token; the client asks for a new one. */
+export interface GuestTokenPayload {
+  readonly sub: string;
+  readonly type: 'guest';
+  readonly authVersion: number;
+}
+
+export const GUEST_TOKEN_TTL_SECONDS = 2 * 60 * 60;
 
 const ALGORITHM = 'HS256';
 
@@ -87,4 +96,40 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenPay
     : Number(payload.iat);
   if (!Number.isInteger(authTime)) throw new Error('refresh token missing authentication time');
   return { sub: payload.sub, type: 'refresh', jti: payload.jti, authVersion, authTime };
+}
+
+export async function signGuestToken(
+  guestUserId: string,
+  authVersion: number,
+): Promise<{ token: string; expiresInSeconds: number }> {
+  const token = await new SignJWT({ type: 'guest', av: authVersion })
+    .setProtectedHeader({ alg: ALGORITHM })
+    .setSubject(guestUserId)
+    .setIssuedAt()
+    .setExpirationTime(`${GUEST_TOKEN_TTL_SECONDS}s`)
+    .sign(secretKey());
+  return { token, expiresInSeconds: GUEST_TOKEN_TTL_SECONDS };
+}
+
+export async function verifyGuestToken(token: string): Promise<GuestTokenPayload> {
+  const { payload } = await jwtVerify(token, secretKey(), { algorithms: [ALGORITHM] });
+  if (payload.type !== 'guest' || typeof payload.sub !== 'string') {
+    throw new Error('not a guest token');
+  }
+  const authVersion = Number.isInteger(payload.av) ? Number(payload.av) : 0;
+  return { sub: payload.sub, type: 'guest', authVersion };
+}
+
+/**
+ * Whether a bearer value claims to be a guest token, without verifying it.
+ * Only used to apply guest restrictions: a forged claim gains nothing, because
+ * claiming guest only narrows access and authentication still verifies it.
+ */
+export function claimsGuestToken(token: string): boolean {
+  if (token.split('.').length !== 3) return false;
+  try {
+    return decodeJwt(token).type === 'guest';
+  } catch {
+    return false;
+  }
 }

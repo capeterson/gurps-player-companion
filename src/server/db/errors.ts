@@ -10,9 +10,12 @@ export const PG_UNIQUE_VIOLATION = '23505';
 export const PG_FOREIGN_KEY_VIOLATION = '23503';
 export const PG_CHECK_VIOLATION = '23514';
 
+export const PG_INSUFFICIENT_PRIVILEGE = '42501';
+
 interface PgErrorShape {
   code?: string;
   constraint?: string;
+  hint?: string;
 }
 
 function pgError(err: unknown): PgErrorShape | null {
@@ -27,4 +30,10 @@ export function isUniqueViolation(err: unknown, constraint?: string): boolean {
   if (!pg || pg.code !== PG_UNIQUE_VIOLATION) return false;
   if (constraint && pg.constraint !== constraint) return false;
   return true;
+}
+
+/** Raised by the database guards that keep the guest preview campaign read-only. */
+export function isPreviewReadOnlyViolation(err: unknown): boolean {
+  const pg = pgError(err) ?? pgError((err as { cause?: unknown } | null)?.cause);
+  return pg?.code === PG_INSUFFICIENT_PRIVILEGE && pg.hint === 'preview_read_only';
 }

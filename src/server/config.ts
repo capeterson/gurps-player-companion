@@ -89,6 +89,11 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_REGISTER_MAX: z.coerce.number().int().positive().default(5),
   AUTH_RATE_LIMIT_RESET_MAX: z.coerce.number().int().positive().default(3),
   AUTH_RATE_LIMIT_CHALLENGE_MAX: z.coerce.number().int().positive().default(10),
+  AUTH_RATE_LIMIT_GUEST_MAX: z.coerce.number().int().positive().default(20),
+  PREVIEW_MODE_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   SHUTDOWN_GRACE_SECONDS: z.coerce.number().int().min(0).max(120).default(15),
   CORS_ORIGINS: z
     .string()
@@ -137,6 +142,10 @@ export type AppConfig = {
   authRateLimitRegisterMax: number;
   authRateLimitResetMax: number;
   authRateLimitChallengeMax: number;
+  /** Guest preview sessions started per source address in one rate-limit window. */
+  authRateLimitGuestMax: number;
+  /** Provision the read-only Lantern Coast preview and accept guest sessions. */
+  previewModeEnabled: boolean;
   /** How long SIGTERM/SIGINT waits for in-flight requests before forcing shutdown. */
   shutdownGraceSeconds: number;
 };
@@ -174,6 +183,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     AUTH_RATE_LIMIT_REGISTER_MAX: env.AUTH_RATE_LIMIT_REGISTER_MAX,
     AUTH_RATE_LIMIT_RESET_MAX: env.AUTH_RATE_LIMIT_RESET_MAX,
     AUTH_RATE_LIMIT_CHALLENGE_MAX: env.AUTH_RATE_LIMIT_CHALLENGE_MAX,
+    AUTH_RATE_LIMIT_GUEST_MAX: env.AUTH_RATE_LIMIT_GUEST_MAX,
+    PREVIEW_MODE_ENABLED: env.PREVIEW_MODE_ENABLED,
     SHUTDOWN_GRACE_SECONDS: env.SHUTDOWN_GRACE_SECONDS,
   });
   if (parsed.ENVIRONMENT === 'production' && !parsed.APP_HOSTNAME) {
@@ -200,6 +211,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     authRateLimitRegisterMax: parsed.AUTH_RATE_LIMIT_REGISTER_MAX,
     authRateLimitResetMax: parsed.AUTH_RATE_LIMIT_RESET_MAX,
     authRateLimitChallengeMax: parsed.AUTH_RATE_LIMIT_CHALLENGE_MAX,
+    authRateLimitGuestMax: parsed.AUTH_RATE_LIMIT_GUEST_MAX,
+    previewModeEnabled: parsed.PREVIEW_MODE_ENABLED,
     shutdownGraceSeconds: parsed.SHUTDOWN_GRACE_SECONDS,
   };
   return cached;

@@ -1,10 +1,29 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { guestAvailability } from '../../../shared/schemas/auth.ts';
 import { AppIcon } from '../../components/ui/AppIcon.tsx';
 import { BrandMark } from '../../components/ui/BrandMark.tsx';
 import { modeLabel, oppositeMode, setThemeMode, useThemeState } from '../../lib/theme.ts';
 
+/** Whether this server offers the read-only guest preview. Hidden until confirmed. */
+function usePreviewAvailable(): boolean {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/v1/auth/guest', { signal: controller.signal })
+      .then(async (response) =>
+        response.ok ? guestAvailability.parse(await response.json()).available : false,
+      )
+      .then(setAvailable)
+      .catch(() => setAvailable(false));
+    return () => controller.abort();
+  }, []);
+  return available;
+}
+
 export function LandingPage() {
   const { mode } = useThemeState();
+  const previewAvailable = usePreviewAvailable();
   return (
     <div className="min-h-dvh bg-base-200 arcane-edge">
       <header className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8">
@@ -44,10 +63,18 @@ export function LandingPage() {
                 <Link to="/register" className="btn btn-primary">
                   Create your account
                 </Link>
-                <a href="#at-the-table" className="btn btn-outline">
-                  Take a look
-                </a>
+                {previewAvailable && (
+                  <Link to="/preview" className="btn btn-outline">
+                    Try without an account
+                  </Link>
+                )}
               </div>
+              {previewAvailable && (
+                <p className="text-sm text-muted">
+                  Explore the Lantern Coast sample campaign, its party, and their character sheets
+                  in a read-only preview.
+                </p>
+              )}
               <p className="text-sm text-muted">
                 Phone, tablet, or desktop. Install from your browser. Open your characters online
                 once, then keep editing when the connection drops.
@@ -64,7 +91,7 @@ export function LandingPage() {
             </figure>
           </div>
         </section>
-        <section id="at-the-table" className="space-y-8 scroll-mt-8">
+        <section className="space-y-8">
           <div className="grid gap-4 md:grid-cols-3">
             {[
               [

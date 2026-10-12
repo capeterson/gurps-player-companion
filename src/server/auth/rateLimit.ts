@@ -5,7 +5,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { AppConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 
-export type AuthRateLimitScope = 'login' | 'register' | 'reset' | 'challenge' | 'oauth';
+export type AuthRateLimitScope = 'login' | 'register' | 'reset' | 'challenge' | 'oauth' | 'guest';
 
 const limitFor = (config: AppConfig, scope: AuthRateLimitScope) => {
   switch (scope) {
@@ -19,6 +19,8 @@ const limitFor = (config: AppConfig, scope: AuthRateLimitScope) => {
       return config.authRateLimitChallengeMax;
     case 'oauth':
       return config.authRateLimitChallengeMax;
+    case 'guest':
+      return config.authRateLimitGuestMax;
   }
 };
 

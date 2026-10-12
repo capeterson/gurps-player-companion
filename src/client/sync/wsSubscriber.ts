@@ -201,6 +201,12 @@ class SyncWsSubscriber {
       this.refreshSession();
       return;
     }
+    // Read-only previews never change, and the push channel is not on the
+    // server's guest allow-list; the periodic cursor pull is enough.
+    if (tokens.guest) {
+      this.publish('stopped');
+      return;
+    }
     this.publish(
       this.attempts > 0 || this.snapshot.lastConnectedAt ? 'reconnecting' : 'connecting',
     );

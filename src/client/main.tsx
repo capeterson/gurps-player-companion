@@ -15,6 +15,7 @@ import { RegisterPage } from './features/auth/RegisterPage.tsx';
 import { ResetPasswordPage } from './features/auth/ResetPasswordPage.tsx';
 import { SuspendedPage } from './features/auth/SuspendedPage.tsx';
 import { HomePage } from './features/home/HomePage.tsx';
+import { PreviewEntryPage } from './features/preview/PreviewEntryPage.tsx';
 import { setPwaConnectionControl } from './lib/api.ts';
 import { connectionStore } from './lib/connectionState.ts';
 import { SessionQueryCacheBoundary, createSessionQueryClient } from './lib/sessionQueryCache.tsx';
@@ -97,6 +98,7 @@ const router = createBrowserRouter([
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
       { path: '/reset-password', element: <ResetPasswordPage /> },
       { path: '/suspended', element: <SuspendedPage /> },
+      { path: '/preview', element: <PreviewEntryPage /> },
       {
         element: <RequireSessionOnly />,
         children: [{ path: '/oauth/consent', element: <OAuthConsentPage /> }],

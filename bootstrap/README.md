@@ -149,6 +149,17 @@ The standard script creates six separate demo players and assigns Bram a manager
 role. The MCP adapter uses one existing account for all characters, because user
 creation is outside MCP's domain surface.
 
+The read-only guest preview ([preview-mode.md](../docs/specs/preview-mode.md))
+is a third adapter. With `PREVIEW_MODE_ENABLED=true` the server builds the same
+campaign at startup under credential-less `@preview.invalid` system accounts, and
+`bun run db:seed` includes it. To build or rebuild it by hand:
+
+```sh
+./scripts/dev-worktree.sh run --rm migrate bun run db:seed:preview --force
+```
+
+Those accounts cannot sign in, so the demo passwords above do not apply to them.
+
 `bun run db:seed:lantern:mcp` is an NDJSON bridge for a connected-tool orchestrator:
 it emits `{kind: "call", name, args}` on stdout, consumes the tool's
 `{status, body}` structured result on stdin, and ends with

@@ -7,7 +7,10 @@ import { useCharactersList } from './useCharacterDetail.ts';
 
 vi.mock('./useCharacterDetail.ts', () => ({ useCharactersList: vi.fn() }));
 vi.mock('../../sync/outbox.ts', () => ({ enqueueCreate: vi.fn(), newClientId: vi.fn() }));
-vi.mock('../../lib/tokenStore.ts', () => ({ readUserIdFromToken: () => 'user-1' }));
+vi.mock('../../lib/tokenStore.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/tokenStore.ts')>()),
+  readUserIdFromToken: () => 'user-1',
+}));
 
 function Location() {
   const location = useLocation();

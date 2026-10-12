@@ -12,6 +12,11 @@ export interface Tokens {
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly accessTokenExpiresIn: number;
+  /**
+   * Present for a read-only guest preview session. Guest sessions have no
+   * refresh token (`refreshToken` is empty); expiry requests a new guest token.
+   */
+  readonly guest?: { readonly campaignId: string } | undefined;
 }
 
 export interface TokenSnapshot extends Tokens {
@@ -54,7 +59,11 @@ function parseStoredPair(raw: string | null): TokenSnapshot | null {
       typeof value.refreshToken !== 'string' ||
       typeof value.accessTokenExpiresIn !== 'number' ||
       typeof value.sessionId !== 'string' ||
-      typeof value.version !== 'number'
+      typeof value.version !== 'number' ||
+      (value.guest !== undefined &&
+        (typeof value.guest !== 'object' ||
+          value.guest === null ||
+          typeof value.guest.campaignId !== 'string'))
     ) {
       return null;
     }
@@ -123,6 +132,8 @@ export const tokenStore = {
     }
     persist({
       ...tokens,
+      // A rotation never turns a guest session into a signed-in one or back.
+      guest: current.guest ? (tokens.guest ?? current.guest) : undefined,
       sessionId: current.sessionId,
       version: current.version + 1,
       refreshRequestId: newSessionId(),

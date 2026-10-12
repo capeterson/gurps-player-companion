@@ -505,6 +505,13 @@
       "when": 1800026000000,
       "tag": "0071_equipped_requires_on_player",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1800027000000,
+      "tag": "0072_preview_mode",
+      "breakpoints": true
     }
   ]
 }

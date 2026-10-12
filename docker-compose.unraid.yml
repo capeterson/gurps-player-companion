@@ -107,6 +107,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-[]}
       APP_HOSTNAME: ${APP_HOSTNAME:?APP_HOSTNAME is required}
       OAUTH_CLIENTS: ${OAUTH_CLIENTS:-[]}
+      PREVIEW_MODE_ENABLED: ${PREVIEW_MODE_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

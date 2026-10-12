@@ -32,6 +32,7 @@ import {
   updateSyncEntity,
   writableSyncEntityTable,
 } from '../db/syncEntityStore.ts';
+import { assertWritableSession } from '../lib/guestSession.ts';
 import {
   campaignTransferStores,
   detachLocalCampaignReferences,
@@ -117,6 +118,7 @@ export async function enqueueFieldPatch(args: EnqueueFieldPatchArgs): Promise<vo
 export async function enqueueFieldPatches(
   patches: readonly EnqueueFieldPatchArgs[],
 ): Promise<void> {
+  assertWritableSession();
   if (patches.length === 0) return;
   const db = getLocalDb();
   const batchId = patches.length > 1 ? newBatchId() : undefined;
@@ -394,6 +396,7 @@ export interface EnqueueEntityPatchArgs {
  * predecessor rules as `enqueueFieldPatch`; `prevValue` is the full row.
  */
 export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<void> {
+  assertWritableSession();
   const db = getLocalDb();
   const table = writableSyncEntityTable(args.entityClass);
   const parentId = parentIdFor(args.entityClass, args.characterId, args.entityId, args.campaignId);
@@ -503,6 +506,7 @@ export interface EnqueueCreateArgs<T> {
 export async function enqueueCreate<T extends Record<string, unknown>>(
   args: EnqueueCreateArgs<T>,
 ): Promise<void> {
+  assertWritableSession();
   const db = getLocalDb();
   const now = new Date().toISOString();
   const op: OutboxEntry = {
@@ -559,6 +563,7 @@ export interface EnqueueDeleteArgs {
 }
 
 export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
+  assertWritableSession();
   const db = getLocalDb();
   await db.transaction('rw', [db.outbox, ...storesForOp(args.entityClass)], async () => {
     await enqueueDeleteInTransaction(args);
@@ -567,6 +572,7 @@ export async function enqueueDelete(args: EnqueueDeleteArgs): Promise<void> {
 
 /** Delete one gesture's entities atomically and retain one history batch id. */
 export async function enqueueDeletes(args: readonly EnqueueDeleteArgs[]): Promise<void> {
+  assertWritableSession();
   if (args.length === 0) return;
   const db = getLocalDb();
   const batchId = args.length > 1 ? newBatchId() : undefined;

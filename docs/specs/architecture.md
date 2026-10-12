@@ -290,6 +290,9 @@ continues working; sync stays paused until the user loads a compatible build.
    via `?token=` query string because the browser WebSocket API can't set
    headers. `/mcp` resolves a scoped, audience-bound OAuth access token and
    supplies the same actor through a private Request identity capability.
+   Before any of this, the guest gate (`services/preview/guestAccess.ts`) refuses
+   every request carrying a read-only guest preview token unless it is on the
+   guest read allow-list; see [preview-mode.md](preview-mode.md).
 3. **Authorization.** Centralized helpers in `auth/permissions.ts`
    (`loadCampaignOr403`, `requireCampaignOwner/Admin/Member`,
    `loadCharacterOr403`, `assertWrite`, `requireSuperuser`) are the single
@@ -581,6 +584,11 @@ the nightly run; overdue accounts run on the next night after startup.
   in the same transaction and prevent repeated refreshes from restoring later
   deletions; this bookkeeping table is not a syncable user entity. See [the seed guide](../../bootstrap/README.md)
   for fixture coverage, account credentials, and isolation tests.
+- Guest preview: `PREVIEW_MODE_ENABLED=true` makes the server provision a
+  read-only copy of the Lantern Coast at startup under credential-less system
+  accounts (`users.system_role`) and accept guest sessions. `bun run
+  db:seed:preview` runs the same provisioning by hand. See
+  [preview-mode.md](preview-mode.md).
 
 ## Active effects and skill procedures
 

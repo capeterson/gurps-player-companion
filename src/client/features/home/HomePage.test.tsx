@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '../../lib/api.ts';
 import { ToastProvider } from '../../lib/toast.tsx';
+import { tokenStore } from '../../lib/tokenStore.ts';
 import { useCharactersList } from '../characters/useCharacterDetail.ts';
 import { HomePage } from './HomePage.tsx';
 
@@ -21,7 +22,10 @@ function renderPage() {
     >
       <ToastProvider>
         <MemoryRouter>
-          <HomePage />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/campaigns/:id" element={<h1>Preview campaign</h1>} />
+          </Routes>
         </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
@@ -29,6 +33,8 @@ function renderPage() {
 }
 
 describe('HomePage', () => {
+  afterEach(() => tokenStore.clear());
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api).mockResolvedValue({
@@ -89,5 +95,20 @@ describe('HomePage', () => {
     expect(
       await screen.findByRole('link', { name: 'Create your first character' }),
     ).toHaveAttribute('href', '/characters');
+  });
+
+  it('sends a guest to the preview campaign instead of an empty personal dashboard', async () => {
+    vi.mocked(useCharactersList).mockReturnValue([]);
+    tokenStore.write({
+      accessToken: 'guest',
+      refreshToken: '',
+      accessTokenExpiresIn: 7200,
+      guest: { campaignId: 'preview-campaign' },
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Preview campaign' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Create your first character' })).toBeNull();
   });
 });

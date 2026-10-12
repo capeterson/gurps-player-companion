@@ -5,6 +5,7 @@ import type { CampaignCreate, CampaignOut } from '../../../shared/schemas/campai
 import { MediaImage } from '../../components/MediaImage.tsx';
 import { AvatarStack } from '../../components/ui/Avatar.tsx';
 import { ApiError, api } from '../../lib/api.ts';
+import { useIsGuestSession } from '../../lib/guestSession.ts';
 import { journalCampaignMutation } from '../../sync/onlineMutationLog.ts';
 import { CampaignSettingsDialog } from './CampaignSettingsDialog.tsx';
 import { InvitationsInbox } from './InvitationsInbox.tsx';
@@ -64,6 +65,7 @@ export function CampaignsPage() {
   });
 
   const myId = me.data?.id;
+  const guest = useIsGuestSession();
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -75,16 +77,18 @@ export function CampaignsPage() {
           </p>
           <h1 className="font-display text-4xl font-semibold leading-none">Campaigns</h1>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          onClick={() => setShowCreate((v) => !v)}
-        >
-          {showCreate ? 'Cancel' : '+ New campaign'}
-        </button>
+        {!guest && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => setShowCreate((v) => !v)}
+          >
+            {showCreate ? 'Cancel' : '+ New campaign'}
+          </button>
+        )}
       </header>
 
-      {showCreate && (
+      {showCreate && !guest && (
         <form
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {

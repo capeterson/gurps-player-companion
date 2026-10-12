@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useIsGuestSession } from '../../lib/guestSession.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
 import { CharacterCard } from './CharacterCard.tsx';
@@ -7,6 +8,7 @@ import { useCharactersList } from './useCharacterDetail.ts';
 
 export function CharactersPage() {
   const navigate = useNavigate();
+  const guest = useIsGuestSession();
   const characters = useCharactersList();
 
   const [name, setName] = useState('');
@@ -73,29 +75,31 @@ export function CharactersPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <header>
         <p className="label-eyebrow">Characters</p>
-        <h1 className="font-display text-3xl">Your characters</h1>
+        <h1 className="font-display text-3xl">{guest ? 'Characters' : 'Your characters'}</h1>
       </header>
 
-      <form
-        className="card grid gap-3 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
-        onSubmit={submit}
-      >
-        <label className="form-control">
-          <span className="label-text">New character name</span>
-          <input
-            className="input input-bordered"
-            value={name}
-            onChange={(e) => {
-              latestName.current = e.target.value;
-              setName(e.target.value);
-            }}
-            placeholder="Sir Lancelot"
-          />
-        </label>
-        <button type="submit" className="btn btn-primary sm:w-fit" disabled={creating}>
-          {creating ? 'Creating…' : 'Create'}
-        </button>
-      </form>
+      {!guest && (
+        <form
+          className="card grid gap-3 p-4 sm:grid-cols-[minmax(16rem,24rem)_auto] sm:items-end"
+          onSubmit={submit}
+        >
+          <label className="form-control">
+            <span className="label-text">New character name</span>
+            <input
+              className="input input-bordered"
+              value={name}
+              onChange={(e) => {
+                latestName.current = e.target.value;
+                setName(e.target.value);
+              }}
+              placeholder="Sir Lancelot"
+            />
+          </label>
+          <button type="submit" className="btn btn-primary sm:w-fit" disabled={creating}>
+            {creating ? 'Creating…' : 'Create'}
+          </button>
+        </form>
+      )}
 
       {createError && <p className="text-error text-sm">Couldn’t create — {createError}</p>}
 

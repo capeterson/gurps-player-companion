@@ -215,6 +215,18 @@
     },
     {
       "kind": "excluded",
+      "method": "GET",
+      "path": "/api/v1/auth/guest",
+      "reason": "read-only guest preview session infrastructure"
+    },
+    {
+      "kind": "excluded",
+      "method": "POST",
+      "path": "/api/v1/auth/guest",
+      "reason": "read-only guest preview session infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "POST",
       "path": "/api/v1/auth/password",
       "reason": "credential infrastructure"

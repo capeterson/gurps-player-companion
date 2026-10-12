@@ -6,17 +6,25 @@
 
 import { randomUUID } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
+import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { apiKeys, refreshTokens, users } from '../db/schema.ts';
 import { hashApiKey, looksLikeApiKey } from './apiKey.ts';
-import { signRefreshToken, verifyAccessToken, verifyRefreshToken } from './jwt.ts';
+import {
+  claimsGuestToken,
+  signRefreshToken,
+  verifyAccessToken,
+  verifyGuestToken,
+  verifyRefreshToken,
+} from './jwt.ts';
 
 export interface AuthenticatedUser {
   readonly id: string;
   readonly email: string;
   readonly displayName: string;
   readonly suspendedAt: Date | null;
-  readonly authMethod: 'jwt' | 'api_key' | 'oauth';
+  /** `guest` is the shared read-only preview session; see services/preview/guestAccess.ts. */
+  readonly authMethod: 'jwt' | 'api_key' | 'oauth' | 'guest';
   readonly authVersion: number;
   /** Unix seconds for the last primary credential ceremony; refresh does not advance it. */
   readonly authenticatedAt: number | null;
@@ -47,7 +55,35 @@ export async function resolveAuthHeader(
   if (looksLikeApiKey(token)) {
     return resolveApiKeyToken(token);
   }
+  if (claimsGuestToken(token)) return resolveGuestToken(token);
   return resolveJwtToken(token);
+}
+
+/** Valid only while preview mode is on and the subject is still the guest account. */
+async function resolveGuestToken(token: string): Promise<AuthenticatedUser> {
+  if (!loadConfig().previewModeEnabled) {
+    throw new AuthError('invalid_token', 'guest preview is disabled');
+  }
+  let payload: { sub: string; authVersion: number };
+  try {
+    payload = await verifyGuestToken(token);
+  } catch (err) {
+    throw new AuthError('invalid_token', `invalid guest token: ${(err as Error).message}`);
+  }
+  const [user] = await getDb().select().from(users).where(eq(users.id, payload.sub));
+  if (!user) throw new AuthError('unknown_user', 'user not found');
+  if (user.systemRole !== 'preview_guest' || payload.authVersion !== user.authVersion) {
+    throw new AuthError('invalid_token', 'guest token has been revoked');
+  }
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    suspendedAt: user.suspendedAt,
+    authMethod: 'guest',
+    authVersion: user.authVersion,
+    authenticatedAt: null,
+  };
 }
 
 async function resolveJwtToken(token: string): Promise<AuthenticatedUser> {

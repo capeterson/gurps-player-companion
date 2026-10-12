@@ -29,6 +29,7 @@
     "db:seed:lantern": "bun run src/server/db/seeds/lanternCoast.ts",
     "db:seed:lantern:refresh": "bun run src/server/db/seeds/lanternCoastRefresh.ts",
     "db:seed:lantern:mcp": "bun run scripts/seed-lantern-mcp.ts",
+    "db:seed:preview": "bun run src/server/db/seeds/preview.ts",
     "db:up": "docker compose -f docker-compose.dev.yml up -d db",
     "db:down": "docker compose -f docker-compose.dev.yml down",
     "openapi:emit": "bun run src/server/openapi/emit.ts > docs/openapi.json",
@@ -37,7 +38,7 @@
     "mcp:check": "bun run src/server/mcp/check.ts",
     "check": "bun run lint && bun run typecheck && bun run skills:check && bun run test && bun run openapi:check && bun run mcp:check",
     "test:acceptance:mcp-seed": "bun run scripts/run-bun-tests.ts mcp-seed tests/acceptance/lantern-coast-mcp.test.ts",
-    "test:e2e:built": "bun run db:seed && PLAYWRIGHT_START_SERVER=1 PLAYWRIGHT_BUILT_SERVER=1 playwright test",
+    "test:e2e:built": "PREVIEW_MODE_ENABLED=true bun run db:seed && PREVIEW_MODE_ENABLED=true PLAYWRIGHT_START_SERVER=1 PLAYWRIGHT_BUILT_SERVER=1 playwright test",
     "skills:check": "bun run scripts/gpc-skill-evals.mjs validate && bun test tests/skills",
     "skills:eval": "bun run scripts/gpc-skill-evals.mjs"
   },

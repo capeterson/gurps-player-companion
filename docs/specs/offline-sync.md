@@ -418,6 +418,12 @@ one transaction. A lost response may recover that exact descendant with the
 same request id for 30 seconds; any different or later reuse revokes the whole
 token family. A failed replacement insert rolls the consume back with it.
 
+A read-only guest preview session ([preview-mode.md](preview-mode.md)) stores an
+empty refresh token. On expiry the same serialized path requests a new guest
+token instead, and a `404` ends the session. Guest sessions pull through the
+ordinary cursor but never open the WebSocket. The outbox, entity-patch and
+image-upload helpers refuse to run, so nothing is written to Dexie or queued.
+
 `refreshTokens()` in `src/client/lib/api.ts` clears the token store **only** on
 a `401`/`403` from `/auth/refresh` — a definitive rejection of the refresh
 token. A `5xx`, a reverse-proxy/tunnel error (Cloudflare `52x`/`530`), or a
