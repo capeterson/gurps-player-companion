@@ -53,6 +53,7 @@ import {
 } from '../db/schema.ts';
 import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
+import { isReservedPreviewEmail } from '../services/preview/provision.ts';
 
 const router = createOpenApiApp();
 
@@ -125,6 +126,9 @@ router.openapi(
   async (c) => {
     const body = c.req.valid('json');
     await enforceAuthRateLimit(c, loadConfig(), 'register');
+    // System preview accounts use this reserved domain; no one may claim it first.
+    if (isReservedPreviewEmail(body.email))
+      throw new HTTPException(409, { message: 'email already in use' });
     const db = getDb();
     // Fast-path pre-check so we don't burn argon2id work on a duplicate
     // email.  The unique index on users.email is the authoritative
@@ -184,7 +188,8 @@ router.openapi(
     await enforceAuthRateLimit(c, config, 'login');
     const db = getDb();
     const rows = await db.select().from(users).where(eq(users.email, body.email));
-    const user = rows[0];
+    // System preview accounts have no credentials; treat them as unknown.
+    const user = rows[0]?.systemRole ? undefined : rows[0];
 
     const hash = user?.passwordHash ?? (await getDummyPasswordHash());
     const ok = await verifyPassword(body.password, hash);
@@ -808,7 +813,7 @@ router.openapi(
       const db = getDb();
       const rows = await db.select().from(users).where(eq(users.email, body.email));
       const user = rows[0];
-      if (user) {
+      if (user && !user.systemRole) {
         const rawToken = randomBytes(32).toString('hex');
         const tokenHash = createHash('sha256').update(rawToken).digest('hex');
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000);

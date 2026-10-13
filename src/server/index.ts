@@ -8,6 +8,7 @@ import {
   startNotificationMaintenance,
   stopNotificationMaintenance,
 } from './services/notificationMaintenance.ts';
+import { startPreviewProvisioning, stopPreviewProvisioning } from './services/preview/provision.ts';
 import { startUserPurgeMaintenance, stopUserPurgeMaintenance } from './services/userPurge.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
 
@@ -16,6 +17,7 @@ export function startBackgroundMaintenance(config: AppConfig): void {
   startMediaMaintenance();
   startUserPurgeMaintenance(config.environment);
   startNotificationMaintenance(config.environment);
+  startPreviewProvisioning(config);
 }
 
 export function startServer(config: AppConfig) {
@@ -46,6 +48,7 @@ async function stopBackgroundMaintenance(): Promise<void> {
     stopMediaMaintenance(),
     stopUserPurgeMaintenance(),
     stopNotificationMaintenance(),
+    stopPreviewProvisioning(),
   ]);
 }
 

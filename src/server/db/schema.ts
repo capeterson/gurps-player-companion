@@ -134,6 +134,8 @@ const revision = () => bigserial('revision', { mode: 'number' }).notNull();
 
 // ---------- users / auth ----------
 
+export type SystemRole = 'preview_guest' | 'preview_fixture';
+
 export const users = pgTable(
   'users',
   {
@@ -170,6 +172,12 @@ export const users = pgTable(
       .notNull()
       .default(DEFAULT_NOTIFICATION_PREFERENCES),
     experimentalMcpUi: boolean('experimental_mcp_ui').notNull().default(false),
+    /**
+     * Non-null marks a credential-less system account for the guest preview:
+     * `preview_guest` reads the preview campaign, `preview_fixture` owns its
+     * content. Such accounts can never sign in, recover, or receive email.
+     */
+    systemRole: varchar('system_role', { length: 32 }).$type<SystemRole>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -519,6 +527,19 @@ export const demoSeedUpdates = pgTable(
   },
   (t) => ({ key: primaryKey({ columns: [t.campaignId, t.seed, t.version] }) }),
 );
+
+/** Singleton pointer to the provisioned read-only preview campaign. */
+export const previewCampaign = pgTable('preview_campaign', {
+  singleton: boolean('singleton').primaryKey().default(true),
+  campaignId: uuid('campaign_id')
+    .notNull()
+    .references(() => campaigns.id, { onDelete: 'cascade' }),
+  guestUserId: uuid('guest_user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  contentVersion: text('content_version').notNull(),
+  provisionedAt: timestamp('provisioned_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const campaignMemberships = pgTable(
   'campaign_memberships',

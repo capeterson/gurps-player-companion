@@ -28,6 +28,9 @@ COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/src/server/db/migrations ./src/server/db/migrations
+# Source content for the optional guest preview campaign (PREVIEW_MODE_ENABLED).
+COPY --from=build /app/bootstrap/lantern_coast.yaml ./bootstrap/lantern_coast.yaml
+COPY --from=build /app/bootstrap/lantern_coast_art ./bootstrap/lantern_coast_art
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/v1/healthz || exit 1

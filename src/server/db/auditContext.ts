@@ -19,6 +19,7 @@
 
 import { sql } from 'drizzle-orm';
 import { currentTrustedExecution } from '../services/executionContext.ts';
+import { GuestWriteForbiddenError, isGuestRequest } from '../services/preview/guestAccess.ts';
 import { getDb, runInDbSavepoint } from './client.ts';
 
 // Derive the transaction type from the actual schema-typed database that
@@ -34,6 +35,8 @@ export async function withAudit<T>(
   fn: (tx: AuditTx) => Promise<T>,
   notificationBatchId: string | null | undefined = batchId,
 ): Promise<T> {
+  // Guests are read-only even if a route on the allow-list ever tried to write.
+  if (isGuestRequest()) throw new GuestWriteForbiddenError();
   return runInDbSavepoint(async () => {
     const tx = getDb() as unknown as AuditTx;
     const execution = currentTrustedExecution();

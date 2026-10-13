@@ -13690,6 +13690,92 @@
         }
       }
     },
+    "/api/v1/auth/guest": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Report whether the read-only guest preview is available",
+        "responses": {
+          "200": {
+            "description": "Preview availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "available": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "available"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start a read-only guest preview session",
+        "responses": {
+          "200": {
+            "description": "Guest token for the preview campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accessToken": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "accessTokenExpiresIn": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    },
+                    "campaignId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "accessToken",
+                    "accessTokenExpiresIn",
+                    "campaignId"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The guest preview is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/api-keys": {
       "get": {
         "tags": [

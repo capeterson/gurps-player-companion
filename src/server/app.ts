@@ -8,6 +8,7 @@ import { HTTPException } from 'hono/http-exception';
 import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';
 import { requireActiveUser } from './auth/middleware.ts';
 import type { AppConfig } from './config.ts';
+import { isPreviewReadOnlyViolation } from './db/errors.ts';
 import { productionHttps } from './https.ts';
 import { isDraining } from './lifecycle.ts';
 import { assertExactCoverage } from './mcp/catalog.ts';
@@ -29,12 +30,14 @@ import { invitationsRouter } from './routes/invitations.ts';
 import { mediaRouter } from './routes/media.ts';
 import { notificationPreferencesRouter } from './routes/notificationPreferences.ts';
 import { notificationsRouter } from './routes/notifications.ts';
+import { previewRouter } from './routes/preview.ts';
 import { syncRouter } from './routes/sync.ts';
 import { createSyncWsHandler } from './routes/syncWs.ts';
 import { durableIdempotency } from './services/idempotency.ts';
 import { mediaAdmission } from './services/media/admission.ts';
 import { mediaConfig } from './services/media/config.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
+import { GuestWriteForbiddenError, guestGate } from './services/preview/guestAccess.ts';
 import { attachStaticHandler } from './static.ts';
 
 function acceptsGzip(value: string): boolean {
@@ -80,6 +83,9 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     c.res.headers.set('X-Frame-Options', 'DENY');
   });
   app.use('*', productionHttps(config));
+  // Guest preview tokens reach only the read allow-list; this runs before every
+  // router, transport and middleware below, so new routes are blocked by default.
+  app.use('*', guestGate);
 
   app.use('/api/v1/media/*', requireActiveUser);
   app.use('/api/v1/media/*', mediaAdmission);
@@ -163,6 +169,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   // Mount sub-routers under /api/v1
   app.route('/api/v1', healthRouter);
   app.route('/api/v1', authRouter);
+  app.route('/api/v1', previewRouter);
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
   app.route('/api/v1', invitationsRouter);
@@ -276,6 +283,8 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
 
   app.onError((err, c) => {
     const requestId = c.get('requestId');
+    if (err instanceof GuestWriteForbiddenError) return c.json({ error: 'guest_read_only' }, 403);
+    if (isPreviewReadOnlyViolation(err)) return c.json({ error: 'preview_read_only' }, 403);
     if (err instanceof HTTPException) {
       if (err.status >= 500) {
         console.error(

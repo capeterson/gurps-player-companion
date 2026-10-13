@@ -38,6 +38,19 @@ export const tokenPair = z.object({
   accessTokenExpiresIn: z.number().int().positive(),
 });
 
+/** Starts a read-only guest preview session. Guest sessions have no refresh token. */
+export const guestSession = z.object({
+  accessToken: z.string().min(1),
+  /** Seconds until the guest token expires; the client then requests a new one. */
+  accessTokenExpiresIn: z.number().int().positive(),
+  /** The preview campaign the guest may read. */
+  campaignId: uuid,
+});
+
+export const guestAvailability = z.object({ available: z.boolean() });
+
+export type GuestSession = z.infer<typeof guestSession>;
+
 export const refreshRequest = z.object({
   refreshToken: z.string().min(1),
   /** Stable for this refresh token so a lost success response can be retried safely. */

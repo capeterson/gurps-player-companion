@@ -11,6 +11,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type { LibraryGraph } from '../../shared/domain/libraryGraph.ts';
 import { parseLibraryYaml } from '../../shared/yaml/library.ts';
 import { importSourceReferences } from '../../shared/yaml/sourceReferences.ts';
+import { loadConfig } from '../config.ts';
 import { upsertByKey } from '../routes/campaignLibraryCrud.ts';
 import {
   itemEntity,
@@ -18,6 +19,7 @@ import {
   spellEntity,
   traitEntity,
 } from '../routes/campaignLibraryEntities.ts';
+import { provisionPreviewCampaign } from '../services/preview/provision.ts';
 import { withAudit } from './auditContext.ts';
 import { closeDb, getDb, runInDbTransaction } from './client.ts';
 import { campaignLibrarySources, campaignMemberships, campaigns } from './schema.ts';
@@ -120,6 +122,11 @@ export async function seedDatabase(): Promise<void> {
     console.log(
       `seeded Sample library; Lantern Coast ${lantern.created ? 'created' : 'already present (preserved)'}`,
     );
+    // Last: provisioning enables its write bypass for the rest of this transaction.
+    if (loadConfig().previewModeEnabled) {
+      const preview = await provisionPreviewCampaign();
+      console.log(`guest preview ${preview.rebuilt ? 'provisioned' : 'already current'}`);
+    }
   });
 }
 

@@ -25,6 +25,8 @@ export const integrationTestConfig: AppConfig = {
   authRateLimitRegisterMax: 10_000,
   authRateLimitResetMax: 10_000,
   authRateLimitChallengeMax: 10_000,
+  authRateLimitGuestMax: 10_000,
+  previewModeEnabled: true,
   shutdownGraceSeconds: 15,
 };
 
@@ -39,5 +41,7 @@ export function configureIntegrationTestEnvironment(): void {
   process.env.AUTH_RATE_LIMIT_CHALLENGE_MAX = String(
     integrationTestConfig.authRateLimitChallengeMax,
   );
+  process.env.AUTH_RATE_LIMIT_GUEST_MAX = String(integrationTestConfig.authRateLimitGuestMax);
+  process.env.PREVIEW_MODE_ENABLED = String(integrationTestConfig.previewModeEnabled);
   resetConfigCache();
 }

@@ -27,6 +27,8 @@ const testConfig: AppConfig = {
   authRateLimitRegisterMax: 5,
   authRateLimitResetMax: 3,
   authRateLimitChallengeMax: 10,
+  authRateLimitGuestMax: 20,
+  previewModeEnabled: false,
   shutdownGraceSeconds: 15,
 };
 

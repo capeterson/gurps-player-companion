@@ -22,11 +22,13 @@ export function themePreferenceFlashKey(field: ThemePreferenceField): string {
  * changes arrive), and turns a server rejection into a toast plus a
  * flash on the affected picker (AGENTS.md rule 2).
  */
-export function useThemePreferenceSync() {
+export function useThemePreferenceSync(enabled = true) {
   const toasts = useToasts();
   useQuery({
     queryKey: THEME_PREFERENCES_QUERY_KEY,
     queryFn: fetchServerThemePreferences,
+    // Guest previews have no account preferences; their theme stays on this device.
+    enabled,
   });
 
   useEffect(

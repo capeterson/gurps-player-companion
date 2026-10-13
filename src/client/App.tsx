@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { appBreadcrumbPage, useAppEntityBreadcrumb } from './components/AppBreadcrumbs.ts';
 import { CharacterHeaderChromeContext } from './components/CharacterHeaderChromeContext.tsx';
 import { NotificationsBell } from './components/NotificationsBell.tsx';
@@ -19,6 +19,7 @@ import { clearAllLibraryTablePreferences } from './features/library/libraryTable
 import { useUnsyncedChangesGuard } from './hooks/useUnsyncedChangesGuard.tsx';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
+import { useIsGuestSession } from './lib/guestSession.ts';
 import { clearSessionQueryCache } from './lib/sessionQueryCache.tsx';
 import {
   clearPendingThemePreferences,
@@ -65,8 +66,9 @@ export function App() {
     queryKey: ['auth', 'me'],
     queryFn: () => api<MeResponse>('/auth/me'),
   });
+  const guest = useIsGuestSession();
 
-  useThemePreferenceSync();
+  useThemePreferenceSync(!guest);
   const discardGuard = useUnsyncedChangesGuard();
 
   // Close header dropdowns when the route changes — the <details> element
@@ -105,9 +107,9 @@ export function App() {
     };
   }, []);
 
-  async function signOut() {
+  async function signOut(destination = '/login') {
     const tokens = tokenStore.read();
-    if (tokens) {
+    if (tokens && !tokens.guest) {
       // Best-effort: revoke the refresh token server-side so it can't be reused.
       api('/auth/logout', {
         method: 'POST',
@@ -133,7 +135,12 @@ export function App() {
     clearAllTraitTablePreferences();
     clearAllLibraryTablePreferences();
     clearAllTableFilters();
-    navigate('/login');
+    navigate(destination);
+  }
+
+  /** Guests leave without a discard prompt: a read-only session has nothing unsaved. */
+  function exitPreview(destination: '/' | '/register') {
+    void signOut(destination);
   }
 
   function toggleTheme() {
@@ -165,7 +172,13 @@ export function App() {
           className="menu dropdown-content z-50 mt-1 w-52 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
         >
           <li className="menu-title px-3 py-2">
-            <span>{me.data ? `${me.data.displayName} · ${me.data.email}` : 'Account'}</span>
+            <span>
+              {guest
+                ? 'Read-only preview'
+                : me.data
+                  ? `${me.data.displayName} · ${me.data.email}`
+                  : 'Account'}
+            </span>
           </li>
           <li>
             <Link to="/">Home</Link>
@@ -176,9 +189,11 @@ export function App() {
           <li>
             <Link to="/campaigns">Campaigns</Link>
           </li>
-          <li>
-            <Link to="/settings">Settings</Link>
-          </li>
+          {!guest && (
+            <li>
+              <Link to="/settings">Settings</Link>
+            </li>
+          )}
           <li>
             <Link to="/about">About</Link>
           </li>
@@ -193,14 +208,25 @@ export function App() {
             </>
           )}
           <li>
-            <button type="button" onClick={() => void discardGuard.guard('signOut', signOut)}>
-              Logout
-            </button>
+            {guest ? (
+              <button type="button" onClick={() => exitPreview('/')}>
+                Exit preview
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void discardGuard.guard('signOut', () => signOut())}
+              >
+                Logout
+              </button>
+            )}
           </li>
         </ul>
       </details>
     </nav>
   );
+
+  if (guest && location.pathname.startsWith('/settings')) return <Navigate to="/" replace />;
 
   return (
     <CharacterHeaderChromeContext.Provider
@@ -209,7 +235,9 @@ export function App() {
         actions: (
           <div className="relative flex w-full shrink-0 items-center justify-end before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] [&>details]:shrink-0 [&>span]:shrink-0">
             <SyncStatusIndicator triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
-            <NotificationsBell triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
+            {!guest && (
+              <NotificationsBell triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
+            )}
             <button
               type="button"
               className="btn btn-ghost btn-sm min-h-11 h-11 w-11 shrink-0 rounded-none border-0 shadow-none"
@@ -325,7 +353,7 @@ export function App() {
           </div>
           <div className="app-header-normal flex shrink-0 items-center gap-1 sm:gap-3">
             <SyncStatusIndicator />
-            <NotificationsBell />
+            {!guest && <NotificationsBell />}
             <button
               type="button"
               className="btn btn-ghost btn-sm gap-2 px-2 sm:px-3"
@@ -338,10 +366,16 @@ export function App() {
             </button>
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
               <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
-                <span className="hidden sm:inline text-muted">Signed in as</span>
-                <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
-                  {me.data?.displayName ?? 'Account'}
-                </span>
+                {guest ? (
+                  <span>Guest</span>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline text-muted">Signed in as</span>
+                    <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
+                      {me.data?.displayName ?? 'Account'}
+                    </span>
+                  </>
+                )}
                 <AppIcon name="chevronDown" size={14} />
               </summary>
               <ul
@@ -354,17 +388,21 @@ export function App() {
                 className="menu dropdown-content z-50 mt-2 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
               >
                 <li className="menu-title px-3 py-2">
-                  <span>{me.data?.email ?? 'Loading account…'}</span>
+                  <span>
+                    {guest ? 'Read-only preview' : (me.data?.email ?? 'Loading account…')}
+                  </span>
                 </li>
                 <li>
                   <Link to="/about">About</Link>
                 </li>
-                <li>
-                  <Link to="/settings">
-                    <AppIcon name="settings" size={16} />
-                    Settings
-                  </Link>
-                </li>
+                {!guest && (
+                  <li>
+                    <Link to="/settings">
+                      <AppIcon name="settings" size={16} />
+                      Settings
+                    </Link>
+                  </li>
+                )}
                 {me.data?.isSuperuser && (
                   <>
                     <li className="menu-title px-3 pt-2">
@@ -382,9 +420,18 @@ export function App() {
                   </>
                 )}
                 <li>
-                  <button type="button" onClick={() => void discardGuard.guard('signOut', signOut)}>
-                    Logout
-                  </button>
+                  {guest ? (
+                    <button type="button" onClick={() => exitPreview('/')}>
+                      Exit preview
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void discardGuard.guard('signOut', () => signOut())}
+                    >
+                      Logout
+                    </button>
+                  )}
                 </li>
               </ul>
             </details>
@@ -395,6 +442,33 @@ export function App() {
           />
         </header>
         <main className="relative z-0 mx-auto w-full max-w-[80rem] p-4 sm:p-7">
+          {guest && (
+            <aside
+              aria-label="Preview"
+              className="alert mb-4 flex flex-wrap items-center justify-between gap-3 border-info/40 bg-info/10 sm:mb-6"
+            >
+              <span>
+                <strong>Read-only preview.</strong> Create an account to build your own characters
+                and campaigns.
+              </span>
+              <span className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => exitPreview('/register')}
+                >
+                  Create your account
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => exitPreview('/')}
+                >
+                  Exit preview
+                </button>
+              </span>
+            </aside>
+          )}
           <Outlet />
         </main>
         {discardGuard.dialog}

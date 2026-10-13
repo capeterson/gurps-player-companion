@@ -57,6 +57,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
 | [notifications.md](notifications.md) | Notification recipients, account settings, email policy, desktop opt-in and durable delivery. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
+| [preview-mode.md](preview-mode.md) | The read-only guest preview: guest tokens, the route allow-list, the database guard, system accounts and provisioning. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
 checklists for extending sync/history) live in
@@ -193,7 +194,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -1347,7 +1348,7 @@ src/
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, notificationPreferences, sync, syncWs,
                  history, admin, adventureLog, characterSubResources, apiKeys,
-                 health, encounters). campaignLibrary.ts is now a thin factory wiring:
+                 health, encounters, preview — the guest-session entry). campaignLibrary.ts is now a thin factory wiring:
                  campaignLibraryEntities.ts (per-entity-kind config: schemas,
                  DTO/insert/update mappers, natural key) and
                  campaignLibraryCrud.ts (generic POST/PATCH/DELETE route
@@ -1360,6 +1361,9 @@ src/
                  opaque token rotation/revocation, discovery + consent routes
     mcp/         exact operation manifest/catalog, SDK transport, checked
                  snapshot, same-process shared-handler executor, and MCP Apps resource discovery
+    services/preview/  Read-only guest preview: guestAccess (the guest route
+                 allow-list gate mounted before every router) and provision
+                 (builds the preview campaign under system accounts)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
                  notificationEvents, notificationEmails, notificationMaintenance
                  (durable audit fan-out, invitation/security mail and lifecycle),
@@ -1448,6 +1452,9 @@ src/
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
                  palette preferences store, server read/push and rejection toasts
     features/home/LandingPage.tsx  Public overview with canonical README screenshots
+                 and the optional Try without an account action
+    features/preview/PreviewEntryPage.tsx  `/preview`: starts a guest session
+    lib/guestSession.ts  Guest session state, renewal and local write refusal
     features/characters/CampaignAssignmentControl.tsx  Overview campaign link,
                  pencil warning, dropdown and final local-first confirmation
     features/settings/AppearanceSection.tsx  Settings theme pickers
@@ -1567,6 +1574,7 @@ bootstrap/
   sample_library.yaml   Seeded into the "Sample" campaign
   lantern_coast.yaml    Original Lantern Coast library and four campaign sourcebooks; bootstrap/README.md lists seven demo accounts
   lantern_coast_art/    Optional seed portraits and campaign cover, uploaded when present
+                        (both also build the guest preview; the runtime image copies them)
 ```
 
 Read the top-of-file doc comments — most load-bearing modules

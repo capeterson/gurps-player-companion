@@ -54,6 +54,8 @@ requirement — not optional documentation.**
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.
+  - `preview-mode.md` — the read-only guest preview: guest tokens, the route
+    allow-list, the database guard and system accounts.
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
   *what you must keep true*.** When they disagree with the code, the code is
   the truth and the spec is a bug — fix it.
@@ -250,6 +252,18 @@ open overlay at the affected sizes before handoff.
   leaked ST/DX/IQ/HT to fellow members while the detail and sync paths
   masked them.) Use `decideCharacterAccess` for the decision; never
   re-derive it ad hoc.
+
+## Guest preview access is an allow-list
+
+Guest preview tokens reach only `GUEST_ALLOWED_OPERATIONS` in
+`src/server/services/preview/guestAccess.ts`; every other route, including any
+new one, refuses them. Never widen guest access by prefix, method or a
+per-route exception. Add an entry only for a read that cannot change server
+state, and keep `preview.integration.test.ts` passing: it sends a guest token to
+every operation. Guests must never write data, settings or credentials. System
+accounts (`users.system_role`) must never join, own or be invited to a campaign
+outside preview provisioning. New client write paths must call
+`assertWritableSession()` or go through the existing outbox/API helpers that do.
 
 ## Offline sync — extension rules
 

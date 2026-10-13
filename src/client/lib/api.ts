@@ -5,6 +5,7 @@
 
 import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { connectionStore } from './connectionState.ts';
+import { GUEST_READ_ONLY_MESSAGE } from './guestSession.ts';
 import { NetworkUnavailableError, isNetworkError } from './networkErrors.ts';
 import { type TokenSnapshot, tokenStore } from './tokenStore.ts';
 
@@ -84,6 +85,7 @@ async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
         if (current.version !== origin.version || current.refreshToken !== origin.refreshToken) {
           return { ok: false, kind: 'rejected' };
         }
+        if (current.guest) return await renewGuestToken(current);
 
         let res: Response;
         try {
@@ -148,6 +150,45 @@ async function refreshTokens(origin: TokenSnapshot): Promise<RefreshResult> {
   return promise;
 }
 
+/** Guest sessions have no refresh token; an expired guest token is replaced by a new one. */
+async function renewGuestToken(current: TokenSnapshot): Promise<RefreshResult> {
+  let res: Response;
+  try {
+    res = await fetchApi(`${API_ROOT}/auth/guest`, { method: 'POST' });
+  } catch (cause) {
+    return { ok: false, kind: 'unavailable', cause };
+  }
+  if (res.status === 404) {
+    // Preview mode was turned off: the guest session is over.
+    tokenStore.clearIfCurrent(current);
+    return { ok: false, kind: 'rejected' };
+  }
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '');
+    return {
+      ok: false,
+      kind: 'unavailable',
+      failure: { status: res.status, bodyText, contentType: res.headers.get('content-type') },
+    };
+  }
+  const fresh = (await res.json()) as {
+    accessToken: string;
+    accessTokenExpiresIn: number;
+    campaignId: string;
+  };
+  return tokenStore.replaceIfCurrent(current, {
+    accessToken: fresh.accessToken,
+    refreshToken: '',
+    accessTokenExpiresIn: fresh.accessTokenExpiresIn,
+    guest: { campaignId: fresh.campaignId },
+  })
+    ? { ok: true }
+    : { ok: false, kind: 'rejected' };
+}
+
+/** The only non-GET request a read-only guest session makes: the sync pull. */
+const GUEST_READ_POSTS = new Set(['/sync/cursor']);
+
 async function runWithRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
   if (typeof navigator !== 'undefined' && 'locks' in navigator && navigator.locks?.request) {
     return await navigator.locks.request(REFRESH_LOCK, fn);
@@ -200,6 +241,14 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
 export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
   const tokens = tokenStore.read();
+  if (
+    tokens?.guest &&
+    options.authenticated !== false &&
+    method !== 'GET' &&
+    !GUEST_READ_POSTS.has(path)
+  ) {
+    throw new ApiError(403, GUEST_READ_ONLY_MESSAGE, { error: 'guest_read_only' });
+  }
   const headers: Record<string, string> = {
     // Lets /sync/* refuse (426) a build whose queued operations it can no
     // longer interpret; see shared/syncProtocol.ts.

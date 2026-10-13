@@ -106,10 +106,17 @@ async function findUserByHandle(handle: string): Promise<DbUser | null> {
   const db = getDb();
   const lowered = trimmed.toLowerCase();
   // Email match first (emails are case-insensitive in practice).
-  const byEmail = await db.select().from(users).where(sql`lower(${users.email}) = ${lowered}`);
+  // System preview accounts are never invitable, by email or by name.
+  const byEmail = await db
+    .select()
+    .from(users)
+    .where(and(sql`lower(${users.email}) = ${lowered}`, isNull(users.systemRole)));
   if (byEmail[0]) return byEmail[0];
   // Then display-name match (case-insensitive).
-  const byName = await db.select().from(users).where(sql`lower(${users.displayName}) = ${lowered}`);
+  const byName = await db
+    .select()
+    .from(users)
+    .where(and(sql`lower(${users.displayName}) = ${lowered}`, isNull(users.systemRole)));
   return byName[0] ?? null;
 }
 

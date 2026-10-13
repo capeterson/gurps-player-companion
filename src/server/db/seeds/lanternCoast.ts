@@ -1,59 +1,16 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import { and, eq, sql } from 'drizzle-orm';
-import { mediaCapabilities, mediaManifest } from '../../../shared/schemas/media.ts';
 import { createApp } from '../../app.ts';
 import { signAccessToken } from '../../auth/jwt.ts';
 import { loadConfig } from '../../config.ts';
 import { closeDb, getDb, runInDbSavepoint, runInDbTransaction } from '../client.ts';
 import { campaigns, users } from '../schema.ts';
 import { ensureDemoUser } from './accounts.ts';
-import {
-  LANTERN_CAMPAIGN_NAME,
-  type LanternArtworkUpload,
-  type LanternRequest,
-  populateLanternCoast,
-} from './lanternCoastContent.ts';
+import { readLanternCoastYaml } from './bootstrapFiles.ts';
+import { LANTERN_CAMPAIGN_NAME, populateLanternCoast } from './lanternCoastContent.ts';
 import { recordLanternSeedVersion } from './lanternCoastRevision.ts';
+import { inProcessSeedRequest, lanternArtworkUploader } from './seedTransport.ts';
 export { LANTERN_CAMPAIGN_NAME } from './lanternCoastContent.ts';
-
-const ARTWORK_EXTENSIONS = ['webp', 'png', 'jpg', 'jpeg'];
-
-async function readArtwork(slug: string): Promise<Buffer | null> {
-  for (const extension of ARTWORK_EXTENSIONS) {
-    try {
-      return await readFile(
-        new URL(`../../../../bootstrap/lantern_coast_art/${slug}.${extension}`, import.meta.url),
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-  }
-  return null;
-}
-
-/** Optional art lives beside the YAML; absent files or disabled storage skip uploads. */
-export function lanternArtworkUploader(request: LanternRequest): LanternArtworkUpload {
-  let enabled: boolean | undefined;
-  return async (actor, targetType, targetId, slug) => {
-    const bytes = await readArtwork(slug);
-    if (!bytes) return null;
-    enabled ??= mediaCapabilities.parse(await request(actor, '/media/capabilities', 'GET')).enabled;
-    if (!enabled) return null;
-    const manifest = mediaManifest.parse(
-      await request(actor, '/media/uploads', 'POST', {
-        clientUploadId: randomUUID(),
-        targetType,
-        targetId,
-        byteLength: bytes.length,
-        sha256: createHash('sha256').update(bytes).digest('hex'),
-        base64: bytes.toString('base64'),
-      }),
-    );
-    if (manifest.state !== 'ready') throw new Error(`Lantern artwork ${slug} is ${manifest.state}`);
-    return manifest.id;
-  };
-}
+export { inProcessSeedRequest, lanternArtworkUploader } from './seedTransport.ts';
 
 /**
  * A single atomic, insert-once fixture. Normal routes validate all campaign and
@@ -73,33 +30,12 @@ export async function seedLanternCoast(ownerId: string, libraryText?: string) {
       .where(and(eq(campaigns.ownerId, ownerId), eq(campaigns.name, LANTERN_CAMPAIGN_NAME)));
     if (existing) return { campaignId: existing.id, created: false };
 
-    const yaml =
-      libraryText ??
-      (await readFile(
-        new URL('../../../../bootstrap/lantern_coast.yaml', import.meta.url),
-        'utf8',
-      ));
+    const yaml = libraryText ?? (await readLanternCoastYaml());
     const app = createApp(loadConfig());
     const [owner] = await db.select().from(users).where(eq(users.id, ownerId));
     if (!owner) throw new Error('Seed owner does not exist');
     const ownerToken = (await signAccessToken(owner.id, owner.authVersion)).token;
-    const request = async (
-      token: string,
-      path: string,
-      method = 'POST',
-      body?: unknown,
-    ): Promise<unknown> => {
-      const response = await app.request(`/api/v1${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-      if (!response.ok)
-        throw new Error(
-          `Lantern seed ${method} ${path}: ${response.status} ${await response.text()}`,
-        );
-      return response.status === 204 ? null : response.json();
-    };
+    const request = inProcessSeedRequest(app);
     const result = await populateLanternCoast({
       yaml,
       request,

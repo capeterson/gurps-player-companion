@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../../lib/api.ts';
+import { guestCampaignId, useIsGuestSession } from '../../lib/guestSession.ts';
 import { CharacterCard } from '../characters/CharacterCard.tsx';
 import { useCharactersList } from '../characters/useCharacterDetail.ts';
 
@@ -19,8 +20,12 @@ export function HomePage() {
     queryFn: () => api<MeResponse>('/auth/me'),
   });
   const characters = useCharactersList();
+  const guest = useIsGuestSession();
 
   const recent = (characters ?? []).slice(0, 4);
+  const previewCampaignId = guest ? guestCampaignId() : null;
+  // A guest owns nothing; their home is the preview campaign.
+  if (previewCampaignId) return <Navigate to={`/campaigns/${previewCampaignId}`} replace />;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

@@ -146,7 +146,7 @@ curl -fsS http://localhost:3000/api/v1/healthz
 
 Production exposes **port 3000**. The stack builds the app, applies migrations, and starts only after they succeed. Put it behind an HTTPS reverse proxy pointing at port 3000; forward WebSocket upgrades and leave `/api/*`, `/mcp`, `/oauth/*`, and `/.well-known/*` uncached. Keep the `db_data` volume backed up. To update, pull the latest code and rerun the build/start command.
 
-The supplied Compose files set container variables explicitly: `.env` supplies `${...}` substitutions, **not every container setting automatically**. For options not forwarded in the file, add them to the app service’s `environment` in a Compose override and include that override with `-f`. The production file forwards `JWT_SECRET`, `APP_HOSTNAME`, `OAUTH_CLIENTS`, `TRUST_PROXY`, and the `AUTH_RATE_LIMIT_*` settings; database credentials, ports, token lifetimes, and CORS are fixed in that file unless overridden.
+The supplied Compose files set container variables explicitly: `.env` supplies `${...}` substitutions, **not every container setting automatically**. For options not forwarded in the file, add them to the app service’s `environment` in a Compose override and include that override with `-f`. The production file forwards `JWT_SECRET`, `APP_HOSTNAME`, `OAUTH_CLIENTS`, `TRUST_PROXY`, `PREVIEW_MODE_ENABLED`, and the `AUTH_RATE_LIMIT_*` settings; database credentials, ports, token lifetimes, and CORS are fixed in that file unless overridden.
 
 ### Environment variables
 
@@ -173,6 +173,8 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `AUTH_RATE_LIMIT_REGISTER_MAX` | `5` | Registration-attempt limit per source IP per window. |
 | `AUTH_RATE_LIMIT_RESET_MAX` | `3` | Password-recovery attempt limit per window. |
 | `AUTH_RATE_LIMIT_CHALLENGE_MAX` | `10` | Passkey-challenge attempt limit per window. |
+| `AUTH_RATE_LIMIT_GUEST_MAX` | `20` | Guest preview sessions started per source IP per window. |
+| `PREVIEW_MODE_ENABLED` | `false` | Adds **Try without an account** to the landing page: a read-only guest preview of the Lantern Coast sample campaign. The server builds the campaign at startup under credential-less system accounts and rebuilds it when a release changes its content. Turning it off invalidates every guest session. |
 | `SHUTDOWN_GRACE_SECONDS` | `15` | On `SIGTERM`/`SIGINT`, how long (0–120) to let in-flight requests finish before forcing shutdown. Keep the orchestrator's stop timeout longer; Compose uses a 25 s `stop_grace_period`. |
 
 Development HMR uses `VITE_HMR_HOST` (default `localhost`), `VITE_HMR_PORT` (defaults to `PORT`, set to `3001` by dev Compose), and `VITE_HMR_PROTOCOL` (`ws`, or `wss` for TLS). These control the browser’s hot-reload connection, not the public application URL. Test-runner overrides are documented in [playwright.config.ts](playwright.config.ts).
