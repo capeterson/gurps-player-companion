@@ -191,7 +191,12 @@ The character inventory editor preserves these stable keys internally and never
 exposes them as editable fields. It edits **Attack name** and **Source reference**
 instead, with automatic keys for newly added alternate attacks. Linked enchantment
 IDs/revisions likewise remain stored while the character editor shows source
-references and readable effect choices.
+references and readable effect choices. Because the server rehydrates every linked
+entry from its definition on each `enchantments` write, the character editor shows
+linked names and effects read-only; **Make independent** keeps the snapshot as owned
+mechanics that the effects form then edits. A newer, different local definition is
+offered through **Review update**, which previews removed/added effect lines and
+never downgrades to an older library row.
 
 Weapon, armor, shield, container, powerstone, magic-item and enchantment facets
 coexist on one physical item. The library editor offers visual attack modes and a
@@ -220,7 +225,9 @@ equipped armor value and applies to all active defenses. Base DB authoring
 permits 5. Physical shield DB remains directional and Block still requires a shield.
 
 Lighten (`weightReductionPercent`, including typed effects) affects only equipped
-armor/shields' own weight (M67). Hideaway deducts only a container's contents,
+armor/shields' own weight (M67). A plain container may still store the value (for
+example from a library template); its editor shows it with a note that it has no
+effect there, and no container self-weight reduction is calculated. Hideaway deducts only a container's contents,
 recursively after nested adjustments, never its own weight (M61). The resolved
 capacity field denotes the weightless variant; ordinary storage capacity and the
 weighted Hideaway variant belong in notes and do not remove load. These manual

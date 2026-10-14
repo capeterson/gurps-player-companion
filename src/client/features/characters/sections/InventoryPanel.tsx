@@ -51,6 +51,13 @@ import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharac
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
 import { InventoryTypeGroup } from './inventory/InventoryTypeGroup.tsx';
+import { clearOpenSections } from './inventory/inventoryEditorState.ts';
+import {
+  type InventoryMoveTarget,
+  moveBlockReason,
+  moveInventoryItems,
+  moveTargetContainers,
+} from './inventory/inventoryMoves.ts';
 import {
   type InventoryList,
   readInventoryGroupByType,
@@ -93,6 +100,11 @@ export interface InventoryDragApi {
   onDrop: (target: DragTarget) => void;
 }
 
+function dropMoveTarget(t: DragTarget): InventoryMoveTarget {
+  if (t.kind === 'character') return { kind: 'player' };
+  return t;
+}
+
 function dragTargetKey(t: DragTarget): string {
   return t.kind === 'container' ? `container:${t.id}` : t.kind;
 }
@@ -115,6 +127,7 @@ export function InventoryPanel({
   const items = character.inventory;
   const toasts = useToasts();
   const headerBottom = useAppHeaderBottom();
+  useEffect(() => clearOpenSections, []);
   const bulkMoveMenuRef = useViewportBoundedOverlay<HTMLUListElement>(true, undefined, {
     shiftVertically: true,
     minimumTop: headerBottom,
@@ -307,43 +320,6 @@ export function InventoryPanel({
     setNewIsContainer(opt.isContainer);
   }
 
-  function clearUnavailableEquipment(ids: readonly string[], patch: InventoryItemUpdate) {
-    const before = inventoryAvailability(items);
-    const after = inventoryAvailability(
-      items.map((item) => (ids.includes(item.id) ? { ...item, ...patch } : item)),
-    );
-    return items
-      .filter(
-        (item) => item.equipped && before.get(item.id)?.equipped && !after.get(item.id)?.equipped,
-      )
-      .map((item) => ({
-        entityClass: 'character_inventory' as const,
-        entityId: item.id,
-        characterId,
-        fieldPath: 'equipped',
-        attemptedValue: false,
-        humanName: 'Equipped',
-        flashKey: makeFlashKey('character_inventory', item.id, 'equipped'),
-      }));
-  }
-
-  // Unequips go first: the server unequips anything moved off the player, so
-  // a later unequip would arrive against a newer revision.
-  async function patchMany(id: string, patch: InventoryItemUpdate, label: string): Promise<void> {
-    await enqueueFieldPatches([
-      ...clearUnavailableEquipment([id], patch),
-      ...Object.entries(patch).map(([field, value]) => ({
-        entityClass: 'character_inventory' as const,
-        entityId: id,
-        fieldPath: field,
-        attemptedValue: value,
-        humanName: `${label} ${field}`,
-        flashKey: makeFlashKey('character_inventory', id, field),
-        characterId,
-      })),
-    ]);
-  }
-
   async function bulkPatch(patch: InventoryItemUpdate, label: string): Promise<void> {
     const ids = Array.from(selectedIds);
     try {
@@ -354,9 +330,8 @@ export function InventoryPanel({
         throw new Error(
           'Move selected items on the player and set positive quantities before equipping them',
         );
-      await enqueueFieldPatches([
-        ...clearUnavailableEquipment(ids, patch),
-        ...ids.flatMap((id) =>
+      await enqueueFieldPatches(
+        ids.flatMap((id) =>
           Object.entries(patch).map(([field, value]) => ({
             entityClass: 'character_inventory' as const,
             entityId: id,
@@ -367,7 +342,17 @@ export function InventoryPanel({
             characterId,
           })),
         ),
-      ]);
+      );
+      toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
+    } catch (err) {
+      toasts.push(`Couldn't ${label.toLowerCase()} — ${(err as Error).message}`, { kind: 'error' });
+    }
+  }
+
+  async function bulkMove(target: InventoryMoveTarget, label: string): Promise<void> {
+    const ids = Array.from(selectedIds);
+    try {
+      await moveInventoryItems({ characterId, ids, target, label });
       toasts.push(`${label} ${ids.length} item${ids.length === 1 ? '' : 's'}`, { kind: 'success' });
     } catch (err) {
       toasts.push(`Couldn't ${label.toLowerCase()} — ${(err as Error).message}`, { kind: 'error' });
@@ -541,17 +526,12 @@ export function InventoryPanel({
     );
   }
 
-  // Containers eligible as a bulk-move target — exclude every selected item
-  // and any of their descendants to avoid cycles.
-  const bulkMoveTargets = useMemo(() => {
-    if (count === 0) return [] as InventoryItemOut[];
-    const blocked = new Set<string>();
-    for (const id of selectedIds) {
-      blocked.add(id);
-      for (const d of descendantsOf(id, tree.byParent)) blocked.add(d);
-    }
-    return containers.filter((c) => !blocked.has(c.id));
-  }, [containers, selectedIds, count, tree.byParent]);
+  // Containers eligible as a bulk-move target — the shared move checks exclude
+  // every selected item and its descendants to avoid cycles.
+  const bulkMoveTargets = useMemo(
+    () => (count === 0 ? [] : moveTargetContainers(items, selectedIds)),
+    [items, selectedIds, count],
+  );
 
   // ── Drag & drop ────────────────────────────────────────────────────────
   const draggedIdRef = useRef<string | null>(null);
@@ -564,20 +544,8 @@ export function InventoryPanel({
     if (!draggedId) return { ok: false, reason: 'Nothing being dragged.' };
     const dragged = items.find((i) => i.id === draggedId);
     if (!dragged) return { ok: false, reason: 'Dragged item not found.' };
-    if (target.kind === 'container') {
-      if (target.id === draggedId) {
-        return { ok: false, reason: "Can't drop an item onto itself." };
-      }
-      const targetItem = items.find((i) => i.id === target.id);
-      if (!targetItem) return { ok: false, reason: 'Target not found.' };
-      if (!targetItem.isContainer) {
-        return { ok: false, reason: `${targetItem.name} isn't a container.` };
-      }
-      const blocked = descendantsOf(draggedId, tree.byParent);
-      if (blocked.has(target.id)) {
-        return { ok: false, reason: "Can't move a container into its own contents." };
-      }
-    }
+    const blocked = moveBlockReason(items, draggedId, dropMoveTarget(target));
+    if (blocked) return { ok: false, reason: blocked };
     return { ok: true, reason: '' };
   }
 
@@ -621,13 +589,12 @@ export function InventoryPanel({
         toasts.push(v.reason, { kind: 'error' });
         return;
       }
-      let patch: InventoryItemUpdate;
-      if (target.kind === 'container')
-        patch = { parentId: target.id, worn: false, externalLocation: null };
-      else if (target.kind === 'character')
-        patch = { parentId: null, worn: true, externalLocation: null };
-      else patch = { parentId: null, worn: false };
-      void patchMany(draggedId, patch, 'Moved').catch((err) => {
+      void moveInventoryItems({
+        characterId,
+        ids: [draggedId],
+        target: dropMoveTarget(target),
+        label: 'Moved',
+      }).catch((err) => {
         toasts.push(`Couldn't move item — ${(err as Error).message}`, { kind: 'error' });
       });
     },
@@ -934,12 +901,7 @@ export function InventoryPanel({
                     <button
                       type="button"
                       className="text-primary font-medium"
-                      onClick={() =>
-                        void bulkPatch(
-                          { parentId: null, worn: true, externalLocation: null },
-                          'Moved on the player:',
-                        )
-                      }
+                      onClick={() => void bulkMove({ kind: 'player' }, 'Moved on the player:')}
                     >
                       On the player
                     </button>
@@ -948,9 +910,7 @@ export function InventoryPanel({
                     <button
                       type="button"
                       className="text-primary font-medium"
-                      onClick={() =>
-                        void bulkPatch({ parentId: null, worn: false }, 'Moved to Stashed:')
-                      }
+                      onClick={() => void bulkMove({ kind: 'stashed' }, 'Moved to Stashed:')}
                     >
                       Stashed
                       <span className="text-base-content/40 text-[10px]">off-player</span>
@@ -965,10 +925,7 @@ export function InventoryPanel({
                       <button
                         type="button"
                         onClick={() =>
-                          void bulkPatch(
-                            { parentId: c.id, worn: false, externalLocation: null },
-                            `Moved to ${c.name}:`,
-                          )
+                          void bulkMove({ kind: 'container', id: c.id }, `Moved to ${c.name}:`)
                         }
                       >
                         {c.name}

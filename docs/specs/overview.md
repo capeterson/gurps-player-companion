@@ -666,7 +666,13 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The field stays mounted in place so promotion does not steal focus. This
   applies to armor typed DR, crushing DR, defense bonus, facing and notes;
   weapon ST, shield DB, structured ranged range (fixed yards or ST multiplier), alternate modes and notes; powerstone and
-  magic-item notes; enchantment details; and basic notes/external location.
+  magic-item notes; enchantment details; and basic notes. Item details hold one **Location** select (On the player, Stashed
+  with its stash location, or In a container) sharing the bulk Move menu's checks
+  and unequip rules; Equipped is disabled with a reason off the player. Linked
+  items name their library item and offer **Unlink**. Enchantments edit full typed
+  effects, levels, applicability and combining in a validated form; linked ones
+  stay read-only until **Make independent** and preview **Review update** changes
+  from a newer local library definition before applying them.
   Armor's **Flexible armor** and **Concealable inner layer** checkboxes are never
   hidden, because a valid inner layer needs both (B286).
   Armor retains every canonical and custom hit location. Weapons retain
@@ -693,9 +699,11 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   drafts. Desktop keeps its Item/Qty/Wt/Cost columns. See
   [interaction-design.md](interaction-design.md) for the shared presentation patterns.
   Implementation lives under
-  `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, `RangedRangeField`, and
+  `characters/sections/inventory/` (`InventoryItemEditor`, `ItemField`, `RangedRangeField`,
+  `ItemLocationField`, `ItemLibraryLink`, `EnchantmentEntryDetails`,
+  `EnchantmentMechanicsForm`, `inventoryMoves`, `inventoryEditorState` and
   `itemMutations`), with regression tests for disclosure, local saves, rollback,
-  category changes, and structured-data preservation.
+  category changes, moves, enchantment effects and structured-data preservation.
   Encumbered Move
   floors at 1 through 15×BL; loads above 10×BL explicitly require carrying on
   the back and cost 1 FP/second (B353, B426). Above 15×BL ordinary carrying
@@ -1418,7 +1426,10 @@ src/
       characters/joinCharacterMechanics.ts, mechanicsUnavailableReason.ts and MechanicsUnavailable.tsx  Owned rule joins and named calculation blockers shared by player and GM views
       characters/sheetAnchors.ts, SheetAnchorLink.tsx and InventoryAnchorLink.tsx  Stable entry hashes and routed source/equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
-                                      structured Range inputs, transactional JSON-property mutations
+                                      structured Range inputs, transactional JSON-property mutations,
+                                      inventoryMoves (the one move path for the Location select,
+                                      bulk Move menu and drag and drop), enchantment effects form and
+                                      update preview, library link/Unlink,
                                       and itemCategories (the category list behind tags and type filters)
       characters/sections/inventoryTree.ts and inventoryTablePreferences.ts  Inventory tree filtering,
                                       per-list sorting, cost rollups and device-local sort choices
