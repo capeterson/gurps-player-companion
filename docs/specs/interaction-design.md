@@ -447,7 +447,15 @@ containers without locking them open. Inventory is not folded: the sheet tab alr
 it, so it renders without a `FoldSection` disclosure. Carried contents inherit their root's
 location. Equipped means worn or wielded for use and is valid only on the
 player; the add form disables Equipped for a Stashed or stashed-container
-location. There is no additional Worn control, filter or status badge. The stored/API `worn` field remains a legacy
+location. The item-details editor has one **Location** select (On the player,
+Stashed, or In each eligible container) that replaces the former External
+location field: Stashed reveals its **Stash location** text, and the item itself
+and its contents are never offered. Every move — this select, the bulk **Move to**
+menu and drag and drop — goes through `inventory/inventoryMoves.ts`, which applies
+the same patches, self/container/cycle checks and unequips anything the move takes
+off the player. Off the player, the editor's Equipped checkbox is disabled with a
+note saying why (an already equipped legacy item can still be unequipped).
+There is no additional Worn control, filter or status badge. The stored/API `worn` field remains a legacy
 root-location flag for compatibility, not an equipment status. Every applied
 category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
 Magic item, Enchantments); no category is hidden by a priority icon. Category
@@ -525,10 +533,27 @@ Primary and alternate attack IDs remain internal, are generated for new attacks,
 and are preserved when names or stats change. Alternate attacks use plain stat
 labels within numbered **Alternate attack** groups. Enchantments show their source
 reference (or Campaign library/Character sheet origin), not snapshot revisions;
-effect choices describe the affected stat. Magic activation and range choices use
+effect choices describe the affected stat. Each enchantment lists its effects in
+readable lines. A campaign-linked enchantment shows its name and effects read-only
+(the server rehydrates linked mechanics from the definition), keeps Item Power,
+level, label and notes editable, and offers **Make independent** behind an inline
+confirmation; independence keeps the current effects and opens them for editing.
+When the local library holds a newer, different definition, the entry says
+“<name> changed in the campaign library” and **Review update** lists what the
+update removes and adds before **Update** applies it; an older library row is never
+offered. Independent enchantments edit applicability, combining rule (add or
+highest in a named group), any number of effects (skill effects use the skill
+picker) and numbered levels with their own effects in one form validated by the
+shared schema; an invalid draft stays open with field errors and is never queued.
+Adding a custom enchantment opens this form directly. When levels exist,
+**Enchantment level** becomes a select of those levels. Magic activation and range choices use
 readable labels while retaining their stored enum values. Item pricing uses
 **Recalculate price**, saved price/weight summaries, and labeled costs/weights with
-units in the existing dialog; trait pricing uses **Recalculate points**. Editors
+units in the existing dialog; trait pricing uses **Recalculate points**. A linked
+item names its campaign library item beside that summary and offers **Unlink**
+(inline confirmation), which clears the link and its pricing record while keeping
+the item's price, weight and categories. Linking an existing item is not offered.
+Editors
 omit generic save/persistence explanations.
 
 Disclosures expose `aria-expanded` and `aria-controls`; row actions include
