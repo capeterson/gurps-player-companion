@@ -603,7 +603,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   mana is known, and changing campaign or mana context closes any pending roll.
   Each cast/maintenance gesture shares one audit batch across its
   FP, HP and powerstone deductions.
-- **Inventory**: nested containers (drag-and-drop, touch-enabled),
+- **Inventory**: nested containers (drag-and-drop, touch-enabled; drop on a
+  container row to nest, anywhere else in a list to move there),
   encumbrance, armor and weapon data, cost/weight rollups. Location determines what is carried:
   On the player, Stashed, or inside a container; nested contents inherit their
   root's carried/stashed location. Equipped means worn or wielded for use and

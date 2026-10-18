@@ -16,7 +16,7 @@ import { pricingDisplayValue } from '../../library/pricingDisplay.ts';
  *  - Add form with location, library autocomplete and a "More options" expander
  *    (container / armor / equipped flags at create time)
  *  - Per-row inline category editors, with autosaved fields and optional details
- *  - DnD between rows / character / stashed targets, with valid/invalid
+ *  - DnD onto containers / character / stashed targets, with valid/invalid
  *    visual feedback
  *
  * Mutations route through this repo's outbox (`useAddEntityForm`'s
@@ -621,6 +621,14 @@ export function InventoryPanel({
         toasts.push(v.reason, { kind: 'error' });
         return;
       }
+      // A root item dropped back on its own section has nowhere to move.
+      const dragged = items.find((i) => i.id === draggedId);
+      if (
+        target.kind !== 'container' &&
+        dragged?.parentId == null &&
+        dragged?.worn === (target.kind === 'character')
+      )
+        return;
       let patch: InventoryItemUpdate;
       if (target.kind === 'container')
         patch = { parentId: target.id, worn: false, externalLocation: null };

@@ -431,7 +431,11 @@ app's existing daisyUI components and semantic theme colors; avoid bespoke
 palettes, nested decorative cards, and additional display fonts.
 
 Inventory location uses the existing move/drop interaction, with On the player,
-Stashed and nested containers. One **Add item** button at the right of the
+Stashed and nested containers. Dragging a row onto a container row nests it;
+dropping it anywhere else in On the player or Stashed, including over a
+non-container row, moves it to that list's top level. Only container rows are
+row-level drop targets, so a list full of items never blocks a move between
+lists. One **Add item** button at the right of the
 inventory toolbar opens the add form in a modal dialog; a successful add closes
 it. The form has one Location selector with those choices and defaults to On
 the player. The selection summary and bulk actions (**N selected**, Clear,
