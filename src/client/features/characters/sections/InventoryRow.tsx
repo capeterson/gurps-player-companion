@@ -205,8 +205,13 @@ export function InventoryRow(props: InventoryRowProps) {
     drag.onDragStart(item.id);
   }
 
+  // Only containers are drop targets. Other rows let the drag bubble to their
+  // section, so dropping anywhere in On the player or Stashed moves the item
+  // there instead of landing on a row that rejects it.
+  const isDropTarget = item.isContainer;
+
   function handleDragOver(e: DragEvent<HTMLTableRowElement>) {
-    if (!drag || !drag.draggingId) return;
+    if (!drag || !drag.draggingId || !isDropTarget) return;
     e.preventDefault();
     e.stopPropagation();
     drag.onDragOverTarget({ kind: 'container', id: item.id }, e.dataTransfer);
@@ -216,18 +221,18 @@ export function InventoryRow(props: InventoryRowProps) {
   // target when dragenter calls preventDefault — without this, drops
   // on touch devices snap back to document.body and never fire onDrop.
   function handleDragEnter(e: DragEvent<HTMLTableRowElement>) {
-    if (!drag || !drag.draggingId) return;
+    if (!drag || !drag.draggingId || !isDropTarget) return;
     e.preventDefault();
     e.stopPropagation();
   }
 
   function handleDragLeave() {
-    if (!drag) return;
+    if (!drag || !isDropTarget) return;
     drag.onDragLeaveTarget({ kind: 'container', id: item.id });
   }
 
   function handleDrop(e: DragEvent<HTMLTableRowElement>) {
-    if (!drag) return;
+    if (!drag || !isDropTarget) return;
     e.preventDefault();
     e.stopPropagation();
     drag.onDrop({ kind: 'container', id: item.id });
