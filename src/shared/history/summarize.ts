@@ -14,6 +14,7 @@ import { formatSigned } from '../format/number.ts';
 import { campaignHouseRules } from '../schemas/campaign.ts';
 import { MANUAL_TEMP_EFFECT_ID } from '../schemas/character.ts';
 import type { EntityClass } from '../schemas/sync.ts';
+import { equipmentSwitchSummary } from './equipmentSwitchSummary.ts';
 
 const HOUSE_RULE_DEFAULTS = campaignHouseRules.parse({});
 
@@ -264,6 +265,8 @@ function summarizeCharacter(
     return `Race: ${display(c.oldValue)} → ${display(c.newValue)}`;
   }
   if (c.field === 'portraitAssetId') return c.newValue ? 'Portrait updated' : 'Portrait removed';
+  if (c.field === 'lastEquipmentSwitch')
+    return equipmentSwitchSummary(c.newValue) ?? 'Last Equipped cleared';
   if (c.field === 'activeEffects') {
     const before = (c.oldValue ?? []) as Array<{ id: string; name: string; state: string }>;
     const after = (c.newValue ?? []) as typeof before;
@@ -446,6 +449,23 @@ function summarizeInventory(
   if (c.field === 'isContainer') return `${name}: ${c.newValue ? 'set' : 'unset'} as container`;
   if (c.field === 'name') return `Renamed ${old?.name ?? name} to ${c.newValue}`;
   return describeFieldChanges(String(name), changes);
+}
+
+function summarizeLoadout(
+  op: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string {
+  const name = next?.name ?? old?.name ?? 'loadout';
+  if (op === 'insert') return `Created loadout ${name}`;
+  if (op === 'delete') return `Deleted loadout ${old?.name ?? name}`;
+  const changes = diffRows(old, next);
+  const c = changes[0];
+  if (!c) return `Loadout ${name} updated`;
+  if (c.field === 'name') return `Renamed loadout ${c.oldValue} to ${c.newValue}`;
+  if (c.field === 'itemIds') return `Changed items in ${name}`;
+  if (c.field === 'sortOrder') return `Reordered loadout ${name}`;
+  return describeFieldChanges(`Loadout ${name}`, changes);
 }
 
 function summarizeCombat(
@@ -681,6 +701,7 @@ const EVENT_SUMMARIZERS = {
   character_technique: summarizeCharacterTechnique,
   character_inventory: summarizeInventory,
   character_combat: summarizeCombat,
+  character_loadout: summarizeLoadout,
   campaign: summarizeCampaign,
   campaign_membership: summarizeMembership,
   campaign_library_source: (op, old, next) =>

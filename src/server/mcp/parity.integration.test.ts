@@ -521,6 +521,56 @@ describe('delegated operation behavioral parity', () => {
     await call(member, 'notification', { action: 'mark_read', path: { id: notification.id } });
     await call(member, 'notification', { action: 'mark_all_read' });
     await call(member, 'notification', { action: 'delete', path: { id: notification.id } });
+    // Loadouts use the member's own budget: the owner's matrix already spends
+    // most of the production per-client rate limit.
+    const kitCharacter = (
+      await call<{ id: string }>(member, 'character', {
+        action: 'create',
+        body: { name: `Kit carrier ${suffix}` },
+      })
+    ).body;
+    const kitItem = (
+      await call<{ item: { id: string } }>(member, 'character_inventory', {
+        action: 'create',
+        ...path(kitCharacter.id),
+        body: { name: `Lantern ${suffix}`, worn: false },
+      })
+    ).body;
+    const loadout = (
+      await call<{ id: string }>(member, 'character_loadout', {
+        action: 'create',
+        ...path(kitCharacter.id),
+        body: { name: `Kit ${suffix}`, itemIds: [kitItem.item.id] },
+      })
+    ).body;
+    const loadoutPath = path(kitCharacter.id, { loadoutId: loadout.id });
+    await call(member, 'character_loadout', {
+      action: 'update',
+      ...loadoutPath,
+      body: { name: `Field kit ${suffix}` },
+    });
+    const equipped = await call<{ character: { inventory: Array<{ equipped: boolean }> } }>(
+      member,
+      'character_loadout',
+      { action: 'equip', ...loadoutPath },
+    );
+    expect(equipped.body.character.inventory).toEqual([
+      expect.objectContaining({ equipped: true, worn: true }),
+    ]);
+    await call(member, 'character_loadout', {
+      action: 'restore_last_equipped',
+      ...path(kitCharacter.id),
+    });
+    const loadouts = await call<{
+      loadouts: Array<{ name: string }>;
+      lastEquipmentSwitch: { kind: string; activeLoadoutName: string | null } | null;
+    }>(member, 'get_character_loadouts', path(kitCharacter.id));
+    expect(loadouts.body.loadouts.map((entry) => entry.name)).toEqual([`Field kit ${suffix}`]);
+    expect(loadouts.body.lastEquipmentSwitch).toMatchObject({
+      kind: 'restore',
+      activeLoadoutName: null,
+    });
+    await call(member, 'character_loadout', { action: 'delete', ...loadoutPath });
 
     await call(owner, 'get_campaign_library', path(campaignId));
     const libraryKinds = [

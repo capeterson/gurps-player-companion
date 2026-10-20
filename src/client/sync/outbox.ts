@@ -1,5 +1,7 @@
 import { promotedInventoryLocation } from '../../shared/domain/inventoryAvailability.ts';
+import { equipmentSwitchProblem } from '../../shared/domain/loadouts.ts';
 import { localInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
+import { type EquipmentSwitch, equipmentSwitch } from '../../shared/schemas/loadout.ts';
 import { HUMAN_RACE, characterRace } from '../../shared/schemas/race.ts';
 import { libraryDependencyHeld } from './libraryDependencies.ts';
 import { patchesOverlap, unsettledPatch } from './patchKeys.ts';
@@ -24,7 +26,13 @@ import {
   type OperationCommand,
   isLibraryEntityClass,
 } from '../../shared/schemas/sync.ts';
-import { type OutboxEntry, type OutboxStatus, coalesceKey, getLocalDb } from '../db/dexie.ts';
+import {
+  type LocalCharacterInventory,
+  type OutboxEntry,
+  type OutboxStatus,
+  coalesceKey,
+  getLocalDb,
+} from '../db/dexie.ts';
 import {
   deleteSyncEntity,
   readSyncEntity,
@@ -33,6 +41,7 @@ import {
   writableSyncEntityTable,
 } from '../db/syncEntityStore.ts';
 import { assertWritableSession } from '../lib/guestSession.ts';
+import { makeFlashKey } from './flashBus.ts';
 import {
   campaignTransferStores,
   detachLocalCampaignReferences,
@@ -151,7 +160,10 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   if (args.entityClass === 'campaign' && args.fieldPath !== 'coverAssetId')
     throw new Error('Only campaign cover images use the outbox');
   const ckey = coalesceKey(args.entityId, args.fieldPath);
-  const now = await nextPatchTime(args.entityId);
+  const now = await afterEquipmentSwitches(
+    args.entityClass === 'character_inventory' ? args.characterId : undefined,
+    await nextPatchTime(args.entityId),
+  );
   // 1. Find any pending/transient_retry op(s) for the same field so we
   //    can coalesce them away -- AND, critically, carry forward the
   //    OLDEST one's prevValue instead of re-reading the local row.
@@ -409,7 +421,10 @@ export async function enqueueEntityPatch(args: EnqueueEntityPatchArgs): Promise<
       (op) => op.command === 'patch' && op.fieldPath === undefined,
     );
     const { carriedPrev, predecessorClientOpId } = await coalesceSameKeyOps(dupes);
-    const now = await nextPatchTime(args.entityId);
+    const now = await afterEquipmentSwitches(
+      args.entityClass === 'character_inventory' ? args.characterId : undefined,
+      await nextPatchTime(args.entityId),
+    );
     await table.put({ ...current, ...args.attemptedValue, updatedAt: now });
     await db.outbox.add({
       clientOpId: newClientId(),
@@ -470,6 +485,7 @@ const FIELD_PATCH_CLASSES: ReadonlySet<EntityClass> = new Set([
   'character_technique',
   'character_inventory',
   'character_combat',
+  'character_loadout',
 ]);
 
 async function readFieldPatchRow(
@@ -486,6 +502,95 @@ async function readFieldValue(args: EnqueueFieldPatchArgs): Promise<unknown> {
 async function readEntityRevision(args: EnqueueFieldPatchArgs): Promise<number | undefined> {
   const rev = (await readFieldPatchRow(args))?.revision as number | undefined;
   return rev === -1 ? undefined : rev;
+}
+
+/** The character field that carries a loadout switch (Last Equipped). */
+export const EQUIPMENT_SWITCH_FIELD = 'lastEquipmentSwitch';
+
+/** True for the outbox row of a loadout switch. */
+export function isEquipmentSwitchOp(
+  op: Pick<OutboxEntry, 'entityClass' | 'command' | 'fieldPath'>,
+): boolean {
+  return (
+    op.entityClass === 'character' &&
+    op.command === 'patch' &&
+    op.fieldPath === EQUIPMENT_SWITCH_FIELD
+  );
+}
+
+export interface EnqueueEquipmentSwitchArgs<T extends { record: EquipmentSwitch }> {
+  readonly characterId: string;
+  /** Toast label, e.g. "Equip Melee". */
+  readonly humanName: string;
+  /** Plans the switch from the stored inventory, inside the enqueue transaction. */
+  readonly plan: (items: readonly LocalCharacterInventory[], current: EquipmentSwitch | null) => T;
+}
+
+/**
+ * Queue one loadout switch (Equip or Restore Last Equipped). Every changed
+ * inventory row and the character's Last Equipped record update locally in
+ * one transaction with ONE operation, which the server applies atomically.
+ * Switches are never coalesced: each record's `before` values describe the
+ * state the previous switch produced, so they replay strictly in order (and
+ * in order with the character's other inventory operations; see
+ * `readDrainableOps`). A rejection restores every item (orchestrator).
+ */
+export async function enqueueEquipmentSwitch<T extends { record: EquipmentSwitch }>(
+  args: EnqueueEquipmentSwitchArgs<T>,
+): Promise<T> {
+  assertWritableSession();
+  const db = getLocalDb();
+  return db.transaction('rw', [db.outbox, db.characters, db.characterInventory], async () => {
+    const character = await db.characters.get(args.characterId);
+    if (!character) throw new Error('This character is not available on this device');
+    const items = await db.characterInventory
+      .where('characterId')
+      .equals(args.characterId)
+      .toArray();
+    const planned = args.plan(items, character.lastEquipmentSwitch ?? null);
+    const record = equipmentSwitch.parse(planned.record);
+    const problem = equipmentSwitchProblem(items, record);
+    if (problem) throw new Error(problem);
+    // Strictly after the character's queued inventory operations: replay
+    // order between the two kinds is decided by this timestamp.
+    const inventoryOps = await db.outbox
+      .filter(
+        (op) =>
+          op.entityClass === 'character_inventory' &&
+          op.parentId === args.characterId &&
+          ['pending', 'in_flight', 'transient_retry'].includes(op.status),
+      )
+      .toArray();
+    const now = new Date(
+      Math.max(
+        Date.parse(await nextPatchTime(args.characterId)),
+        ...inventoryOps.map((op) => Date.parse(op.enqueuedAt) + 1),
+      ),
+    ).toISOString();
+    for (const change of record.changes)
+      await db.characterInventory.update(change.itemId, { ...change.after, updatedAt: now });
+    await db.characters.update(args.characterId, { lastEquipmentSwitch: record, updatedAt: now });
+    const clientOpId = newClientId();
+    await db.outbox.add({
+      clientOpId,
+      entityClass: 'character',
+      entityId: args.characterId,
+      command: 'patch',
+      // Unique: a later switch must queue behind this one, never replace it.
+      coalesceKey: `${coalesceKey(args.characterId, EQUIPMENT_SWITCH_FIELD)}:${clientOpId}`,
+      fieldPath: EQUIPMENT_SWITCH_FIELD,
+      attemptedValue: record,
+      prevValue: character.lastEquipmentSwitch ?? null,
+      baseRevision: character.revision === -1 ? undefined : character.revision,
+      validationVersion: 1,
+      status: 'pending',
+      enqueuedAt: now,
+      attemptCount: 0,
+      humanName: args.humanName,
+      flashKey: makeFlashKey('character', args.characterId, EQUIPMENT_SWITCH_FIELD),
+    });
+    return planned;
+  });
 }
 
 export interface EnqueueCreateArgs<T> {
@@ -546,6 +651,8 @@ export async function enqueueCreate<T extends Record<string, unknown>>(
           .first(),
       );
     }
+    if (args.entityClass === 'character_inventory')
+      op.enqueuedAt = await afterEquipmentSwitches(op.parentId, op.enqueuedAt);
     await applyLocalCreate(args);
     await db.outbox.add(op);
   });
@@ -585,7 +692,10 @@ export async function enqueueDeletes(args: readonly EnqueueDeleteArgs[]): Promis
 
 async function enqueueDeleteInTransaction(args: EnqueueDeleteArgs): Promise<void> {
   const db = getLocalDb();
-  const now = new Date().toISOString();
+  const now = await afterEquipmentSwitches(
+    args.entityClass === 'character_inventory' ? args.characterId : undefined,
+    new Date().toISOString(),
+  );
   const prevValue =
     args.prevValue === undefined
       ? await readLocalEntity(args.entityClass, args.entityId)
@@ -920,8 +1030,22 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
     const earlierRaceCampaignPatch = unsettled.some(
       (previous) => previous.enqueuedAt < op.enqueuedAt && raceCampaignOrder(previous, op),
     );
+    // A loadout switch was planned against the inventory its character's
+    // earlier operations produced, and later inventory edits were made on
+    // top of the switch. Each waits until the other kind has settled.
+    const switchCharacter = equipmentSwitchCharacter(op);
+    const switchOrderHeld =
+      switchCharacter !== undefined &&
+      unsettled.some(
+        (previous) =>
+          previous.clientOpId !== op.clientOpId &&
+          previous.enqueuedAt < op.enqueuedAt &&
+          equipmentSwitchCharacter(previous) === switchCharacter &&
+          (isEquipmentSwitchOp(previous) || isEquipmentSwitchOp(op)),
+      );
     const dependencyHeld =
       earlierRaceCampaignPatch ||
+      switchOrderHeld ||
       Boolean(op.localMediaUploadId && !op.localMediaReady) ||
       (libraryWrites.length > 0 && libraryDependencyHeld(op, libraryWrites, libraryCampaignId)) ||
       mixedPatchHeld ||
@@ -952,6 +1076,12 @@ export async function readDrainableOps(limit: number, nowMs = Date.now()): Promi
     }
   }
   return ready;
+}
+
+/** The character whose switch ordering an operation joins, if any. */
+function equipmentSwitchCharacter(op: OutboxEntry): string | undefined {
+  if (isEquipmentSwitchOp(op)) return op.entityId;
+  return op.entityClass === 'character_inventory' ? op.parentId : undefined;
 }
 
 /** Milliseconds until the next explicitly delayed pending/retry row becomes eligible. */
@@ -1184,6 +1314,20 @@ export function backoffMs(attemptCount: number): number {
 }
 
 export const MAX_ATTEMPTS = 8;
+
+/**
+ * A character's inventory operations replay after its earlier loadout
+ * switches (see `readDrainableOps`), so never let them share a timestamp.
+ */
+async function afterEquipmentSwitches(characterId: string | undefined, at: string) {
+  if (!characterId) return at;
+  const switches = (
+    await getLocalDb().outbox.where('entityId').equals(characterId).toArray()
+  ).filter((op) => unsettledPatch(op) && isEquipmentSwitchOp(op));
+  return new Date(
+    Math.max(Date.parse(at), ...switches.map((op) => Date.parse(op.enqueuedAt) + 1)),
+  ).toISOString();
+}
 
 /** Preserve gesture order across whole-entry and field patches even within one millisecond. */
 async function nextPatchTime(entityId: string): Promise<string> {

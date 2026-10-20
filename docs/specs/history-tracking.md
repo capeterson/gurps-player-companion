@@ -318,3 +318,15 @@ archive. See [media-uploads.md](media-uploads.md).
 ## Racial templates
 
 `campaign_library_race` has revision, history and tombstone triggers; definition writes use existing audited library handlers. Character `race` changes use the existing root history trigger and summaries identify the before/after public race name. Restricted race definitions follow the library history visibility guard. See [races.md](races.md).
+
+## Equipment loadouts
+
+`character_loadouts` has revision, tombstone, history and preview-guard
+triggers (migration 0073); summaries read "Created loadout Melee", "Renamed
+loadout Melee to Duel", "Changed items in Melee", "Reordered loadout Melee" and
+"Deleted loadout Melee". A switch is one audit batch: the character's
+`last_equipment_switch` update ("Equipped loadout Melee" / "Restored Last
+Equipped") and every item row it changed share the sync op's batch id (REST
+equip/restore pass a fresh batch id), and `groupIntoBatches` titles the fold with
+the switch summary. The character History filter lists loadouts under Inventory.
+See [equipment-loadouts.md](equipment-loadouts.md).

@@ -4,6 +4,7 @@ import {
   activeEffectsField,
 } from '../../shared/schemas/activeEffects.ts';
 import { localInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
+import { equipmentSwitch } from '../../shared/schemas/loadout.ts';
 import { characterRace } from '../../shared/schemas/race.ts';
 import { HUMAN_RACE } from '../../shared/schemas/race.ts';
 import { drainOneImage, warmMediaManifests } from './mediaUploads.ts';
@@ -79,6 +80,7 @@ import {
   countPending,
   enqueueEntityPatch,
   enqueueFieldPatch,
+  isEquipmentSwitchOp,
   nextOutboxAttemptDelay,
   readDrainableOps,
   recoverStaleInFlight,
@@ -555,6 +557,7 @@ class SyncOrchestrator {
           'character_technique',
           'character_inventory',
           'character_combat',
+          'character_loadout',
         ]);
         return await this.pullInner(force, generation);
       }
@@ -1426,6 +1429,10 @@ class SyncOrchestrator {
     // Earlier outcomes in a batch can repair this operation's baseline
     // while retaining its intent (for example nested container deletions).
     const op = (await getLocalDb().outbox.get(originalOp.clientOpId)) ?? originalOp;
+    if (isEquipmentSwitchOp(op)) {
+      await this.revertEquipmentSwitch(op);
+      return undefined;
+    }
     if (op.command === 'patch' && op.fieldPath !== undefined) {
       const fieldPath = op.fieldPath;
       const db = getLocalDb();
@@ -1496,6 +1503,76 @@ class SyncOrchestrator {
       await this.reinsertLocal(op.entityClass, op.prevValue);
     }
     return undefined;
+  }
+
+  /**
+   * Undo a rejected loadout switch. Later switches of the same character were
+   * planned on top of it and are withdrawn with it, newest first. Each item
+   * field returns to its pre-switch value unless a newer queued edit owns it;
+   * that edit inherits the restored value as its rollback baseline. The
+   * server row may have moved on (the usual cause of a rejection), so the
+   * affected classes are re-pulled from the start to converge.
+   */
+  private async revertEquipmentSwitch(op: OutboxEntry): Promise<void> {
+    const db = getLocalDb();
+    const flashed = new Set<string>();
+    await db.transaction('rw', ALL_STORE_NAMES, async () => {
+      const unsettled = await db.outbox
+        .filter(
+          (entry) =>
+            (entry.entityId === op.entityId || entry.parentId === op.entityId) &&
+            ['pending', 'in_flight', 'transient_retry'].includes(entry.status),
+        )
+        .toArray();
+      const withdrawn = unsettled
+        .filter(
+          (entry) =>
+            isEquipmentSwitchOp(entry) &&
+            entry.clientOpId !== op.clientOpId &&
+            entry.enqueuedAt > op.enqueuedAt,
+        )
+        .sort((a, b) => b.enqueuedAt.localeCompare(a.enqueuedAt));
+      const reverted = [...withdrawn, op];
+      const revertedIds = new Set(reverted.map((entry) => entry.clientOpId));
+      for (const entry of reverted) {
+        const record = equipmentSwitch.safeParse(entry.attemptedValue).data;
+        for (const change of record?.changes ?? []) {
+          const current = await db.characterInventory.get(change.itemId);
+          const newer = unsettled.filter(
+            (candidate) =>
+              !revertedIds.has(candidate.clientOpId) &&
+              candidate.entityClass === 'character_inventory' &&
+              candidate.entityId === change.itemId &&
+              candidate.enqueuedAt > entry.enqueuedAt,
+          );
+          const patch: Record<string, unknown> = {};
+          for (const key of Object.keys(change.after) as (keyof typeof change.after)[]) {
+            const owner = newer.find((candidate) => patchKeys(candidate).includes(key));
+            if (owner) {
+              const queued = await db.outbox.get(owner.clientOpId);
+              if (queued?.fieldPath === key && queued.prevValue === change.after[key])
+                await db.outbox.update(owner.clientOpId, { prevValue: change.before[key] });
+              continue;
+            }
+            if (current) patch[key] = change.before[key];
+          }
+          if (current && Object.keys(patch).length) {
+            await db.characterInventory.update(change.itemId, patch);
+            flashed.add(makeFlashKey('character_inventory', change.itemId, 'equipped'));
+          }
+        }
+      }
+      if (withdrawn.length) await db.outbox.bulkDelete(withdrawn.map((entry) => entry.clientOpId));
+      await db.characters.update(op.entityId, {
+        lastEquipmentSwitch: equipmentSwitch
+          .nullable()
+          .catch(null)
+          .parse(op.prevValue ?? null),
+      });
+      await db.syncCursors.bulkDelete(['character', 'character_inventory']);
+    });
+    for (const key of flashed)
+      flashBus.emit({ key, reason: 'Loadout switch reverted; equipment restored' });
   }
 
   /**
@@ -1667,7 +1744,8 @@ class SyncOrchestrator {
     } else if (
       isLibraryEntityClass(op.entityClass) ||
       op.entityClass === 'character_trait' ||
-      op.entityClass === 'character_inventory'
+      op.entityClass === 'character_inventory' ||
+      op.entityClass === 'character_loadout'
     ) {
       // Whole-entry patches and deletes pulse the entry's row (S5/S13).
       flashBus.emit({
@@ -1757,7 +1835,8 @@ class SyncOrchestrator {
     } else if (
       isLibraryEntityClass(op.entityClass) ||
       op.entityClass === 'character_trait' ||
-      op.entityClass === 'character_inventory'
+      op.entityClass === 'character_inventory' ||
+      op.entityClass === 'character_loadout'
     ) {
       flashBus.emit({
         key: makeFlashKey(op.entityClass, op.entityId, 'entry'),
@@ -1832,6 +1911,7 @@ class SyncOrchestrator {
       db.characterTechniques,
       db.characterInventory,
       db.characterCombat,
+      db.characterLoadouts,
       db.campaigns,
       ...LIBRARY_STORE_NAMES.map((name) => db[name]),
       db.tombstones,
@@ -2005,6 +2085,7 @@ class SyncOrchestrator {
       await db.characterLanguages.where('characterId').equals(op.entityId).delete();
       await db.characterTechniques.where('characterId').equals(op.entityId).delete();
       await db.characterInventory.where('characterId').equals(op.entityId).delete();
+      await db.characterLoadouts.where('characterId').equals(op.entityId).delete();
       await db.characterCombat.delete(op.entityId);
     } else if (op.entityClass === 'character_inventory') {
       speculativeInventoryIds = new Set(
@@ -2142,6 +2223,7 @@ class SyncOrchestrator {
         db.characters,
         db.campaigns,
         db.characterCombat,
+        db.characterLoadouts,
         db.tombstones,
         ...campaignTransferStores(),
         ...LIBRARY_STORE_NAMES.map((name) => db[name]),
@@ -2228,6 +2310,25 @@ class SyncOrchestrator {
           .parse(op.localInventoryPromotionUndo ?? [])
           .find((entry) => entry.id === id);
         if (undo) for (const key of Object.keys(undo.after)) delete merged[key];
+      }
+      // An unsettled loadout switch owns its items' location and equipped
+      // fields, exactly as a field patch owns its field (S4).
+      if (typeof row.characterId === 'string') {
+        const switches = await db.outbox
+          .where('entityId')
+          .equals(row.characterId)
+          .filter(
+            (op) =>
+              isEquipmentSwitchOp(op) &&
+              ['pending', 'in_flight', 'transient_retry'].includes(op.status),
+          )
+          .toArray();
+        for (const op of switches) {
+          const change = equipmentSwitch
+            .safeParse(op.attemptedValue)
+            .data?.changes.find((entry) => entry.itemId.toLowerCase() === id.toLowerCase());
+          if (change) for (const key of Object.keys(change.after)) delete merged[key];
+        }
       }
     }
     // Campaign moves also change child links locally. Cursor rows must not
@@ -2451,6 +2552,7 @@ class SyncOrchestrator {
         db.characterTechniques,
         db.characterInventory,
         db.characterCombat,
+        db.characterLoadouts,
       ],
       async () => {
         await db.characterTraits.where('characterId').anyOf(idArray).delete();
@@ -2459,6 +2561,7 @@ class SyncOrchestrator {
         await db.characterLanguages.where('characterId').anyOf(idArray).delete();
         await db.characterTechniques.where('characterId').anyOf(idArray).delete();
         await db.characterInventory.where('characterId').anyOf(idArray).delete();
+        await db.characterLoadouts.where('characterId').anyOf(idArray).delete();
         // Combat's primary key IS the characterId (1:1), so a straight
         // bulkDelete by pk works.  (`where('id')` is wrong here — `id`
         // isn't indexed on this store, and the resulting SchemaError
@@ -2495,6 +2598,7 @@ class SyncOrchestrator {
             activeEffects: [],
             dismissedWarnings: [],
             activeConditionGroups: [],
+            lastEquipmentSwitch: null,
             updatedAt: now,
             minimalViewMasked: true,
           });
@@ -2628,6 +2732,7 @@ class SyncOrchestrator {
         db.characterTechniques,
         db.characterInventory,
         db.characterCombat,
+        db.characterLoadouts,
         db.campaigns,
       ],
       async () => {
@@ -2638,6 +2743,7 @@ class SyncOrchestrator {
           await db.characterLanguages.where('characterId').anyOf(charIdsToDelete).delete();
           await db.characterTechniques.where('characterId').anyOf(charIdsToDelete).delete();
           await db.characterInventory.where('characterId').anyOf(charIdsToDelete).delete();
+          await db.characterLoadouts.where('characterId').anyOf(charIdsToDelete).delete();
           // Combat's primary key IS the characterId -- bulkDelete by pk,
           // not `where('id')` (unindexed, throws SchemaError).
           await db.characterCombat.bulkDelete(charIdsToDelete);

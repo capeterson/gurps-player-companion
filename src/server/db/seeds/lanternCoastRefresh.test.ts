@@ -23,6 +23,7 @@ import { closeDb, getDb, runInDbTransaction } from '../client.ts';
 import {
   campaignLibraryItems,
   campaigns,
+  characterLoadouts,
   characterTraits,
   characters,
   combatStates,
@@ -459,6 +460,43 @@ describe('Lantern Coast explicit content refresh', () => {
       ).toHaveLength(count.length);
     });
   }, 60000);
+  it('adds sample loadouts to a revision 4 campaign once, keeping a player’s own', async () => {
+    await isolated(async (ownerId) => {
+      const { campaignId } = await seedLanternCoast(ownerId);
+      const roster = await getDb()
+        .select()
+        .from(characters)
+        .where(eq(characters.campaignId, campaignId));
+      const kestrel = roster.find((row) => row.name === 'Kestrel Vale');
+      const mira = roster.find((row) => row.name === 'Mira Ashfall');
+      if (!kestrel || !mira) throw new Error('Missing seeded characters');
+      // A V4 campaign predates loadouts; Mira already made one of her own.
+      await withAudit(ownerId, undefined, async (tx) => {
+        await tx.delete(characterLoadouts).where(eq(characterLoadouts.characterId, kestrel.id));
+        await tx
+          .insert(characterLoadouts)
+          .values({ characterId: mira.id, name: 'Study', itemIds: [], sortOrder: 0 });
+        await tx.delete(demoSeedUpdates).where(eq(demoSeedUpdates.campaignId, campaignId));
+        await tx.insert(demoSeedUpdates).values({ campaignId, seed: 'lantern-coast', version: 4 });
+      });
+
+      expect((await refreshLanternCoast(ownerId)).refreshed).toBe(true);
+      const names = async (characterId: string) =>
+        (
+          await getDb()
+            .select({ name: characterLoadouts.name })
+            .from(characterLoadouts)
+            .where(eq(characterLoadouts.characterId, characterId))
+        )
+          .map((row) => row.name)
+          .sort();
+      expect(await names(kestrel.id)).toEqual(['Field kit', 'Shore patrol', 'Travel']);
+      expect(await names(mira.id)).toEqual(['Study']);
+      expect((await refreshLanternCoast(ownerId)).refreshed).toBe(false);
+      expect(await names(kestrel.id)).toHaveLength(3);
+    });
+  }, 30000);
+
   it('keeps renamed source UUID links and tolerates a deleted source with no definitions', async () => {
     await isolated(async (ownerId) => {
       const old = await oldDemo(ownerId);

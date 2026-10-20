@@ -39,6 +39,7 @@ const CHARACTER_CATEGORIES: Record<string, string> = {
   character_inventory: 'inventory',
   character_language: 'languages',
   character_technique: 'techniques',
+  character_loadout: 'equipment loadouts',
 };
 const categoryFor = (entityClass: string) =>
   CHARACTER_CATEGORIES[entityClass] ?? 'character details';

@@ -512,6 +512,13 @@
       "when": 1800027000000,
       "tag": "0072_preview_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1800028000000,
+      "tag": "0073_character_loadouts",
+      "breakpoints": true
     }
   ]
 }

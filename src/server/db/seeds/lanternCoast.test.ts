@@ -60,6 +60,11 @@ async function get(userId: string, path: string) {
   expect(response.status).toBe(200);
   return response.json();
 }
+function ownerOf(roster: { id: string; ownerId: string }[], characterId: string) {
+  const owner = roster.find((row) => row.id === characterId)?.ownerId;
+  if (!owner) throw new Error('Missing character owner');
+  return owner;
+}
 async function rows(campaignId: string) {
   return getDb().select().from(characters).where(eq(characters.campaignId, campaignId));
 }
@@ -184,6 +189,25 @@ describe('Lantern Coast standard seed', () => {
       const mira = details.find((row) => row.name === 'Mira Ashfall');
       const bram = details.find((row) => row.name === 'Bram Stonebridge');
       if (!kestrel || !mira || !bram) throw new Error('Missing seeded character');
+      // Sample loadouts: Field kit is Kestrel's current set, so equipping it
+      // changes nothing on the sheet but records Last Equipped.
+      const loadouts = await get(ownerOf(roster, kestrel.id), `/characters/${kestrel.id}/loadouts`);
+      expect(loadouts.loadouts.map((entry: { name: string }) => entry.name)).toEqual([
+        'Field kit',
+        'Shore patrol',
+        'Travel',
+      ]);
+      expect(loadouts.lastEquipmentSwitch).toMatchObject({
+        kind: 'loadout',
+        activeLoadoutName: 'Field kit',
+        changes: [],
+      });
+      expect(loadouts.loadouts[0].itemIds.sort()).toEqual(
+        kestrel.inventory
+          .filter((item) => item.equipped)
+          .map((item) => item.id)
+          .sort(),
+      );
       for (const detail of details) {
         expect(detail.libraryEffectsKnown).toBe(true);
         expect(detail.revision).toBeGreaterThan(0);

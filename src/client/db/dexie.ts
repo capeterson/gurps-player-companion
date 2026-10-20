@@ -5,6 +5,7 @@ import type {
 import type { PricingResolution } from '../../shared/schemas/calculation.ts';
 import type { LocalInventoryPromotionUndo } from '../../shared/schemas/inventory.ts';
 import type { LibraryModifierOut, LibrarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
+import type { EquipmentSwitch } from '../../shared/schemas/loadout.ts';
 import type { MediaManifest, MediaTarget } from '../../shared/schemas/media.ts';
 import type { CharacterRace, LibraryRaceOut } from '../../shared/schemas/race.ts';
 import type { SyncLogPayloadMetadata } from '../../shared/schemas/syncLog.ts';
@@ -26,6 +27,7 @@ import { migrateSourcebookReferences } from './migrateSourcebookReferences.ts';
  *   characterTechniques pk=id
  *   characterInventory pk=id
  *   characterCombat    pk=characterId  (1:1 with characters)
+ *   characterLoadouts  pk=id  (v18)
  *   campaigns          pk=id
  *   campaignLibrary*   pk=id, index campaignId  (v11, one per library class)
  *   outbox             pk=clientOpId
@@ -102,6 +104,8 @@ export interface LocalCharacter {
   dismissedWarnings: string[];
   /** Trait/skill effect condition groups currently toggled ON. */
   activeConditionGroups: string[];
+  /** Latest loadout switch (Last Equipped); absent on rows synced before v18. */
+  lastEquipmentSwitch?: EquipmentSwitch | null;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -232,6 +236,18 @@ export interface LocalCharacterInventory {
   enchantments: unknown | null;
   libraryItemId: string | null;
   pricingResolution?: PricingResolution | null | undefined;
+  createdAt: string;
+  updatedAt: string;
+  revision: number;
+}
+
+/** Named equipment loadout (`character_loadout`). */
+export interface LocalCharacterLoadout {
+  id: string;
+  characterId: string;
+  name: string;
+  itemIds: string[];
+  sortOrder: number;
   createdAt: string;
   updatedAt: string;
   revision: number;
@@ -634,6 +650,7 @@ class LocalDb extends Dexie {
   characterTechniques!: Table<LocalCharacterTechnique, string>;
   characterInventory!: Table<LocalCharacterInventory, string>;
   characterCombat!: Table<LocalCharacterCombat, string>;
+  characterLoadouts!: Table<LocalCharacterLoadout, string>;
   campaigns!: Table<LocalCampaign, string>;
   campaignLibrarySources!: Table<LocalLibrarySource, string>;
   campaignLibraryModifiers!: Table<LocalLibraryModifier, string>;
@@ -658,6 +675,7 @@ class LocalDb extends Dexie {
 
   constructor() {
     super('gurps-pc-local');
+    this.version(18).stores({ characterLoadouts: 'id, characterId, updatedAt, revision' });
     this.version(17).stores({}).upgrade(migrateSourcebookReferences);
     // Existing journal rows remain readable inline; new large bodies are lazy.
     this.version(16).stores({ campaignLibraryRaces: 'id, campaignId, revision' });
@@ -880,6 +898,7 @@ export const ALL_STORE_NAMES = [
   'characterTechniques',
   'characterInventory',
   'characterCombat',
+  'characterLoadouts',
   'campaigns',
   ...LIBRARY_STORE_NAMES,
   'soloEncounters',
@@ -907,6 +926,7 @@ const STORE_BY_ENTITY_CLASS: Readonly<Record<EntityClass, keyof LocalDb | null>>
   character_technique: 'characterTechniques',
   character_inventory: 'characterInventory',
   character_combat: 'characterCombat',
+  character_loadout: 'characterLoadouts',
   campaign: 'campaigns',
   campaign_membership: null,
   campaign_library_source: 'campaignLibrarySources',

@@ -2065,6 +2065,107 @@
     },
     {
       "kind": "tool",
+      "method": "GET",
+      "path": "/api/v1/characters/{id}/loadouts",
+      "tool": "get_character_loadouts",
+      "scope": "gpc:read",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/characters/{id}/loadouts",
+      "tool": "character_loadout",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "create"
+    },
+    {
+      "kind": "tool",
+      "method": "PATCH",
+      "path": "/api/v1/characters/{id}/loadouts/{loadoutId}",
+      "tool": "character_loadout",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "update"
+    },
+    {
+      "kind": "tool",
+      "method": "DELETE",
+      "path": "/api/v1/characters/{id}/loadouts/{loadoutId}",
+      "tool": "character_loadout",
+      "scope": "gpc:manage",
+      "destructive": true,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "delete"
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/characters/{id}/loadouts/{loadoutId}/equip",
+      "tool": "character_loadout",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "equip"
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/characters/{id}/loadouts/restore-last-equipped",
+      "tool": "character_loadout",
+      "scope": "gpc:write",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "restore_last_equipped"
+    },
+    {
+      "kind": "tool",
       "method": "PATCH",
       "path": "/api/v1/characters/{id}/combat",
       "tool": "update_character_combat",
@@ -61356,6 +61457,799 @@
       "schemaSource": "openapi-zod-registry"
     },
     {
+      "name": "get_character_loadouts",
+      "description": "List equipment loadouts and the Last Equipped record",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "const": 200
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "loadouts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "characterId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "itemIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "sortOrder": {
+                          "type": "number"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "characterId",
+                        "name",
+                        "itemIds",
+                        "sortOrder",
+                        "createdAt",
+                        "updatedAt",
+                        "revision"
+                      ]
+                    }
+                  },
+                  "lastEquipmentSwitch": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "loadout",
+                              "restore"
+                            ]
+                          },
+                          "activeLoadoutId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "activeLoadoutName": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "previousActiveLoadoutId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "previousActiveLoadoutName": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "switchedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "previousEquippedIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "maxItems": 2000
+                          },
+                          "changes": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "itemId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "before": {
+                                  "type": "object",
+                                  "properties": {
+                                    "equipped": {
+                                      "type": "boolean"
+                                    },
+                                    "worn": {
+                                      "type": "boolean"
+                                    },
+                                    "parentId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "externalLocation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "equipped",
+                                    "worn",
+                                    "parentId",
+                                    "externalLocation"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "after": {
+                                  "type": "object",
+                                  "properties": {
+                                    "equipped": {
+                                      "type": "boolean"
+                                    },
+                                    "worn": {
+                                      "type": "boolean"
+                                    },
+                                    "parentId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    },
+                                    "externalLocation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "maxLength": 160
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "equipped",
+                                    "worn",
+                                    "parentId",
+                                    "externalLocation"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "itemId",
+                                "before",
+                                "after"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "maxItems": 2000
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "activeLoadoutId",
+                          "activeLoadoutName",
+                          "previousActiveLoadoutId",
+                          "previousActiveLoadoutName",
+                          "switchedAt",
+                          "previousEquippedIds",
+                          "changes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "loadouts",
+                  "lastEquipmentSwitch"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 403
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 404
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ],
+        "$defs": {
+          "ErrorBody": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:read",
+        "operation": "GET /api/v1/characters/{id}/loadouts",
+        "resultMode": "canonical-read"
+      },
+      "operation": "GET /api/v1/characters/{id}/loadouts",
+      "scope": "gpc:read",
+      "destructive": false,
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
+    },
+    {
+      "name": "character_loadout",
+      "description": "create: Create a named set of this character’s inventory items. Omitting `sortOrder` places it last in the menu.\nupdate: Rename, reorder or change the items of an equipment loadout\ndelete: Delete an equipment loadout (its items are unchanged)\nequip: Moves each loadout item that is not on the player to the root of On the player, equips the loadout items and unequips every other item without moving it. The previous state becomes Last Equipped.\nrestore_last_equipped: Reverses the latest loadout switch: re-equips the previous equipped set and returns moved items to their earlier location. The state it replaces becomes the new Last Equipped, so restoring twice toggles.",
+      "inputSchema": {
+        "type": "object",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "create"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "itemIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 1000,
+                    "default": []
+                  },
+                  "sortOrder": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path",
+              "body"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "update"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "loadoutId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id",
+                  "loadoutId"
+                ],
+                "additionalProperties": false
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "itemIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "maxItems": 1000
+                  },
+                  "sortOrder": {
+                    "type": "number"
+                  }
+                }
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path",
+              "body"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "delete"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "loadoutId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id",
+                  "loadoutId"
+                ],
+                "additionalProperties": false
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "equip"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "loadoutId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id",
+                  "loadoutId"
+                ],
+                "additionalProperties": false
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "restore_last_equipped"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 200,
+                "maximum": 299
+              },
+              "contentType": {
+                "const": "application/json"
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "acknowledged": {
+                    "const": true,
+                    "description": "The delegated mutation committed successfully."
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The most specific affected resource id, when one is available."
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The affected resource revision, when the REST result exposes one."
+                  }
+                },
+                "required": [
+                  "acknowledged"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "actions": [
+          {
+            "action": "create",
+            "requiredScope": "gpc:write",
+            "operation": "POST /api/v1/characters/{id}/loadouts",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
+            "action": "update",
+            "requiredScope": "gpc:write",
+            "operation": "PATCH /api/v1/characters/{id}/loadouts/{loadoutId}",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
+            "action": "delete",
+            "requiredScope": "gpc:manage",
+            "operation": "DELETE /api/v1/characters/{id}/loadouts/{loadoutId}",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
+            "action": "equip",
+            "requiredScope": "gpc:write",
+            "operation": "POST /api/v1/characters/{id}/loadouts/{loadoutId}/equip",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
+            "action": "restore_last_equipped",
+            "requiredScope": "gpc:write",
+            "operation": "POST /api/v1/characters/{id}/loadouts/restore-last-equipped",
+            "resultMode": "compact-mutation-ack"
+          }
+        ]
+      },
+      "actions": [
+        {
+          "action": "create",
+          "operation": "POST /api/v1/characters/{id}/loadouts",
+          "scope": "gpc:write",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "update",
+          "operation": "PATCH /api/v1/characters/{id}/loadouts/{loadoutId}",
+          "scope": "gpc:write",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "delete",
+          "operation": "DELETE /api/v1/characters/{id}/loadouts/{loadoutId}",
+          "scope": "gpc:manage",
+          "destructive": true,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "equip",
+          "operation": "POST /api/v1/characters/{id}/loadouts/{loadoutId}/equip",
+          "scope": "gpc:write",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "restore_last_equipped",
+          "operation": "POST /api/v1/characters/{id}/loadouts/restore-last-equipped",
+          "scope": "gpc:write",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        }
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
+    },
+    {
       "name": "update_character_combat",
       "description": "Patch the combat state (owner only). Upserts on first call.",
       "inputSchema": {
@@ -61863,6 +62757,7 @@
                         "character_technique",
                         "character_inventory",
                         "character_combat",
+                        "character_loadout",
                         "campaign",
                         "campaign_membership",
                         "campaign_library_trait",
@@ -62242,6 +63137,7 @@
                         "character_technique",
                         "character_inventory",
                         "character_combat",
+                        "character_loadout",
                         "campaign",
                         "campaign_membership",
                         "campaign_library_trait",

@@ -51,6 +51,9 @@ import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharac
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
 import { InventoryTypeGroup } from './inventory/InventoryTypeGroup.tsx';
+import { LoadoutEditor } from './inventory/LoadoutEditor.tsx';
+import { LoadoutsMenu } from './inventory/LoadoutsMenu.tsx';
+import { useCharacterLoadouts } from './inventory/useCharacterLoadouts.ts';
 import {
   type InventoryList,
   readInventoryGroupByType,
@@ -121,6 +124,13 @@ export function InventoryPanel({
   });
 
   const [filterText, setFilterText] = useState('');
+  const loadoutData = useCharacterLoadouts(characterId);
+  const [editingLoadout, setEditingLoadout] = useState<{ id: string; focusName: boolean } | null>(
+    null,
+  );
+  const editedLoadout = canWrite
+    ? loadoutData.loadouts.find((loadout) => loadout.id === editingLoadout?.id)
+    : undefined;
   const [sorts, setSorts] = useState(() => ({
     worn: readInventoryTablePreferences(characterId, 'worn'),
     stashed: readInventoryTablePreferences(characterId, 'stashed'),
@@ -875,7 +885,7 @@ export function InventoryPanel({
             <>
               <input
                 type="search"
-                className="input input-bordered input-sm min-w-0 flex-1 sm:max-w-xs"
+                className="input input-bordered input-sm min-w-32 flex-1 sm:max-w-xs"
                 value={filterText}
                 onChange={(event) => {
                   clear();
@@ -994,16 +1004,45 @@ export function InventoryPanel({
               </button>
             </div>
           )}
-          {canWrite && (
-            <button
-              type="button"
-              {...addButtonFlash.flashProps}
-              className="field-rollback-flash btn btn-sm btn-primary ml-auto"
-              onClick={() => setAddOpen(true)}
-            >
-              Add item
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {(canWrite || loadoutData.loadouts.length > 0) && (
+              <LoadoutsMenu
+                characterId={characterId}
+                canWrite={canWrite}
+                items={items}
+                basicLift={
+                  character.libraryEffectsKnown === false ? undefined : encumbrance?.basicLift
+                }
+                data={loadoutData}
+                onEdit={(loadoutId, created) =>
+                  setEditingLoadout({ id: loadoutId, focusName: created === true })
+                }
+              />
+            )}
+            {canWrite && (
+              <button
+                type="button"
+                {...addButtonFlash.flashProps}
+                className="field-rollback-flash btn btn-sm btn-primary"
+                onClick={() => setAddOpen(true)}
+              >
+                Add item
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {editedLoadout && (
+        <div className="px-2 pt-2 sm:px-5">
+          <LoadoutEditor
+            key={editedLoadout.id}
+            characterId={characterId}
+            loadout={editedLoadout}
+            items={items}
+            focusName={editingLoadout?.focusName ?? false}
+            onClose={() => setEditingLoadout(null)}
+          />
         </div>
       )}
 

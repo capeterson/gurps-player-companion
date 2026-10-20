@@ -1120,3 +1120,55 @@ it.each([
   });
   expect(event.summary).toBe(`Earned points ${before} → ${after}`);
 });
+
+describe('summarizeEvent equipment loadouts', () => {
+  const record = {
+    kind: 'loadout',
+    activeLoadoutId: null,
+    activeLoadoutName: 'Melee',
+    previousActiveLoadoutId: null,
+    previousActiveLoadoutName: null,
+    switchedAt: '2026-10-19T12:00:00.000Z',
+    previousEquippedIds: [],
+    changes: [],
+  };
+
+  it('names the equipped loadout and a Last Equipped restore', () => {
+    const update = (next: unknown) =>
+      summarizeEvent({
+        entityClass: 'character',
+        op: 'update',
+        oldRow: { name: 'Ash', last_equipment_switch: null },
+        newRow: { name: 'Ash', last_equipment_switch: next },
+      }).summary;
+    expect(update(record)).toBe('Equipped loadout Melee');
+    expect(update({ ...record, kind: 'restore' })).toBe('Restored Last Equipped');
+  });
+
+  it('describes loadout creation, edits, reordering and deletion', () => {
+    const loadout = (
+      op: string,
+      oldRow: Record<string, unknown> | null,
+      newRow: Record<string, unknown> | null,
+    ) => summarizeEvent({ entityClass: 'character_loadout', op, oldRow, newRow }).summary;
+    const melee = { name: 'Melee', item_ids: [], sort_order: 0 };
+    expect(loadout('insert', null, melee)).toBe('Created loadout Melee');
+    expect(loadout('update', melee, { ...melee, name: 'Duel' })).toBe(
+      'Renamed loadout Melee to Duel',
+    );
+    expect(loadout('update', melee, { ...melee, item_ids: ['a'] })).toBe('Changed items in Melee');
+    expect(loadout('update', melee, { ...melee, sort_order: 2 })).toBe('Reordered loadout Melee');
+    expect(loadout('delete', melee, null)).toBe('Deleted loadout Melee');
+  });
+
+  it('folds a switch batch under the switch summary', () => {
+    const bid = crypto.randomUUID();
+    const groups = groupIntoBatches([
+      makeEvent({ batchId: bid, entityClass: 'character', summary: 'Equipped loadout Melee' }),
+      makeEvent({ batchId: bid, entityClass: 'character_inventory', summary: 'Equipped Sword' }),
+      makeEvent({ batchId: bid, entityClass: 'character_inventory', summary: 'Unequipped Bow' }),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.groupSummary).toBe('Equipped loadout Melee');
+  });
+});

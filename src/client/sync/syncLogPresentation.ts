@@ -25,6 +25,7 @@ const ENTITIES: Record<EntityClass, EntityPresentation> = {
     anchor: 'inventory',
   },
   character_combat: { label: 'Combat state', destination: 'characterChild' },
+  character_loadout: { label: 'Loadout', destination: 'characterChild' },
   campaign: { label: 'Campaign', destination: 'campaign' },
   campaign_membership: { label: 'Campaign member', destination: 'campaign' },
   campaign_library_trait: { label: 'Library trait', destination: 'library', section: 'traits' },

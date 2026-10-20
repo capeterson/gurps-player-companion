@@ -35,6 +35,7 @@ const destinations: Record<EntityClass, [string, string]> = {
   character_language: ['Language', '/characters/parent'],
   character_technique: ['Technique', '/characters/parent'],
   character_combat: ['Combat state', '/characters/parent'],
+  character_loadout: ['Loadout', '/characters/parent'],
   campaign: ['Campaign', '/campaigns/entity'],
   campaign_membership: ['Campaign member', '/campaigns/parent'],
   campaign_library_trait: ['Library trait', '/campaigns/parent/library?section=traits&open=entity'],

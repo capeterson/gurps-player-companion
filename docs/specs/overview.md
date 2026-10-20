@@ -56,6 +56,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [history-tracking.md](history-tracking.md) | The append-only audit-log subsystem (character + campaign history). |
 | [mcp-agent-access.md](mcp-agent-access.md) | Same-process MCP/OAuth delegation, player API coverage, and parity gates. |
 | [notifications.md](notifications.md) | Notification recipients, account settings, email policy, desktop opt-in and durable delivery. |
+| [equipment-loadouts.md](equipment-loadouts.md) | Named equipment loadouts, the atomic Equip/Restore switch, Last Equipped and the active-loadout display. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
 | [preview-mode.md](preview-mode.md) | The read-only guest preview: guest tokens, the route allow-list, the database guard, system accounts and provisioning. |
 
@@ -617,7 +618,17 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   On the player. The section is not folded, and the selection's bulk actions share
   the toolbar row with search and Add item. While items are selected that toolbar
   sticks below the sheet header, so **Move to** (On the player, Stashed or a
-  container) moves rows from anywhere in a long list without dragging. Collapsing a
+  container) moves rows from anywhere in a long list without dragging.
+  **Loadouts** (beside Add item) lists named item sets in a hand-ordered menu
+  (drag or ArrowUp/ArrowDown on the handle). **Equip** moves the loadout's items
+  that are off the player to the root of On the player, equips them and unequips
+  every other item in place, as one atomic switch; the state it replaces becomes
+  **Last Equipped**, and restoring that toggles back. The success toast names
+  what changed, skipped items and a new encumbrance level, and offers Restore.
+  The button names the last equipped loadout, emphasized while equipment matches
+  it and de-emphasized with an explanatory tooltip once it differs. Edit and New
+  loadout open an inline editor (name, item checklist, delete). Read-only viewers
+  see names only. See [equipment-loadouts.md](equipment-loadouts.md). Collapsing a
   container or type section deselects what it hides, including a deep-linked
   item's highlight, and pressing outside the panel clears the selection and highlight. Both encumbrance summaries
   use player-carried weight, excluding stashed items; the raw weight total covers all items.
@@ -1348,7 +1359,7 @@ src/
     routes/health.ts  Liveness, database/migration readiness and release probes
     routes/      One file per resource group (auth, characters, campaigns,
                  campaignLibrary, invitations, notifications, notificationPreferences, sync, syncWs,
-                 history, admin, adventureLog, characterSubResources, apiKeys,
+                 history, admin, adventureLog, characterSubResources, characterLoadouts, apiKeys,
                  health, encounters, preview — the guest-session entry). campaignLibrary.ts is now a thin factory wiring:
                  campaignLibraryEntities.ts (per-entity-kind config: schemas,
                  DTO/insert/update mappers, natural key) and
@@ -1366,6 +1377,7 @@ src/
                  allow-list gate mounted before every router) and provision
                  (builds the preview campaign under system accounts)
     services/    syncDispatch (the write chokepoint), wsBus, characterSummary,
+                 loadouts (loadout CRUD and the atomic equipment switch shared by REST and sync),
                  notificationEvents, notificationEmails, notificationMaintenance
                  (durable audit fan-out, invitation/security mail and lifecycle),
                  userPurge (nightly account deletion and refresh-token expiry cleanup at 03:00 UTC),
@@ -1420,7 +1432,9 @@ src/
       characters/sheetAnchors.ts, SheetAnchorLink.tsx and InventoryAnchorLink.tsx  Stable entry hashes and routed source/equipment links
       characters/sections/inventory/ Inline category editors, field disclosure,
                                       structured Range inputs, transactional JSON-property mutations
-                                      and itemCategories (the category list behind tags and type filters)
+                                      and itemCategories (the category list behind tags and type filters);
+                                      LoadoutsMenu, LoadoutEditor, loadoutMutations and loadoutPresentation
+                                      (equipment loadouts; planning lives in shared/domain/loadouts.ts)
       characters/sections/inventoryTree.ts and inventoryTablePreferences.ts  Inventory tree filtering,
                                       per-list sorting, cost rollups and device-local sort choices
       characters/sections/  Sheet-panel form plumbing shared across
@@ -1643,7 +1657,8 @@ Equipment revision 3 updates unchanged V2 armor/weapon facets and adds layered
 gear; an already-enriched V2 campaign receives equipment only, retaining later
 skill/journal deletions. Content revision 4 upgrades unchanged V3 copy and builds,
 adds the new definitions and assigns races to characters still on Human. Inventory quantities, containment and customized facets
-are preserved.
+are preserved. Revision 5 adds Kestrel Vale's sample loadouts (Field kit, Shore patrol, Travel) and equips
+Field kit, her current set, unless she already has loadouts.
 Its YAML boundary resolves renamed books through surviving definition UUID links
 and excludes unavailable sourcebooks rather than restoring them.
 Ordinary seeding does not refresh existing Lantern campaigns.
@@ -1669,7 +1684,7 @@ Things that repeatedly surprise people working in this repo:
 1. **Sync coverage is partial and deliberate.** The character family
    (`character`, `character_trait`, `character_skill`, `character_spell`,
    `character_language`, `character_technique`, `character_inventory`,
-   `character_combat`) and all twelve `campaign_library_*` classes flow through
+   `character_combat`, `character_loadout`) and all twelve `campaign_library_*` classes flow through
    the outbox; library edits are whole-entry patches (`AGENTS.md` S13) and the
    library YAML import is the one online-only library action. Campaigns
    are pulled into Dexie and only `coverAssetId` writes use the outbox; the adventure log, invitations, and

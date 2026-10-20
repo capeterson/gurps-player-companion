@@ -91,8 +91,8 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
-    expect(TOOLS.length).toBe(109);
-    expect(tools.length).toBe(52);
+    expect(TOOLS.length).toBe(115);
+    expect(tools.length).toBe(54);
     for (const tool of tools) {
       expect(tool.policy.tool).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
       expect(tool.policy.tool.startsWith('gpc_')).toBe(false);
@@ -591,7 +591,7 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     const mutations = tools.filter((tool) => tool.policy.method !== 'GET');
-    expect(mutations.length).toBe(34);
+    expect(mutations.length).toBe(35);
     for (const tool of mutations) {
       const output = JSON.stringify(tool.outputSchema);
       expect(tool.policy.resultMode, tool.policy.tool).toBe('compact-mutation-ack');

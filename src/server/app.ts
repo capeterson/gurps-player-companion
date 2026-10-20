@@ -21,6 +21,7 @@ import { apiKeysRouter } from './routes/apiKeys.ts';
 import { authRouter } from './routes/auth.ts';
 import { campaignLibraryRouter } from './routes/campaignLibrary.ts';
 import { campaignsRouter } from './routes/campaigns.ts';
+import { characterLoadoutsRouter } from './routes/characterLoadouts.ts';
 import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
 import { encounterRouter } from './routes/encounters.ts';
@@ -181,6 +182,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', encounterRouter);
   app.route('/api/v1', charactersRouter);
   app.route('/api/v1', characterSubResourcesRouter);
+  app.route('/api/v1', characterLoadoutsRouter);
   app.route('/api/v1', historyRouter);
   app.route('/api/v1', createOAuthAccountRouter(config));
 

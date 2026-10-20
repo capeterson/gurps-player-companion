@@ -55,7 +55,7 @@ Any one of these on its own stops a guest write:
    `token` query parameter may reach only the exact operations in
    `GUEST_ALLOWED_OPERATIONS`: health checks, `/auth/me`, campaign, character,
    library, adventure-log, history, encounter, invitation and notification
-   reads, media capabilities, and `POST /sync/cursor` (a read that sends its
+   reads, the character loadout list, media capabilities, and `POST /sync/cursor` (a read that sends its
    cursors as a body). Everything else, including `/mcp`, `/oauth/*`, admin, media uploads and the
    WebSocket, answers `403 {"error":"guest_read_only"}`. A new route is
    blocked for guests until someone deliberately adds it to the list.

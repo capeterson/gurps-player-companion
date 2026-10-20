@@ -18,6 +18,7 @@ import {
   bigserial,
   boolean,
   date,
+  doublePrecision,
   foreignKey,
   index,
   integer,
@@ -63,6 +64,7 @@ import type {
 } from '../../shared/schemas/inventory.ts';
 import { FLUENCY_LEVELS } from '../../shared/schemas/language.ts';
 import type { LibraryMechanics } from '../../shared/schemas/libraryMechanics.ts';
+import type { EquipmentSwitch } from '../../shared/schemas/loadout.ts';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationPreferences,
@@ -682,6 +684,11 @@ export const characters = pgTable(
      */
     activeConditionGroups: jsonb('active_condition_groups').$type<string[]>().notNull().default([]),
 
+    /** Latest loadout switch: Last Equipped, the active loadout and the
+     * switch's undo journal. Validated by `equipmentSwitch`
+     * (src/shared/schemas/loadout.ts); null before the first switch. */
+    lastEquipmentSwitch: jsonb('last_equipment_switch').$type<EquipmentSwitch | null>(),
+
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
@@ -888,6 +895,31 @@ export const inventoryItems = pgTable(
       t.revision,
     ),
     parentIdx: index('inventory_items_parent_idx').on(t.parentId),
+  }),
+);
+
+/** Named equipment loadouts (migration 0073). */
+export const characterLoadouts = pgTable(
+  'character_loadouts',
+  {
+    id: id(),
+    characterId: uuid('character_id')
+      .notNull()
+      .references(() => characters.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 80 }).notNull(),
+    /** Validated by `loadoutItemIds` (src/shared/schemas/loadout.ts). */
+    itemIds: jsonb('item_ids').$type<string[]>().notNull().default([]),
+    sortOrder: doublePrecision('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    revision: revision(),
+  },
+  (t) => ({
+    characterIdx: index('character_loadouts_character_idx').on(t.characterId),
+    characterRevisionIdx: index('character_loadouts_character_revision_idx').on(
+      t.characterId,
+      t.revision,
+    ),
   }),
 );
 
@@ -1511,6 +1543,7 @@ export type DbCharacterSpell = typeof characterSpells.$inferSelect;
 export type DbCharacterLanguage = typeof characterLanguages.$inferSelect;
 export type DbCharacterTechnique = typeof characterTechniques.$inferSelect;
 export type DbInventoryItem = typeof inventoryItems.$inferSelect;
+export type DbCharacterLoadout = typeof characterLoadouts.$inferSelect;
 export type DbCombatState = typeof combatStates.$inferSelect;
 export type DbEncounter = typeof encounters.$inferSelect;
 export type DbEncounterCombatant = typeof encounterCombatants.$inferSelect;

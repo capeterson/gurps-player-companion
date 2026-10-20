@@ -5,6 +5,7 @@
  */
 
 import { type Page, expect, test } from '@playwright/test';
+import { selectCharacterSection } from './character-navigation';
 import { captureReviewScreenshot } from './review-artifacts';
 
 const PARTY = [
@@ -85,6 +86,24 @@ test('a guest reads the Lantern Coast party without any way to change it', async
   await page.goto('/');
   await expect(page).toHaveURL(/\/campaigns\/[0-9a-f-]{36}$/);
 
+  expect(writes).toEqual([]);
+});
+
+test('a guest sees sample loadouts without equip or edit actions', async ({ page }) => {
+  const writes = recordWrites(page);
+  await startPreview(page);
+  await page.getByRole('link', { name: 'Kestrel Vale' }).click();
+  await expect(page.getByRole('heading', { name: 'Kestrel Vale', level: 1 }).first()).toBeVisible();
+  await selectCharacterSection(page, 'Inventory');
+  // The seed equips its current set, so the active loadout is an exact match.
+  const loadouts = page.getByRole('button', { name: 'Loadouts: Field kit ▾' });
+  await expect(loadouts.getByText('Field kit')).toHaveClass(/font-semibold/);
+  await loadouts.click();
+  const menu = page.getByRole('menu', { name: 'Loadouts' });
+  await expect(menu.getByRole('listitem')).toHaveText(['Field kit', 'Shore patrol', 'Travel']);
+  await expect(menu.getByRole('menuitem')).toHaveCount(0);
+  await expect(menu.getByRole('button', { name: /^Reorder/ })).toHaveCount(0);
+  await expectInsideViewport(page, menu);
   expect(writes).toEqual([]);
 });
 

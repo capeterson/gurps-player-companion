@@ -33,7 +33,7 @@ The outbox + cursor system covers the **character family** and the
 ```
 character  character_trait  character_skill  character_spell
 character_language  character_technique  character_inventory
-character_combat
+character_combat  character_loadout
 
 campaign_library_trait  campaign_library_skill  campaign_library_spell
 campaign_library_item  campaign_library_language  campaign_library_technique
@@ -363,7 +363,8 @@ execution: `/sync/operations` does not persist outcome receipts by `clientOpId`.
 
 An installed PWA can stay offline across several deploys and return with outbox
 operations, and a Dexie layout, written by an older build. `src/shared/syncProtocol.ts`
-defines `SYNC_PROTOCOL_VERSION` (currently 1) and `MIN_SUPPORTED_SYNC_PROTOCOL`.
+defines `SYNC_PROTOCOL_VERSION` (currently 3; 3 added the `character_loadout`
+class and `characters.lastEquipmentSwitch`) and `MIN_SUPPORTED_SYNC_PROTOCOL` (2).
 `lib/api.ts` sends `X-GPC-Sync-Protocol` on every request; a missing header counts
 as protocol 1 because clients before the header spoke it.
 
@@ -1185,3 +1186,27 @@ preserve these local promotion fields while the delete is unsettled. Rejection
 or explicit discard restores unchanged fields, preserves newer child edits, and
 flashes affected rows alongside the deletion rollback notice. The client-only
 journal has a shared Zod schema and never enters a sync envelope.
+
+### Equipment loadout switches
+
+`character_loadout` (Dexie v18 `characterLoadouts`) is an ordinary character
+child class with per-field patches of `name`, `itemIds` and `sortOrder`.
+Checklist toggles read and write the stored `itemIds` in one Dexie transaction.
+
+Equip and Restore Last Equipped are **one** `patch` of the character field
+`lastEquipmentSwitch` (`enqueueEquipmentSwitch`). The record lists every changed
+item's `before`/`after` equipped and location fields; the enqueue transaction
+plans it from the stored inventory, applies every `after` locally and adds the
+op. The op is never coalesced (its coalesce key is unique) and replays strictly
+in order with the character's inventory operations: `readDrainableOps` holds a
+switch behind earlier unsettled inventory ops of that character, and inventory
+ops behind earlier switches, and enqueue timestamps never tie between the two.
+The server validates every `before` against its rows and applies the whole
+switch in one transaction, or refuses it; an identical replay is acknowledged.
+While a switch is unsettled, cursor rows for its items keep the four switched
+fields (S4). A rejection restores every item field that no newer queued edit
+owns (that edit inherits the restored rollback baseline), withdraws later
+switches of the character, restores the previous record, persists one toast,
+flashes the affected rows and the Loadouts button, and clears the `character`
+and `character_inventory` cursors so the server's current rows are pulled again.
+See [equipment-loadouts.md](equipment-loadouts.md).
