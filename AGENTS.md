@@ -51,6 +51,8 @@ requirement — not optional documentation.**
   - `races.md` — campaign racial templates, owned character race purchases, variants, forms, and lenses.
   - `library-calculation-rules.md` — source editions, bounded declarative pricing, completeness, purchase snapshots and weapon modes.
   - `notifications.md` — event recipients, inbox/email preferences, desktop opt-in and durable delivery.
+  - `equipment-loadouts.md` — named equipment loadouts and the atomic
+    Equip/Restore Last Equipped switch.
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.
@@ -278,7 +280,7 @@ broken at least once; assume the comment in the file already warns you.
 The outbox + cursor system covers the character classes (`character`,
 `character_trait`, `character_skill`, `character_spell`,
 `character_language`, `character_technique`, `character_inventory`,
-`character_combat`) **and every campaign-library class**
+`character_combat`, `character_loadout`) **and every campaign-library class**
 (`campaign_library_trait`, `_skill`, `_spell`, `_item`, `_language`,
 `_technique`, `_style`, `_enchantment`, `_active_effect`, `_source`, `_modifier`, `_race`). The library is
 local-first like the character sheet: every library read comes from Dexie,

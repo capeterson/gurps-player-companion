@@ -53,14 +53,14 @@ describe('commit-safe revision allocation', () => {
         AND table_name IN (
           'campaigns', 'campaign_memberships', 'characters', 'character_traits',
           'character_skills', 'character_spells', 'character_languages',
-          'character_techniques', 'inventory_items', 'combat_states',
+          'character_techniques', 'inventory_items', 'combat_states', 'character_loadouts',
           'campaign_library_traits', 'campaign_library_skills',
           'campaign_library_spells', 'campaign_library_items',
           'campaign_library_languages', 'campaign_library_techniques',
           'campaign_library_styles', 'adventure_log_entries', 'entity_history'
         )
     `);
-    expect(defaults.rows).toHaveLength(19);
+    expect(defaults.rows).toHaveLength(20);
     for (const row of defaults.rows) {
       expect(row.column_default, row.table_name).toContain('next_sync_revision()');
     }

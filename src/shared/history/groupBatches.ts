@@ -1,5 +1,6 @@
 /** Group adjacent history events and name multi-event batches for the feed. */
 import type { HistoryEventOut } from '../schemas/history.ts';
+import { isEquipmentSwitchSummary } from './equipmentSwitchSummary.ts';
 
 // ---------- batch grouping ----------
 
@@ -101,6 +102,11 @@ function makeBatchSummary(events: HistoryEventOut[]): string {
   const n = events.length;
   const first = events[0];
   if (!first) return `${n} changes`;
+  // A loadout switch updates the character and every item it moved or equipped.
+  const equipmentSwitch = events.find(
+    (e) => e.entityClass === 'character' && isEquipmentSwitchSummary(e.summary),
+  );
+  if (equipmentSwitch) return equipmentSwitch.summary;
   // A same-item burst (see SAME_ITEM_BURST_WINDOW_MS) is several quick
   // edits to one thing, not one gesture touching several things — phrase
   // it accordingly rather than reusing the "N items" bulk-gesture wording.

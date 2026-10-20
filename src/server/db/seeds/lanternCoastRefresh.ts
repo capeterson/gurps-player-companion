@@ -58,6 +58,7 @@ import { LANTERN_CAMPAIGN_NAME, type LanternRequest } from './lanternCoastConten
 import { refreshLanternCoastV4 } from './lanternCoastContentV4.ts';
 import { lanternCharacters, lanternSharedLogs } from './lanternCoastData.ts';
 import { refreshLanternCoastEquipment } from './lanternCoastEquipment.ts';
+import { addLanternLoadouts } from './lanternCoastLoadouts.ts';
 import { lanternSeedIsCurrent, recordLanternSeedVersion } from './lanternCoastRevision.ts';
 
 const purchaseIdentity = (row: { name: string; specialization?: unknown }) =>
@@ -186,16 +187,34 @@ export async function refreshLanternCoast(
       });
       return skipped;
     };
+    const refreshLoadouts = async () => {
+      const { players, skipped } = await matchedPlayers();
+      for (const player of players)
+        await addLanternLoadouts(
+          request,
+          player.actor,
+          player.characterId,
+          player.fixture.character.name,
+        );
+      return skipped;
+    };
     // Each later revision runs alone on a campaign that already received the
     // earlier ones, so deleted V2 skills/notes and V3 equipment are not restored.
+    if (await lanternSeedIsCurrent(campaign.id, 4)) {
+      const skippedCharacters = await refreshLoadouts();
+      await recordLanternSeedVersion(campaign.id, ownerId);
+      return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
+    }
     if (await lanternSeedIsCurrent(campaign.id, 3)) {
       const skippedCharacters = await refreshContentV4();
+      await refreshLoadouts();
       await recordLanternSeedVersion(campaign.id, ownerId);
       return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
     }
     if (await lanternSeedIsCurrent(campaign.id, 2)) {
       const skippedCharacters = await refreshEquipment();
       await refreshContentV4();
+      await refreshLoadouts();
       await recordLanternSeedVersion(campaign.id, ownerId);
       return { campaignId: campaign.id, created: false, refreshed: true, skippedCharacters };
     }
@@ -601,7 +620,11 @@ export async function refreshLanternCoast(
         visibility: 'campaign',
       });
     }
-    for (const name of [...(await refreshEquipment()), ...(await refreshContentV4())]) {
+    for (const name of [
+      ...(await refreshEquipment()),
+      ...(await refreshContentV4()),
+      ...(await refreshLoadouts()),
+    ]) {
       if (!skippedCharacters.includes(name)) skippedCharacters.push(name);
     }
     // Last write: a rerun must not recreate deliberate deletions after enrichment.

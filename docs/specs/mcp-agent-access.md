@@ -184,7 +184,7 @@ tools. The current covered surface is:
 | API surface | MCP requirement |
 |---|---|
 | Current user (`GET /auth/me`) | Safe current-user identity with no credentials. |
-| Characters | List/detail/create/update/delete, warning dismissal, all trait/skill/spell/language/technique/inventory writes, combat updates, condition-group activation/deactivation. Include every writable field, optional/null/default behavior, and computed detail field. |
+| Characters | List/detail/create/update/delete, warning dismissal, all trait/skill/spell/language/technique/inventory/loadout writes, loadout equip and Last Equipped restore, combat updates, condition-group activation/deactivation. Include every writable field, optional/null/default behavior, and computed detail field. |
 | Campaigns | List/detail/create/update/delete, member and role changes, ownership transfer; use existing role checks. |
 | Campaign library | Read and CRUD for every library type, plus YAML import/export with sourcebook selection and existing options. Restricted entries are owner-only. Reads support section/name/limit/offset narrowing; preserve YAML export as a typed text payload. |
 | Invitations and notifications | All list, invite/cancel/accept/reject, mark-read/read-all, and deletion operations. |
@@ -606,3 +606,13 @@ handlers enforce campaign ownership of each UUID, backed by database foreign key
 ## Racial templates
 
 The `library_race` tool covers owner-only race create/update/delete with REST-shared schemas and handlers. Existing library list, YAML import/export and character operations include races. The owned-snapshot server trust boundary, campaign restrictions, audit/history, cursor invalidation and minimal-view masking apply equally to MCP. See [races.md](races.md).
+
+## Equipment loadouts
+
+`get_character_loadouts` reads `GET /characters/{id}/loadouts` (full view only).
+The `character_loadout` task tool covers `create`, `update`, `delete`, `equip`
+and `restore_last_equipped`, sharing the REST handlers and `services/loadouts.ts`
+with the sync dispatcher: the server plans and applies each switch atomically
+under the character's inventory lock, in one audit batch. Guests may read the
+list; every write is refused. The parity matrix exercises every action with the
+second actor's rate budget. See [equipment-loadouts.md](equipment-loadouts.md).

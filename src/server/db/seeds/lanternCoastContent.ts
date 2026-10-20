@@ -24,6 +24,7 @@ import {
   lanternCharacters,
   lanternSharedLogs,
 } from './lanternCoastData.ts';
+import { addLanternLoadouts } from './lanternCoastLoadouts.ts';
 
 export const LANTERN_CAMPAIGN_NAME = 'The Lantern Coast';
 const childSchemas = {
@@ -203,6 +204,7 @@ export async function populateLanternCoast({
       for (const child of item.contents ?? []) await addItem(child, saved.item.id);
     };
     for (const item of fixture.inventory) await addItem(item);
+    await addLanternLoadouts(request, token, character.id, fixture.character.name);
     const effects = [];
     for (const entry of fixture.effects) {
       const source = activeEffectDefinitionOut.parse(definition('activeEffects', entry.name));

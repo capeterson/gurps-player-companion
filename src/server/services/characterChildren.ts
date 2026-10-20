@@ -19,6 +19,7 @@ import { traitCreate } from '../../shared/schemas/trait.ts';
 import type { AuditTx } from '../db/auditContext.ts';
 import {
   characterLanguages,
+  characterLoadouts,
   characterSkills,
   characterSpells,
   characterTechniques,
@@ -42,6 +43,7 @@ export const CHARACTER_CHILD_TABLES = {
   character_language: characterLanguages,
   character_technique: characterTechniques,
   character_inventory: inventoryItems,
+  character_loadout: characterLoadouts,
 } as const;
 
 export type CharacterChildClass = keyof typeof CHARACTER_CHILD_TABLES;

@@ -37,6 +37,7 @@ export const GUEST_ALLOWED_OPERATIONS: readonly GuestOperation[] = [
   { method: 'GET', path: '/api/v1/characters/{id}' },
   { method: 'GET', path: '/api/v1/characters/{id}/history' },
   { method: 'GET', path: '/api/v1/characters/{id}/inventory/{itemId}' },
+  { method: 'GET', path: '/api/v1/characters/{id}/loadouts' },
   { method: 'GET', path: '/api/v1/invitations' },
   { method: 'GET', path: '/api/v1/notifications' },
   { method: 'GET', path: '/api/v1/media/capabilities' },

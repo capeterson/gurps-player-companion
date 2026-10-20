@@ -576,7 +576,8 @@ async function fetchClassUpserts(args: {
     case 'character_spell':
     case 'character_language':
     case 'character_technique':
-    case 'character_inventory': {
+    case 'character_inventory':
+    case 'character_loadout': {
       const table = CHARACTER_CHILD_TABLES[entityClass];
       const changes = await fetchChildClass({
         entityClass,
@@ -865,6 +866,7 @@ function projectCharacterRow(row: DbCharacter): DbCharacter & { raceName: string
     activeEffects: [],
     dismissedWarnings: [],
     activeConditionGroups: [],
+    lastEquipmentSwitch: null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     revision: row.revision,

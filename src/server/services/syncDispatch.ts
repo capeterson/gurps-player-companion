@@ -37,6 +37,7 @@ import { characterCreate, characterSyncPatch } from '../../shared/schemas/charac
 import { combatStateUpdate } from '../../shared/schemas/combat.ts';
 import { inventoryItemCreate, inventoryItemUpdate } from '../../shared/schemas/inventory.ts';
 import { languageUpdate } from '../../shared/schemas/language.ts';
+import { type LoadoutUpdate, loadoutCreate, loadoutUpdate } from '../../shared/schemas/loadout.ts';
 import { skillUpdate } from '../../shared/schemas/skill.ts';
 import { spellUpdate } from '../../shared/schemas/spell.ts';
 import {
@@ -62,6 +63,7 @@ import { isUniqueViolation } from '../db/errors.ts';
 import {
   campaignMemberships,
   campaigns,
+  characterLoadouts,
   characters,
   combatStates,
   inventoryItems,
@@ -94,6 +96,12 @@ import {
   inventoryInsertValues,
 } from './entityWrites.ts';
 import { publishLibraryInvalidation } from './libraryInvalidation.ts';
+import {
+  applyEquipmentSwitch,
+  createLoadout,
+  deleteLoadout,
+  prepareLoadoutUpdate,
+} from './loadouts.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
 import { publish as wsPublish } from './wsBus.ts';
@@ -118,6 +126,7 @@ const FIELD_VALIDATORS = {
   character_technique: techniqueUpdate,
   character_inventory: inventoryItemUpdate,
   character_combat: combatStateUpdate,
+  character_loadout: loadoutUpdate,
 } as const;
 
 type WritableEntityClass = keyof typeof FIELD_VALIDATORS;
@@ -131,6 +140,7 @@ const WRITABLE_FOR_PATCH: Record<EntityClass, readonly string[] | null> = {
   character_technique: Object.keys(techniqueUpdate.shape) as readonly string[],
   character_inventory: Object.keys(inventoryItemUpdate.shape) as readonly string[],
   character_combat: Object.keys(combatStateUpdate.shape) as readonly string[],
+  character_loadout: Object.keys(loadoutUpdate.shape) as readonly string[],
   // Only the campaign cover is outbox-backed; other settings remain REST-only.
   campaign: ['coverAssetId'],
   campaign_membership: null,
@@ -209,6 +219,7 @@ const DISPATCHABLE_CLASSES = new Set<EntityClass>([
   'character_technique',
   'character_inventory',
   'character_combat',
+  'character_loadout',
   'campaign_library_trait',
   'campaign_library_skill',
   'campaign_library_spell',
@@ -591,6 +602,8 @@ async function dispatchOperationInner(
       return dispatchInventory(ctx, op, tx);
     case 'character_combat':
       return dispatchCombat(ctx, op, tx);
+    case 'character_loadout':
+      return dispatchLoadout(ctx, op, tx);
     case 'campaign_library_trait':
     case 'campaign_library_skill':
     case 'campaign_library_spell':
@@ -660,6 +673,14 @@ async function dispatchCharacter(
   // even though the REST PATCH route forbids it.
   const access = await loadCharacterOr403(op.entityId, ctx.userId);
   assertWrite(access);
+  if (op.fieldPath === 'lastEquipmentSwitch') {
+    // One loadout switch: every item change and the Last Equipped record
+    // commit together, sharing REST's validation (services/loadouts.ts).
+    return appliedOutcome(
+      op,
+      await applyEquipmentSwitch(tx, ctx.userId, op.entityId, op.attemptedValue),
+    );
+  }
   if (!op.fieldPath) {
     const body = characterSyncPatch.parse(op.attemptedValue) as AttributeCapPatch;
     await assertCharacterPatchCaps(ctx.userId, access.character, body);
@@ -1012,6 +1033,43 @@ async function assertNoCycle(
     if (!row) break;
     current = row.parentId;
   }
+}
+
+// ---------- character_loadout ----------
+
+async function dispatchLoadout(
+  ctx: DispatchContext,
+  op: OperationEnvelope,
+  tx: AuditTx,
+): Promise<OperationOutcome> {
+  const characterId = requireParentId(op);
+  const access = await loadChildParentAccess(ctx, characterId);
+  assertWrite(access);
+  if (op.command === 'create') {
+    const body = loadoutCreate.parse(op.attemptedValue);
+    const created = await createLoadout(tx, ctx.userId, characterId, body, op.entityId);
+    return appliedOutcome(op, Number(created.revision));
+  }
+  if (op.command === 'delete') {
+    // Replayed deletes are idempotent once write access is established.
+    await deleteLoadout(tx, characterId, op.entityId);
+    return { clientOpId: op.clientOpId, status: 'applied' };
+  }
+  return patchEntity({
+    op,
+    userId: ctx.userId,
+    entityClass: 'character_loadout',
+    tx,
+    table: characterLoadouts,
+    prepareUpdates: async (updates) => {
+      const { updatedAt: _updatedAt, ...fields } = updates;
+      Object.assign(
+        updates,
+        await prepareLoadoutUpdate(tx, ctx.userId, characterId, fields as LoadoutUpdate),
+      );
+    },
+    childWhere: () => childRowWhere(characterLoadouts, characterId, op.entityId),
+  });
 }
 
 // ---------- character_combat ----------

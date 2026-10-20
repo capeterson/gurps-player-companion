@@ -305,14 +305,14 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
    - `character` upserts are emitted for every accessible character, but
      `minimal` rows are run through `projectCharacterRow` first — this drops
      every private column's **real value** (stats, mods, `tempEffects`,
-     `dismissedWarnings`, `activeConditionGroups`) and ships only the public identity fields plus the
+     `dismissedWarnings`, `activeConditionGroups`, `lastEquipmentSwitch`) and ships only the public identity fields plus the
      insured-safe defaults the NOT NULL columns still need (`st=10`, etc.). The
      client's `applyServerRow` merge uses the masked payload to overwrite the
      local row, purging any stale real values that were cached before access
      was downgraded (the projection keeps the default-valued keys present
      precisely because `applyServerRow` is a merge — omitting them would leave
      the stale real values in place).
-   - Child classes (traits / skills / spells / inventory / combat) are scoped
+   - Child classes (traits / skills / spells / inventory / loadouts / combat) are scoped
      to `fullAccessCharacterIds` only — a `minimal` viewer never pulls another
      player's private rows at all.
    - The response also carries authoritative `accessible.characterIds` /
@@ -321,6 +321,7 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
      user; when either set expands it clears all class cursors and performs one
      from-zero pull, so newly granted access back old rows that predate the
      viewer's high-water marks.
+   - `GET /characters/{id}/loadouts` requires the `full` view (403 otherwise).
    - `GET /characters/{id}` and `GET /characters/{id}/history` apply the
      same gate via `resolveCharacterView()` in
      `src/server/services/characterAccess.ts`, which owns the membership
@@ -338,11 +339,11 @@ remained readable in IndexedDB after access was downgraded to `minimal`).
    **every** `/sync/cursor` pull and on **bootstrap**, so a fresh
    `shareCharacterSheets = false` flip lands by the next sync tick at latest.
    The sweep now:
-   - deletes child rows (traits / skills / spells / inventory / combat), AND
+   - deletes child rows (traits / skills / spells / inventory / loadouts / combat), AND
    - **rewrites each minimal character's row down to identity-only fields**,
      blanking `st`/`dx`/`iq`/`ht`/`hpMod`/`willMod`/`perMod`/`fpMod`/
       `speedQuarterMod`/`moveMod`/`tempEffects`/`dismissedWarnings`/
-      `activeConditionGroups` to safe
+      `activeConditionGroups`/`lastEquipmentSwitch` to safe
       defaults. Masked rows carry a local-only marker; when access returns to
       `full`, the orchestrator resets the character-family cursors and pulls
       from revision zero once to restore the real parent and child rows.

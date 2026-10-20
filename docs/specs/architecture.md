@@ -369,7 +369,9 @@ Tables (grouped):
 - **Characters (sync-backed)**: `characters`, `character_traits`,
   `character_skills`, `inventory_items` (self-FK for nesting),
   `character_spells`, `character_languages`, `character_techniques`,
-  `combat_states` (1:1 by `character_id`).
+  `character_loadouts`, `combat_states` (1:1 by `character_id`).
+  `characters.last_equipment_switch` holds the latest loadout switch (see
+  [equipment-loadouts.md](equipment-loadouts.md)).
 - **Campaign content**: `campaign_library_sources`, `campaign_library_modifiers`, `adventure_log_entries`, `campaign_library_traits`,
   `campaign_library_skills`, `campaign_library_spells`,
   `campaign_library_items`, `campaign_library_languages`,

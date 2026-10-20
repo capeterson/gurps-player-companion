@@ -19,7 +19,7 @@
 export const SYNC_PROTOCOL_HEADER = 'x-gpc-sync-protocol';
 
 /** The protocol this build speaks. */
-export const SYNC_PROTOCOL_VERSION = 2;
+export const SYNC_PROTOCOL_VERSION = 3;
 
 /** The oldest client protocol the server still accepts on `/sync/*`. */
 export const MIN_SUPPORTED_SYNC_PROTOCOL = 2;

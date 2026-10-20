@@ -20,7 +20,8 @@ const ENTITY_FILTERS = [
   { label: 'Magic', match: (e: HistoryEventOut) => e.entityClass === 'character_spell' },
   {
     label: 'Inventory',
-    match: (e: HistoryEventOut) => e.entityClass === 'character_inventory',
+    match: (e: HistoryEventOut) =>
+      e.entityClass === 'character_inventory' || e.entityClass === 'character_loadout',
   },
   {
     label: 'Combat',
