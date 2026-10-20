@@ -28,7 +28,7 @@ export function describeSwitch(
   title: string,
   plan: PlannedSwitch,
   items: readonly InventoryItemOut[],
-  basicLift: number,
+  basicLift: number | undefined,
 ): string {
   const { changes } = plan.record;
   const equipped = changes.filter((c) => c.after.equipped && !c.before.equipped).length;
@@ -55,10 +55,12 @@ export function describeSwitch(
     sentences.push(
       `${names(plan.unrestored, items)} kept their places; their containers are gone.`,
     );
-  const updates = equipmentSwitchUpdates(plan.record);
-  const after = items.map((item) => ({ ...item, ...updates.get(item.id) }));
-  const before = encumbranceLabel(items, basicLift);
-  const now = encumbranceLabel(after, basicLift);
-  if (now !== before) sentences.push(`Encumbrance now ${now}.`);
+  if (basicLift !== undefined) {
+    const updates = equipmentSwitchUpdates(plan.record);
+    const after = items.map((item) => ({ ...item, ...updates.get(item.id) }));
+    const before = encumbranceLabel(items, basicLift);
+    const now = encumbranceLabel(after, basicLift);
+    if (now !== before) sentences.push(`Encumbrance now ${now}.`);
+  }
   return sentences.join(' ');
 }

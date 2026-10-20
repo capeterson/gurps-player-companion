@@ -1010,7 +1010,9 @@ export function InventoryPanel({
                 characterId={characterId}
                 canWrite={canWrite}
                 items={items}
-                basicLift={encumbrance.basicLift}
+                basicLift={
+                  character.libraryEffectsKnown === false ? undefined : encumbrance?.basicLift
+                }
                 data={loadoutData}
                 onEdit={(loadoutId, created) =>
                   setEditingLoadout({ id: loadoutId, focusName: created === true })

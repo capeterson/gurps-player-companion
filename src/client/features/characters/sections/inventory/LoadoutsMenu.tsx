@@ -41,7 +41,8 @@ export function LoadoutsMenu({
   characterId: string;
   canWrite: boolean;
   items: readonly InventoryItemOut[];
-  basicLift: number;
+  /** Absent while sheet mechanics are unavailable: no encumbrance wording. */
+  basicLift: number | undefined;
   data: CharacterLoadouts;
   /** `created` opens the editor with the default name selected. */
   onEdit: (loadoutId: string, created?: boolean) => void;

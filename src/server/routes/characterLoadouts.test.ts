@@ -131,7 +131,9 @@ describe('equipment loadouts over REST', () => {
       .from(entityHistory)
       .where(eq(entityHistory.characterId, s.characterId));
     const switchRow = history.find(
-      (row) => row.entityClass === 'character' && row.newRow?.last_equipment_switch,
+      (row) =>
+        row.entityClass === 'character' &&
+        (row.newRow as Record<string, unknown> | null)?.last_equipment_switch,
     );
     expect(switchRow?.batchId).toBeTruthy();
     expect(
