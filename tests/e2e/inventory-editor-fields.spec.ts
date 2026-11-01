@@ -23,11 +23,15 @@ const SHOTS_DIR = process.env.INVENTORY_EDITOR_SHOTS_DIR;
 
 async function expectInside(page: Page, locator: Locator, label: string) {
   const width = page.viewportSize()?.width ?? 0;
-  const box = await locator.boundingBox();
-  expect(box, `${label} is rendered`).not.toBeNull();
-  if (!box) return;
-  expect(box.x, `${label} starts inside ${width}px`).toBeGreaterThanOrEqual(-1);
-  expect(box.x + box.width, `${label} ends inside ${width}px`).toBeLessThanOrEqual(width + 1);
+  // A sync retry can re-render a just-moved row; measure its settled copy.
+  await expect(async () => {
+    await expect(locator, `${label} is visible`).toBeVisible({ timeout: 1_000 });
+    const box = await locator.boundingBox();
+    expect(box, `${label} is rendered`).not.toBeNull();
+    if (!box) return;
+    expect(box.x, `${label} starts inside ${width}px`).toBeGreaterThanOrEqual(-1);
+    expect(box.x + box.width, `${label} ends inside ${width}px`).toBeLessThanOrEqual(width + 1);
+  }).toPass({ timeout: 15_000 });
 }
 
 async function expectNoPageOverflow(page: Page) {
