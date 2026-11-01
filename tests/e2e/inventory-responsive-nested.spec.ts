@@ -305,8 +305,12 @@ test('nested inventory names and expanded item controls stay in view at supporte
             { fullPage: true, animations: 'disabled' },
           );
         }
+        // A press outside the inventory closes the menu and clears the selection.
         await page.mouse.click(2, viewport.height / 2);
         await expect(moveMenu).not.toBeVisible();
+        await expect(page.getByText('1 selected')).toBeHidden();
+        await createdRow.locator('.inventory-item-title').click();
+        await expect(page.getByText('1 selected')).toBeVisible();
       });
     }
 

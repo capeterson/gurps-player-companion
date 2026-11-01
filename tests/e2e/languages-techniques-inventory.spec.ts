@@ -396,8 +396,9 @@ test('languages, techniques and inventory retain edits and fit their responsive 
     path: 'test-results/inventory-tree-before-checks-mobile.png',
   });
 
-  // Selection and an unblurred editor draft must survive collapsing the root
-  // container. These are visible interactions, not a direct state assertion.
+  // Collapsing the root container deselects the hidden row, while an unblurred
+  // editor draft survives. These are visible interactions, not a direct state
+  // assertion.
   const unselectedColor = await nestedBlade.evaluate(
     (row) => getComputedStyle(row).backgroundColor,
   );
@@ -416,10 +417,10 @@ test('languages, techniques and inventory retain edits and fit their responsive 
   await pack.getByRole('button', { name: 'Collapse contents' }).dispatchEvent('click');
   await expect(nestedBlade).toBeHidden();
   await expect(nestedEditor).toBeHidden();
-  await expect(page.getByText('1 selected', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 selected', { exact: true })).toBeHidden();
   await pack.getByRole('button', { name: 'Expand contents' }).dispatchEvent('click');
   await expect(nestedBlade).toBeVisible();
-  await expect(nestedBlade).toHaveAttribute('aria-selected', 'true');
+  await expect(nestedBlade).toHaveAttribute('aria-selected', 'false');
   await expect(nestedEditor).toBeVisible();
   await expect(nestedDamage).toHaveValue('sw+2 cut');
 
