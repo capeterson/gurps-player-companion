@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { pricingSourceChanged } from '../../../shared/domain/libraryPricing.ts';
 import { computeLeveledTraitCost } from '../../../shared/domain/modifierMath.ts';
 import type { PricingResolution } from '../../../shared/schemas/calculation.ts';
@@ -16,8 +16,11 @@ import { useLocalLibrary } from './useLocalLibrary.ts';
 export function RepriceEntry({
   section,
   entry,
+  children,
 }: {
   section: 'traits' | 'items';
+  /** Extra actions beside Recalculate, e.g. an inventory item's Unlink. */
+  children?: ReactNode;
   entry: {
     id: string;
     characterId: string;
@@ -56,6 +59,17 @@ export function RepriceEntry({
       data-flashing={flash['data-flashing']}
       data-flash-parity={flash['data-flash-parity']}
     >
+      {section === 'items' && sourceId && (
+        <p className="text-sm break-words">
+          {source ? (
+            <>
+              Linked to <span className="font-medium">{source.name}</span> in the campaign library
+            </>
+          ) : (
+            'Linked to a campaign library item that isn’t available'
+          )}
+        </p>
+      )}
       <p className="text-sm">
         {!source
           ? `Using saved ${savedValues}`
@@ -63,10 +77,15 @@ export function RepriceEntry({
             ? `Library ${section === 'items' ? 'price' : 'point cost'} changed — using your saved ${savedValues}`
             : `Saved ${savedValues}`}
       </p>
-      {source && (
-        <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
-          {section === 'items' ? 'Recalculate price' : 'Recalculate points'}
-        </button>
+      {(source || children) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {source && (
+            <button type="button" className="btn btn-sm" onClick={() => setOpen(true)}>
+              {section === 'items' ? 'Recalculate price' : 'Recalculate points'}
+            </button>
+          )}
+          {children}
+        </div>
       )}
       {error && (
         <p role="alert" className="text-error">

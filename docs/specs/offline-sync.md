@@ -221,7 +221,18 @@ works offline.**
    gesture failure emits a visual-only flash plus a field-specific toast
    without reverting another input’s newer unsaved draft.
    Inventory multi-select equip/wear/move actions and bulk deletes use the same
-   all-or-nothing helpers with one history `batchId`. A storage failure rolls
+   all-or-nothing helpers with one history `batchId`. Moves (bulk menu, drag and
+   drop, and the item editor's Location select) share `inventoryMoves.ts`, which
+   reads the stored tree, applies the server's self/container/cycle checks and
+   enqueues the unequips before the location fields in one transaction. The
+   Location select is a `useDraftField` keyed on `worn` that also flashes on
+   `parentId`/`externalLocation` rollbacks. An enchantment's effects form and
+   **Make independent**/**Update** actions replace one entry of the `enchantments`
+   field through the same transactional helper, after validating the whole
+   effects draft with `enchantmentMechanics`; the update preview reads linked
+   definitions from the local library store. **Unlink** enqueues `libraryItemId`
+   before `pricingResolution` so the server never checks pricing against a link
+   being removed. A storage failure rolls
    back every local row and queued op; the panel reports the error and retains
    its selection so the gesture can be retried. Inventory inline inputs use
    `useDraftField` with commit-time enqueueing. Their JSON property updates
