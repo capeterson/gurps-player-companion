@@ -153,7 +153,7 @@ test('nested inventory names and expanded item controls stay in view at supporte
     const inventory = page.getByRole('table', { name: 'Carried inventory', exact: true });
     await expect(page.getByText('Worn', { exact: true })).toHaveCount(0);
     await openAddItem(page);
-    const location = page.getByLabel('Location');
+    const location = page.getByRole('dialog', { name: 'Add item' }).getByLabel('Location');
     await expect(location).toHaveValue('');
     await expect(location.locator('option', { hasText: 'On the player' })).toHaveAttribute(
       'value',

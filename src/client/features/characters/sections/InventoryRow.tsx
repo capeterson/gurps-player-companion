@@ -10,6 +10,7 @@ import {
   Fragment,
   type MouseEvent,
   type ReactNode,
+  useEffect,
   useRef,
   useState,
 } from 'react';
@@ -23,6 +24,11 @@ import { sheetAnchor } from '../sheetAnchors.ts';
 import type { InventoryDragApi } from './InventoryPanel.tsx';
 import { InventoryItemDetails } from './inventory/InventoryItemDetails.tsx';
 import { InventoryItemEditor } from './inventory/InventoryItemEditor.tsx';
+import {
+  onRevealContainers,
+  openSectionFor,
+  rememberOpenSection,
+} from './inventory/inventoryEditorState.ts';
 import { CATEGORY_LABELS, type ItemCategory, type ItemSection } from './inventory/itemMutations.ts';
 import { readContainerExpanded, writeContainerExpanded } from './inventoryContainerState.ts';
 import { descendantsOf, inventoryFilterValues } from './inventoryTree.ts';
@@ -128,9 +134,21 @@ export function InventoryRow(props: InventoryRowProps) {
   const descendantCount = hasChildren ? descendantsOf(item.id, byParent).size : 0;
   const sel = isSelected(item.id);
   const highlighted = highlightItemId === item.id;
-  const [section, setSection] = useState<ItemSection | null>(null);
+  // An open editor reopens when a move re-parents (and so remounts) this row.
+  const [section, setOpenSection] = useState<ItemSection | null>(() => openSectionFor(item.id));
+  function setSection(next: ItemSection | null) {
+    rememberOpenSection(item.id, next);
+    setOpenSection(next);
+  }
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [visited, setVisited] = useState<ItemSection[]>([]);
+  const [visited, setVisited] = useState<ItemSection[]>(() => (section ? [section] : []));
+  useEffect(
+    () =>
+      onRevealContainers((ids) => {
+        if (ids.has(item.id)) setOpen(true);
+      }),
+    [item.id],
+  );
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const editorId = `inventory-editor-${item.id}`;
   function showSection(next: ItemSection) {

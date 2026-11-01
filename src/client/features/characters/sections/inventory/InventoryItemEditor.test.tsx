@@ -11,11 +11,16 @@ import {
   inventoryItemOut,
   weaponData,
 } from '../../../../../shared/schemas/inventory.ts';
+import type { OperationOutcome } from '../../../../../shared/schemas/sync.ts';
 import { getLocalDb } from '../../../../db/dexie.ts';
+import type { LocalCharacter, LocalLibraryItem, OutboxEntry } from '../../../../db/dexie.ts';
 import { ToastProvider } from '../../../../lib/toast.tsx';
 import { flashBus } from '../../../../sync/flashBus.ts';
+import { getSyncOrchestrator } from '../../../../sync/orchestrator.ts';
 import { InventoryRow } from '../InventoryRow.tsx';
 import { buildTree, inventoryCostTotals } from '../inventoryTree.ts';
+import { clearOpenSections } from './inventoryEditorState.ts';
+import * as moves from './inventoryMoves.ts';
 import * as mutations from './itemMutations.ts';
 
 const ID = '0193b3c0-f1f0-7000-8000-00000000a001';
@@ -122,6 +127,7 @@ async function change(label: string, value: string) {
   fireEvent.blur(input);
 }
 afterEach(() => {
+  clearOpenSections();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   selection.mockClear();
@@ -550,11 +556,16 @@ describe('inline inventory editing', () => {
     expect(screen.getByRole('textbox', { name: 'Enchantment label' })).toHaveValue('+3');
     expect(screen.getByText('Source: M66')).toBeVisible();
     expect(screen.queryByText(/revision|snapshot|follows library|retained/i)).toBeNull();
-    await change('Spell name', 'Deflect');
-    await waitFor(async () => expect((await stored()).enchantments[0]?.spellName).toBe('Deflect'));
+    // A linked name follows its campaign definition, so it is shown, not edited.
+    expect(screen.getByText('Fortify', { selector: 'p' })).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Spell name' })).toBeNull();
+    await change('Enchantment label', 'Fortify +3');
+    await waitFor(async () =>
+      expect((await stored()).enchantments[0]?.category).toBe('Fortify +3'),
+    );
     expect((await stored()).enchantments[0]).toMatchObject({
+      spellName: 'Fortify',
       spellLevel: 0,
-      category: '+3',
       notes: 'Old runes',
       definitionId: '0193b3c0-f1f0-7000-8000-00000000e002',
       definitionRevision: 7,
@@ -603,14 +614,17 @@ describe('inline inventory editing', () => {
     expect(screen.queryByText(/revision|snapshot|follows library|retained/i)).toBeNull();
 
     await user.type(screen.getByLabelText('New enchantment name'), 'Local ward');
-    expect(screen.getByLabelText('Custom enchantment effect')).toHaveTextContent(
+    await user.click(screen.getByRole('button', { name: 'Add enchantment' }));
+    // A custom enchantment opens straight into its effects form.
+    const form = await screen.findByRole('form', { name: 'Effects of Local ward' });
+    await user.click(within(form).getByRole('button', { name: 'Add effect' }));
+    expect(within(form).getByLabelText('Base effect 1')).toHaveTextContent(
       'Damage resistance (DR)',
     );
-    await user.selectOptions(screen.getByLabelText('Custom enchantment effect'), 'dr');
-    const value = screen.getByLabelText('Custom enchantment value');
+    const value = within(form).getByLabelText('Base effect 1 value');
     await user.clear(value);
     await user.type(value, '2');
-    await user.click(screen.getByRole('button', { name: 'Add enchantment' }));
+    await user.click(within(form).getByRole('button', { name: 'Save effects' }));
     await waitFor(async () =>
       expect((await stored()).enchantments[2]).toMatchObject({
         spellName: 'Local ward',
@@ -644,5 +658,370 @@ describe('inline inventory editing', () => {
     expect(screen.getByLabelText('Shield side')).toHaveTextContent('All directions');
     await user.click(screen.getByRole('button', { name: 'Magic item settings for Coat' }));
     expect(screen.getByLabelText('Activation')).toHaveTextContent('Uses energyAlways on');
+  });
+});
+
+const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000c002';
+const PACK = '0193b3c0-f1f0-7000-8000-00000000a002';
+const DEFINITION = '0193b3c0-f1f0-7000-8000-00000000e001';
+
+function orchestrator() {
+  return getSyncOrchestrator() as unknown as {
+    applyOutcomes(ops: OutboxEntry[], outcomes: OperationOutcome[]): Promise<void>;
+    applyServerRow(entityClass: string, row: Record<string, unknown>, opts: object): Promise<void>;
+  };
+}
+async function rejectAll(reason: string) {
+  const ops = await getLocalDb().outbox.toArray();
+  await orchestrator().applyOutcomes(
+    ops,
+    ops.map((op) => ({ clientOpId: op.clientOpId, status: 'rejected', reason })),
+  );
+}
+function definition(overrides: Partial<LibraryEnchantmentOut> = {}): LibraryEnchantmentOut {
+  return {
+    id: DEFINITION,
+    campaignId: CAMPAIGN,
+    name: 'Fortify',
+    description: null,
+    source: 'M66',
+    tags: [],
+    applicability: 'armor',
+    effects: [{ target: 'dr', value: 1 }],
+    levels: [],
+    stackingPolicy: { kind: 'highest', key: 'fortify' },
+    revision: 7,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+const LINKED = {
+  spellName: 'Fortify',
+  spellLevel: 15,
+  definitionId: DEFINITION,
+  definitionRevision: 7,
+  definitionSource: 'M66',
+  mechanics: {
+    applicability: 'armor' as const,
+    effects: [{ target: 'dr' as const, value: 1 }],
+    levels: [],
+    stackingPolicy: { kind: 'highest' as const, key: 'fortify' },
+  },
+};
+async function openEnchantments(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Enchantments settings for Coat' }));
+  return within(screen.getByRole('region', { name: 'Coat: Enchantments' }));
+}
+
+describe('enchantment effects', () => {
+  it('edits several effects, a skill effect and levels as one validated draft', async () => {
+    const user = await setup({ enchantments: [{ spellName: 'Ward', spellLevel: 15 }] });
+    const editor = await openEnchantments(user);
+    await user.click(editor.getByRole('button', { name: 'Edit effects of Ward' }));
+    const form = within(editor.getByRole('form', { name: 'Effects of Ward' }));
+    for (let i = 0; i < 3; i++) await user.click(form.getByRole('button', { name: 'Add effect' }));
+    await user.selectOptions(form.getByLabelText('Base effect 2'), 'db');
+    await user.selectOptions(form.getByLabelText('Base effect 3'), 'skill');
+    await user.click(form.getByRole('button', { name: 'Add level' }));
+    await user.click(form.getByRole('button', { name: 'Add level' }));
+    await user.click(form.getByRole('button', { name: 'Add level 2 effect' }));
+    const secondLevel = form.getByLabelText('Level 2 number');
+    await user.clear(secondLevel);
+    await user.type(secondLevel, '1');
+    await user.click(form.getByRole('button', { name: 'Save effects' }));
+
+    // Invalid drafts stay open with field errors and are never queued.
+    expect(form.getByRole('alert')).toHaveTextContent('Fix the 2 highlighted fields');
+    expect(form.getByText('Choose a skill')).toBeVisible();
+    expect(form.getByText('Use each level number once')).toBeVisible();
+    expect(await getLocalDb().outbox.count()).toBe(0);
+
+    fireEvent.change(form.getByLabelText('Base effect 3 skill'), {
+      target: { value: 'Broadsword' },
+    });
+    await user.clear(secondLevel);
+    await user.type(secondLevel, '2');
+    await user.type(form.getByLabelText('Level 2 label'), 'Greater');
+    const levelValue = form.getByLabelText('Level 2 effect 1 value');
+    await user.clear(levelValue);
+    await user.type(levelValue, '3');
+    expect(form.queryByRole('alert')).toBeNull();
+    await user.click(form.getByRole('button', { name: 'Save effects' }));
+
+    await waitFor(async () =>
+      expect((await stored()).enchantments[0]?.mechanics).toEqual({
+        applicability: 'any',
+        effects: [
+          { target: 'dr', value: 1 },
+          { target: 'db', value: 1 },
+          { target: 'skill', value: 1, skillName: 'Broadsword' },
+        ],
+        levels: [
+          { level: 1, effects: [] },
+          { level: 2, label: 'Greater', effects: [{ target: 'dr', value: 3 }] },
+        ],
+        stackingPolicy: { kind: 'stack' },
+      }),
+    );
+    expect(editor.queryByRole('form')).toBeNull();
+    const summary = editor.getByRole('list', { name: 'Effects of Ward' });
+    expect(summary).toHaveTextContent('+1 Broadsword');
+    expect(summary).toHaveTextContent('Level 2 (Greater): +3 DR');
+    // Defined levels become the selectable enchantment level.
+    expect(editor.getByRole('combobox', { name: 'Enchantment level' })).toHaveTextContent(
+      'Level 2 (Greater)',
+    );
+    const ops = await getLocalDb().outbox.toArray();
+    expect(ops.map((op) => op.fieldPath)).toEqual(['enchantments']);
+  });
+
+  it('rolls back a rejected effects edit with a toast record and a visible flash', async () => {
+    const user = await setup({ enchantments: [{ spellName: 'Ward', spellLevel: 15 }] });
+    const editor = await openEnchantments(user);
+    await user.click(editor.getByRole('button', { name: 'Edit effects of Ward' }));
+    await user.click(editor.getByRole('button', { name: 'Add effect' }));
+    await user.click(editor.getByRole('button', { name: 'Save effects' }));
+    await waitFor(async () => expect((await stored()).enchantments[0]?.mechanics).toBeTruthy());
+    await act(async () => rejectAll('Enchantments must be a valid list'));
+    expect((await stored()).enchantments[0]?.mechanics).toBeUndefined();
+    expect(await getLocalDb().rejectionToasts.toArray()).toEqual([
+      expect.objectContaining({ reason: 'Enchantments must be a valid list' }),
+    ]);
+    expect(screen.getByRole('region', { name: 'Coat: Enchantments' })).toHaveAttribute(
+      'data-flashing',
+      'true',
+    );
+    await waitFor(() => expect(editor.getByText('No effects.')).toBeVisible());
+  });
+
+  it('keeps linked effects read-only until Make independent, then edits the copy', async () => {
+    const user = await setup({ enchantments: [LINKED] });
+    const editor = await openEnchantments(user);
+    expect(editor.getByRole('list', { name: 'Effects of Fortify' })).toHaveTextContent('+1 DR');
+    expect(editor.queryByRole('button', { name: /Edit effects/ })).toBeNull();
+    await user.click(editor.getByRole('button', { name: 'Make Fortify independent' }));
+    expect(editor.getByText(/Stop following Fortify in the campaign library\?/)).toBeVisible();
+    await user.click(editor.getByRole('button', { name: 'Keep linked' }));
+    expect((await stored()).enchantments[0]?.definitionId).toBe(DEFINITION);
+    await user.click(editor.getByRole('button', { name: 'Make Fortify independent' }));
+    await user.click(editor.getByRole('button', { name: 'Make independent' }));
+    const form = await editor.findByRole('form', { name: 'Effects of Fortify' });
+    expect((await stored()).enchantments[0]).toMatchObject({
+      spellName: 'Fortify',
+      definitionId: null,
+      definitionRevision: null,
+      mechanics: LINKED.mechanics,
+    });
+    expect(within(form).getByLabelText('Base effect 1 value')).toHaveValue('1');
+    expect(editor.getByText('Source: Character sheet')).toBeVisible();
+  });
+
+  it('previews and applies a newer campaign definition from the local library', async () => {
+    await getLocalDb().campaignLibraryEnchantments.put(
+      definition({
+        name: 'Greater Fortify',
+        revision: 9,
+        effects: [{ target: 'dr', value: 2 }],
+      }),
+    );
+    const user = await setup({ enchantments: [LINKED] });
+    const editor = await openEnchantments(user);
+    expect(
+      await editor.findByText('Greater Fortify changed in the campaign library.'),
+    ).toBeVisible();
+    expect(editor.queryByText(/revision|snapshot/i)).toBeNull();
+    await user.click(editor.getByRole('button', { name: 'Review update' }));
+    expect(editor.getByText('Name: Fortify → Greater Fortify')).toBeVisible();
+    expect(editor.getByRole('list', { name: 'Removed effects' })).toHaveTextContent('+1 DR');
+    expect(editor.getByRole('list', { name: 'Added effects' })).toHaveTextContent('+2 DR');
+    expect(await getLocalDb().outbox.count()).toBe(0);
+    await user.click(editor.getByRole('button', { name: 'Update' }));
+    await waitFor(async () =>
+      expect((await stored()).enchantments[0]).toMatchObject({
+        spellName: 'Greater Fortify',
+        definitionId: DEFINITION,
+        definitionRevision: 9,
+        mechanics: { effects: [{ target: 'dr', value: 2 }] },
+      }),
+    );
+    await waitFor(() => expect(editor.queryByText(/changed in the campaign library/)).toBeNull());
+  });
+
+  it('never offers an older library row as an update', async () => {
+    await getLocalDb().campaignLibraryEnchantments.put(
+      definition({ revision: 6, effects: [{ target: 'dr', value: 5 }] }),
+    );
+    const user = await setup({ enchantments: [LINKED] });
+    const editor = await openEnchantments(user);
+    expect(editor.getByRole('list', { name: 'Effects of Fortify' })).toBeVisible();
+    expect(editor.queryByRole('button', { name: 'Review update' })).toBeNull();
+  });
+});
+
+describe('library link', () => {
+  it('names the linked library item and unlinks it after confirmation', async () => {
+    const db = getLocalDb();
+    await db.characters.put({ id: CHARACTER, campaignId: CAMPAIGN, revision: 1 } as LocalCharacter);
+    await db.campaignLibraryItems.put({
+      id: '0193b3c0-f1f0-7000-8000-00000000f001',
+      campaignId: CAMPAIGN,
+      name: 'Long Coat of the Northern Watch',
+      cost: 100,
+      weightLbs: 10,
+      hideawayCapacityLbs: 0,
+      revision: 3,
+    } as unknown as LocalLibraryItem);
+    const user = await setup({ libraryItemId: '0193b3c0-f1f0-7000-8000-00000000f001' });
+    await user.click(screen.getByRole('button', { name: 'Edit Coat' }));
+    const editor = within(screen.getByRole('region', { name: 'Coat: Item details' }));
+    expect(
+      await editor.findByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          element.textContent ===
+            'Linked to Long Coat of the Northern Watch in the campaign library',
+      ),
+    ).toBeVisible();
+    await user.click(editor.getByRole('button', { name: 'Unlink Coat from the campaign library' }));
+    await user.click(editor.getByRole('button', { name: 'Keep link' }));
+    expect(await db.outbox.count()).toBe(0);
+    await user.click(editor.getByRole('button', { name: 'Unlink Coat from the campaign library' }));
+    await user.click(editor.getByRole('button', { name: 'Unlink' }));
+    await waitFor(async () => expect((await stored()).libraryItemId).toBeNull());
+    // The link is cleared first; this fixture has no pricing record to clear.
+    expect((await db.outbox.toArray()).map((op) => op.fieldPath)).toEqual(['libraryItemId']);
+    expect((await stored()).pricingResolution ?? null).toBeNull();
+    await waitFor(() => expect(editor.queryByText(/Linked to/)).toBeNull());
+  });
+});
+
+describe('item location', () => {
+  async function setupWithPack(overrides: Partial<InventoryItemOut> = {}) {
+    await getLocalDb().characterInventory.put({
+      ...item({
+        id: PACK,
+        name: 'Backpack',
+        isArmor: false,
+        armor: null,
+        isContainer: true,
+        equipped: false,
+      }),
+      revision: 1,
+    });
+    const user = await setup(overrides);
+    await user.click(screen.getByRole('button', { name: 'Edit Coat' }));
+    return {
+      user,
+      editor: within(screen.getByRole('region', { name: 'Coat: Item details' })),
+    };
+  }
+
+  it('moves between the player, the stash and a container with the bulk-move patches', async () => {
+    const { user, editor } = await setupWithPack();
+    const location = editor.getByRole('combobox', { name: 'Location' });
+    expect(location).toHaveValue('player');
+    await waitFor(() => expect(location).toHaveTextContent('In Backpack'));
+    expect(editor.queryByLabelText('External location')).toBeNull();
+
+    await user.selectOptions(location, 'stashed');
+    await waitFor(async () =>
+      expect(await stored()).toMatchObject({ worn: false, equipped: false }),
+    );
+    // Moving off the player unequips; Equipped explains why it is unavailable.
+    const equipped = editor.getByRole('checkbox', { name: 'Equipped' });
+    await waitFor(() => {
+      expect(equipped).toBeDisabled();
+      expect(equipped).not.toBeChecked();
+    });
+    expect(equipped).toHaveAccessibleDescription('Move the item on the player to equip it.');
+    await change('Stash location', 'Inn room');
+    await waitFor(async () => expect((await stored()).externalLocation).toBe('Inn room'));
+
+    await user.selectOptions(location, 'player');
+    await waitFor(async () =>
+      expect(await stored()).toMatchObject({ parentId: null, worn: true, externalLocation: null }),
+    );
+    await waitFor(() => expect(editor.getByRole('checkbox', { name: 'Equipped' })).toBeEnabled());
+    expect(editor.queryByLabelText('Stash location')).toBeNull();
+
+    // Entering a container re-parents the row, so it is the last step here.
+    await user.selectOptions(location, PACK);
+    await waitFor(async () =>
+      expect(await stored()).toMatchObject({ parentId: PACK, worn: false, externalLocation: null }),
+    );
+  });
+
+  it('never offers the item itself or its contents as a destination', async () => {
+    await getLocalDb().characterInventory.put({
+      ...item({
+        id: '0193b3c0-f1f0-7000-8000-00000000a003',
+        name: 'Pouch',
+        parentId: ID,
+        isArmor: false,
+        armor: null,
+        isContainer: true,
+        worn: false,
+        equipped: false,
+      }),
+      revision: 1,
+    });
+    const { editor } = await setupWithPack({ isContainer: true });
+    const location = editor.getByRole('combobox', { name: 'Location' });
+    await waitFor(() => expect(location).toHaveTextContent('In Backpack'));
+    expect(location).not.toHaveTextContent('In Pouch');
+    expect(location).not.toHaveTextContent('In Coat');
+  });
+
+  it('rolls back a rejected move with a toast record and flashes the Location control', async () => {
+    const { user, editor } = await setupWithPack();
+    const location = editor.getByRole('combobox', { name: 'Location' });
+    await user.selectOptions(location, 'stashed');
+    await waitFor(async () => expect((await stored()).worn).toBe(false));
+    await act(async () => rejectAll('Equipped items must be on the player'));
+    await waitFor(() => expect(location).toHaveValue('player'));
+    expect(location).toHaveAttribute('data-flashing', 'true');
+    expect((await stored()).worn).toBe(true);
+    expect(await getLocalDb().rejectionToasts.count()).toBeGreaterThan(0);
+  });
+
+  it('queues a same-field move and keeps a different-field edit during a slow save', async () => {
+    const { user, editor } = await setupWithPack({ equipped: false });
+    let release = () => {};
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = moves.moveInventoryItems;
+    vi.spyOn(moves, 'moveInventoryItems').mockImplementationOnce(async (...args) => {
+      await original(...args);
+      await barrier;
+    });
+    const location = editor.getByRole('combobox', { name: 'Location' });
+    await user.selectOptions(location, 'stashed');
+    await waitFor(async () => expect((await stored()).worn).toBe(false));
+    // The harness lists roots only, so the follow-up stays a root location.
+    await user.selectOptions(location, 'player');
+    await change('Quantity', '3');
+    await waitFor(async () => expect(await stored()).toMatchObject({ worn: true, quantity: 3 }));
+    await act(async () => release());
+    await waitFor(() => expect(location).toHaveValue('player'));
+    expect(editor.getByRole('textbox', { name: 'Quantity' })).toHaveValue('3');
+  });
+
+  it('keeps a pending move when a stale cursor row arrives', async () => {
+    const { user, editor } = await setupWithPack();
+    const location = editor.getByRole('combobox', { name: 'Location' });
+    await user.selectOptions(location, 'stashed');
+    await waitFor(async () => expect((await stored()).worn).toBe(false));
+    const stale = await getLocalDb().characterInventory.get(ID);
+    await act(async () =>
+      orchestrator().applyServerRow(
+        'character_inventory',
+        { ...stale, worn: true, equipped: true, notes: 'server note', revision: 2 },
+        {},
+      ),
+    );
+    expect(await stored()).toMatchObject({ worn: false, equipped: false, notes: 'server note' });
+    expect(location).toHaveValue('stashed');
   });
 });

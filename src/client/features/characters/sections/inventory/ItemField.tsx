@@ -3,18 +3,22 @@ import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.t
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
+import { ItemLocationField } from './ItemLocationField.tsx';
 import { RangedRangeField } from './RangedRangeField.tsx';
 import { readItemPath, readPath, writeItemPath } from './itemMutations.ts';
 
 export interface ItemFieldSpec {
   path: string;
   label: string;
-  kind?: 'number' | 'boolean' | 'text' | 'range';
+  kind?: 'number' | 'boolean' | 'text' | 'range' | 'location';
   optional?: boolean;
   advanced?: boolean;
   choices?: readonly string[];
   choiceLabels?: Readonly<Record<string, string>>;
   emptyChoiceLabel?: string;
+  /** Short explanation shown under the control, e.g. why it is unavailable. */
+  hint?: string;
+  disabled?: boolean;
 }
 
 export function hasFieldValue(value: unknown): boolean {
@@ -38,6 +42,7 @@ export function ItemField({
 }) {
   if (spec.kind === 'range')
     return <RangedRangeField item={item} path={spec.path} label={spec.label} />;
+  if (spec.kind === 'location') return <ItemLocationField item={item} label={spec.label} />;
   return (
     <ScalarItemField
       item={item}
@@ -90,8 +95,11 @@ function ScalarItemField({
       draft.commit();
       setFocused(false);
     },
+    disabled: spec.disabled,
     'aria-invalid': draft.error != null,
-    'aria-describedby': draft.error ? `${id}-error` : undefined,
+    'aria-describedby':
+      [draft.error ? `${id}-error` : '', spec.hint ? `${id}-hint` : ''].filter(Boolean).join(' ') ||
+      undefined,
   };
 
   return (
@@ -157,6 +165,11 @@ function ScalarItemField({
             />
           )}
         </label>
+      )}
+      {spec.hint && (
+        <p id={`${id}-hint`} className="text-xs text-base-content/60 mt-1">
+          {spec.hint}
+        </p>
       )}
       {draft.error && (
         <p id={`${id}-error`} className="text-xs text-error mt-1">
