@@ -76,7 +76,9 @@ test('a guest reads the Lantern Coast party without any way to change it', async
   await page.goto('/campaigns');
   await expect(page.getByRole('link', { name: 'The Lantern Coast' }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: '+ New campaign' })).toHaveCount(0);
-  await page.goto('/log');
+  await page.getByRole('link', { name: 'The Lantern Coast' }).first().click();
+  await expect(page).toHaveURL(/\/campaigns\/[0-9a-f-]{36}$/);
+  await page.goto(`${new URL(page.url()).pathname}/log`);
   await expect(page.getByRole('button', { name: /Shared/ })).toBeVisible();
   await expect(page.getByRole('button', { name: '+ New entry' })).toHaveCount(0);
 

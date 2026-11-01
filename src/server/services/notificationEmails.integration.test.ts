@@ -5,7 +5,6 @@ import { createApp } from '../app.ts';
 import { resetConfigCache } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { notificationEmailQueue, passkeyCredentials } from '../db/schema.ts';
-import { sendNotificationEmail } from '../email.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { nextNotificationEmailAttemptAt } from './notificationEmails.ts';
 import { processNotificationEmails } from './notificationEmails.ts';

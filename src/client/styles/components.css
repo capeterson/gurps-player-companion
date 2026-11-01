@@ -2,7 +2,7 @@
    Arcane component primitives
 
    Ports of the design handoff's reusable surface classes (`.chip`,
-   `.row`, `.panel-tabs`, `.hp-bar`) so that callers in Tailwind/JSX
+   `.row`, `.panel-tabs`) so that callers in Tailwind/JSX
    get the design's exact spacing, radius, and colour rules without
    re-declaring them in every component.
 
@@ -134,24 +134,6 @@
   color: var(--color-base-content);
   border-bottom-color: var(--color-primary);
   font-weight: 600;
-}
-
-/* ---- HP bar ------------------------------------------------- */
-/* Fill colour set inline by the caller via `style={{ background:
-   hpColor }}`. Background uses the recessed surface so the bar
-   reads as a well punched into the card. */
-.hp-bar {
-  position: relative;
-  width: 100%;
-  background: var(--surface-deep);
-  border-radius: 9999px;
-  overflow: hidden;
-  border: 1px solid var(--color-base-300);
-}
-.hp-bar > div {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.35s cubic-bezier(0.2, 0.7, 0.3, 1), background 0.25s;
 }
 
 /* ---- Modal backdrop ---------------------------------------- */
@@ -471,8 +453,7 @@
   text-underline-offset: 0.15em;
   cursor: pointer;
 }
-.rich-text-surface:empty::before,
-.rich-text-surface.ProseMirror p.is-editor-empty:first-child::before {
+.rich-text-surface:empty::before {
   content: attr(data-placeholder);
   color: var(--text-dim);
   pointer-events: none;

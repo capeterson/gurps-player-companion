@@ -5,7 +5,6 @@ import {
   evaluateSkillDefaultConditions,
   evaluateSkillPrerequisite,
   failedPrerequisiteMessages,
-  resolvedTechLevel,
 } from './skillRules.ts';
 
 const context = {
@@ -91,16 +90,6 @@ describe('conditional defaults', () => {
 });
 
 describe('Tech Level skill rules', () => {
-  it('resolves fixed and required policies without treating null as ambient TL', () => {
-    expect(resolvedTechLevel({ kind: 'fixed', techLevel: 6 }, null)).toBe(6);
-    expect(
-      resolvedTechLevel({ kind: 'required', suggestedFrom: 'campaign' }, null, { campaign: 8 }),
-    ).toBe(8);
-    expect(() => resolvedTechLevel({ kind: 'required', suggestedFrom: 'none' }, null)).toThrow(
-      'concrete Tech Level',
-    );
-  });
-
   it('applies the asymmetric IQ table and -1 per TL for other skills', () => {
     expect(crossTechLevelPenalty('IQ', 8, 9)).toBe(-5);
     expect(crossTechLevelPenalty('IQ', 8, 10)).toBe(-10);

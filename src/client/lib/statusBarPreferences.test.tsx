@@ -1,12 +1,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, expect, it } from 'vitest';
-import {
-  readStatusBarPreferences,
-  useStatusBarPreferences,
-  writeStatusBarPreferences,
-} from './statusBarPreferences.ts';
+import { useStatusBarPreferences, writeStatusBarPreferences } from './statusBarPreferences.ts';
 
 beforeEach(() => localStorage.clear());
+
+const readStatusBarPreferences = (userId: string) =>
+  renderHook(() => useStatusBarPreferences(userId)).result.current;
 
 it('defaults all optional header controls off and scopes changes to one user', () => {
   const { result, rerender } = renderHook(({ userId }) => useStatusBarPreferences(userId), {

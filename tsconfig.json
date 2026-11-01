@@ -17,14 +17,7 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "jsx": "react-jsx",
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["src/shared/*"],
-      "@server/*": ["src/server/*"],
-      "@client/*": ["src/client/*"],
-      "@sw/*": ["src/sw/*"]
-    }
+    "jsx": "react-jsx"
   },
   "include": [
     "src/**/*.ts",

@@ -1086,21 +1086,6 @@ export const modifierEntity: LibraryEntityConfig<
     ),
 };
 
-export const libraryEntities = [
-  sourceEntity,
-  modifierEntity,
-  traitEntity,
-  skillEntity,
-  spellEntity,
-  itemEntity,
-  languageEntity,
-  techniqueEntity,
-  styleEntity,
-  enchantmentEntity,
-  activeEffectEntity,
-  raceEntity,
-] as const;
-
 /** Entity-class → config, shared by the sync dispatcher and cursor reader. */
 export const LIBRARY_ENTITY_CONFIGS = {
   campaign_library_trait: traitEntity,

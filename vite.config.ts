@@ -85,12 +85,6 @@ export default defineConfig(async () => {
         },
       },
     },
-    resolve: {
-      alias: {
-        '@shared': new URL('./src/shared', import.meta.url).pathname,
-        '@client': new URL('./src/client', import.meta.url).pathname,
-      },
-    },
     server: {
       port: Number(process.env.PORT ?? 3000),
       host: true,

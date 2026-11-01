@@ -12,7 +12,6 @@ import { RichTextEditor } from '../../components/markdown/RichTextEditor.tsx';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
-import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api } from '../../lib/api.ts';
 import { useIsGuestSession } from '../../lib/guestSession.ts';
 import { getSyncOrchestrator } from '../../sync/orchestrator.ts';
@@ -164,29 +163,14 @@ function draftFromEntry(entry: AdventureLogOut): AdventureLogCreate {
   };
 }
 
-/**
- * Top-level adventure-log page.  When `campaignId` is omitted the
- * page picks a campaign from the `?campaign=` query string (or the
- * first one available) and mirrors the selection back into the URL —
- * the legacy /log behaviour.  When a parent route passes the id
- * directly (e.g. /campaigns/:id/log), the URL-sync logic is skipped and
- * the page just renders the log for that campaign.
- */
-export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } = {}) {
+/** Adventure log for the campaign mounted at /campaigns/:id/log. */
+export function LogPage({ campaignId }: { campaignId: string }) {
   const guest = useIsGuestSession();
   const qc = useQueryClient();
-  const campaigns = useQuery({
-    queryKey: ['campaigns'],
-    queryFn: () => api<CampaignOut[]>('/campaigns'),
-    enabled: !campaignIdProp,
-  });
-
-  const { campaignId, params, setParams } = useSelectedCampaignId(campaignIdProp, campaigns.data);
 
   const entries = useQuery({
     queryKey: ['campaigns', campaignId, 'log'],
     queryFn: () => api<AdventureLogOut[]>(`/campaigns/${campaignId}/log`),
-    enabled: !!campaignId,
   });
 
   // Current user + campaign metadata — used to decide which entries
@@ -198,14 +182,13 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   const campaignQuery = useQuery({
     queryKey: ['campaigns', campaignId],
     queryFn: () => api<CampaignOut>(`/campaigns/${campaignId}`),
-    enabled: !!campaignId,
   });
 
   const characters = useCharactersList();
   const ownedCharacters = (characters ?? []).filter(
     (character) => character.ownerId === me.data?.id,
   );
-  const roster = useCampaignCharactersList(campaignId ?? undefined);
+  const roster = useCampaignCharactersList(campaignId);
   const [recipientDialog, setRecipientDialog] = useState(false);
   const [recipientSelection, setRecipientSelection] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterKind>('all');
@@ -321,11 +304,6 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
     if (filter === 'private') return all.filter((e) => e.visibility === 'private');
     return all;
   }, [entries.data, filter]);
-
-  const currentCampaign = useMemo(
-    () => campaigns.data?.find((c) => c.id === campaignId) ?? null,
-    [campaigns.data, campaignId],
-  );
 
   const canModify = (entry: AdventureLogOut): boolean => {
     const meId = me.data?.id;
@@ -600,41 +578,13 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5">
       <header className="flex min-h-8 flex-wrap items-end justify-between gap-3">
-        {campaignIdProp ? (
-          <h2 className="font-display text-xl font-semibold leading-none">Adventure Log</h2>
-        ) : (
-          <div className="min-w-0">
-            <p className="label-eyebrow">
-              Campaign ·{' '}
-              {currentCampaign?.name ?? campaignQuery.data?.name ?? 'No campaign selected'}
-            </p>
-            <h1 className="font-display text-3xl font-semibold leading-none">Adventure Log</h1>
-          </div>
-        )}
+        <h2 className="font-display text-xl font-semibold leading-none">Adventure Log</h2>
         <div className="flex items-center gap-2">
-          {!campaignIdProp && campaigns.data && campaigns.data.length > 1 && (
-            <select
-              className="select select-bordered select-sm"
-              value={campaignId ?? ''}
-              onChange={(e) => {
-                const next = new URLSearchParams(params);
-                next.set('campaign', e.target.value);
-                setParams(next);
-              }}
-              aria-label="Select campaign"
-            >
-              {campaigns.data.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
           {editor.kind === 'hidden' && !guest ? (
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              disabled={!campaignId || entries.isLoading}
+              disabled={entries.isLoading}
               onClick={openCreate}
             >
               + New entry
@@ -643,55 +593,37 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
         </div>
       </header>
 
-      {campaigns.isError && !campaignIdProp && (
-        <QueryReadError
-          label="campaigns"
-          error={campaigns.error}
-          onRetry={() => void campaigns.refetch()}
-        />
-      )}
-      {!campaigns.isLoading &&
-        !campaigns.isError &&
-        (campaigns.data?.length ?? 0) === 0 &&
-        !campaignIdProp && (
-          <div className="card p-card text-center text-muted">
-            You don't belong to any campaigns yet. Create one on the Campaign tab to start a log.
-          </div>
-        )}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setFilter('all')}
+          disabled={editor.kind === 'edit'}
+          className={`chip ${filter === 'all' ? 'on' : ''}`}
+        >
+          All <span className="num text-dim ml-1">{entries.data ? counts.all : '—'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('shared')}
+          disabled={editor.kind === 'edit'}
+          className={`chip ${filter === 'shared' ? 'on' : ''}`}
+        >
+          Shared <span className="num text-dim ml-1">{entries.data ? counts.shared : '—'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter('private')}
+          disabled={editor.kind === 'edit'}
+          className={`chip ${filter === 'private' ? 'on' : ''}`}
+        >
+          Private <span className="num text-dim ml-1">{entries.data ? counts.private : '—'}</span>
+        </button>
+      </div>
 
-      {campaignId && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setFilter('all')}
-            disabled={editor.kind === 'edit'}
-            className={`chip ${filter === 'all' ? 'on' : ''}`}
-          >
-            All <span className="num text-dim ml-1">{entries.data ? counts.all : '—'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter('shared')}
-            disabled={editor.kind === 'edit'}
-            className={`chip ${filter === 'shared' ? 'on' : ''}`}
-          >
-            Shared <span className="num text-dim ml-1">{entries.data ? counts.shared : '—'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setFilter('private')}
-            disabled={editor.kind === 'edit'}
-            className={`chip ${filter === 'private' ? 'on' : ''}`}
-          >
-            Private <span className="num text-dim ml-1">{entries.data ? counts.private : '—'}</span>
-          </button>
-        </div>
-      )}
+      {editor.kind === 'create' && editorForm}
 
-      {editor.kind === 'create' && campaignId && editorForm}
-
-      {entries.isLoading && campaignId && <p className="text-muted">Loading log…</p>}
-      {entries.isError && campaignId && (
+      {entries.isLoading && <p className="text-muted">Loading log…</p>}
+      {entries.isError && (
         <QueryReadError
           label="adventure log"
           error={entries.error}
@@ -699,7 +631,7 @@ export function LogPage({ campaignId: campaignIdProp }: { campaignId?: string } 
         />
       )}
 
-      {visible.length === 0 && entries.isFetched && !entries.isError && campaignId && (
+      {visible.length === 0 && entries.isFetched && !entries.isError && (
         <p className="text-center text-muted">No entries yet for this filter.</p>
       )}
 

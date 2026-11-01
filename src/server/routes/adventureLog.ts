@@ -9,7 +9,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, desc, eq, ilike, ne, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   adventureLogCreate,
@@ -348,6 +348,4 @@ router.openapi(
   },
 );
 
-// Touch otherwise-unused imports so the linter stays quiet.
-export const _ = { asc, ne };
 export const adventureLogRouter = router;

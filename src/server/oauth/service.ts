@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { and, desc, eq, gt, inArray, isNull, lt, notExists, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, lt, notExists, notInArray, sql } from 'drizzle-orm';
 import {
   type OAuthAuthorizationQuery,
   type OAuthDynamicClientRegistration,

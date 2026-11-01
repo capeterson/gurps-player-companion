@@ -28,10 +28,4 @@ export default defineConfig({
       include: ['src/shared/**/*.ts', 'src/client/**/*.{ts,tsx}', 'src/sw/**/*.ts'],
     },
   },
-  resolve: {
-    alias: {
-      '@shared': new URL('./src/shared', import.meta.url).pathname,
-      '@client': new URL('./src/client', import.meta.url).pathname,
-    },
-  },
 });

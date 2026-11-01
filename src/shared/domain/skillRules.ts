@@ -1,10 +1,6 @@
 import type { SkillAttribute } from '../constants/skills.ts';
 import { formatSigned } from '../format/number.ts';
-import type {
-  SkillDefaultCondition,
-  SkillPrerequisite,
-  SkillTechLevelPolicy,
-} from '../schemas/skill.ts';
+import type { SkillDefaultCondition, SkillPrerequisite } from '../schemas/skill.ts';
 
 export type RuleTruth = 'met' | 'unmet' | 'unknown';
 
@@ -204,25 +200,6 @@ export function conditionsProven(
   return evaluateSkillDefaultConditions(conditions, context).every(
     (result) => result.truth === 'met',
   );
-}
-
-export function resolvedTechLevel(
-  policy: SkillTechLevelPolicy,
-  requested: number | null | undefined,
-  suggested: { campaign?: number | null; character?: number | null } = {},
-): number | null {
-  if (policy.kind === 'not_applicable') return null;
-  if (policy.kind === 'fixed') return policy.techLevel;
-  if (requested !== null && requested !== undefined) return requested;
-  const suggestion =
-    policy.suggestedFrom === 'campaign'
-      ? suggested.campaign
-      : policy.suggestedFrom === 'character'
-        ? suggested.character
-        : null;
-  if (suggestion === null || suggestion === undefined)
-    throw new Error('A concrete Tech Level is required');
-  return suggestion;
 }
 
 /** Basic Set cross-TL use. `null` means the IQ-based table makes use impossible. */

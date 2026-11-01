@@ -12,13 +12,6 @@ import type { Portable } from './sourceReferences.ts';
 
 import { Document, parse, stringify } from 'yaml';
 import {
-  type LibraryEnchantmentCreate,
-  type LibraryItemCreate,
-  type LibraryLanguageCreate,
-  type LibrarySkillCreate,
-  type LibrarySpellCreate,
-  type LibraryStyleCreate,
-  type LibraryTechniqueCreate,
   type LibraryTraitCreate,
   type LibraryYamlDoc,
   libraryYamlDoc,

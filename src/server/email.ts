@@ -34,38 +34,6 @@ export async function sendPasswordResetEmail(
   });
 }
 
-export async function sendCampaignInviteEmail(
-  resend: Resend,
-  from: string,
-  opts: {
-    to: string;
-    displayName: string;
-    inviterName: string;
-    campaignName: string;
-    role: string;
-    appUrl: string;
-  },
-): Promise<void> {
-  const { to, displayName, inviterName, campaignName, role, appUrl } = opts;
-  await resend.emails.send({
-    from,
-    to,
-    subject: `${inviterName} invited you to join ${campaignName}`,
-    text: [
-      `Hi ${displayName},`,
-      '',
-      `${inviterName} has invited you to join the campaign "${campaignName}" as a ${role}.`,
-      '',
-      appUrl ? `Sign in to accept or decline: ${appUrl}` : 'Sign in to accept or decline.',
-    ].join('\n'),
-    html: `
-<p>Hi ${escapeHtml(displayName)},</p>
-<p>${escapeHtml(inviterName)} has invited you to join the campaign <strong>${escapeHtml(campaignName)}</strong> as a ${escapeHtml(role)}.</p>
-${appUrl ? `<p><a href="${escapeHtml(appUrl)}">Sign in to accept or decline</a></p>` : '<p>Sign in to accept or decline.</p>'}
-    `.trim(),
-  });
-}
-
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')

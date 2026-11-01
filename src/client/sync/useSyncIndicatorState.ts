@@ -9,11 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useSyncExternalStore } from 'react';
 import { getLocalDb } from '../db/dexie.ts';
 import { LEGACY_CAMPAIGN_HOLD_REASON } from '../db/legacyCampaignDependencies.ts';
-import { type SyncIndicatorState, type SyncStatus, syncStateStore } from './state.ts';
-
-function getSnapshot(): SyncIndicatorState {
-  return syncStateStore.value;
-}
+import { type SyncStatus, syncStateStore } from './state.ts';
 
 function getStatusSnapshot(): SyncStatus {
   return syncStateStore.status;
@@ -21,10 +17,6 @@ function getStatusSnapshot(): SyncStatus {
 
 function subscribe(cb: () => void): () => void {
   return syncStateStore.subscribe(cb);
-}
-
-export function useSyncIndicatorState(): SyncIndicatorState {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 /** State plus the reason for an `error`, for the badge tooltip + sync log. */

@@ -425,7 +425,6 @@ export interface OutboxEntry {
   serverReason?: string | undefined;
   /** Raw network error or per-operation server outcome for sync diagnostics. */
   lastError?: unknown;
-  serverNewRevision?: number | undefined;
   /**
    * Stable label used in toasts ("Couldn't save ${humanName}").  Filled
    * in by the enqueue site so the orchestrator doesn't have to know

@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { normalizeHouseRuleSettings } from '../../shared/domain/campaignRules.ts';
 import {
@@ -590,6 +590,4 @@ router.openapi(
   },
 );
 
-// Touch sql import so eslint doesn't complain about unused.  We use sql in tests.
-export const _ = sql;
 export const campaignsRouter = router;

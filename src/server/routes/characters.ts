@@ -9,7 +9,6 @@ import {
   characterDetail,
   characterDetailEnvelope,
   characterListItem,
-  characterMinimalOut,
   characterUpdate,
   dismissWarningRequest,
 } from '../../shared/schemas/character.ts';

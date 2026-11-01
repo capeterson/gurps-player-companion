@@ -285,39 +285,6 @@ export function resolveWeaponEffectMatches(
 }
 
 /**
- * Active effects for one item/mode. Item-level declarations flow to every
- * mode once; a modeName narrows them by normalized exact match.
- */
-export function weaponEffectsFor(
-  matches: ReadonlyArray<WeaponEffectMatch>,
-  inventoryItemId: string,
-  target: WeaponEffectTarget,
-  modeName?: string | null,
-  modeKey?: string | null,
-  skill?: string | null,
-): ResolvedEffect[] {
-  const normalizedMode = normalizeMechanicalName(modeName ?? 'primary');
-  return matches.flatMap((match) => {
-    if (
-      match.effect.target !== target ||
-      !match.effect.active ||
-      !match.matchedInventoryItemIds.includes(inventoryItemId)
-    ) {
-      return [];
-    }
-    if (!weaponSelectorMatchesSkill(match.effect.weaponSelector, skill)) return [];
-    const key = match.effect.weaponSelector?.modeKey;
-    if (key && key !== modeKey) return [];
-    const wantedMode = normalizeMechanicalName(match.effect.weaponSelector?.modeName ?? '');
-    return wantedMode && wantedMode !== normalizedMode ? [] : [match.effect];
-  });
-}
-
-export function sumResolvedEffects(effects: ReadonlyArray<ResolvedEffect>): number {
-  return effects.reduce((total, effect) => total + effect.value, 0);
-}
-
-/**
  * Sentinel id used for the synthesized `TempEffect` that carries the
  * aggregated trait-effect contributions to primary attrs (ST/DX/IQ/HT)
  * and standard secondary axes (HP/FP/Will/Per/Speed/Move).  The rest of

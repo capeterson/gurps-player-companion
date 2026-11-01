@@ -1016,8 +1016,7 @@ and `/campaigns/:id/gm` form one campaign workspace. Every destination uses the
 same campaign identity header and sibling navigation; the app-header breadcrumb
 continues to show `Campaign > campaign name > destination`. The workspace uses
 the local campaign mirror as its fallback, so the navigation and sync-backed
-library remain available offline. The legacy top-level `/log` and `/library`
-routes remain as campaign-switching entry points.
+library remain available offline.
 
 The Overview (`/campaigns/:id`) holds campaign facts and the browseable character
 roster rather than embedding unrelated tools in one long page. Every member
@@ -1517,7 +1516,6 @@ src/
                  useDraftField (canonical draft-on-blur), useDraftToggle,
                  useUnsyncedChangesGuard (confirmed session cleanup),
                  useAppHeaderBottom (live sticky-header offset),
-                 useSelectedCampaignId (legacy Log/Library campaign URL selection),
                  useFlashState (shared flash-pulse primitive the draft
                  hooks build on), useFlashGroup (visible summary feedback
                  for retained language/technique editor rollbacks), ...
@@ -1560,7 +1558,7 @@ src/
                    entries))
     constants/   attributes, skills, traits, combat (postures, common
                  conditions, maneuvers), hitLocations (+ aim penalties),
-                 rangePenalty (B550 reference steps), magic
+                 magic
     yaml/        library.ts + sourceReferences.ts — round-trippable campaign-library YAML codec
                  and portable source-key ↔ live UUID translation
     history/     summarize.ts — shared history one-liner formatter

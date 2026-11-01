@@ -64,5 +64,4 @@ export async function closeDb(): Promise<void> {
   }
 }
 
-export type Db = ReturnType<typeof getDb>;
 export { schema };

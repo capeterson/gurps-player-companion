@@ -10,8 +10,6 @@ import {
   resolveEffects,
   resolveWeaponEffectMatches,
   skillBonusFor,
-  sumResolvedEffects,
-  weaponEffectsFor,
 } from './traitEffects.ts';
 
 const baseAttrs: CharacterAttrs = {
@@ -510,45 +508,6 @@ describe('weapon-scoped effects', () => {
       matchStatus: 'multiple',
       matchedInventoryItemIds: ['p1', 'p2'],
     });
-    expect(sumResolvedEffects(weaponEffectsFor(matches, 'p1', 'weapon_attack'))).toBe(2);
-    expect(weaponEffectsFor(matches, 'r1', 'weapon_attack')).toHaveLength(0);
-  });
-
-  it('applies item-level effects once per mode and narrows named modes exactly', () => {
-    const resolved = resolveEffects(
-      [
-        trait('enchanted', 'Enchanted', null, [
-          {
-            target: 'weapon_damage',
-            value: 1,
-            scaling: 'flat',
-            weaponSelector: { kind: 'weapon_name', weaponName: 'Spear' },
-          },
-          {
-            target: 'weapon_damage',
-            value: 2,
-            scaling: 'flat',
-            weaponSelector: { kind: 'weapon_name', weaponName: 'Spear', modeName: 'Thrown' },
-          },
-        ]),
-      ],
-      [],
-      new Set(),
-    );
-    const matches = resolveWeaponEffectMatches(resolved, [
-      {
-        id: 'spear',
-        name: ' spear ',
-        equipped: true,
-        weaponData: { skill: 'Spear', alternateModes: [{ name: 'Thrown' }] },
-      },
-    ]);
-    expect(sumResolvedEffects(weaponEffectsFor(matches, 'spear', 'weapon_damage', 'primary'))).toBe(
-      1,
-    );
-    expect(sumResolvedEffects(weaponEffectsFor(matches, 'spear', 'weapon_damage', 'Thrown'))).toBe(
-      3,
-    );
   });
 
   it('diagnoses missing modes and never name-falls through to a custom item', () => {

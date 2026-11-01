@@ -91,15 +91,14 @@ function makeEntry(over: Partial<AdventureLogOut>): AdventureLogOut {
   } as AdventureLogOut;
 }
 
-function renderPage(props?: { campaignId?: string }, cachedCampaigns?: CampaignOut[]) {
+function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  if (cachedCampaigns) queryClient.setQueryData(['campaigns'], cachedCampaigns);
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <LogPage {...props} />
+        <LogPage campaignId={CAMP_ID} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -562,20 +561,15 @@ describe('LogPage', () => {
     });
   });
 
-  it('embedded mode (campaignId prop) hides the campaign eyebrow title block', async () => {
+  it('renders an h2 heading without a campaign eyebrow', async () => {
     setupResponses();
-    const secondCampaign = { ...campaign, id: 'c2', name: 'Other Campaign' };
-    renderPage({ campaignId: CAMP_ID }, [campaign, secondCampaign]);
-    // Embedded mode renders an <h2> "Adventure Log" instead of the
-    // h1+eyebrow block (the parent already shows the campaign name).
+    renderPage();
+    // The campaign workspace header already shows the campaign name.
     await waitFor(() => {
       const headings = screen.getAllByText('Adventure Log');
       expect(headings.some((h) => h.tagName === 'H2')).toBe(true);
     });
-    // The eyebrow "Campaign · ..." should NOT render in embedded mode.
     expect(screen.queryByText(/Campaign ·/)).not.toBeInTheDocument();
-    // Even if the shared campaigns query is already cached, a campaign detail
-    // route is fixed by its path and must not render a redundant picker.
     expect(screen.queryByRole('combobox', { name: 'Select campaign' })).not.toBeInTheDocument();
   });
 

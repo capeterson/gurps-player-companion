@@ -5,13 +5,11 @@ import {
   INVENTORY_OTHER_TYPE,
   buildTree,
   descendantsOf,
-  eligibleContainers,
   filterInventoryTree,
   flattenDFS,
   inventoryCostTotals,
   inventoryTypeLabels,
   sortInventoryTree,
-  validateReparent,
 } from './inventoryTree.ts';
 
 function weapon(): NonNullable<InventoryItemOut['weaponData']> {
@@ -233,42 +231,5 @@ describe('descendantsOf', () => {
     ];
     const { byParent } = buildTree(items);
     expect([...descendantsOf('root', byParent)].sort()).toEqual(['leaf', 'mid']);
-  });
-});
-
-describe('eligibleContainers', () => {
-  it('excludes the item itself, its descendants, and non-container items', () => {
-    const items = [
-      item('pack', null, 'Pack', true),
-      item('belt', null, 'Belt', true),
-      item('sword', null, 'Sword'),
-      item('pouch', 'pack', 'Pouch', true),
-    ];
-    expect(eligibleContainers(items, 'pack').map((i) => i.id)).toEqual(['belt']);
-  });
-});
-
-describe('validateReparent', () => {
-  it('rejects self-drop', () => {
-    const { byParent } = buildTree([item('x', null, 'X', true)]);
-    expect(validateReparent('x', 'x', byParent).ok).toBe(false);
-  });
-
-  it('rejects dropping a container into its own descendant', () => {
-    const items = [item('outer', null, 'Outer', true), item('inner', 'outer', 'Inner', true)];
-    const { byParent } = buildTree(items);
-    expect(validateReparent('outer', 'inner', byParent).ok).toBe(false);
-  });
-
-  it('accepts a normal sibling reparent', () => {
-    const items = [item('a', null, 'A'), item('b', null, 'B', true)];
-    const { byParent } = buildTree(items);
-    expect(validateReparent('a', 'b', byParent).ok).toBe(true);
-  });
-
-  it('accepts dropping to root', () => {
-    const items = [item('a', 'b', 'A'), item('b', null, 'B', true)];
-    const { byParent } = buildTree(items);
-    expect(validateReparent('a', null, byParent).ok).toBe(true);
   });
 });

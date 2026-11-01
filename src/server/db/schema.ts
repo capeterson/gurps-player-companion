@@ -1553,24 +1553,6 @@ export type DbCampaignMembership = typeof campaignMemberships.$inferSelect;
 export type DbCampaignInvitation = typeof campaignInvitations.$inferSelect;
 export type DbNotification = typeof notifications.$inferSelect;
 export type DbAdventureLogEntry = typeof adventureLogEntries.$inferSelect;
-export type DbCampaignLibraryTrait = typeof campaignLibraryTraits.$inferSelect;
-export type DbCampaignLibrarySkill = typeof campaignLibrarySkills.$inferSelect;
-export type DbCampaignLibrarySpell = typeof campaignLibrarySpells.$inferSelect;
-export type DbCampaignLibraryEnchantment = typeof campaignLibraryEnchantments.$inferSelect;
-export type DbCampaignLibraryItem = typeof campaignLibraryItems.$inferSelect;
-export type DbCampaignLibraryLanguage = typeof campaignLibraryLanguages.$inferSelect;
-export type DbCampaignLibraryTechnique = typeof campaignLibraryTechniques.$inferSelect;
-export type DbCampaignLibraryStyle = typeof campaignLibraryStyles.$inferSelect;
-export type DbApiKey = typeof apiKeys.$inferSelect;
-export type DbRefreshToken = typeof refreshTokens.$inferSelect;
-export type DbPasswordResetToken = typeof passwordResetTokens.$inferSelect;
-
-// Use the bigserial as our `revision` (auto-incremented per-row insert)
-// rather than per-table.  For multi-table sync, clients track a cursor
-// per entity-class, sorted by row id and revision.
-// Drizzle warns to keep `bigserial` to avoid a separate sequence; we lean
-// on the global sequence to give monotonic ordering across all tables.
-export const _ensureBigserial = bigserial;
 
 // ---------- sync tombstones ----------
 //
@@ -1599,8 +1581,6 @@ export const entityTombstones = pgTable(
     ),
   }),
 );
-
-export type DbEntityTombstone = typeof entityTombstones.$inferSelect;
 
 // ---------- entity history ----------
 //

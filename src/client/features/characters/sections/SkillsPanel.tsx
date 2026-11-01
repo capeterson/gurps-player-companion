@@ -13,15 +13,12 @@ import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
 import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
-import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueDelete } from '../../../sync/outbox.ts';
 import { LibraryMechanicsNote } from './LibraryMechanicsNote.tsx';
 import { RollSheet } from './RollSheet.tsx';
 import { SkillPointsBreakdown } from './SkillPointsBreakdown.tsx';

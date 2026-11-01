@@ -6,8 +6,6 @@
  * and the server-side point ledger.
  */
 
-export type Attribute = 'ST' | 'DX' | 'IQ' | 'HT' | 'Will' | 'Per' | 'Other';
-
 export const PRIMARY_ATTRIBUTES = ['ST', 'DX', 'IQ', 'HT'] as const;
 export type PrimaryAttribute = (typeof PRIMARY_ATTRIBUTES)[number];
 
@@ -35,6 +33,3 @@ export const SECONDARY_COST_PER_LEVEL = {
  * "quarter increments" (integer) to avoid floating-point arithmetic.
  */
 export const SPEED_COST_PER_QUARTER = 5 as const;
-
-export const SECONDARY_MODS = ['hp', 'will', 'per', 'fp', 'move'] as const;
-export type SecondaryMod = (typeof SECONDARY_MODS)[number];

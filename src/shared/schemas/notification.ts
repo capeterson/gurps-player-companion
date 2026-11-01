@@ -2,13 +2,6 @@ import { z } from 'zod';
 import { isoTimestamp, uuid } from './common.ts';
 
 /**
- * Discriminator constants for `notification.type`.  The payload shape is
- * owned by whoever emits the row, but the well-known types are listed
- * here so the front-end can exhaustively branch on them.
- */
-export const NOTIFICATION_TYPE_CAMPAIGN_INVITATION = 'campaign_invitation';
-
-/**
  * Payload schema for `type === 'campaign_invitation'` rows in the
  * `notifications.payload` jsonb column.  Keys are snake_case because
  * that's what the existing rows in production carry (the column

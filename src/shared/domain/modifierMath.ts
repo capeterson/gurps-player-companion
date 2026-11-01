@@ -106,20 +106,3 @@ export function computeLeveledTraitCost(input: LeveledTraitCostInput): ModifiedC
   );
   return { ...modCost, leveled, variantAdjusted };
 }
-
-/**
- * Validate that all selected modifiers respect their mutex groups.
- * Returns a list of conflicting group names (empty if valid).
- */
-export function findGroupConflicts(modifiers: readonly TraitModifier[]): string[] {
-  const seen = new Map<string, number>();
-  for (const m of modifiers) {
-    if (!m.group) continue;
-    seen.set(m.group, (seen.get(m.group) ?? 0) + 1);
-  }
-  const conflicts: string[] = [];
-  for (const [group, count] of seen) {
-    if (count > 1) conflicts.push(group);
-  }
-  return conflicts;
-}

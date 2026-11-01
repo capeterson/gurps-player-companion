@@ -1,7 +1,6 @@
-import { type TablePreferences, tablePreferencesCodec } from '../tablePreferences.ts';
+import { tablePreferencesCodec } from '../tablePreferences.ts';
 
 export type DefenseSort = 'custom' | 'defense' | 'skill' | 'final';
-export type DefenseTablePreferences = TablePreferences<DefenseSort>;
 
 const codec = tablePreferencesCodec<DefenseSort>(
   'gurps:defenseTable:',

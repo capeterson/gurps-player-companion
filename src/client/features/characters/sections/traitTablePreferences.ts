@@ -1,7 +1,6 @@
-import { type TablePreferences, tablePreferencesCodec } from './tablePreferences.ts';
+import { tablePreferencesCodec } from './tablePreferences.ts';
 
 export type TraitSort = 'custom' | 'name' | 'kind' | 'points' | 'level';
-export type TraitTablePreferences = TablePreferences<TraitSort>;
 
 const codec = tablePreferencesCodec<TraitSort>(
   'gurps:traitTable:',

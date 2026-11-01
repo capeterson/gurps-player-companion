@@ -14,13 +14,7 @@ import {
   resetSyncOrchestratorForTests,
   setRejectionNotifier,
 } from './orchestrator.ts';
-import {
-  enqueueCreate,
-  enqueueDelete,
-  enqueueEntityPatch,
-  enqueueFieldPatch,
-  readDrainableOps,
-} from './outbox.ts';
+import { enqueueCreate, enqueueDelete, enqueueEntityPatch, enqueueFieldPatch } from './outbox.ts';
 import { syncStateStore } from './state.ts';
 
 const CAMPAIGN = '0193b3c0-f1f0-7000-8000-00000000ca01';

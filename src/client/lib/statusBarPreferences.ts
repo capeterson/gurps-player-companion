@@ -27,8 +27,7 @@ function readRaw(userId: string | undefined): string | null {
   }
 }
 
-export function readStatusBarPreferences(userId: string | undefined): StatusBarPreferences {
-  const raw = readRaw(userId);
+function parsePreferences(raw: string | null): StatusBarPreferences {
   if (!raw) return DEFAULTS;
   try {
     const value = JSON.parse(raw) as Partial<StatusBarPreferences>;
@@ -77,15 +76,5 @@ export function useStatusBarPreferences(userId: string | undefined): StatusBarPr
   );
   const snapshot = useCallback(() => readRaw(userId), [userId]);
   const raw = useSyncExternalStore(subscribe, snapshot, () => null);
-  if (!raw) return DEFAULTS;
-  try {
-    const value = JSON.parse(raw) as Partial<StatusBarPreferences>;
-    return {
-      showPosture: value.showPosture === true,
-      showManeuver: value.showManeuver === true,
-      showConditions: value.showConditions === true,
-    };
-  } catch {
-    return DEFAULTS;
-  }
+  return parsePreferences(raw);
 }

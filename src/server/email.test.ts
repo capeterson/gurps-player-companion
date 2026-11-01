@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { Resend } from 'resend';
-import { sendCampaignInviteEmail, sendPasswordResetEmail } from './email.ts';
+import { sendNotificationEmail, sendPasswordResetEmail } from './email.ts';
 
 function mockResend() {
   const messages: Record<string, unknown>[] = [];
@@ -30,27 +30,25 @@ describe('HTML email interpolation', () => {
     expect(message?.text).toContain(`O'Brien & <img src=x onerror="alert(1)">`);
   });
 
-  it('escapes invitee, inviter, campaign, role and app URL using the mocked transport', async () => {
+  it('escapes notification message text and the app URL attribute using the mocked transport', async () => {
     const { resend, messages } = mockResend();
-    await sendCampaignInviteEmail(resend, 'test@example.invalid', {
+    await sendNotificationEmail(resend, 'test@example.invalid', {
       to: 'player@example.invalid',
-      displayName: 'Player <svg/onload=alert(1)>',
-      inviterName: `O'Brien & <b>GM</b>`,
-      campaignName: 'Café & 東京 <script>alert(1)</script>',
-      role: 'manager" onclick="alert(2)',
+      subject: 'Invitation',
+      message: `O'Brien & <b>GM</b> invited you to Café & 東京 <script>alert(1)</script>`,
       appUrl: 'https://app.example/invitations?return="x"&next=one',
+      idempotencyKey: 'test-key',
     });
 
     expect(messages).toHaveLength(1);
     const message = messages[0];
-    expect(message?.html).toContain('Player &lt;svg/onload=alert(1)&gt;');
-    expect(message?.html).toContain(`O'Brien &amp; &lt;b&gt;GM&lt;/b&gt;`);
-    expect(message?.html).toContain('Café &amp; 東京 &lt;script&gt;alert(1)&lt;/script&gt;');
-    expect(message?.html).toContain('manager&quot; onclick=&quot;alert(2)');
+    expect(message?.html).toContain(
+      `O'Brien &amp; &lt;b&gt;GM&lt;/b&gt; invited you to Café &amp; 東京 &lt;script&gt;alert(1)&lt;/script&gt;`,
+    );
     expect(message?.html).toContain(
       'href="https://app.example/invitations?return=&quot;x&quot;&amp;next=one"',
     );
     expect(message?.html).not.toContain('<script>');
-    expect(message?.html).not.toContain('<svg');
+    expect(message?.html).not.toContain('<b>');
   });
 });

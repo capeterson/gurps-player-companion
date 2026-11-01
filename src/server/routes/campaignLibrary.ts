@@ -4,8 +4,7 @@ import {
   mergeLibraryGraph,
   validateLibraryGraph,
 } from '../../shared/domain/libraryGraph.ts';
-import { canAdoptLibraryEntry, libraryEntryKey } from '../../shared/domain/libraryIdentity.ts';
-import { validatePricingCatalog } from '../../shared/domain/libraryPricing.ts';
+import { canAdoptLibraryEntry } from '../../shared/domain/libraryIdentity.ts';
 import { activeEffectDefinitionOut } from '../../shared/schemas/activeEffects.ts';
 import { libraryModifierOut, librarySourceOut } from '../../shared/schemas/libraryMetadata.ts';
 import { libraryRaceOut } from '../../shared/schemas/race.ts';
@@ -16,7 +15,6 @@ import {
 } from '../../shared/yaml/sourceReferences.ts';
 import { campaignLibrarySources } from '../db/schema.ts';
 import { loadLibraryGraph } from '../services/libraryPricing.ts';
-import { loadPricingCatalog } from '../services/libraryPricing.ts';
 import { importSourcebooks } from '../services/librarySourceImport.ts';
 import { modifierEntity, sourceEntity } from './campaignLibraryEntities.ts';
 /**
@@ -47,7 +45,6 @@ import { and, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { normalizeHouseRuleSettings } from '../../shared/domain/campaignRules.ts';
 import { canonicalLibraryKey } from '../../shared/domain/libraryIdentity.ts';
-import { calculationKey } from '../../shared/schemas/calculation.ts';
 import { campaignUpdate } from '../../shared/schemas/campaign.ts';
 import {
   importMode,
