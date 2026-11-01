@@ -166,5 +166,5 @@ export class SyncStateStore {
   }
 }
 
-/** Singleton consumed by `useSyncIndicatorState`. */
+/** Singleton consumed by `useSyncStatus`. */
 export const syncStateStore = new SyncStateStore();

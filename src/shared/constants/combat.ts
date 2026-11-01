@@ -74,5 +74,3 @@ export const MANEUVERS = [
   { id: 'ready', label: 'Ready', blurb: 'Draw, reload, or otherwise prepare equipment' },
   { id: 'wait', label: 'Wait', blurb: 'Hold an action to trigger on a specified condition' },
 ] as const;
-
-export type Maneuver = (typeof MANEUVERS)[number];

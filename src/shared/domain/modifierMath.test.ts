@@ -3,7 +3,6 @@ import {
   type TraitModifier,
   computeLeveledTraitCost,
   computeModifiedCost,
-  findGroupConflicts,
 } from './modifierMath.ts';
 
 const enh = (name: string, costValue: number, group?: string): TraitModifier => ({
@@ -65,18 +64,6 @@ describe('computeModifiedCost', () => {
   it('adds flat modifiers after percent scaling', () => {
     const r = computeModifiedCost(20, [enh('a', 50), flat('b', 5)]);
     expect(r.total).toBe(35); // 20 * 1.5 = 30 + 5
-  });
-});
-
-describe('findGroupConflicts', () => {
-  it('returns empty when no groups overlap', () => {
-    expect(findGroupConflicts([enh('a', 10, 'g1'), enh('b', 10, 'g2')])).toEqual([]);
-  });
-  it('returns groups with multiple selections', () => {
-    expect(findGroupConflicts([enh('a', 10, 'g1'), enh('b', 5, 'g1')])).toEqual(['g1']);
-  });
-  it('ignores modifiers without a group', () => {
-    expect(findGroupConflicts([enh('a', 10), enh('b', 5)])).toEqual([]);
   });
 });
 

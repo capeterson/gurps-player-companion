@@ -17,7 +17,7 @@ import { campaignLibraryActiveEffects } from '../db/schema.ts';
  * status lives in `outcomes[].status`.
  */
 
-import { createRoute, z } from '@hono/zod-openapi';
+import { createRoute } from '@hono/zod-openapi';
 import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
 import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
@@ -47,7 +47,6 @@ import {
   characters,
   combatStates,
   entityTombstones,
-  inventoryItems,
 } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { CHARACTER_CHILD_TABLES } from '../services/characterChildren.ts';

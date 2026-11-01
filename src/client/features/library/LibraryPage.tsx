@@ -19,7 +19,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   type LibraryGraph,
   libraryEditionDecisions,
@@ -39,7 +39,6 @@ import {
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 import { getLocalDb } from '../../db/dexie.ts';
 import { useAppHeaderBottom } from '../../hooks/useAppHeaderBottom.ts';
-import { useSelectedCampaignId } from '../../hooks/useSelectedCampaignId.ts';
 import { ApiError, api, apiFetch } from '../../lib/api.ts';
 import { editingFocusBounds } from '../../lib/editingFocusBounds.ts';
 import { readActiveUser } from '../../sync/activeUser.ts';
@@ -95,30 +94,23 @@ function parseSection(value: string | null): SectionKey {
 }
 
 /**
- * Top-level library page.  Mirrors LogPage: when the parent route
- * passes `campaignId` (e.g. `/campaigns/:id/library`) we use that and
- * skip the URL-sync logic; otherwise pick from `?campaign=` or the
- * first campaign and mirror it back into the query string.
+ * Library page for the campaign mounted at `/campaigns/:id/library` (or
+ * `library-transfer`).
  *
  * `?section=`, `?q=` and `?open=` make a section, a search and an open
  * entry linkable.
  */
 export function LibraryPage({
-  campaignId: campaignIdProp,
+  campaignId,
   transferOnly = false,
 }: {
-  campaignId?: string;
+  campaignId: string;
   transferOnly?: boolean;
-} = {}) {
+}) {
   const qc = useQueryClient();
-  // Campaign rows are synced read-only, so the switcher and the owner check
-  // work offline too.
+  // Campaign rows are synced read-only, so the owner check works offline too.
   const campaigns = useLiveQuery(() => getLocalDb().campaigns.toArray(), []);
-  const sortedCampaigns = useMemo(
-    () => campaigns && [...campaigns].sort((a, b) => a.name.localeCompare(b.name)),
-    [campaigns],
-  );
-  const { campaignId, params, setParams } = useSelectedCampaignId(campaignIdProp, sortedCampaigns);
+  const [params, setParams] = useSearchParams();
   const currentCampaignId = useRef(campaignId);
   currentCampaignId.current = campaignId;
   const currentCampaign = useMemo(
@@ -558,7 +550,7 @@ export function LibraryPage({
   }
 
   const shell = (key: SectionKey): LibrarySectionShellProps => ({
-    campaignId: campaignId ?? '',
+    campaignId,
     library,
     words,
     sourceFilter: key === 'sources' ? '' : sourceFilter,
@@ -777,55 +769,20 @@ export function LibraryPage({
     <div ref={pageRef} className="mx-auto max-w-5xl space-y-6" style={pageStyle}>
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          {!campaignIdProp && (
-            <p className="label-eyebrow">
-              Campaign · {currentCampaign?.name ?? 'No campaign selected'}
-            </p>
-          )}
-          {campaignIdProp ? (
-            <h2 className="font-display text-2xl font-semibold leading-none">Library</h2>
-          ) : (
-            <h1 className="font-display text-4xl font-semibold leading-none">Library</h1>
-          )}
+          <h2 className="font-display text-2xl font-semibold leading-none">Library</h2>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link
             className="link text-sm"
-            to={`/help/campaign-library${campaignId ? `?campaign=${encodeURIComponent(campaignId)}` : ''}`}
+            to={`/help/campaign-library?campaign=${encodeURIComponent(campaignId)}`}
             target="_blank"
             rel="noopener noreferrer"
           >
             Library guide <span className="sr-only">(opens in a new tab)</span>
             <span aria-hidden="true">↗</span>
           </Link>
-          {/* Hide campaign switcher when the parent already scoped us to a campaign */}
-          {!campaignIdProp && sortedCampaigns && sortedCampaigns.length > 1 && (
-            <select
-              className="select select-bordered select-sm"
-              value={campaignId ?? ''}
-              onChange={(e) => {
-                const next = new URLSearchParams(params);
-                next.set('campaign', e.target.value);
-                next.delete('open');
-                setParams(next);
-              }}
-              aria-label="Select campaign"
-            >
-              {sortedCampaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       </header>
-
-      {campaigns !== undefined && !campaignIdProp && campaigns.length === 0 && (
-        <div className="card p-card text-center text-muted">
-          You don&apos;t belong to any campaigns yet.
-        </div>
-      )}
 
       <div
         ref={toolbarRef}
@@ -883,9 +840,9 @@ export function LibraryPage({
         <div ref={setJumpSlot} className="empty:hidden" />
       </div>
 
-      {campaignId && localLibrary === undefined && <p className="text-muted">Loading library…</p>}
+      {localLibrary === undefined && <p className="text-muted">Loading library…</p>}
 
-      {campaignId && localLibrary && (
+      {localLibrary && (
         <div className="library-content flex flex-col gap-3">
           <CatalogSection section="sources" {...shell('sources')} />
           <CatalogSection section="modifiers" {...shell('modifiers')} />

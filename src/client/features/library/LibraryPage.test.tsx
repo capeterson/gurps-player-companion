@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { activeEffectDefinitionCreate } from '../../../shared/schemas/activeEffects.ts';
 import { libraryModifierCreate } from '../../../shared/schemas/libraryMetadata.ts';
@@ -781,20 +782,22 @@ it('imports only the sourcebook selected from a full YAML file', async () => {
 it('discards a Replace preview when the selected campaign changes', async () => {
   await seed();
   function SwitchCampaign() {
-    const navigate = useNavigate();
+    const [campaignId, setCampaignId] = useState(CAMPAIGN);
     return (
-      <button type="button" onClick={() => navigate(`/?campaign=${OTHER_CAMPAIGN}`)}>
-        Switch campaign
-      </button>
+      <>
+        <button type="button" onClick={() => setCampaignId(OTHER_CAMPAIGN)}>
+          Switch campaign
+        </button>
+        <LibraryPage campaignId={campaignId} transferOnly />
+      </>
     );
   }
   render(
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter initialEntries={[`/?campaign=${CAMPAIGN}`]}>
+      <MemoryRouter>
         <SwitchCampaign />
-        <LibraryPage transferOnly />
       </MemoryRouter>
     </QueryClientProvider>,
   );

@@ -11,7 +11,6 @@ import type { TraitModifier as AppliedTraitModifier } from '../../../../shared/s
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog.tsx';
 import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../components/ui/FoldSection.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
@@ -23,8 +22,6 @@ import { Table, TableBody } from '../../../components/ui/Table.tsx';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../hooks/useDraftField.ts';
 import { useExperimentalActiveEffects } from '../../../hooks/useExperimentalActiveEffects.ts';
 import { intParser } from '../../../lib/parsers.ts';
-import { useToasts } from '../../../lib/toast.tsx';
-import { enqueueDelete } from '../../../sync/outbox.ts';
 import { useCampaignHouseRules } from '../../campaigns/useCampaignHouseRules.ts';
 import { EffectsEditor, effectPreview } from '../../library/EffectsEditor.tsx';
 import { PricingResolver } from '../../library/PricingResolver.tsx';

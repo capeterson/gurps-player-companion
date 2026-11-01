@@ -20,7 +20,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { type InvitationOut, invitationOut, inviteRequest } from '../../shared/schemas/campaign.ts';
@@ -585,7 +585,4 @@ router.openapi(
   },
 );
 
-// Touch unused imports so biome doesn't trip on them once the file
-// stabilises (`or` reserved for future or-of-status filters).
-export const _ = { or };
 export const invitationsRouter = router;

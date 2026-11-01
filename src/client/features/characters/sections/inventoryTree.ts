@@ -251,37 +251,3 @@ export function descendantsOf(
   }
   return out;
 }
-
-/** Containers a given item could legally be reparented into. */
-export function eligibleContainers(
-  items: readonly InventoryItemOut[],
-  selfId: string,
-): InventoryItemOut[] {
-  const { byParent } = buildTree(items);
-  const blocked = descendantsOf(selfId, byParent);
-  return items
-    .filter((i) => i.isContainer && i.id !== selfId && !blocked.has(i.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/**
- * Validate a proposed reparent.  Returns `{ ok: false, reason }` for
- * the obvious cycle / self-drop cases that the UI surfaces as a toast,
- * `{ ok: true }` otherwise.  The server still owns the authoritative
- * cycle check — this is the optimistic UI guard.
- */
-export function validateReparent(
-  draggedId: string,
-  newParentId: string | null,
-  byParent: Map<string | null, InventoryItemOut[]>,
-): { ok: true } | { ok: false; reason: string } {
-  if (draggedId === newParentId) {
-    return { ok: false, reason: "Can't drop an item onto itself." };
-  }
-  if (newParentId === null) return { ok: true };
-  const blocked = descendantsOf(draggedId, byParent);
-  if (blocked.has(newParentId)) {
-    return { ok: false, reason: "Can't drop a container into its own descendant." };
-  }
-  return { ok: true };
-}

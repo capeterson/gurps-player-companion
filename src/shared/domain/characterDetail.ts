@@ -974,8 +974,6 @@ export function buildCharacterDetail(
     ),
   }));
 
-  // Strip the unused `sourceCharacterRecordId` field name — the schema
-  // calls it `sourceId` for brevity.  resolveEffects already emits sourceId.
   const weaponMatches = resolveWeaponEffectMatches(resolved, inventoryOut);
   const effectsOut: ResolvedEffectOut[] = resolved.map((e) => {
     const weaponMatch = weaponMatches.find((match) => match.effect === e);

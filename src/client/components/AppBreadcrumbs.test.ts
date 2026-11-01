@@ -20,22 +20,8 @@ describe('appEntityBreadcrumbTarget', () => {
     });
   });
 
-  it('resolves selected campaigns on global log and library pages', () => {
-    expect(appEntityBreadcrumbTarget('/log', '?campaign=camp-1')).toEqual({
-      kind: 'campaign',
-      id: 'camp-1',
-    });
-    expect(appEntityBreadcrumbTarget('/library', '?campaign=camp-2')).toEqual({
-      kind: 'campaign',
-      id: 'camp-2',
-    });
-    expect(appEntityBreadcrumbTarget('/log')).toBeNull();
-  });
-
   it('labels every routed campaign subpage', () => {
     expect(appBreadcrumbPage('/campaigns/camp-1')).toBe('Overview');
-    expect(appBreadcrumbPage('/log')).toBe('Adventure log');
-    expect(appBreadcrumbPage('/library')).toBe('Library');
     expect(appBreadcrumbPage('/campaigns/camp-1/log')).toBe('Adventure log');
     expect(appBreadcrumbPage('/campaigns/camp-1/library')).toBe('Library');
     expect(appBreadcrumbPage('/campaigns/camp-1/history')).toBe('History');

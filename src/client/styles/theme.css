@@ -32,7 +32,7 @@
 
 @import "tailwindcss";
 
-/* Reusable surface primitives (chip, row, panel-tab, hp-bar,
+/* Reusable surface primitives (chip, row, panel-tab,
    modal-back, bumper). Defined separately so callers compose them
    with Tailwind utilities without re-declaring rules. */
 @import "./components.css";
@@ -597,10 +597,8 @@
   --spacing-row: 2.5rem; /* 40px, matches design --row-h */
 
   /* Three-layer shadow system; defined per-theme above and exposed as
-     `shadow-arcane`, `shadow-arcane-lg`, `shadow-arcane-glow`. */
-  --shadow-arcane: var(--shadow-1);
+     `shadow-arcane-lg`. */
   --shadow-arcane-lg: var(--shadow-2);
-  --shadow-arcane-glow: var(--shadow-glow);
 
   /* "Cinzel Variable" / "Work Sans Variable" are the family names
      registered by @fontsource-variable; IM Fell English ships as
@@ -694,54 +692,6 @@ body {
     ),
     radial-gradient(ellipse 600px 300px at 8% 100%, var(--arcane-edge-violet) 0%, transparent 65%);
   z-index: 0;
-}
-
-/* ============================================================
-   HP-pool flash and number-tween animations
-   (mirrors the design prototype's keyframes)
-   ============================================================ */
-
-@keyframes hp-flash {
-  0% {
-    background: var(--hp-crit);
-    transform: scale(1);
-  }
-  40% {
-    background: var(--hp-crit);
-    transform: scale(1.04);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.flash {
-  animation: hp-flash 0.5s ease-out;
-}
-
-@keyframes num-pop {
-  0% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  50% {
-    transform: translateY(-3px);
-    opacity: 0.6;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-.num-tween {
-  animation: num-pop 0.25s ease-out;
-}
-
-/* Reduce motion if the user has asked for it. */
-@media (prefers-reduced-motion: reduce) {
-  .flash,
-  .num-tween {
-    animation: none;
-  }
 }
 
 /* ============================================================
@@ -868,17 +818,6 @@ body {
 }
 .fold-body > .card > .label-eyebrow:first-child {
   display: none;
-}
-.combat-defense-values {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: .5rem;
-}
-.combat-defense-values button {
-  min-height: 44px;
-}
-.combat-defense-values button > span:first-child {
-  white-space: normal;
 }
 .markdown-body {
   overflow-wrap: anywhere;

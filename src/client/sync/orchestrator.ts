@@ -275,11 +275,6 @@ function pullLogEntry(
   return entry;
 }
 
-interface OrchestratorEvents {
-  /** Notified after a drain or pull cycle completes (success or partial failure). */
-  cycleDone(): void;
-}
-
 class SyncOrchestrator {
   private started = false;
   private running = false;
@@ -288,7 +283,6 @@ class SyncOrchestrator {
   private wakeUpResolve: (() => void) | null = null;
   private periodicTimer: ReturnType<typeof setInterval> | null = null;
   private outboxLiveSub: { unsubscribe(): void } | null = null;
-  private listeners = new Set<keyof OrchestratorEvents>();
   private cycleListeners = new Set<() => void>();
   private recoveryInProgress = false;
   private bootstrapRetryTimer: ReturnType<typeof setTimeout> | null = null;

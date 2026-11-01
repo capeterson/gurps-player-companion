@@ -42,7 +42,7 @@ and has no refresh token. When it expires the client requests a new one.
 only for the account whose `system_role` is `preview_guest`, and only at that
 account's current `auth_version`. Advancing that version revokes every
 outstanding guest token. Guests authenticate as `authMethod: 'guest'`, so every
-`requireJwt`/`requireActiveJwt` route (password, passkeys, API keys,
+`requireActiveJwt` route (password, passkeys, API keys,
 preferences, OAuth consent) also refuses them.
 
 ### Defense layers

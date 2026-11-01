@@ -188,14 +188,6 @@ const router = createBrowserRouter([
                 ),
               },
               {
-                path: '/log',
-                element: page(() => import('./features/log/LogPage.tsx'), 'LogPage'),
-              },
-              {
-                path: '/library',
-                element: page(() => import('./features/library/LibraryPage.tsx'), 'LibraryPage'),
-              },
-              {
                 path: '/help/campaign-library',
                 element: page(
                   () => import('./features/help/CampaignLibraryHelpPage.tsx'),

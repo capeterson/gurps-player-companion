@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { type OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { bodyLimit } from 'hono/body-limit';
-import { upgradeWebSocket, websocket } from 'hono/bun';
+import { upgradeWebSocket } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';

@@ -4,8 +4,6 @@
  * localStorage.
  */
 
-const ACCESS_KEY = 'gpc.access';
-const REFRESH_KEY = 'gpc.refresh';
 const TOKEN_PAIR_KEY = 'gpc.tokenPair.v1';
 
 export interface Tokens {
@@ -40,8 +38,7 @@ function installStorageListener(): void {
   if (storageListenerInstalled || typeof window === 'undefined') return;
   storageListenerInstalled = true;
   window.addEventListener('storage', (event) => {
-    if (event.key !== TOKEN_PAIR_KEY && event.key !== ACCESS_KEY && event.key !== REFRESH_KEY)
-      return;
+    if (event.key !== TOKEN_PAIR_KEY) return;
     notify(parseStoredPair(window.localStorage.getItem(TOKEN_PAIR_KEY)));
   });
 }
@@ -80,34 +77,13 @@ function parseStoredPair(raw: string | null): TokenSnapshot | null {
 
 function persist(pair: TokenSnapshot): void {
   window.localStorage.setItem(TOKEN_PAIR_KEY, JSON.stringify(pair));
-  // Remove the pre-session-fence representation once it has been migrated.
-  window.localStorage.removeItem(ACCESS_KEY);
-  window.localStorage.removeItem(REFRESH_KEY);
   notify(pair);
 }
 
 export const tokenStore = {
   read(): TokenSnapshot | null {
     if (typeof window === 'undefined') return null;
-    const stored = parseStoredPair(window.localStorage.getItem(TOKEN_PAIR_KEY));
-    if (stored) return stored;
-
-    // One-time migration from the original two-key representation. Giving
-    // the pair a session id makes already-signed-in installations safe as
-    // soon as the upgraded client boots.
-    const access = window.localStorage.getItem(ACCESS_KEY);
-    const refresh = window.localStorage.getItem(REFRESH_KEY);
-    if (!access || !refresh) return null;
-    const migrated: TokenSnapshot = {
-      accessToken: access,
-      refreshToken: refresh,
-      accessTokenExpiresIn: 0,
-      sessionId: newSessionId(),
-      version: 0,
-      refreshRequestId: newSessionId(),
-    };
-    persist(migrated);
-    return migrated;
+    return parseStoredPair(window.localStorage.getItem(TOKEN_PAIR_KEY));
   },
   write(tokens: Tokens): void {
     if (typeof window === 'undefined') return;
@@ -157,8 +133,6 @@ export const tokenStore = {
   clear(): void {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem(TOKEN_PAIR_KEY);
-    window.localStorage.removeItem(ACCESS_KEY);
-    window.localStorage.removeItem(REFRESH_KEY);
     notify(null);
   },
   hasToken(): boolean {

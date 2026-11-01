@@ -37,7 +37,9 @@ export function CampaignLibraryHelpPage() {
       ),
     [activeEffectsEnabled],
   );
-  const libraryPath = campaign ? `/campaigns/${encodeURIComponent(campaign)}/library` : '/library';
+  const libraryPath = campaign
+    ? `/campaigns/${encodeURIComponent(campaign)}/library`
+    : '/campaigns';
 
   useEffect(() => {
     let cancelled = false;

@@ -7,7 +7,6 @@ export const MEDIA_THUMB_BYTES = 128 * 1024;
 export const MEDIA_LOCAL_BYTES = 50 * 1024 * 1024;
 export const mediaTarget = z.enum(['character', 'campaign']);
 export type MediaTarget = z.infer<typeof mediaTarget>;
-export const mediaVariant = z.enum(['thumb', 'display']);
 export const mediaInitialize = z
   .object({
     clientUploadId: uuid,

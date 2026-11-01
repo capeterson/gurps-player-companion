@@ -33,7 +33,6 @@ import { tokenStore } from './lib/tokenStore.ts';
 import { getSyncOrchestrator } from './sync/orchestrator.ts';
 
 const CAMPAIGN_ROOT = '/campaigns';
-const CAMPAIGN_PATHS = new Set<string>([CAMPAIGN_ROOT, '/log', '/library']);
 
 interface MeResponse {
   id: string;
@@ -46,13 +45,13 @@ export function App() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const location = useLocation();
-  const entityBreadcrumb = useAppEntityBreadcrumb(location.pathname, location.search);
+  const entityBreadcrumb = useAppEntityBreadcrumb(location.pathname);
   const campaignPage = appBreadcrumbPage(location.pathname);
   const characterActive =
     location.pathname === '/characters' || entityBreadcrumb?.kind === 'character';
   const characterDetail = /^\/characters\/[^/]+\/?$/.test(location.pathname);
   const campaignActive =
-    CAMPAIGN_PATHS.has(location.pathname) || entityBreadcrumb?.kind === 'campaign';
+    location.pathname === CAMPAIGN_ROOT || entityBreadcrumb?.kind === 'campaign';
   const { mode } = useThemeState();
   const mobileCharacterMenuRef = useRef<HTMLDetailsElement>(null);
   const userMenuRef = useRef<HTMLDetailsElement>(null);

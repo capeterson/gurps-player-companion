@@ -16,16 +16,11 @@
 
 import { asc, eq } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
-import type { CharacterAttrs } from '../../shared/domain/characterCalc.ts';
 import {
   type CharacterDetailInput,
   buildCharacterDetail as buildCharacterDetailShared,
   buildCombatStateOut as buildCombatStateOutShared,
-  buildInventoryItemOut as buildInventoryItemOutShared,
   buildLanguageOut as buildLanguageOutShared,
-  buildSkillOut as buildSkillOutShared,
-  buildSpellOut as buildSpellOutShared,
-  buildTechniqueOut as buildTechniqueOutShared,
   buildTraitOut as buildTraitOutShared,
 } from '../../shared/domain/characterDetail.ts';
 import { ownedLibraryEffects } from '../../shared/schemas/libraryMechanics.ts';
@@ -51,29 +46,6 @@ import {
   combatStates,
   inventoryItems,
 } from '../db/schema.ts';
-
-export function characterAttrsFromRow(c: DbCharacter): CharacterAttrs {
-  return {
-    st: c.st,
-    dx: c.dx,
-    iq: c.iq,
-    ht: c.ht,
-    hpMod: c.hpMod,
-    willMod: c.willMod,
-    perMod: c.perMod,
-    fpMod: c.fpMod,
-    speedQuarterMod: c.speedQuarterMod,
-    moveMod: c.moveMod,
-    tempEffects: c.tempEffects ?? [],
-    // Trait-effect deltas live on the shared input; populated by
-    // buildCharacterDetail itself before computeDerived runs.
-    dodgeMod: 0,
-    parryMod: 0,
-    blockMod: 0,
-    drMod: 0,
-    frightCheckMod: 0,
-  };
-}
 
 export interface SummaryInput {
   readonly character: DbCharacter;
@@ -181,8 +153,4 @@ export async function loadCharacterDetail(
 
 export const buildTraitOut = buildTraitOutShared;
 export const buildCombatStateOut = buildCombatStateOutShared;
-export const buildSkillOut = buildSkillOutShared;
-export const buildSpellOut = buildSpellOutShared;
-export const buildInventoryItemOut = buildInventoryItemOutShared;
 export const buildLanguageOut = buildLanguageOutShared;
-export const buildTechniqueOut = buildTechniqueOutShared;

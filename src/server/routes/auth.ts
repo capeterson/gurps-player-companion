@@ -27,12 +27,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../auth/j
 import { requireActiveJwt, requireUser } from '../auth/middleware.ts';
 import { getDummyPasswordHash, hashPassword, verifyPassword } from '../auth/password.ts';
 import { enforceAuthRateLimit, enforceFailedLoginRateLimit } from '../auth/rateLimit.ts';
-import {
-  AuthError,
-  hasRecentAuthentication,
-  resolveAuthHeader,
-  rotateRefreshToken,
-} from '../auth/session.ts';
+import { AuthError, hasRecentAuthentication, rotateRefreshToken } from '../auth/session.ts';
 import {
   consumeChallenge,
   createChallenge,

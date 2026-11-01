@@ -33,16 +33,7 @@ import { requireActiveUser } from '../auth/middleware.ts';
 import { assertWrite, loadCharacterOr403 } from '../auth/permissions.ts';
 import { withAudit } from '../db/auditContext.ts';
 import type { getDb } from '../db/client.ts';
-import {
-  characterLanguages,
-  characterSkills,
-  characterSpells,
-  characterTechniques,
-  characterTraits,
-  characters,
-  combatStates,
-  inventoryItems,
-} from '../db/schema.ts';
+import { characters, combatStates, inventoryItems } from '../db/schema.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import {
   LIBRARY_LINKED_CHILDREN,
@@ -53,8 +44,6 @@ import {
 import {
   buildCombatStateOut,
   buildLanguageOut,
-  buildSkillOut,
-  buildTechniqueOut,
   buildTraitOut,
   loadCharacterDetail,
 } from '../services/characterSummary.ts';

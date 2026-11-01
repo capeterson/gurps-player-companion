@@ -482,7 +482,7 @@ seeds the character row's written fluency to `n/a`.
   skills, perks and techniques without creating a separate character style row.
 - Client surfaces: `CampaignLibraryPage` (the `/campaigns/:id/library` editor),
   `CampaignLibraryTransferPage` (the campaign's **Import & export** tab),
-  and the top-nav `LibraryPage` (`/library`, a campaign-switching editor), plus
+  both rendering `LibraryPage` for their campaign, plus
   `LibraryAutocomplete` / `LibraryModifierPicker` on the
   character sheet, which let a player search the campaign library when adding a
   trait/skill/spell/item/enchantment/language/technique. All of them read the
@@ -873,9 +873,7 @@ Per-campaign session notes (`adventure_log_entries`, exposed via
   form without switching to rich mode. Strict CommonMark line breaks (single
   newlines do not become `<br>`).
 - Client surface: `LogPage` (single-column `max-w-3xl` layout), mounted at the
-  campaign-scoped `/campaigns/:id/log` route. Scoped mode is fixed to the parent
-  campaign and therefore does not render the legacy standalone page's campaign
-  selector.
+  campaign-scoped `/campaigns/:id/log` route and fixed to that campaign.
 
 ## Auditing
 

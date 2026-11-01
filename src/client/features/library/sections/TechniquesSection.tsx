@@ -2,7 +2,6 @@ import type { LibraryTechniqueCreate } from '../../../../shared/schemas/campaign
 import { TECHNIQUE_DIFFICULTIES } from '../../../../shared/schemas/technique.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import type { LocalLibraryTechnique } from '../../../db/dexie.ts';
-import { compareTableText } from '../../characters/sections/useSortableCharacterRows.tsx';
 import { TechniqueForm } from '../LibraryPackagesForms.tsx';
 import type { LibrarySectionConfig } from '../LibrarySection.tsx';
 import { useLibraryEntryMutations } from '../useLocalLibrary.ts';
