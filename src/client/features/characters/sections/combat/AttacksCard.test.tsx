@@ -15,6 +15,7 @@ import type {
 } from '../../../../../shared/schemas/character.ts';
 import type { RollRequest } from '../rollTypes.ts';
 import { AttacksCard } from './AttacksCard.tsx';
+import { DualWeaponProvider } from './DualWeaponContext.tsx';
 import { clearAllAttackTablePreferences } from './attackTablePreferences.ts';
 
 function attackFrom(openRoll: ReturnType<typeof vi.fn>) {
@@ -985,5 +986,212 @@ it('converts fixed dice after weapon bonuses and keeps a fire component separate
     dice: { dice: 2, adds: 0 },
     damageType: 'burn',
     armorDivisor: null,
+  });
+});
+
+describe('AttacksCard Dual-Weapon Attack', () => {
+  beforeEach(() => clearAllAttackTablePreferences());
+
+  function dualCharacter(traits: { name: string }[] = []): CharacterDetail {
+    const character = makeCharacter('sw cut');
+    const sword = character.inventory[0];
+    if (!sword?.weaponData) throw new Error('Missing weapon fixture');
+    character.inventory = [
+      sword,
+      {
+        ...sword,
+        id: 'w2',
+        name: 'Shortsword',
+        weaponData: { ...sword.weaponData, skill: 'Shortsword' },
+      },
+      {
+        ...sword,
+        id: 'w3',
+        name: 'Rapier',
+        weaponData: { ...sword.weaponData, skill: 'Rapier' },
+      },
+    ] as CharacterDetail['inventory'];
+    character.skills = [
+      { id: 's1', name: 'Broadsword', level: 14 },
+      { id: 's2', name: 'Shortsword', level: 12 },
+      { id: 's3', name: 'Rapier', level: 13 },
+    ] as unknown as CharacterDetail['skills'];
+    character.traits = traits as unknown as CharacterDetail['traits'];
+    return character;
+  }
+
+  function renderDual(character: CharacterDetail, openRoll = vi.fn()) {
+    render(
+      <DualWeaponProvider characterId={character.id} maneuver="Attack">
+        <AttacksCard character={character} openRoll={openRoll} />
+      </DualWeaponProvider>,
+    );
+    return openRoll;
+  }
+
+  const rowTarget = (weapon: string, skill: string) =>
+    within(screen.getByRole('rowgroup', { name: weapon })).getByRole('button', {
+      name: new RegExp(`^${skill}`),
+    });
+
+  function pickBoth() {
+    fireEvent.click(screen.getByRole('button', { name: 'Dual-Weapon Attack' }));
+    expect(screen.getByText('Choose two attacks.')).toBeVisible();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Broadsword' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Shortsword' }));
+  }
+
+  it('lowers each chosen attack by 4 and refuses a third pick', () => {
+    renderDual(dualCharacter([{ name: 'Ambidexterity' }]));
+    pickBoth();
+    expect(rowTarget('Broadsword', 'Broadsword')).toHaveTextContent('10');
+    expect(rowTarget('Shortsword', 'Shortsword')).toHaveTextContent('8');
+    expect(rowTarget('Rapier', 'Rapier')).toHaveTextContent('13');
+    expect(screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Rapier' })).toBeDisabled();
+  });
+
+  it('asks which attack uses the off hand and applies a further -4 to that row only', () => {
+    renderDual(dualCharacter());
+    pickBoth();
+    expect(screen.getByText('Which attack uses your off hand?')).toBeVisible();
+    fireEvent.click(screen.getByRole('radio', { name: 'Shortsword' }));
+    expect(rowTarget('Broadsword', 'Broadsword')).toHaveTextContent('10');
+    expect(rowTarget('Shortsword', 'Shortsword')).toHaveTextContent('4');
+  });
+
+  it('does not ask for an off hand with Ambidexterity', () => {
+    renderDual(dualCharacter([{ name: 'Ambidexterity' }]));
+    pickBoth();
+    expect(screen.queryByText('Which attack uses your off hand?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  it('describes the choice and the foe penalty without touching the attacker', () => {
+    renderDual(dualCharacter([{ name: 'Ambidexterity' }]));
+    fireEvent.click(screen.getByRole('button', { name: 'Dual-Weapon Attack' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Broadsword' }));
+    expect(screen.getByText('Choose one more attack.')).toBeVisible();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Shortsword' }));
+    expect(
+      screen.getByText(
+        'Broadsword and Shortsword: -4 each; the foe defends at -1. Clear one to choose another.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('disables a second line of an already-picked weapon', () => {
+    const character = dualCharacter([{ name: 'Ambidexterity' }]);
+    const sword = character.inventory[0];
+    if (!sword?.weaponData) throw new Error('Missing weapon fixture');
+    sword.weaponData.modes = [
+      { key: 'thrust', name: 'Thrust', skill: 'Broadsword', damage: 'thr imp' },
+      { key: 'swing', name: 'Swing', skill: 'Broadsword', damage: 'sw cut' },
+    ] as never;
+    renderDual(character);
+    fireEvent.click(screen.getByRole('button', { name: 'Dual-Weapon Attack' }));
+    const thrust = screen.getByRole('checkbox', {
+      name: 'Dual-Weapon Attack with Broadsword · Thrust',
+    });
+    const swing = screen.getByRole('checkbox', {
+      name: 'Dual-Weapon Attack with Broadsword · Swing',
+    });
+    fireEvent.click(thrust);
+    expect(swing).toBeDisabled();
+    expect(
+      screen.getByRole('checkbox', { name: 'Dual-Weapon Attack with Shortsword' }),
+    ).toBeEnabled();
+    fireEvent.click(thrust);
+    expect(swing).toBeEnabled();
+  });
+
+  it('waives the -4 under All-Out Attack and says so', () => {
+    const character = dualCharacter([{ name: 'Ambidexterity' }]);
+    character.combat = { maneuver: 'all_out_attack' } as unknown as CharacterDetail['combat'];
+    renderDual(character);
+    pickBoth();
+    expect(rowTarget('Broadsword', 'Broadsword')).toHaveTextContent('14');
+    expect(rowTarget('Shortsword', 'Shortsword')).toHaveTextContent('12');
+    expect(
+      screen.getByText(
+        'Broadsword and Shortsword: no −4 under All-Out Attack; the foe defends at -1. Clear one to choose another.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('still applies the off-hand -4 under All-Out Attack', () => {
+    const character = dualCharacter();
+    character.combat = { maneuver: 'all_out_attack' } as unknown as CharacterDetail['combat'];
+    renderDual(character);
+    pickBoth();
+    fireEvent.click(screen.getByRole('radio', { name: 'Shortsword' }));
+    expect(rowTarget('Broadsword', 'Broadsword')).toHaveTextContent('14');
+    expect(rowTarget('Shortsword', 'Shortsword')).toHaveTextContent('8');
+  });
+
+  it('shows the foe defends at -1 in the modifier tooltip of a picked row', async () => {
+    renderDual(dualCharacter([{ name: 'Ambidexterity' }]));
+    pickBoth();
+    const group = screen.getByRole('rowgroup', { name: 'Broadsword' });
+    fireEvent.click(within(group).getByRole('button', { name: /^Modifiers/ }));
+    expect(await screen.findByText('Foe defends at -1 (MA83)')).toBeVisible();
+  });
+
+  it('rolls with the reduced target and a Dual-Weapon Attack label', () => {
+    const openRoll = renderDual(dualCharacter([{ name: 'Ambidexterity' }]));
+    pickBoth();
+    fireEvent.click(rowTarget('Broadsword', 'Broadsword'));
+    const request = openRoll.mock.calls.at(-1)?.[0] as RollRequest;
+    expect(request.baseTarget).toBe(10);
+    expect(request.label.endsWith('(Dual-Weapon Attack)')).toBe(true);
+  });
+
+  it('shows a resolved weapon damage effect beside the damage button', () => {
+    const character = makeCharacter('sw+1 cut');
+    character.effects = [
+      {
+        sourceKind: 'active_effect',
+        sourceName: 'Broadsword: Flaming Weapon',
+        sourceId: '44444444-4444-4444-8444-444444444444',
+        target: 'weapon_damage',
+        value: 2,
+        active: true,
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+    ] as unknown as CharacterDetail['effects'];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    expect(screen.getByText('+2 Flaming Weapon')).toBeVisible();
+  });
+
+  function withDamageType(damageType: string) {
+    const character = makeCharacter('sw+1 cut');
+    character.effects = [
+      {
+        sourceKind: 'active_effect',
+        sourceName: 'Broadsword: Flaming Weapon',
+        sourceId: '44444444-4444-4444-8444-444444444444',
+        target: 'weapon_damage',
+        value: 2,
+        damageType,
+        active: true,
+        matchedInventoryItemIds: ['w1'],
+        weaponMatchStatus: 'one',
+      },
+    ] as unknown as CharacterDetail['effects'];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+  }
+
+  it('names a differing damage type on the weapon damage effect', () => {
+    withDamageType('fire');
+    const line = screen.getByText(/Flaming Weapon/, { selector: 'li' });
+    expect(line).toBeVisible();
+    expect(line.textContent).toMatch(/\+2\s+fire\s+Flaming Weapon/);
+  });
+
+  it("does not repeat the weapon's own damage type", () => {
+    withDamageType('cut');
+    const line = screen.getByText(/Flaming Weapon/, { selector: 'li' });
+    expect(line).toBeVisible();
+    expect(line.textContent).toBe('+2 Flaming Weapon');
   });
 });

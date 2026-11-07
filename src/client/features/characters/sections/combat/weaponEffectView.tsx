@@ -116,7 +116,7 @@ export interface ModifierSection {
 }
 
 /**
- * One ± control per attack row: a viewport-bounded, scrollable tooltip that
+ * One ✦ control per attack row: a viewport-bounded, scrollable tooltip that
  * lists the attack, Accuracy and damage breakdowns together.
  */
 export function ModifierTooltip({
@@ -152,7 +152,7 @@ export function ModifierTooltip({
         </div>
       }
     >
-      <span aria-hidden="true">±</span>
+      <span aria-hidden="true">✦</span>
     </InfoTooltip>
   );
 }
