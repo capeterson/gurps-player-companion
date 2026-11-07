@@ -507,9 +507,7 @@ function SecondaryModCell({
         {adjusted && (
           <span className="num text-[10px] text-base-content/60 flex items-baseline gap-0.5">
             <span>{fmtRaw(baseRaw)}</span>
-            {modValue !== 0 && (
-              <span>{fmtSignedDelta(modValue, modScale ?? 1)}</span>
-            )}
+            {modValue !== 0 && <span>{fmtSignedDelta(modValue, modScale ?? 1)}</span>}
             {tempTotal !== 0 && (
               <span className="text-warning">{fmtSignedDelta(tempTotal, modScale ?? 1)}</span>
             )}
