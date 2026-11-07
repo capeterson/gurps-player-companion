@@ -1109,7 +1109,7 @@ function PointsPanel({
               <span className="font-semibold">{pointTarget}</span>
             </span>
           )}
-          {unspent != null && unspent !== 0 && (
+          {unspent != null && (
             <span className={unspent < 0 ? 'text-error' : 'text-primary'}>
               <span className="label-eyebrow">{unspent < 0 ? 'Over' : 'Unspent'}</span>{' '}
               <span className="font-semibold">{Math.abs(unspent)}</span>
