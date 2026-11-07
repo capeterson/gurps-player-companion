@@ -16,7 +16,7 @@ function card(page: Page, title: string) {
     .locator('xpath=ancestor::section[1]');
 }
 
-test('Overview stat cards align without gaps and utilities retain their natural height', async ({
+test('Overview stat cards align without gaps and both columns end together', async ({
   page,
 }, testInfo) => {
   test.setTimeout(150_000);
@@ -105,6 +105,12 @@ test('Overview stat cards align without gaps and utilities retain their natural 
                 .locator('xpath=ancestor::section[1]'),
             );
             expect(Math.abs(ledger.y - s.y)).toBeLessThanOrEqual(1);
+            // Both Overview columns end on the same line: Status and the
+            // stretched Encumbrance card share a bottom edge.
+            const encumbranceBox = await box(card(page, 'Encumbrance'));
+            expect(
+              Math.abs(s.y + s.height - (encumbranceBox.y + encumbranceBox.height)),
+            ).toBeLessThanOrEqual(1);
           } else {
             expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
             expect(s.y).toBeGreaterThanOrEqual(b.y + b.height);
@@ -124,16 +130,12 @@ test('Overview stat cards align without gaps and utilities retain their natural 
             expect(Math.abs(fp.y - move.y)).toBeLessThanOrEqual(1);
             expect(fp.y).toBeGreaterThan(hp.y);
           }
-          // The Points card does not fold; it is a header-only card.
+          // Points and Encumbrance are plain, always-expanded stat cards.
           await expect(page.getByRole('heading', { name: 'Points', exact: true })).toBeVisible();
-          for (const name of ['Encumbrance']) {
-            const trigger = page.getByRole('button', { name: new RegExp(`^${name}`) });
-            await expect(trigger).toBeVisible();
-            if ((await trigger.getAttribute('aria-expanded')) === 'true') await trigger.click();
-            const fold = trigger.locator('xpath=ancestor::section[1]');
-            const [panel, heading] = await Promise.all([box(fold), box(trigger)]);
-            expect(panel.height - heading.height).toBeLessThanOrEqual(2);
-          }
+          await expect(page.getByRole('button', { name: /^Encumbrance/ })).toHaveCount(0);
+          const encumbranceCard = card(page, 'Encumbrance');
+          await expect(encumbranceCard.getByText('None', { exact: true })).toBeVisible();
+          await expect(encumbranceCard.getByText('Carrying', { exact: true })).toBeVisible();
           for (const [parent, names] of [
             [primary, ['ST', 'DX', 'IQ', 'HT']],
             [secondary, ['HP', 'Will', 'Per', 'FP', 'Speed', 'Move']],
@@ -156,9 +158,6 @@ test('Overview stat cards align without gaps and utilities retain their natural 
               }
             }
           }
-          const encumbrance = page.getByRole('button', { name: /^Encumbrance/ });
-          await encumbrance.click();
-          await expect(page.getByText('Carrying', { exact: true })).toBeVisible();
           if (state.name === 'modified' && [320, 1212, 1440].includes(width)) {
             await attachReviewScreenshot(page, testInfo, `overview-${theme}-${width}`, {
               fullPage: true,

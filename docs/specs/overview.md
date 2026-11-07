@@ -296,10 +296,11 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   do not display them. Attributes, Secondary attributes, and Status stay expanded inside
   it, with one heading each. The Points card is a compact, non-folding card
   showing the total (a tooltip target listing every bucket and the cap) and
-  **Available** points, which is negative when over the cap. The identity header has no separate points widget. Encumbrance and Conditional effects fold independently;
-  Encumbrance keeps its tier badge right-aligned in the header and shows only the carry bar
-  (Move and Dodge live in Secondary attributes). Folded sections shrink to their
-  headings without stretching to fill neighboring cards. Conditional effects is absent unless the campaign active-effects
+  **Available** points, which is negative when over the cap. The identity header has no separate points widget. Encumbrance is a
+  non-folding stat card with its tier badge right-aligned in the header and only the carry bar
+  inside (Move and Dodge live in Secondary attributes); it stretches so the two Overview columns
+  end together. Conditional effects folds and shrinks to its heading without stretching to fill
+  neighboring cards. Conditional effects is absent unless the campaign active-effects
   experiment is enabled and condition groups exist. Skills, Traits, Inventory, and main Combat sections have keyboard-accessible
   folding headers. Magic collections instead have plain headings and compact tables. On Combat, Attacks, Incoming attack, and the optional Turn
   tracker fold independently. Incoming attack groups the body map, target/facing
@@ -351,7 +352,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   damage** (B16 table, shown as "Thr / Sw"), etc. The **Secondary attributes** card
   surfaces the six secondary stats (HP, Will, Per, FP, Basic Speed, Basic
   Move) with their effective values and per-stat ✦ temp-modifier
-  popovers. The **Status** card shows derived combat values not displayed
+  popovers; amber values, deltas and ✦ buttons appear only for an active temporary boost, never for permanent purchases. The **Status** card shows derived combat values not displayed
   elsewhere — Dodge, Basic Lift, and Thr / Sw. Current HP/FP live in the
   persistent **Current Status** controls; user preferences can also show posture,
   maneuver, and conditions there. The sheet's top row no longer duplicates the six secondary

@@ -260,11 +260,14 @@ and bottom edges, with Status starting one standard gap below Attributes.
 Secondary attributes use three columns from 640–767px and from 1024px upward,
 so wide paired cards display their values in two rows rather than leaving a hole
 below Attributes. Numeric value/modifier groups can wrap within their cells.
-The utility column keeps its own panels at content height: the non-folding
-Points card (a header-only data card whose total opens the bucket breakdown in
-a tooltip), plus Encumbrance and Conditional effects, which show only their
-headings when folded. Status uses a four-column grid with single-line labels so
-its height matches that column. Conditional effects owns its fold and
+The utility column holds the non-folding Points card (a header-only data card
+whose total opens the bucket breakdown in a tooltip), the non-folding
+Encumbrance card (the same stat-card chrome, with its tier badge in the header
+and the carry bar inside), and Conditional effects, which shows only its heading
+when folded. Status uses a four-column grid with single-line labels. In two
+columns, Status and the utility column end on the same line: the Encumbrance
+card stretches to fill the remaining column height while Points and Conditional
+effects keep their content height. Conditional effects owns its fold and
 is absent unless the campaign active-effects experiment is enabled and condition
 groups are declared. The controls omit explanatory source captions.
 Campaign settings has the owner-only **Enable active effects** experiment, off by

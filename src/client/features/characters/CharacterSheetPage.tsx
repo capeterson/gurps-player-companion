@@ -178,8 +178,8 @@ function AttrInput({
  * optionally, a permanent modifier (used by secondary stats whose
  * "base" is computed from primary attributes and can only be
  * shifted via a stored mod). Renders `border-warning text-warning`
- * when any modifier is non-zero so a glance tells the player
- * "this stat is being adjusted."
+ * only while a temporary modifier is active; permanent purchases never
+ * change the color.
  *
  * Subscribes to the flashBus for both fields so an async server
  * rejection on either visually pulses the button (AGENTS.md rule 2).
@@ -224,8 +224,8 @@ function ModifierButton({
   const tempFlash = useFieldFlash(tempFlashKey);
   const permFlash = useFieldFlash(permSaver?.flashKey);
   const [open, setOpen] = useState(false);
-  const permActive = permValue !== undefined && permValue !== 0;
-  const active = tempTotal !== 0 || permActive;
+  // Color means a temporary boost only; a permanent purchase stays neutral.
+  const active = tempTotal !== 0;
   const flashing = tempFlash.flashing || permFlash.flashing ? 'true' : 'false';
   const parity = tempFlash.flashing
     ? tempFlash['data-flash-parity']
@@ -499,7 +499,7 @@ function SecondaryModCell({
       </InfoTooltip>
       <span className="flex flex-wrap items-baseline gap-2">
         <span
-          className={`num text-xl font-semibold ${adjusted ? 'text-warning' : ''}`}
+          className={`num text-xl font-semibold ${tempTotal !== 0 ? 'text-warning' : ''}`}
           title={adjusted ? `Effective ${displayValue} (${breakdown})` : undefined}
         >
           {displayValue}
@@ -507,9 +507,7 @@ function SecondaryModCell({
         {adjusted && (
           <span className="num text-[10px] text-base-content/60 flex items-baseline gap-0.5">
             <span>{fmtRaw(baseRaw)}</span>
-            {modValue !== 0 && (
-              <span className="text-warning">{fmtSignedDelta(modValue, modScale ?? 1)}</span>
-            )}
+            {modValue !== 0 && <span>{fmtSignedDelta(modValue, modScale ?? 1)}</span>}
             {tempTotal !== 0 && (
               <span className="text-warning">{fmtSignedDelta(tempTotal, modScale ?? 1)}</span>
             )}
@@ -1129,7 +1127,13 @@ function EncumbranceBadge({ character }: { character: CharacterDetail }) {
   return <span className={`badge ${tone.badge}`}>{e.label}</span>;
 }
 
-function EncumbrancePanel({ character }: { character: CharacterDetail }) {
+function EncumbrancePanel({
+  character,
+  className = '',
+}: {
+  character: CharacterDetail;
+  className?: string;
+}) {
   const e = character.encumbrance;
   const bl = e.basicLift;
   const tiers = [
@@ -1177,39 +1181,39 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   );
 
   return (
-    <StatCard title="Encumbrance">
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <div className="flex items-baseline justify-between gap-2 text-xs">
-            <InfoTooltip content={tierBreakdown}>
-              <span>Carrying</span>
-            </InfoTooltip>
-            <span className="num">
-              <span className="font-semibold text-base-content">
-                {e.playerWeightLbs.toFixed(1)}
-              </span>
-              <span className="text-base-content/50"> / {maxWeight.toFixed(1)} lb</span>
-            </span>
-          </div>
+    <StatCard
+      title="Encumbrance"
+      className={className}
+      headerExtra={<EncumbranceBadge character={character} />}
+    >
+      <div className="space-y-1.5">
+        <div className="flex items-baseline justify-between gap-2 text-xs">
+          <InfoTooltip content={tierBreakdown}>
+            <span>Carrying</span>
+          </InfoTooltip>
+          <span className="num">
+            <span className="font-semibold text-base-content">{e.playerWeightLbs.toFixed(1)}</span>
+            <span className="text-base-content/50"> / {maxWeight.toFixed(1)} lb</span>
+          </span>
+        </div>
+        <div
+          className="relative h-2.5 rounded-full bg-base-200 overflow-hidden"
+          aria-label={`Encumbrance ${e.label}, carrying ${e.playerWeightLbs.toFixed(1)} of ${maxWeight.toFixed(1)} lb`}
+        >
           <div
-            className="relative h-2.5 rounded-full bg-base-200 overflow-hidden"
-            aria-label={`Encumbrance ${e.label}, carrying ${e.playerWeightLbs.toFixed(1)} of ${maxWeight.toFixed(1)} lb`}
-          >
+            className={`absolute inset-y-0 left-0 ${tone.fill} transition-[width]`}
+            style={{ width: `${fillPct}%` }}
+          />
+          {[10, 20, 30, 60].map((pct) => (
             <div
-              className={`absolute inset-y-0 left-0 ${tone.fill} transition-[width]`}
-              style={{ width: `${fillPct}%` }}
+              key={pct}
+              className="absolute inset-y-0 w-px bg-base-100"
+              style={{ left: `${pct}%` }}
             />
-            {[10, 20, 30, 60].map((pct) => (
-              <div
-                key={pct}
-                className="absolute inset-y-0 w-px bg-base-100"
-                style={{ left: `${pct}%` }}
-              />
-            ))}
-          </div>
-          <div className="text-xs text-base-content/60 num">
-            {atCap ? 'Maxed out' : `${lbToNext.toFixed(1)} lb until ${nextThresholdLabel}`}
-          </div>
+          ))}
+        </div>
+        <div className="text-xs text-base-content/60 num">
+          {atCap ? 'Maxed out' : `${lbToNext.toFixed(1)} lb until ${nextThresholdLabel}`}
         </div>
       </div>
     </StatCard>
@@ -1618,13 +1622,7 @@ export function CharacterSheetPage() {
                   <StatusPanel character={character} />
                   <div className="flex min-w-0 flex-col gap-4">
                     <PointsPanel character={character} pointTarget={pointTarget} />
-                    <FoldSection
-                      preferenceKey={`${character.id}:EncumbrancePanel`}
-                      title="Encumbrance"
-                      titleExtra={<EncumbranceBadge character={character} />}
-                    >
-                      <EncumbrancePanel character={character} />
-                    </FoldSection>
+                    <EncumbrancePanel character={character} className="flex-1" />
                     {campaign?.experimentalActiveEffects === true && (
                       <ActiveConditionsPanel character={character} canWrite={canWrite} foldable />
                     )}

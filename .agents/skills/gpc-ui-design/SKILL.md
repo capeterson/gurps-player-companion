@@ -21,6 +21,8 @@ expectations come from observed regressions and explicit user preferences.
 - Select columns for the space the content actually receives, including nested
   card padding. More desktop columns are not automatically better. Prefer a
   readable two-column Overview over four narrow, uneven cards.
+- Amber/warning color on a stat value, its delta or its ✦ button means an active
+  temporary boost only. Permanent purchases and mods never change the color.
 - Let numeric values and their modifier controls wrap as a group when necessary;
   never overlap adjacent values, clip controls or assume a sample value is the
   maximum supported value. Keep editable values close to their own action.
