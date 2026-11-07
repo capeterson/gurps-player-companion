@@ -248,6 +248,19 @@ function summarizeTempEffects(oldValue: unknown, newValue: unknown): string {
 
 // ---------- per-entity-class summarizers ----------
 
+/** Moving to / out of the recycle bin is an update of `deletedAt`. */
+function recycleBinSummary(
+  subject: string,
+  old: Record<string, unknown> | null,
+  next: Record<string, unknown> | null,
+): string | null {
+  const before = old?.deletedAt ?? null;
+  const after = next?.deletedAt ?? null;
+  if (before === null && after !== null) return `Moved ${subject} to the recycle bin`;
+  if (before !== null && after === null) return `Restored ${subject} from the recycle bin`;
+  return null;
+}
+
 function summarizeCharacter(
   op: string,
   old: Record<string, unknown> | null,
@@ -255,6 +268,12 @@ function summarizeCharacter(
 ): string {
   if (op === 'insert') return `Created character ${next?.name ?? ''}`;
   if (op === 'delete') return `Deleted character ${old?.name ?? ''}`;
+  const recycled = recycleBinSummary(
+    `character ${next?.name ?? old?.name ?? ''}`.trim(),
+    old,
+    next,
+  );
+  if (recycled) return recycled;
   // patch: find first meaningful change
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Character updated';
@@ -492,6 +511,8 @@ function summarizeCampaign(
 ): string {
   if (op === 'insert') return `Created campaign ${next?.name ?? ''}`;
   if (op === 'delete') return `Deleted campaign ${old?.name ?? ''}`;
+  const recycled = recycleBinSummary(`campaign ${next?.name ?? old?.name ?? ''}`.trim(), old, next);
+  if (recycled) return recycled;
   const changes = diffRows(old, next);
   if (changes.length === 0) return 'Campaign updated';
   const msgs: string[] = [];

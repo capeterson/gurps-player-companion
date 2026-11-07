@@ -15,7 +15,7 @@ async function campaignAudience(campaignId: string): Promise<Audience> {
   const db = getDb();
   const [campaign] = await db
     .select({ ownerId: campaigns.ownerId })
-    .from(campaigns)
+    .from(campaigns) // recycle-bin: includes binned: nudge recipients before and after a bin or restore
     .where(eq(campaigns.id, campaignId));
   const members = await db
     .select({ userId: campaignMemberships.userId })
@@ -33,7 +33,7 @@ async function campaignAudience(campaignId: string): Promise<Audience> {
 async function characterAudience(characterId: string): Promise<Audience> {
   const [character] = await getDb()
     .select({ ownerId: characters.ownerId, campaignId: characters.campaignId })
-    .from(characters)
+    .from(characters) // recycle-bin: includes binned: nudge recipients before and after a bin or restore
     .where(eq(characters.id, characterId));
   if (!character) return { recipients: new Set() };
   const audience = character.campaignId

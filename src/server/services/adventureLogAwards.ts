@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type AdventureLogUpdate,
@@ -40,7 +40,12 @@ export async function resolveLogAwards(
     const roster = await tx
       .select()
       .from(characters)
-      .where(ids == null ? eq(characters.campaignId, campaignId) : inArray(characters.id, ids))
+      .where(
+        and(
+          isNull(characters.deletedAt),
+          ids == null ? eq(characters.campaignId, campaignId) : inArray(characters.id, ids),
+        ),
+      )
       .orderBy(asc(characters.id));
     // Snapshot recipients here, then lock the entire previous/next union in
     // one order below. Historical recipients can belong to another campaign.
@@ -67,7 +72,7 @@ export async function resolveLogAwards(
       ? []
       : await tx
           .select()
-          .from(characters)
+          .from(characters) // recycle-bin: includes binned: reversing earlier awards must find every recipient
           .where(inArray(characters.id, ids))
           .orderBy(asc(characters.id))
           .for('update');
@@ -127,7 +132,7 @@ export async function lockLogCampaign(tx: AuditTx, campaignId: string, actorId: 
   const [campaign] = await tx
     .select()
     .from(campaigns)
-    .where(eq(campaigns.id, campaignId))
+    .where(and(eq(campaigns.id, campaignId), isNull(campaigns.deletedAt)))
     .for('update');
   if (!campaign) throw new HTTPException(404, { message: 'campaign not found' });
   if (campaign.ownerId !== actorId) {

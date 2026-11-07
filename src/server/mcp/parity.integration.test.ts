@@ -998,6 +998,31 @@ describe('delegated operation behavioral parity', () => {
     ).body;
     await call(owner, 'campaign', { action: 'delete', ...path(deleteCampaign.id) });
 
+    // The owner principal is near the per-principal MCP rate budget, so the
+    // recycle-bin round trip runs as its own principal.
+    const recycler = await registerActor('recycler', client.id);
+    const binned = (
+      await call<{ id: string }>(recycler, 'character', {
+        action: 'create',
+        body: { name: `Binned ${suffix}` },
+      })
+    ).body;
+    await call(recycler, 'character', { action: 'delete', ...path(binned.id) });
+    const bin = await call<{ characters: { id: string }[]; campaigns: { id: string }[] }>(
+      recycler,
+      'list_recycle_bin',
+    );
+    expect(bin.body.characters.map((row) => row.id)).toContain(binned.id);
+    await call(recycler, 'character', { action: 'restore', ...path(binned.id) });
+    const binnedCampaign = (
+      await call<{ id: string }>(recycler, 'campaign', {
+        action: 'create',
+        body: { name: `Binned ${suffix}` },
+      })
+    ).body;
+    await call(recycler, 'campaign', { action: 'delete', ...path(binnedCampaign.id) });
+    await call(recycler, 'campaign', { action: 'restore', ...path(binnedCampaign.id) });
+
     expect([...exercised].sort()).toEqual(
       TOOLS.map((tool) => (tool.action ? `${tool.tool}#${tool.action}` : tool.tool)).sort(),
     );

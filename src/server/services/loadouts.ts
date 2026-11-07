@@ -199,7 +199,7 @@ export async function applyEquipmentSwitch(
     // identifies it): acknowledge it rather than refusing it as stale.
     const [row] = await tx
       .select({ revision: characters.revision })
-      .from(characters)
+      .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
       .where(eq(characters.id, characterId));
     return Number(row?.revision ?? 0);
   }
@@ -302,7 +302,7 @@ export async function readLastEquipmentSwitch(
 ): Promise<EquipmentSwitch | null> {
   const [row] = await tx
     .select({ lastEquipmentSwitch: characters.lastEquipmentSwitch })
-    .from(characters)
+    .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     .where(eq(characters.id, characterId));
   const parsed = equipmentSwitch.nullable().safeParse(row?.lastEquipmentSwitch ?? null);
   return parsed.success ? parsed.data : null;

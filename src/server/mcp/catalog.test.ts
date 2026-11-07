@@ -91,8 +91,8 @@ describe('MCP canonical schema conversion', () => {
     const snapshot = JSON.parse(readFileSync('docs/openapi.json', 'utf8'));
     const tools = buildToolCatalog(snapshot);
     expect(tools.length).toBe(new Set(TOOLS.map((entry) => entry.tool)).size);
-    expect(TOOLS.length).toBe(115);
-    expect(tools.length).toBe(54);
+    expect(TOOLS.length).toBe(118);
+    expect(tools.length).toBe(55);
     for (const tool of tools) {
       expect(tool.policy.tool).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/);
       expect(tool.policy.tool.startsWith('gpc_')).toBe(false);

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { resolveAuthHeader } from '../auth/session.ts';
 import { getDb, runInDbSavepoint, runInDbTransaction } from '../db/client.ts';
@@ -34,7 +34,7 @@ async function permissionHash(userId: string): Promise<string> {
     })
     .from(campaignMemberships)
     .innerJoin(campaigns, eq(campaignMemberships.campaignId, campaigns.id))
-    .where(eq(campaignMemberships.userId, userId));
+    .where(and(eq(campaignMemberships.userId, userId), isNull(campaigns.deletedAt)));
   const owned = await db
     .select({
       id: campaigns.id,
@@ -42,11 +42,11 @@ async function permissionHash(userId: string): Promise<string> {
       allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
     })
     .from(campaigns)
-    .where(eq(campaigns.ownerId, userId));
+    .where(and(eq(campaigns.ownerId, userId), isNull(campaigns.deletedAt)));
   const ownedCharacters = await db
     .select({ id: characters.id, campaignId: characters.campaignId })
     .from(characters)
-    .where(eq(characters.ownerId, userId));
+    .where(and(eq(characters.ownerId, userId), isNull(characters.deletedAt)));
   const accessibleCampaignIds = [
     ...new Set([
       ...memberships.map((membership) => membership.campaignId),
@@ -64,9 +64,12 @@ async function permissionHash(userId: string): Promise<string> {
           })
           .from(characters)
           .where(
-            or(
-              eq(characters.ownerId, userId),
-              inArray(characters.campaignId, accessibleCampaignIds),
+            and(
+              isNull(characters.deletedAt),
+              or(
+                eq(characters.ownerId, userId),
+                inArray(characters.campaignId, accessibleCampaignIds),
+              ),
             ),
           );
   return sha(

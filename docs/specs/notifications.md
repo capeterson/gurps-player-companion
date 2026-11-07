@@ -47,6 +47,10 @@ The bounded bell panel wraps, scrolls and stays within the dynamic viewport.
 The shared overlay helper measures its remaining height below the header,
 including mobile headers that wrap onto another row and visual-viewport changes.
 
+Deleting a campaign or character (moving it to the recycle bin) notifies as a
+deletion, and restoring one notifies "restored"; the nightly purge acts as the
+system and sends nothing. See [recycle-bin.md](recycle-bin.md).
+
 ## Email policy
 
 Only two optional email categories exist, both enabled by default and

@@ -124,7 +124,7 @@ export async function hydrateItemEnchantmentDefinitions<T extends Record<string,
     if (definition.restricted && actorId) {
       const [campaign] = await tx
         .select({ ownerId: campaigns.ownerId })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(campaigns.id, campaignId));
       const held = enchantmentRef.array().safeParse(existing?.enchantments);
       if (
@@ -177,14 +177,14 @@ function gmPermissionLabels(rule: SkillPrerequisite): string[] {
 export async function lockLibraryReferenceScope(tx: AuditTx, characterId: string, userId: string) {
   const [observed] = await tx
     .select({ campaignId: characters.campaignId })
-    .from(characters)
+    .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     .where(eq(characters.id, characterId));
   const [campaign] = observed?.campaignId
-    ? await tx.select().from(campaigns).where(eq(campaigns.id, observed.campaignId)).for('share')
+    ? await tx.select().from(campaigns).where(eq(campaigns.id, observed.campaignId)).for('share') // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     : [];
   const [parent] = await tx
     .select()
-    .from(characters)
+    .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     .where(eq(characters.id, characterId))
     .for('update');
   if (!parent) throw new HTTPException(404, { message: 'character not found' });

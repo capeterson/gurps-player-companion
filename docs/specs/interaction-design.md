@@ -55,6 +55,14 @@ tab; missing mechanics show the existing unavailable notice and hide numbers.
 Long unspaced names in character change summaries wrap inside the GM activity
 feed, including when it appears below the cards on narrow viewports.
 
+## Deleting characters
+
+Character cards on the Characters page carry a `⋯` menu (owners only) with
+**Delete…**; the confirmation states that the character goes to the recycle bin and
+is permanently deleted after 30 days, and the success toast offers **Undo**. The
+Recycle bin lives at `/recycle-bin`, linked by muted text under the Characters and
+Campaigns lists (see [recycle-bin.md](recycle-bin.md)).
+
 ## Identity images and campaign settings
 
 The Overview campaign is a wrapping link beside an **Edit campaign** pencil for

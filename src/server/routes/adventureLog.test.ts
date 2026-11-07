@@ -749,12 +749,27 @@ describe('adventure-log character attachments', () => {
         })
       ).status,
     ).toBe(204);
-    const edited = await app.request(`/api/v1/campaigns/${campaignId}/log/${entry.id}`, {
-      method: 'PATCH',
-      headers: jsonHeaders(author.accessToken),
-      body: JSON.stringify({ body: 'Still private' }),
-    });
-    expect(edited.status).toBe(200);
-    expect(await edited.json()).toMatchObject({ characterId: null, visibility: 'private' });
+    const edit = (body: string) =>
+      app.request(`/api/v1/campaigns/${campaignId}/log/${entry.id}`, {
+        method: 'PATCH',
+        headers: jsonHeaders(author.accessToken),
+        body: JSON.stringify({ body }),
+      });
+    // A character in the recycle bin keeps its notes attached so a restore is lossless.
+    const whileBinned = await edit('Still private');
+    expect(whileBinned.status).toBe(200);
+    expect(await whileBinned.json()).toMatchObject({ characterId: own.id, visibility: 'private' });
+    // Permanent deletion detaches the note; it stays private and unpublished.
+    expect(
+      (
+        await app.request(`/api/v1/recycle-bin/characters/${own.id}`, {
+          method: 'DELETE',
+          headers: jsonHeaders(author.accessToken),
+        })
+      ).status,
+    ).toBe(204);
+    const afterPurge = await edit('Still private, detached');
+    expect(afterPurge.status).toBe(200);
+    expect(await afterPurge.json()).toMatchObject({ characterId: null, visibility: 'private' });
   });
 });

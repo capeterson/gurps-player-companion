@@ -41,6 +41,11 @@ const CHARACTER_CATEGORIES: Record<string, string> = {
   character_technique: 'techniques',
   character_loadout: 'equipment loadouts',
 };
+/** Recycle-bin transitions are updates of `deleted_at`, reported as delete/restore. */
+const wasBinned = (before: Row, after: Row) =>
+  (before.deleted_at ?? null) === null && (after.deleted_at ?? null) !== null;
+const wasRestored = (before: Row, after: Row) =>
+  (before.deleted_at ?? null) !== null && (after.deleted_at ?? null) === null;
 const categoryFor = (entityClass: string) =>
   CHARACTER_CATEGORIES[entityClass] ?? 'character details';
 
@@ -75,7 +80,7 @@ async function eventPayload(
     const [character] = event.characterId
       ? await getDb()
           .select({ name: characters.name })
-          .from(characters)
+          .from(characters) // recycle-bin: includes binned: events describe the bin transition itself
           .where(eq(characters.id, event.characterId))
       : [];
     const name =
@@ -83,8 +88,18 @@ async function eventPayload(
       (event.entityClass === 'character'
         ? String(before.name ?? after.name ?? 'Your character')
         : 'Your character');
-    const deleted = event.entityClass === 'character' && event.op === 'delete';
+    const isCharacter = event.entityClass === 'character';
+    const deleted = isCharacter && (event.op === 'delete' || wasBinned(before, after));
+    const restored = isCharacter && wasRestored(before, after);
     const href = deleted || !character ? null : `/characters/${event.characterId}#history`;
+    if (restored)
+      return {
+        ...base,
+        href,
+        topic: 'characterChanges',
+        title: `${name} was restored`,
+        message: `${actorName} restored this character from the recycle bin.`,
+      };
     if (!deleted && event.entityClass === 'character' && changed.includes('earned_points'))
       return {
         ...base,
@@ -120,7 +135,7 @@ async function eventPayload(
     const [campaign] = event.campaignId
       ? await getDb()
           .select({ name: campaigns.name })
-          .from(campaigns)
+          .from(campaigns) // recycle-bin: includes binned: events describe the bin transition itself
           .where(eq(campaigns.id, event.campaignId))
       : [];
     if (event.op === 'patch' && !changed.includes('role')) return null;
@@ -147,13 +162,20 @@ async function eventPayload(
   }
   if (event.entityClass === 'campaign') {
     if (event.op === 'create') return null;
-    if (event.op === 'delete')
+    if (event.op === 'delete' || wasBinned(before, after))
       return {
         ...base,
         href: null,
         topic: 'membership',
         title: 'Campaign deleted',
         message: `${actorName} deleted ${camp}.`,
+      };
+    if (wasRestored(before, after))
+      return {
+        ...base,
+        topic: 'membership',
+        title: 'Campaign restored',
+        message: `${actorName} restored ${camp} from the recycle bin.`,
       };
     if (changed.includes('owner_id'))
       return {
@@ -253,7 +275,7 @@ export async function processNotificationEvents(): Promise<number> {
           ) {
             const [campaign] = await db
               .select({ ownerId: campaigns.ownerId })
-              .from(campaigns)
+              .from(campaigns) // recycle-bin: includes binned: events describe the bin transition itself
               .where(eq(campaigns.id, event.campaignId));
             const [member] = await db
               .select({ id: campaignMemberships.id })

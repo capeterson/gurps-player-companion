@@ -16,7 +16,7 @@ export async function requireExperimentalActiveEffects(tx: AuditTx, campaignId: 
   const [campaign] = campaignId
     ? await tx
         .select({ enabled: campaigns.experimentalActiveEffects })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: post-authorization lookup
         .where(eq(campaigns.id, campaignId))
     : [];
   if (campaign?.enabled !== true)
@@ -47,7 +47,7 @@ export async function prepareActiveEffects(
   const [previousCharacter] = characterId
     ? await tx
         .select({ activeEffects: characters.activeEffects })
-        .from(characters)
+        .from(characters) // recycle-bin: post-authorization lookup
         .where(eq(characters.id, characterId))
     : [];
   for (const entry of entries) {
@@ -68,7 +68,7 @@ export async function prepareActiveEffects(
         !item && characterId
           ? await tx
               .select({ activeEffects: characters.activeEffects })
-              .from(characters)
+              .from(characters) // recycle-bin: post-authorization lookup
               .where(eq(characters.id, characterId))
           : [];
       const historical = previous?.activeEffects.some(
@@ -96,7 +96,7 @@ export async function prepareActiveEffects(
     const [campaign] = source?.restricted
       ? await tx
           .select({ ownerId: campaigns.ownerId })
-          .from(campaigns)
+          .from(campaigns) // recycle-bin: post-authorization lookup
           .where(eq(campaigns.id, campaignId))
       : [];
     const alreadyHeld = previousCharacter?.activeEffects.some(
@@ -139,7 +139,7 @@ export async function refreshActiveEffectDefinition(
   if (!source) return;
   const rows = await tx
     .select()
-    .from(characters)
+    .from(characters) // recycle-bin: includes binned: library changes must reach binned characters too
     .where(eq(characters.campaignId, campaignId))
     .for('update');
   for (const row of rows) {

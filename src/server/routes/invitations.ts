@@ -94,7 +94,7 @@ async function loadInvitationOut(invitationId: string): Promise<InvitationOut | 
     .innerJoin(campaigns, eq(campaigns.id, campaignInvitations.campaignId))
     .innerJoin(inviterAlias, eq(inviterAlias.id, campaignInvitations.inviterId))
     .innerJoin(inviteeAlias, eq(inviteeAlias.id, campaignInvitations.inviteeId))
-    .where(eq(campaignInvitations.id, invitationId));
+    .where(and(eq(campaignInvitations.id, invitationId), isNull(campaigns.deletedAt)));
   const row = rows[0];
   if (!row) return null;
   return buildInvitationOut(row.invitation, row.campaign, row.inviter, row.invitee);
@@ -132,7 +132,7 @@ async function notifyInvitationResponse(
     .where(eq(users.id, invitation.inviterId));
   const [campaign] = await tx
     .select({ name: campaigns.name })
-    .from(campaigns)
+    .from(campaigns) // recycle-bin: post-authorization lookup
     .where(eq(campaigns.id, invitation.campaignId));
   if (!sender || !campaign || !notificationPreferences.parse(sender.preferences).invitations)
     return;
@@ -316,7 +316,7 @@ router.openapi(
         invitee: inviteeAlias,
       })
       .from(campaignInvitations)
-      .innerJoin(campaigns, eq(campaigns.id, campaignInvitations.campaignId))
+      .innerJoin(campaigns, eq(campaigns.id, campaignInvitations.campaignId)) // recycle-bin: post-authorization lookup
       .innerJoin(inviterAlias, eq(inviterAlias.id, campaignInvitations.inviterId))
       .innerJoin(inviteeAlias, eq(inviteeAlias.id, campaignInvitations.inviteeId))
       .where(
@@ -421,7 +421,11 @@ router.openapi(
       .innerJoin(inviterAlias, eq(inviterAlias.id, campaignInvitations.inviterId))
       .innerJoin(inviteeAlias, eq(inviteeAlias.id, campaignInvitations.inviteeId))
       .where(
-        and(eq(campaignInvitations.inviteeId, user.id), eq(campaignInvitations.status, 'pending')),
+        and(
+          eq(campaignInvitations.inviteeId, user.id),
+          eq(campaignInvitations.status, 'pending'),
+          isNull(campaigns.deletedAt),
+        ),
       )
       .orderBy(desc(campaignInvitations.createdAt), desc(campaignInvitations.id))
       .limit(limit)
@@ -481,6 +485,12 @@ router.openapi(
         .for('update');
       const locked = lockedRows[0];
       if (!locked || locked.status !== 'pending') return false;
+      // A campaign in the recycle bin cannot gain members until it is restored.
+      const [campaign] = await tx
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(and(eq(campaigns.id, invitation.campaignId), isNull(campaigns.deletedAt)));
+      if (!campaign) throw new HTTPException(404, { message: 'campaign not found' });
 
       await tx
         .update(campaignInvitations)

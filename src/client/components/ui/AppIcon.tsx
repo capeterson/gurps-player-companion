@@ -7,6 +7,7 @@ import {
   CircleCheck,
   Compass,
   Dice6,
+  Ellipsis,
   Feather,
   Fingerprint,
   Gem,
@@ -58,6 +59,7 @@ const ICONS = {
   chevronDown: ChevronDown,
   chevronRight: ChevronRight,
   trash: Trash2,
+  more: Ellipsis,
 } as const;
 
 export type AppIconName = keyof typeof ICONS;

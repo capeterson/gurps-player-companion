@@ -4,18 +4,18 @@ import { type AppConfig, loadConfig } from './config.ts';
 import { closeDb } from './db/client.ts';
 import { beginDraining } from './lifecycle.ts';
 import { startMediaMaintenance, stopMediaMaintenance } from './services/media/maintenance.ts';
+import { startNightlyMaintenance, stopNightlyMaintenance } from './services/nightlyMaintenance.ts';
 import {
   startNotificationMaintenance,
   stopNotificationMaintenance,
 } from './services/notificationMaintenance.ts';
 import { startPreviewProvisioning, stopPreviewProvisioning } from './services/preview/provision.ts';
-import { startUserPurgeMaintenance, stopUserPurgeMaintenance } from './services/userPurge.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
 
 /** Server-process work only; each starter is idempotent and skips the test environment. */
 export function startBackgroundMaintenance(config: AppConfig): void {
   startMediaMaintenance();
-  startUserPurgeMaintenance(config.environment);
+  startNightlyMaintenance(config.environment);
   startNotificationMaintenance(config.environment);
   startPreviewProvisioning(config);
 }
@@ -46,7 +46,7 @@ export interface ShutdownDeps {
 async function stopBackgroundMaintenance(): Promise<void> {
   await Promise.all([
     stopMediaMaintenance(),
-    stopUserPurgeMaintenance(),
+    stopNightlyMaintenance(),
     stopNotificationMaintenance(),
     stopPreviewProvisioning(),
   ]);

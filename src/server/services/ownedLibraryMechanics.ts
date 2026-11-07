@@ -29,7 +29,7 @@ export async function captureLibraryMechanics(
   if (!sourceId) return null;
   const [parent] = await tx
     .select({ campaignId: characters.campaignId })
-    .from(characters)
+    .from(characters) // recycle-bin: includes binned: library changes must reach binned characters too
     .where(eq(characters.id, characterId))
     .for('share');
   const table = kind === 'traits' ? campaignLibraryTraits : campaignLibrarySkills;
@@ -134,7 +134,7 @@ export async function refreshOwnedLibraryMechanics(
     const ownedItems = await tx
       .select({ id: inventoryItems.id, enchantments: inventoryItems.enchantments })
       .from(inventoryItems)
-      .innerJoin(characters, eq(inventoryItems.characterId, characters.id))
+      .innerJoin(characters, eq(inventoryItems.characterId, characters.id)) // recycle-bin: includes binned: library changes must reach binned characters too
       .where(
         and(
           eq(characters.campaignId, campaignId),
@@ -168,7 +168,7 @@ export async function refreshOwnedLibraryMechanics(
         libraryMechanics: characterSkills.libraryMechanics,
       })
       .from(characterSkills)
-      .innerJoin(characters, eq(characterSkills.characterId, characters.id))
+      .innerJoin(characters, eq(characterSkills.characterId, characters.id)) // recycle-bin: includes binned: library changes must reach binned characters too
       .where(
         and(eq(characterSkills.librarySkillId, sourceId), eq(characters.campaignId, campaignId)),
       );
@@ -236,7 +236,7 @@ export async function refreshOwnedLibraryMechanics(
   const children = await tx
     .select({ id: childTable.id })
     .from(childTable)
-    .innerJoin(characters, eq(childTable.characterId, characters.id))
+    .innerJoin(characters, eq(childTable.characterId, characters.id)) // recycle-bin: includes binned: library changes must reach binned characters too
     .where(and(eq(reference, sourceId), eq(characters.campaignId, campaignId)));
   if (!children.length) return;
   const snapshot = libraryMechanics.parse({
@@ -307,7 +307,7 @@ export async function detachLibraryReferencesForTransfer(
   if (updates.campaignId === undefined) return;
   const [parent] = await tx
     .select({ campaignId: characters.campaignId, activeEffects: characters.activeEffects })
-    .from(characters)
+    .from(characters) // recycle-bin: includes binned: library changes must reach binned characters too
     .where(eq(characters.id, characterId))
     .for('update');
   const proposedCampaignId =

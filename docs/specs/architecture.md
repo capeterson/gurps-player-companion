@@ -454,9 +454,11 @@ Key PG18 / trigger machinery, layered by migration:
   the player's `SyncProvider` or `SyncBootstrapGate`, so admin access never waits
   for a player-data download or starts the outbox/cursor/WebSocket subsystem.
 
-The same Bun process schedules due-account purges at 03:00 UTC with an unreferenced
-wall-clock timeout (`services/userPurge.ts`); creating an app in the test environment
-does not start it. A PostgreSQL transaction advisory lock serializes sweep workers,
+The same Bun process schedules the nightly sweeps at 03:00 UTC with an unreferenced
+wall-clock timeout (`services/nightlyMaintenance.ts`): due-account purges
+(`services/userPurge.ts`) and the recycle-bin purge of characters and campaigns
+binned for 30 days (`services/recycleBin.ts`, [recycle-bin.md](recycle-bin.md)).
+Creating an app in the test environment does not start it. A PostgreSQL transaction advisory lock serializes sweep workers,
 which also delete expired `refresh_tokens` using an indexed expiry cutoff even
 when no accounts are due. Unexpired revoked rotation ancestors are retained for
 idempotent refresh retries and replay detection.

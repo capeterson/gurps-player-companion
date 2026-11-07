@@ -9,7 +9,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { type SQL, and, count, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { type SQL, and, count, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { type AnyPgColumn, alias } from 'drizzle-orm/pg-core';
 import { HTTPException } from 'hono/http-exception';
 import { summarizeEvent } from '../../shared/history/summarize.ts';
@@ -142,7 +142,7 @@ router.openapi(
         campaignId: characters.campaignId,
       })
       .from(characters)
-      .where(eq(characters.id, characterId));
+      .where(and(eq(characters.id, characterId), isNull(characters.deletedAt)));
 
     const char = charRows[0];
     if (!char) throw new HTTPException(404, { message: 'character not found' });

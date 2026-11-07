@@ -32,6 +32,7 @@ import { mediaRouter } from './routes/media.ts';
 import { notificationPreferencesRouter } from './routes/notificationPreferences.ts';
 import { notificationsRouter } from './routes/notifications.ts';
 import { previewRouter } from './routes/preview.ts';
+import { recycleBinRouter } from './routes/recycleBin.ts';
 import { syncRouter } from './routes/sync.ts';
 import { createSyncWsHandler } from './routes/syncWs.ts';
 import { durableIdempotency } from './services/idempotency.ts';
@@ -173,6 +174,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   app.route('/api/v1', previewRouter);
   app.route('/api/v1', apiKeysRouter);
   app.route('/api/v1', campaignsRouter);
+  app.route('/api/v1', recycleBinRouter);
   app.route('/api/v1', invitationsRouter);
   app.route('/api/v1', notificationPreferencesRouter);
   app.route('/api/v1', notificationsRouter);

@@ -19,6 +19,8 @@ interface RetypeToConfirmDialogProps {
   children: ReactNode;
   /** The exact string the user must retype to unlock the confirm button. */
   expectedText: string;
+  /** What is being retyped, e.g. "campaign name" (the default). */
+  noun?: string;
   confirmLabel: string;
   pendingLabel: string;
   pending: boolean;
@@ -31,6 +33,7 @@ export function RetypeToConfirmDialog({
   title,
   children,
   expectedText,
+  noun = 'campaign name',
   confirmLabel,
   pendingLabel,
   pending,
@@ -69,7 +72,7 @@ export function RetypeToConfirmDialog({
         <div className="py-3 text-sm space-y-3">
           {children}
           <p>
-            To confirm, type the campaign name{' '}
+            To confirm, type the {noun}{' '}
             <code className="px-1 rounded bg-base-200">{expectedText}</code> below.
           </p>
           <input
@@ -77,7 +80,7 @@ export function RetypeToConfirmDialog({
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             placeholder={expectedText}
-            aria-label="Type campaign name to confirm"
+            aria-label={`Type ${noun} to confirm`}
             className="input input-bordered w-full"
           />
         </div>

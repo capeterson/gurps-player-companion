@@ -104,6 +104,7 @@ import {
 } from './loadouts.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 import { buildPatchSet } from './patchSet.ts';
+import { binCharacter } from './recycleBin.ts';
 import { publish as wsPublish } from './wsBus.ts';
 
 /**
@@ -409,7 +410,7 @@ async function characterInvalidationRecipients(
       const db = getDb();
       const [charRow] = await db
         .select({ ownerId: characters.ownerId, campaignId: characters.campaignId })
-        .from(characters)
+        .from(characters) // recycle-bin: includes binned: replay detection and nudge recipients
         .where(eq(characters.id, characterId));
       if (charRow) {
         recipients.add(charRow.ownerId);
@@ -433,7 +434,7 @@ async function campaignRecipients(campaignId: string): Promise<string[]> {
   const db = getDb();
   const [campaignRow] = await db
     .select({ ownerId: campaigns.ownerId })
-    .from(campaigns)
+    .from(campaigns) // recycle-bin: includes binned: replay detection and nudge recipients
     .where(eq(campaigns.id, campaignId));
   const members = await db
     .select({ userId: campaignMemberships.userId })
@@ -528,7 +529,7 @@ async function resolveReplayedCreate(
     const db = getDb();
     switch (op.entityClass) {
       case 'character': {
-        const [row] = await db.select().from(characters).where(eq(characters.id, op.entityId));
+        const [row] = await db.select().from(characters).where(eq(characters.id, op.entityId)); // recycle-bin: includes binned: replay detection and nudge recipients
         return row && row.ownerId === userId ? appliedOutcome(op, Number(row.revision)) : null;
       }
       default: {
@@ -657,11 +658,10 @@ async function dispatchCharacter(
   if (op.command === 'delete') {
     const access = await loadCharacterOr403(op.entityId, ctx.userId);
     assertWrite(access);
-    await tx.delete(characters).where(eq(characters.id, op.entityId));
-    // Tombstone trigger inserts a tombstone row whose revision becomes
-    // the cursor for "this entity was deleted".  We don't know it
-    // ahead of time, so we don't include `newRevision` here -- the
-    // client picks it up on the next /sync/cursor pull.
+    // Deleting moves the character to the recycle bin. It leaves the cursor's
+    // `accessible` set, so every device prunes it on its next pull; no
+    // tombstone exists until the 30-day purge hard-deletes it.
+    await binCharacter(tx, op.entityId, ctx.userId);
     return { clientOpId: op.clientOpId, status: 'applied' };
   }
 

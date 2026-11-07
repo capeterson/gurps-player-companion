@@ -65,8 +65,14 @@ async function userSummary(userId: string): Promise<AdminUserSummary> {
   const u = (await db.select().from(users).where(eq(users.id, userId)))[0];
   if (!u) throw new HTTPException(404, { message: 'user not found' });
   const [charCount, campCount] = await Promise.all([
-    db.select({ n: count() }).from(characters).where(eq(characters.ownerId, userId)),
-    db.select({ n: count() }).from(campaigns).where(eq(campaigns.ownerId, userId)),
+    db
+      .select({ n: count() })
+      .from(characters)
+      .where(eq(characters.ownerId, userId)), // recycle-bin: admin views include binned rows
+    db
+      .select({ n: count() })
+      .from(campaigns)
+      .where(eq(campaigns.ownerId, userId)), // recycle-bin: admin views include binned rows
   ]);
   return {
     id: u.id,
@@ -179,14 +185,14 @@ router.openapi(
     const db = getDb();
     const charRows = await db
       .select()
-      .from(characters)
+      .from(characters) // recycle-bin: admin views include binned rows
       .where(eq(characters.ownerId, userId))
       .orderBy(desc(characters.createdAt));
-    const campOwned = await db.select().from(campaigns).where(eq(campaigns.ownerId, userId));
+    const campOwned = await db.select().from(campaigns).where(eq(campaigns.ownerId, userId)); // recycle-bin: admin views include binned rows
     const campMember = await db
       .select({ campaign: campaigns, role: campaignMemberships.role })
       .from(campaignMemberships)
-      .innerJoin(campaigns, eq(campaigns.id, campaignMemberships.campaignId))
+      .innerJoin(campaigns, eq(campaigns.id, campaignMemberships.campaignId)) // recycle-bin: admin views include binned rows
       .where(and(eq(campaignMemberships.userId, userId), ne(campaigns.ownerId, userId)));
     const out: AdminUserDetail = {
       ...summary,
@@ -407,14 +413,14 @@ router.openapi(
     const baseFilter = where ?? sql`true`;
     const totalRows = await db
       .select({ total: count() })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: admin views include binned rows
       .innerJoin(users, eq(users.id, campaigns.ownerId))
       .where(baseFilter);
     const total = Number(totalRows[0]?.total ?? 0);
 
     const rows = await db
       .select({ campaign: campaigns, ownerName: users.displayName, ownerEmail: users.email })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: admin views include binned rows
       .innerJoin(users, eq(users.id, campaigns.ownerId))
       .where(baseFilter)
       .orderBy(desc(campaigns.createdAt))
@@ -428,7 +434,10 @@ router.openapi(
             .select({ n: count() })
             .from(campaignMemberships)
             .where(eq(campaignMemberships.campaignId, campaign.id)),
-          db.select({ n: count() }).from(characters).where(eq(characters.campaignId, campaign.id)),
+          db
+            .select({ n: count() })
+            .from(characters)
+            .where(eq(characters.campaignId, campaign.id)), // recycle-bin: admin views include binned rows
         ]);
         return {
           id: campaign.id,
@@ -472,7 +481,7 @@ router.openapi(
     await requireSuperuser(actor.id);
     const { campaignId } = c.req.valid('param');
     const db = getDb();
-    const campRow = (await db.select().from(campaigns).where(eq(campaigns.id, campaignId)))[0];
+    const campRow = (await db.select().from(campaigns).where(eq(campaigns.id, campaignId)))[0]; // recycle-bin: admin views include binned rows
     if (!campRow) throw new HTTPException(404, { message: 'campaign not found' });
     const owner = (await db.select().from(users).where(eq(users.id, campRow.ownerId)))[0];
     if (!owner) throw new HTTPException(404, { message: 'campaign owner not found' });
@@ -483,7 +492,7 @@ router.openapi(
       .where(eq(campaignMemberships.campaignId, campaignId));
     const charRows = await db
       .select()
-      .from(characters)
+      .from(characters) // recycle-bin: admin views include binned rows
       .where(eq(characters.campaignId, campaignId))
       .orderBy(desc(characters.createdAt));
     const out: AdminCampaignDetail = {

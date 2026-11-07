@@ -9,7 +9,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, ilike, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNull, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   adventureLogCreate,
@@ -84,7 +84,7 @@ async function resolveAttachment(
     const [character] = await tx
       .select({ ownerId: characters.ownerId })
       .from(characters)
-      .where(eq(characters.id, characterId))
+      .where(and(eq(characters.id, characterId), isNull(characters.deletedAt)))
       .for('share');
     if (!character || character.ownerId !== userId) {
       throw new HTTPException(403, { message: 'Log attachment must be a character you own' });

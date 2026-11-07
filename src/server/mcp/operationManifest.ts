@@ -158,6 +158,18 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   tool('GET', '/api/v1/campaigns', 'list_campaigns', 'gpc:read'),
   task('POST', '/api/v1/campaigns', 'campaign', 'create', 'gpc:write'),
   task('DELETE', '/api/v1/campaigns/{id}', 'campaign', 'delete', 'gpc:manage'),
+  task('POST', '/api/v1/campaigns/{id}/restore', 'campaign', 'restore', 'gpc:manage', false),
+  tool('GET', '/api/v1/recycle-bin', 'list_recycle_bin', 'gpc:read'),
+  excluded(
+    'DELETE',
+    '/api/v1/recycle-bin/characters/{id}',
+    'Permanent deletion is reserved for people using the app or raw API, never delegated agents',
+  ),
+  excluded(
+    'DELETE',
+    '/api/v1/recycle-bin/campaigns/{id}',
+    'Permanent deletion is reserved for people using the app or raw API, never delegated agents',
+  ),
   tool('GET', '/api/v1/campaigns/{id}', 'get_campaign', 'gpc:read'),
   task('PATCH', '/api/v1/campaigns/{id}', 'campaign', 'update', 'gpc:write'),
   task('POST', '/api/v1/campaigns/{id}/members', 'campaign_member', 'add', 'gpc:manage', true),
@@ -519,6 +531,7 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   tool('GET', '/api/v1/characters', 'list_characters', 'gpc:read'),
   task('POST', '/api/v1/characters', 'character', 'create', 'gpc:write'),
   task('DELETE', '/api/v1/characters/{id}', 'character', 'delete', 'gpc:manage'),
+  task('POST', '/api/v1/characters/{id}/restore', 'character', 'restore', 'gpc:manage', false),
   tool('GET', '/api/v1/characters/{id}', 'get_character', 'gpc:read'),
   tool(
     'GET',

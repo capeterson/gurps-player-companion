@@ -389,6 +389,51 @@
     },
     {
       "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/campaigns/{id}/restore",
+      "tool": "campaign",
+      "scope": "gpc:manage",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "restore"
+    },
+    {
+      "kind": "tool",
+      "method": "GET",
+      "path": "/api/v1/recycle-bin",
+      "tool": "list_recycle_bin",
+      "scope": "gpc:read",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ]
+    },
+    {
+      "kind": "excluded",
+      "method": "DELETE",
+      "path": "/api/v1/recycle-bin/characters/{id}",
+      "reason": "Permanent deletion is reserved for people using the app or raw API, never delegated agents"
+    },
+    {
+      "kind": "excluded",
+      "method": "DELETE",
+      "path": "/api/v1/recycle-bin/campaigns/{id}",
+      "reason": "Permanent deletion is reserved for people using the app or raw API, never delegated agents"
+    },
+    {
+      "kind": "tool",
       "method": "GET",
       "path": "/api/v1/campaigns/{id}",
       "tool": "get_campaign",
@@ -1688,6 +1733,23 @@
         "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
       ],
       "action": "delete"
+    },
+    {
+      "kind": "tool",
+      "method": "POST",
+      "path": "/api/v1/characters/{id}/restore",
+      "tool": "character",
+      "scope": "gpc:manage",
+      "destructive": false,
+      "openWorld": false,
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry",
+      "resultMode": "compact-mutation-ack",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+      ],
+      "action": "restore"
     },
     {
       "kind": "tool",
@@ -3456,7 +3518,7 @@
     },
     {
       "name": "campaign",
-      "description": "create: Create a new campaign (the creator becomes owner)\ndelete: Delete a campaign (owner only). Cascades to memberships, library, log.\nupdate: Update campaign metadata (owner only)",
+      "description": "create: Create a new campaign (the creator becomes owner)\ndelete: Move a campaign to the recycle bin (owner only). Members lose access and its characters leave it; permanently deleted after 30 days.\nrestore: Restore a campaign from the recycle bin (owner only) and re-attach the characters it released\nupdate: Update campaign metadata (owner only)",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -3706,6 +3768,39 @@
               "action": {
                 "type": "string",
                 "const": "delete"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "restore"
               },
               "path": {
                 "type": "object",
@@ -4098,6 +4193,12 @@
             "resultMode": "compact-mutation-ack"
           },
           {
+            "action": "restore",
+            "requiredScope": "gpc:manage",
+            "operation": "POST /api/v1/campaigns/{id}/restore",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
             "action": "update",
             "requiredScope": "gpc:write",
             "operation": "PATCH /api/v1/campaigns/{id}",
@@ -4129,6 +4230,17 @@
           ]
         },
         {
+          "action": "restore",
+          "operation": "POST /api/v1/campaigns/{id}/restore",
+          "scope": "gpc:manage",
+          "destructive": false,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
           "action": "update",
           "operation": "PATCH /api/v1/campaigns/{id}",
           "scope": "gpc:write",
@@ -4139,6 +4251,184 @@
             "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
           ]
         }
+      ],
+      "handler": "shared-openapi-handler",
+      "schemaSource": "openapi-zod-registry"
+    },
+    {
+      "name": "list_recycle_bin",
+      "description": "List the characters and campaigns you can restore",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "body": {}
+        },
+        "required": [
+          "status",
+          "contentType",
+          "body"
+        ],
+        "additionalProperties": false,
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "const": 200
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "characters": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "deletedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "purgeAfter": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "deletedAt",
+                        "purgeAfter"
+                      ]
+                    }
+                  },
+                  "campaigns": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "deletedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "purgeAfter": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "characterCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "deletedAt",
+                        "purgeAfter",
+                        "characterCount"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "characters",
+                  "campaigns"
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "const": 401
+              },
+              "body": {
+                "$ref": "#/$defs/ErrorBody"
+              }
+            }
+          },
+          {
+            "properties": {
+              "status": {
+                "type": "integer",
+                "minimum": 400,
+                "maximum": 599
+              },
+              "body": {
+                "type": "object",
+                "properties": {
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "error"
+                ]
+              }
+            }
+          }
+        ],
+        "$defs": {
+          "ErrorBody": {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ]
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "_meta": {
+        "requiredScope": "gpc:read",
+        "operation": "GET /api/v1/recycle-bin",
+        "resultMode": "canonical-read"
+      },
+      "operation": "GET /api/v1/recycle-bin",
+      "scope": "gpc:read",
+      "destructive": false,
+      "resultMode": "canonical-read",
+      "parityTests": [
+        "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+        "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
       ],
       "handler": "shared-openapi-handler",
       "schemaSource": "openapi-zod-registry"
@@ -36717,7 +37007,7 @@
     },
     {
       "name": "character",
-      "description": "create: Create a character\ndelete: DELETE /api/v1/characters/{id}\nupdate: Update character (owner only)",
+      "description": "create: Create a character\ndelete: Move a character to the recycle bin (permanently deleted after 30 days)\nrestore: Restore a character from the recycle bin\nupdate: Update character (owner only)",
       "inputSchema": {
         "type": "object",
         "anyOf": [
@@ -36984,6 +37274,39 @@
               "action": {
                 "type": "string",
                 "const": "delete"
+              },
+              "path": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "idempotencyKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "Stable mutation retry key. Reuse only with identical input."
+              }
+            },
+            "required": [
+              "action",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "action": {
+                "type": "string",
+                "const": "restore"
               },
               "path": {
                 "type": "object",
@@ -39158,6 +39481,12 @@
             "resultMode": "compact-mutation-ack"
           },
           {
+            "action": "restore",
+            "requiredScope": "gpc:manage",
+            "operation": "POST /api/v1/characters/{id}/restore",
+            "resultMode": "compact-mutation-ack"
+          },
+          {
             "action": "update",
             "requiredScope": "gpc:write",
             "operation": "PATCH /api/v1/characters/{id}",
@@ -39182,6 +39511,17 @@
           "operation": "DELETE /api/v1/characters/{id}",
           "scope": "gpc:manage",
           "destructive": true,
+          "resultMode": "compact-mutation-ack",
+          "parityTests": [
+            "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",
+            "src/server/mcp/parity.integration.test.ts#enforces-declared-oauth-scope"
+          ]
+        },
+        {
+          "action": "restore",
+          "operation": "POST /api/v1/characters/{id}/restore",
+          "scope": "gpc:manage",
+          "destructive": false,
           "resultMode": "compact-mutation-ack",
           "parityTests": [
             "src/server/mcp/parity.integration.test.ts#executes-success-and-rest-differential",

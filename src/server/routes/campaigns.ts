@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { normalizeHouseRuleSettings } from '../../shared/domain/campaignRules.ts';
 import {
@@ -37,6 +37,7 @@ import { advanceCampaignProjectionRevision } from '../services/libraryInvalidati
 import { prepareMediaAttachment } from '../services/media/service.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
+import { binCampaign, loadBinnedCampaignOr403, restoreCampaign } from '../services/recycleBin.ts';
 
 const router = createOpenApiApp();
 router.use('/campaigns', requireActiveUser);
@@ -129,6 +130,7 @@ router.openapi(
       )
       .where(
         and(
+          isNull(campaigns.deletedAt),
           or(eq(campaigns.ownerId, user.id), eq(campaignMemberships.userId, user.id)),
           search ? ilike(campaigns.name, `%${escapeLikePattern(search)}%`) : undefined,
         ),
@@ -291,7 +293,7 @@ router.openapi(
     const row = await withAudit(user.id, undefined, async (tx) => {
       await tx
         .select({ id: campaigns.id })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(campaigns.id, id))
         .for('update');
       await prepareMediaAttachment(tx, 'campaign', id, body);
@@ -320,11 +322,12 @@ router.openapi(
     method: 'delete',
     path: '/campaigns/{id}',
     tags: ['campaigns'],
-    summary: 'Delete a campaign (owner only). Cascades to memberships, library, log.',
+    summary:
+      'Move a campaign to the recycle bin (owner only). Members lose access and its characters leave it; permanently deleted after 30 days.',
     security: [{ bearerAuth: [] }],
     request: { params: z.object({ id: uuid }) },
     responses: {
-      204: { description: 'Deleted' },
+      204: { description: 'Moved to the recycle bin' },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
     },
@@ -333,21 +336,32 @@ router.openapi(
     const user = c.get('user');
     const { id } = c.req.valid('param');
     await requireCampaignOwner(id, user.id);
-    await withAudit(user.id, undefined, async (tx) => {
-      // Block new FK assignments before enumerating copies to preserve.
-      await tx
-        .select({ id: campaigns.id })
-        .from(campaigns)
-        .where(eq(campaigns.id, id))
-        .for('update');
-      const ownedCharacters = await tx
-        .select({ id: characters.id })
-        .from(characters)
-        .where(eq(characters.campaignId, id));
-      for (const character of ownedCharacters)
-        await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null }, id);
-      await tx.delete(campaigns).where(eq(campaigns.id, id));
-    });
+    await withAudit(user.id, undefined, (tx) => binCampaign(tx, id, user.id));
+    return c.body(null, 204);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/campaigns/{id}/restore',
+    tags: ['campaigns'],
+    summary:
+      'Restore a campaign from the recycle bin (owner only) and re-attach the characters it released',
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: uuid }) },
+    responses: {
+      204: { description: 'Restored' },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not in the recycle bin'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    await loadBinnedCampaignOr403(id, user.id);
+    const restored = await withAudit(user.id, undefined, (tx) => restoreCampaign(tx, id));
+    if (!restored) throw new HTTPException(404, { message: 'campaign not found' });
     return c.body(null, 204);
   },
 );
@@ -498,12 +512,12 @@ router.openapi(
     const result = await withAudit(user.id, undefined, async (tx) => {
       await tx
         .select({ id: campaigns.id })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(campaigns.id, id))
         .for('update');
       const owned = await tx
         .select({ id: characters.id })
-        .from(characters)
+        .from(characters) // recycle-bin: includes binned: a removed member's binned characters are released too
         .where(and(eq(characters.campaignId, id), eq(characters.ownerId, userId)));
       for (const character of owned)
         await detachLibraryReferencesForTransfer(tx, character.id, { campaignId: null }, id);
@@ -582,7 +596,7 @@ router.openapi(
           and(eq(campaignMemberships.campaignId, id), eq(campaignMemberships.userId, newOwnerId)),
         );
     });
-    const refreshed = await db.select().from(campaigns).where(eq(campaigns.id, id));
+    const refreshed = await db.select().from(campaigns).where(eq(campaigns.id, id)); // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     const updated = refreshed[0];
     if (!updated) throw new HTTPException(500, { message: 'campaign vanished' });
     const members = await loadMembers(id);

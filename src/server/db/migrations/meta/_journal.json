@@ -526,6 +526,13 @@
       "when": 1800029000000,
       "tag": "0074_sunbolt_light_theme",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1800030000000,
+      "tag": "0075_recycle_bin",
+      "breakpoints": true
     }
   ]
 }

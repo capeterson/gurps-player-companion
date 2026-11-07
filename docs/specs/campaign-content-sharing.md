@@ -248,6 +248,15 @@ actions reachable.
 Client surfaces: `CampaignInvitePanel`, `CampaignMembersPanel`,
 `InvitationsInbox`, `TransferOwnershipDialog`, `NotificationsBell`.
 
+## Deleting and restoring a campaign
+
+Deleting a campaign moves it to the recycle bin ([recycle-bin.md](recycle-bin.md)).
+It vanishes for every member (lists, detail, sync, invitations, log, encounters),
+its characters are detached immediately with their library-linked mechanics
+converted to owned copies, and pending invitations can no longer be accepted.
+The owner can restore it within 30 days; characters whose owners are still the
+owner or members and that have not joined another campaign are re-attached.
+
 ## The character-sheet share gate
 
 The core privacy control. Each campaign has a boolean **`shareCharacterSheets`**.
