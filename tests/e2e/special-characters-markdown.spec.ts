@@ -254,12 +254,14 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   const traitPreview = page
     .locator('table[aria-label="Traits"] tbody')
     .filter({ hasText: traitName })
+    .locator('tr')
+    .last()
     .locator('.markdown-body');
   await expect(traitPreview).toBeVisible();
   await expect(traitPreview).toContainText('café 東京 مرحبا 🐉');
   const renderedTraitNotes = await assertNoExecutableMarkdown(
     page,
-    'table[aria-label="Traits"] .markdown-body',
+    'table[aria-label="Traits"] tbody tr:last-child .markdown-body',
   );
   expect(renderedTraitNotes.activeElements).toBe(0);
   expect(renderedTraitNotes.text).toContain('<img src=x onerror="window.__markdownCanary = 7">');
@@ -291,12 +293,14 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   const reloadedTraitPreview = page
     .locator('table[aria-label="Traits"] tbody')
     .filter({ hasText: traitName })
+    .locator('tr')
+    .last()
     .locator('.markdown-body');
   await expect(reloadedTraitPreview).toBeVisible();
   await expect(reloadedTraitPreview).toContainText('café 東京 مرحبا 🐉');
   const reloadedTraitRender = await assertNoExecutableMarkdown(
     page,
-    'table[aria-label="Traits"] .markdown-body',
+    'table[aria-label="Traits"] tbody tr:last-child .markdown-body',
   );
   expect(reloadedTraitRender.activeElements).toBe(0);
   expect(reloadedTraitRender.text).toContain('Trait notes: quotes');

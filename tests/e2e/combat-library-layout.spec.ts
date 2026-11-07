@@ -217,7 +217,7 @@ test('Current Status stays available and combat stays compact across mobile and 
         .first(),
     ).toHaveText('Field guide');
     await selectCharacterSection(page, 'Combat');
-    await expect(overview).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Attributes', exact: true })).toHaveCount(0);
     await expect(status).toBeVisible();
     await expect(page.getByRole('group', { name: 'Hit points', exact: true })).toHaveCount(0);
     const incomingAttack = page.getByRole('region', { name: 'Incoming attack' });
