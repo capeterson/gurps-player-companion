@@ -593,8 +593,7 @@ function IdentityPanel({
   const [descriptionMode, setDescriptionMode] = useState<'unopened' | 'view' | 'edit'>('unopened');
 
   return (
-    <section className="card p-5 space-y-3">
-      <p className="label-eyebrow">Identity</p>
+    <div className="space-y-3">
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
         <MediaImage
           targetType="character"
@@ -727,7 +726,7 @@ function IdentityPanel({
             <p className="text-sm text-muted">No description yet.</p>
           ))}
       </fieldset>
-    </section>
+    </div>
   );
 }
 
@@ -915,8 +914,9 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
 
   return (
     <StatCard title="Status">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -933,6 +933,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={d.dodge}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -949,6 +950,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={formatSigned(d.parryMod)}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -964,6 +966,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={formatSigned(d.blockMod)}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -985,6 +988,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={character.libraryEffectsKnown === false ? '—' : d.traitDr}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -1005,6 +1009,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={formatSigned(d.frightCheckMod)}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -1019,6 +1024,7 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
           value={`${d.basicLift.toFixed(1)} lb`}
         />
         <Stat
+          singleLine
           label={
             <InfoTooltip
               content={
@@ -1038,13 +1044,6 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
   );
 }
 
-/** Folded ledger summary: total, plus how far from the campaign point cap. */
-function pointsSummary(total: number, pointTarget: number | null): string {
-  const unspent = pointTarget != null ? pointTarget - total : 0;
-  if (unspent === 0) return `${total} pts`;
-  return `${total} pts · ${unspent < 0 ? 'Over' : 'Unspent'} ${Math.abs(unspent)}`;
-}
-
 function PointsPanel({
   character,
   pointTarget,
@@ -1054,84 +1053,71 @@ function PointsPanel({
 }) {
   const p = character.points;
   const unspent = pointTarget != null ? pointTarget - p.total : null;
-  return (
-    <StatCard title="Point ledger" points={p.total}>
-      {unspent != null && unspent !== 0 && (
-        <p className="flex justify-between text-sm mb-1">
-          <span className="text-base-content/60">{unspent < 0 ? 'Over' : 'Unspent'}</span>
-          <span
-            className="num font-medium"
-            style={{ color: unspent < 0 ? 'var(--color-error)' : 'var(--color-primary)' }}
+  const rows: { label: string; value: number; muted?: boolean; total?: boolean }[] = [
+    ...(pointTarget != null ? [{ label: 'Point cap', value: pointTarget, muted: true }] : []),
+    ...((character.earnedPoints ?? 0) !== 0
+      ? [{ label: 'Earned points', value: character.earnedPoints ?? 0, muted: true }]
+      : []),
+    { label: 'Race', value: character.race?.snapshot?.points ?? 0 },
+    { label: 'Attributes', value: p.attributes },
+    { label: 'Secondary', value: p.secondary },
+    { label: 'Advantages', value: p.advantages },
+    { label: 'Disadvantages', value: p.disadvantages },
+    { label: 'Quirks', value: p.quirks },
+    { label: 'Languages', value: p.languages },
+    { label: 'Skills', value: p.skills },
+    { label: 'Techniques', value: p.techniques },
+    { label: 'Spells', value: p.spells },
+    { label: 'Total', value: p.total, total: true },
+  ];
+  const breakdown = (
+    <div className="grid gap-1.5">
+      <div className="font-semibold text-base-content">Point ledger</div>
+      <ul className="num grid gap-0.5">
+        {rows.map((row) => (
+          <li
+            key={row.label}
+            className={`flex justify-between gap-3 ${
+              row.total
+                ? 'mt-1 border-t border-base-300 pt-1 font-semibold text-base-content'
+                : row.muted
+                  ? 'text-base-content/60'
+                  : ''
+            }`}
           >
-            {Math.abs(unspent)}
-          </span>
-        </p>
-      )}
-      <ul className="text-sm space-y-1">
-        {pointTarget != null && (
-          <li className="flex justify-between">
-            <span>Point cap</span>
-            <span className="num">{pointTarget}</span>
+            <span>{row.label}</span>
+            <span>{row.value}</span>
           </li>
-        )}
-        {(character.earnedPoints ?? 0) !== 0 && (
-          <li className="flex justify-between text-secondary">
-            <span>Earned points</span>
-            <span className="num">{character.earnedPoints}</span>
-          </li>
-        )}
-        <li className="flex justify-between">
-          <span>Race</span>
-          <span className="num">{character.race?.snapshot?.points ?? 0}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Attributes</span>
-          <span className="num">{p.attributes}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Secondary</span>
-          <span className="num">{p.secondary}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Advantages</span>
-          <span className="num">{p.advantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Disadvantages</span>
-          <span className="num">{p.disadvantages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Quirks</span>
-          <span className="num">{p.quirks}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Languages</span>
-          <span className="num">{p.languages}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Skills</span>
-          <span className="num">{p.skills}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Techniques</span>
-          <span className="num">{p.techniques}</span>
-        </li>
-        <li className="flex justify-between">
-          <span>Spells</span>
-          <span className="num">{p.spells}</span>
-        </li>
-        <li className="flex justify-between border-t border-base-300 pt-1 mt-1 font-medium">
-          <span>Total</span>
-          <span className="num">{p.total}</span>
-        </li>
-        {character.campaignId !== null && character.points.unspent !== 0 && (
-          <li className="flex justify-between text-base-content/70">
-            <span>{p.unspent > 0 ? 'Unspent' : 'Over target'}</span>
-            <span className="num">{p.unspent > 0 ? p.unspent : -p.unspent}</span>
-          </li>
-        )}
+        ))}
       </ul>
-    </StatCard>
+    </div>
+  );
+  return (
+    <StatCard
+      title="Point ledger"
+      headerExtra={
+        <span className="num flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 text-sm">
+          <InfoTooltip content={breakdown}>
+            <span>
+              <span className="text-lg font-semibold">{p.total}</span>
+              <span className="text-base-content/60"> pts</span>
+            </span>
+          </InfoTooltip>
+          {pointTarget != null && (
+            <span>
+              <span className="label-eyebrow">Cap</span>{' '}
+              <span className="font-semibold">{pointTarget}</span>
+            </span>
+          )}
+          {unspent != null && unspent !== 0 && (
+            <span className={unspent < 0 ? 'text-error' : 'text-primary'}>
+              <span className="label-eyebrow">{unspent < 0 ? 'Over' : 'Unspent'}</span>{' '}
+              <span className="font-semibold">{Math.abs(unspent)}</span>
+            </span>
+          )}
+        </span>
+      }
+    />
   );
 }
 
@@ -1142,6 +1128,12 @@ const ENCUMBRANCE_TONE = [
   { badge: 'badge-error', fill: 'bg-error' },
   { badge: 'badge-error', fill: 'bg-error' },
 ] as const;
+
+function EncumbranceBadge({ character }: { character: CharacterDetail }) {
+  const e = character.encumbrance;
+  const tone = ENCUMBRANCE_TONE[e.level] ?? ENCUMBRANCE_TONE[0];
+  return <span className={`badge ${tone.badge}`}>{e.label}</span>;
+}
 
 function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const e = character.encumbrance;
@@ -1191,10 +1183,7 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   );
 
   return (
-    <StatCard
-      title="Encumbrance"
-      headerExtra={<span className={`badge ${tone.badge}`}>{e.label}</span>}
-    >
+    <StatCard title="Encumbrance">
       <div className="space-y-3">
         <div className="space-y-1.5">
           <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1662,17 +1651,11 @@ export function CharacterSheetPage() {
                   />
                   <StatusPanel character={character} />
                   <div className="flex min-w-0 flex-col gap-4">
-                    <FoldSection
-                      preferenceKey={`${character.id}:PointsPanel`}
-                      title="Point ledger"
-                      defaultOpen={false}
-                      summary={pointsSummary(character.points.total, pointTarget)}
-                    >
-                      <PointsPanel character={character} pointTarget={pointTarget} />
-                    </FoldSection>
+                    <PointsPanel character={character} pointTarget={pointTarget} />
                     <FoldSection
                       preferenceKey={`${character.id}:EncumbrancePanel`}
                       title="Encumbrance"
+                      titleExtra={<EncumbranceBadge character={character} />}
                     >
                       <EncumbrancePanel character={character} />
                     </FoldSection>

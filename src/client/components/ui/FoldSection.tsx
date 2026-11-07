@@ -6,6 +6,8 @@ interface FoldSectionProps {
   title: string;
   icon?: AppIconName;
   summary?: ReactNode;
+  /** Always visible beside the title, folded or not (e.g. a status badge). */
+  titleExtra?: ReactNode;
   defaultOpen?: boolean;
   forceOpen?: boolean;
   children: ReactNode;
@@ -18,6 +20,7 @@ export function FoldSection({
   title,
   icon,
   summary,
+  titleExtra,
   defaultOpen = true,
   forceOpen = false,
   children,
@@ -62,6 +65,7 @@ export function FoldSection({
           </span>
           {icon && <AppIcon name={icon} size={18} className="text-muted" />}
           <span className="label-eyebrow">{title}</span>
+          {titleExtra}
           {!open && summary && (
             <span className="ml-auto min-w-0 text-right text-xs text-muted font-normal">
               {summary}

@@ -849,6 +849,9 @@ body {
 .fold-body > .card > .card-body > header > h2 {
   display: none;
 }
+.fold-body > .card > .card-body > header:has(> span:empty) {
+  display: none;
+}
 .fold-body > .card > .card-body > header {
   justify-content: flex-end;
   margin-bottom: .5rem;

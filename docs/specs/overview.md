@@ -294,11 +294,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   stats, status, ledger, encumbrance and conditional effects) directly under the
   Overview heading, above the non-collapsible Identity card; other destinations
   do not display them. Attributes, Secondary attributes, and Status stay expanded inside
-  it, with one heading each. Point ledger, Encumbrance, and Conditional effects
-  fold independently (a folded Point ledger shows its total and any unspent/over
-  points against the campaign cap; Encumbrance shows only the carry bar and tier,
-  since Move and Dodge live in Secondary attributes) and shrink to their headings without stretching to fill
-  neighboring cards. Conditional effects is absent unless the campaign active-effects
+  it, with one heading each. The Point ledger is a compact, non-folding card
+  showing the total (a tooltip target listing every bucket), the campaign cap, and
+  unspent/over points. Encumbrance and Conditional effects fold independently;
+  Encumbrance keeps its tier badge beside the title and shows only the carry bar
+  (Move and Dodge live in Secondary attributes). Folded sections shrink to their
+  headings without stretching to fill neighboring cards. Conditional effects is absent unless the campaign active-effects
   experiment is enabled and condition groups exist. Skills, Traits, Inventory, and main Combat sections have keyboard-accessible
   folding headers. Magic collections instead have plain headings and compact tables. On Combat, Attacks, Incoming attack, and the optional Turn
   tracker fold independently. Incoming attack groups the body map, target/facing
