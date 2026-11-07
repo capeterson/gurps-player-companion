@@ -942,11 +942,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     Dodge has no minimum introduced by pool reductions. Changing character/maneuver
     clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
     unmodeled tactical situations and custom maneuvers remain player-supplied.
-  - **Attacks** — a compact table groups equipped weapons and their alternate
-    modes, with aligned governing-skill/target, damage, damage-type, and reach
-    columns. Weapon, governing skill, and damage type headers toggle ascending /
-    descending sorting. **Custom** order exposes drag handles (including touch
-    long-press); focused handles also move with the up/down arrow keys. Sort and
+  - **Attacks** — a ledger table with one dense row per attack mode, grouped by
+    equipped weapon; the weapon name (linked to its inventory entry) starts its
+    group beside the first mode. Each row shows the mode and governing skill with
+    the final target in one roll button, the damage dice as a roll button, the
+    damage type, and a **Reach / Range** column (the ranged stat line for ranged
+    modes, reach otherwise). Weapon, governing skill, and damage type headers are
+    the only sort controls and toggle ascending / descending. Drag handles
+    (including touch long-press) are always present; focused handles also move
+    with the up/down arrow keys, and moving a weapon while sorted returns the table
+    to custom order starting from the visible order. Below 640px each mode stacks
+    under its weapon name with Reach / Range on a muted line, the damage chip shows
+    the type, and Type is not sortable. Sort and
     custom weapon order are saved per character on this device, survive reloads,
     and are cleared on logout. These are presentation preferences, not inventory
     edits, and are not server-synced (`combat/attackTablePreferences.ts`). New
@@ -959,10 +966,13 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     unsupported expressions and recorded weapon/enchantment data stay unchanged.
     The same dice power combat displays, previews and rolls. Damage chips are **tappable buttons that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
-    1-point floor from B378), reach, an ST-shortfall badge/caption
+    1-point floor from B378), reach, an ST-shortfall warning line
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
     RoF/Shots/Bulk/Recoil) when the weapon has one, and the resolved
-    skill as a compact roll button. Attack rolls open separate range, Aim,
+    skill as a compact roll button. A mode with attack, Accuracy or damage
+    effects, or an ST shortfall, has one **±** control whose viewport-bounded
+    tooltip lists the Attack (including the ST arithmetic), Accuracy and Damage
+    breakdowns with their source names. Attack rolls open separate range, Aim,
     hit-location and Other controls. Fixed-yard and ST-multiplier ranges use a
     structured weapon value, with the speed/range slider stopping at the
     mode's resolved Max. Aim offers none, 1, 2 or 3+ seconds (Acc, Acc+1,

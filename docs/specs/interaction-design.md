@@ -516,6 +516,23 @@ works on non-secure HTTP IP origins where `crypto.randomUUID()` is unavailable.
 Long unspaced solo-tracker combatant names wrap inside the tracker, and armor
 names in the protection-layer breakdown shrink and wrap beside their DR values.
 
+Combat **Attacks** is a ledger: one dense row per attack mode, grouped by weapon.
+The weapon name starts its group beside the first mode. The whole governing-skill
+cell is the attack roll button (mode name, muted skill name, level in a tinted
+chip); damage is a separate dice button, so levels and damage each scan down a
+fixed column. Type and Reach / Range stay visible as muted text; a mode shows its
+ranged stat line or, for melee, its reach. ST-shortfall and bow-ST warnings are a
+short line under the affected attack. Each mode with attack, Accuracy or damage
+effects, or an ST shortfall, gets one **±** control: a portaled, scrollable
+`InfoTooltip` with titled Attack, Accuracy and Damage breakdowns
+(`ModifierTooltip`). Column headers are the only sort controls and handles are
+always present, as in Active defenses; moving a weapon while sorted turns the
+visible order into the custom order. Below 640px the same table rows become a
+grid: the weapon name and handle take the group's first line, each mode keeps its
+skill/level and damage/type chips on one line, Reach / Range drops to a muted
+line beneath it, and the Type and Reach / Range headings are hidden, so Type is
+not sortable there. The table elements keep their native roles at every width.
+
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide
 excluded rows without unmounting their editors.
@@ -649,6 +666,7 @@ are inspected alongside bounding-box and overlap assertions.
 | Spells, reference and energy payment | `src/client/features/characters/sections/SpellsPanel.tsx`, `CastSpellDialog.tsx`, `spellTablePreferences.ts` |
 | Magic tab, shared search, stored energy and item spells | `src/client/features/characters/sections/MagicSection.tsx`, `PowerstonesPanel.tsx`, `ItemSpellsPanel.tsx`, `magicActionStyles.ts` |
 | Languages and techniques | `src/client/features/characters/sections/LanguagesPanel.tsx`, `TechniquesPanel.tsx` |
+| Combat attack ledger and modifier breakdowns | `src/client/features/characters/sections/combat/AttacksCard.tsx`, `weaponEffectView.tsx` |
 | Inventory responsive item layout | `src/client/features/characters/sections/InventoryPanel.tsx`, `InventoryRow.tsx`, `inventory/inventory.css` |
 | Draft serialization and rollback feedback | `src/client/hooks/useDraftField.ts`, `src/client/features/characters/sections/useEntityRowPatch.ts` |
 | Visible rollback feedback for closed disclosures | `src/client/hooks/useFlashGroup.ts`, `useFlashState.ts` |

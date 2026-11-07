@@ -34,9 +34,11 @@ import {
   saveAttackTablePreferences,
 } from './attackTablePreferences.ts';
 import {
-  ModifierBreakdown,
+  type ModifierSection,
+  ModifierTooltip,
   WeaponEffectDiagnostics,
   effectTotal,
+  hasModifierEffects,
   skillEffectsForRow,
   weaponEffectsForRow,
 } from './weaponEffectView.tsx';
@@ -84,6 +86,18 @@ function damageLinesFor(weaponName: string, wd: WeaponData): DamageLine[] {
   return lines.filter((line, i) => i > 0 || line.damage !== undefined || lines.length === 1);
 }
 
+/*
+ * Below 640px each attack row becomes a four-column grid (handle gutter, skill,
+ * damage, ±): the weapon name takes the group's first line and Reach / Range
+ * drops to a muted line under its attack. The table elements keep their native
+ * roles; only their display changes.
+ */
+const CELL = 'border-0 px-1.5 py-0.5 align-top';
+/** In the separated-border table model the group rule is drawn on the first row's cells. */
+const GROUP_RULE = 'sm:border-t sm:border-base-300/60';
+const ROW =
+  'border-0 max-sm:grid max-sm:grid-cols-[1.5rem_minmax(0,1fr)_minmax(6rem,auto)_1.75rem] max-sm:items-start';
+
 export interface AttacksCardProps {
   character: CharacterDetail;
   openRoll: (req: RollRequest) => void;
@@ -107,11 +121,11 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
     setSaveFailed(!saveAttackTablePreferences(character.id, next));
   }
 
-  function sortBy(sort: AttackSort) {
+  function sortBy(sort: Exclude<AttackSort, 'custom'>) {
     save({
       ...preferences,
       sort,
-      descending: sort === preferences.sort && sort !== 'custom' ? !preferences.descending : false,
+      descending: sort === preferences.sort ? !preferences.descending : false,
     });
   }
 
@@ -172,36 +186,55 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
     );
   });
 
+  /**
+   * Moving a weapon returns the table to custom order, starting from the order
+   * currently on screen so a sorted view becomes the new custom order.
+   */
   function moveWeapon(id: string, targetId: string) {
-    const from = customOrder.indexOf(id);
-    const to = customOrder.indexOf(targetId);
+    const visible = sortedWeapons.map((weapon) => weapon.id);
+    const from = visible.indexOf(id);
+    const to = visible.indexOf(targetId);
     if (from < 0 || to < 0 || from === to) return;
-    const next = [...customOrder];
+    const next = [...visible];
     next.splice(from, 1);
     next.splice(to, 0, id);
     // Keep unequipped IDs so putting a weapon away does not discard its preference.
-    const hiddenIds = preferences.order.filter((savedId) => !customOrder.includes(savedId));
+    const hiddenIds = preferences.order.filter((savedId) => !visible.includes(savedId));
     save({ order: [...next, ...hiddenIds], sort: 'custom', descending: false });
     setAnnouncement(
       `${weapons.find((weapon) => weapon.id === id)?.name ?? 'Attack'} moved to position ${to + 1}.`,
     );
   }
 
-  function sortHeader(label: string, sort: Exclude<AttackSort, 'custom'>) {
+  function sortHeader(
+    label: string,
+    sort: Exclude<AttackSort, 'custom'>,
+    className = '',
+    phoneLabel?: string,
+  ) {
     const active = preferences.sort === sort;
     return (
       <TableHeader
         column={sort}
         label={label}
         scope="col"
+        className={`px-1.5 ${className}`}
         aria-sort={active ? (preferences.descending ? 'descending' : 'ascending') : 'none'}
       >
         <button
           type="button"
-          className="btn btn-ghost btn-xs -ml-2 whitespace-nowrap"
+          className="btn btn-ghost btn-xs -ml-1 h-auto min-h-0 whitespace-nowrap px-1 py-1 font-semibold"
+          aria-label={phoneLabel ? label : undefined}
           onClick={() => sortBy(sort)}
         >
-          {label}{' '}
+          {phoneLabel ? (
+            <>
+              <span className="max-sm:hidden">{label}</span>
+              <span className="sm:hidden">{phoneLabel}</span>
+            </>
+          ) : (
+            label
+          )}{' '}
           <span aria-hidden="true">{active ? (preferences.descending ? '↓' : '↑') : '↕'}</span>
         </button>
       </TableHeader>
@@ -218,25 +251,6 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
 
   return (
     <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks" icon="combat">
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-        <p className="label-eyebrow">
-          <span className="text-base-content/50">{weapons.length} equipped weapons</span>
-        </p>
-        <label className="flex items-center gap-2 text-xs text-base-content/60">
-          Order
-          <select
-            aria-label="Attack order"
-            className="select select-sm w-36"
-            value={preferences.sort}
-            onChange={(event) => sortBy(event.target.value as AttackSort)}
-          >
-            <option value="custom">Custom</option>
-            <option value="weapon">Weapon</option>
-            <option value="skill">Governing skill</option>
-            <option value="type">Damage type</option>
-          </select>
-        </label>
-      </div>
       {saveFailed && (
         <output className="text-xs text-warning">
           This browser could not save the attack order. It will reset when you leave this page.
@@ -259,23 +273,30 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
         <Table
           preferenceKey={`${character.id}:attacks`}
           aria-label="Attacks"
-          className="table table-sm w-full"
+          className="table table-sm w-full max-sm:block"
         >
-          <caption className="sr-only">
-            Equipped weapon attacks. Sort columns or choose Custom to reorder weapons.
-          </caption>
-          <thead>
-            <tr>
-              {preferences.sort === 'custom' && (
-                <th scope="col" className="w-9">
-                  <span className="sr-only">Reorder</span>
-                </th>
-              )}
-              {sortHeader('Weapon', 'weapon')}
-              {sortHeader('Governing skill', 'skill')}
-              <TableHeader column="damage" label="Damage" />
-              {sortHeader('Type', 'type')}
-              <TableHeader column="reach" label="Reach" />
+          <caption className="sr-only">Equipped weapon attacks.</caption>
+          <thead className="max-sm:block">
+            <tr className="max-sm:flex max-sm:items-center">
+              <th scope="col" className="w-8 px-1 max-sm:w-6 max-sm:shrink-0 max-sm:px-0">
+                <span className="sr-only">Custom order</span>
+              </th>
+              {sortHeader('Weapon', 'weapon', 'sm:w-32 md:w-40 lg:w-56')}
+              {sortHeader('Governing skill', 'skill', 'sm:w-48 lg:w-64', 'Skill')}
+              <TableHeader
+                column="damage"
+                label="Damage"
+                className="px-1.5 text-right max-sm:ml-auto sm:w-20"
+              />
+              {sortHeader('Type', 'type', 'max-sm:hidden sm:w-12')}
+              <th scope="col" className="w-9 px-1 max-sm:hidden">
+                <span className="sr-only">Modifiers</span>
+              </th>
+              <TableHeader
+                column="reach"
+                label="Reach / Range"
+                className="px-1.5 whitespace-nowrap max-sm:hidden"
+              />
             </tr>
           </thead>
           {sortedWeapons.map((w, weaponIndex) => {
@@ -333,7 +354,7 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                 }}
                 key={w.id}
                 aria-label={w.name}
-                className={`border-t border-base-300/60 ${draggingId === w.id ? 'opacity-40' : ''} ${dropTarget === w.id ? 'bg-base-200' : ''}`}
+                className={`max-sm:block max-sm:border-t max-sm:border-base-300/60 max-sm:py-1 ${draggingId === w.id ? 'opacity-40' : ''} ${dropTarget === w.id ? 'bg-base-200' : ''}`}
                 onDragEnter={(event) => {
                   if (draggingId) {
                     event.preventDefault();
@@ -432,10 +453,77 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                   const dice = finalDice ? formatDamageDice(finalDice) : null;
                   const effectiveDivisor = w.effectiveArmorDivisor ?? resolved?.armorDivisor;
                   const divisor = effectiveDivisor ? ` (${effectiveDivisor})` : '';
+
+                  const modifierSections: ModifierSection[] = [];
+                  if (showSkill && resolution.kind === 'matched') {
+                    const attackBreakdown = {
+                      baseLabel: 'Skill after ST',
+                      baseValue: resolution.level - stPenalty - effectTotal(skillEffects),
+                      globalEffects: skillEffects,
+                      weaponEffects: attackEffects,
+                      finalValue: finalTarget,
+                    };
+                    if (stPenalty > 0 || hasModifierEffects(attackBreakdown)) {
+                      modifierSections.push({
+                        title: 'Attack',
+                        ...(stPenalty > 0
+                          ? {
+                              note: `${resolution.level} − ${stPenalty} ST (B270)`,
+                            }
+                          : {}),
+                        breakdown: attackBreakdown,
+                      });
+                    }
+                    const accuracyBreakdown = {
+                      baseLabel: 'Accuracy',
+                      baseValue: ranged?.acc ?? 0,
+                      weaponEffects: accuracyEffects,
+                      finalValue: accuracy,
+                    };
+                    if (ranged && hasModifierEffects(accuracyBreakdown)) {
+                      modifierSections.push({ title: 'Accuracy', breakdown: accuracyBreakdown });
+                    }
+                  }
+                  if (resolved && finalDice && damageEffects.length > 0) {
+                    modifierSections.push({
+                      title: 'Damage',
+                      breakdown: {
+                        baseLabel: 'Parsed damage',
+                        baseValue: formatDamageDice({
+                          ...resolved.unconvertedDice,
+                          adds: resolved.unconvertedDice.adds - effectTotal(damageEffects),
+                        }),
+                        weaponEffects: damageEffects,
+                        finalValue: formatDamageDice(finalDice),
+                      },
+                    });
+                  }
+
+                  const first = rowIndex === 0;
+                  const rule = first ? GROUP_RULE : '';
+                  const lineRow = first ? 'max-sm:row-start-2' : 'max-sm:row-start-1';
+                  const rangeRow = first ? 'max-sm:row-start-3' : 'max-sm:row-start-2';
+                  const rangeText =
+                    firstOfLine && ranged ? (
+                      rangedStatLine(ranged)
+                    ) : firstOfLine && line.reach ? (
+                      <>
+                        <span className="sm:hidden">Reach </span>
+                        {line.reach}
+                      </>
+                    ) : null;
+                  const modeLabel = line.modeName && (
+                    <span className="order-first font-semibold text-base-content">
+                      {line.modeName}
+                    </span>
+                  );
                   return (
-                    <tr key={key} className="border-0">
-                      {rowIndex === 0 && preferences.sort === 'custom' && (
-                        <td rowSpan={rows.length} className="align-top px-1">
+                    <tr key={key} className={ROW}>
+                      {first && (
+                        <td
+                          rowSpan={rows.length}
+                          className={`border-0 px-1 py-0.5 align-top max-sm:col-start-1 max-sm:row-start-1 max-sm:p-0 ${rule}`}
+                        >
                           <DragHandle
                             aria-label={`Reorder attack ${weaponIndex + 1}`}
                             onDragStart={(event) => {
@@ -457,103 +545,87 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           />
                         </td>
                       )}
-                      {rowIndex === 0 && (
+                      {first && (
                         <th
                           scope="rowgroup"
                           rowSpan={rows.length}
-                          className="min-w-32 max-w-64 align-top font-normal"
+                          className={`${CELL} ${rule} pt-2 font-normal max-sm:col-span-3 max-sm:col-start-2 max-sm:row-start-1 max-sm:pt-1 max-sm:pb-0`}
                         >
                           <InventoryAnchorLink
                             itemId={w.id}
-                            className="link link-hover block font-medium"
+                            className="link link-hover block font-semibold [overflow-wrap:anywhere] sm:max-w-32 md:max-w-40 lg:max-w-56"
                           >
                             {w.name}
                           </InventoryAnchorLink>
                         </th>
                       )}
-                      <td className="align-top">
-                        {firstOfLine && (stPenalty > 0 || bowTooStrong) && (
-                          <span className="badge badge-warning badge-outline badge-xs">
-                            {bowTooStrong ? (
-                              'Bow ST exceeds usable ST (B275)'
-                            ) : (
-                              <>
-                                ST {currentMode?.stRequired} (−{stPenalty})
-                              </>
-                            )}
-                          </span>
-                        )}
+                      <td
+                        className={`${CELL} ${rule} max-sm:col-span-2 max-sm:col-start-1 max-sm:pl-3 ${lineRow}`}
+                      >
                         {showSkill &&
                           (resolution.kind === 'matched' ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn-sm h-auto min-h-8 gap-2 px-2 py-1 text-left font-normal"
-                                disabled={bowTooStrong}
-                                onClick={() =>
-                                  openRoll({
-                                    label: attackLabel,
-                                    baseTarget: finalTarget,
-                                    attack: {
-                                      ranged: !!ranged,
-                                      range: resolveRangedRange(
-                                        ranged?.range,
-                                        state.strength(character.derived.effectiveSt),
-                                        currentMode?.weaponSt ?? currentMode?.stRequired,
-                                      ),
-                                      accuracy,
-                                      canTargetVitals: canHitVitals,
-                                    },
-                                  })
-                                }
-                              >
-                                <span className="max-w-40 text-xs">{attackLabel}</span>
-                                <span className="num text-base font-bold">{finalTarget}</span>
-                              </button>
-                              {stPenalty > 0 && (
-                                <span className="mt-1 block text-[11px] text-base-content/50">
-                                  {resolution.level} − {stPenalty} ST
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm h-auto min-h-7 w-full flex-nowrap justify-between gap-1.5 px-1.5 py-0 max-sm:px-1 text-left font-normal"
+                              disabled={bowTooStrong}
+                              onClick={() =>
+                                openRoll({
+                                  label: attackLabel,
+                                  baseTarget: finalTarget,
+                                  attack: {
+                                    ranged: !!ranged,
+                                    range: resolveRangedRange(
+                                      ranged?.range,
+                                      state.strength(character.derived.effectiveSt),
+                                      currentMode?.weaponSt ?? currentMode?.stRequired,
+                                    ),
+                                    accuracy,
+                                    canTargetVitals: canHitVitals,
+                                  },
+                                })
+                              }
+                            >
+                              {/* Mode reads first; the accessible name keeps "Skill · Mode N". */}
+                              <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm">
+                                <span className="min-w-0 break-words text-xs text-base-content/70">
+                                  {resolution.name}
                                 </span>
-                              )}
-                              <ModifierBreakdown
-                                baseLabel="Skill after ST"
-                                baseValue={resolution.level - stPenalty - effectTotal(skillEffects)}
-                                globalEffects={skillEffects}
-                                weaponEffects={attackEffects}
-                                finalValue={finalTarget}
-                              />
-                              {ranged && (
-                                <ModifierBreakdown
-                                  baseLabel="Accuracy"
-                                  baseValue={ranged.acc ?? 0}
-                                  weaponEffects={accuracyEffects}
-                                  finalValue={accuracy}
-                                />
-                              )}
-                            </>
-                          ) : resolution.kind === 'missing' ? (
-                            <p className="max-w-44 text-xs text-base-content/50">
-                              Skill '{resolution.skillName}' not on sheet.
-                            </p>
+                                {line.modeName && (
+                                  <>
+                                    <span className="sr-only"> · </span>
+                                    {modeLabel}
+                                  </>
+                                )}
+                              </span>{' '}
+                              <span className="num shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-base font-bold text-primary">
+                                {finalTarget}
+                              </span>
+                            </button>
                           ) : (
-                            <p className="text-xs text-base-content/50">
-                              No matching skill on sheet.
+                            <p className="flex flex-wrap items-baseline gap-x-1.5 px-1.5 py-1.5 text-xs text-base-content/70">
+                              {modeLabel}
+                              <span>
+                                {resolution.kind === 'missing'
+                                  ? `Skill '${resolution.skillName}' not on sheet.`
+                                  : 'No matching skill on sheet.'}
+                              </span>
                             </p>
                           ))}
+                        {firstOfLine && (stPenalty > 0 || bowTooStrong) && (
+                          <p className="px-1.5 text-[11px] font-medium text-warning">
+                            {bowTooStrong
+                              ? 'Bow ST exceeds usable ST (B275)'
+                              : `ST ${currentMode?.stRequired} (−${stPenalty})`}
+                          </p>
+                        )}
                       </td>
-                      <td className="whitespace-nowrap">
-                        {firstOfLine && ranged && (
-                          <p className="text-xs whitespace-normal">{rangedStatLine(ranged)}</p>
-                        )}
-                        {line.modeName && (
-                          <span className="mb-0.5 block text-[10px] text-base-content/50">
-                            {line.modeName}
-                          </span>
-                        )}
+                      <td
+                        className={`${CELL} ${rule} text-right whitespace-nowrap max-sm:col-start-3 ${lineRow}`}
+                      >
                         {resolved && finalDice ? (
                           <button
                             type="button"
-                            className="btn btn-sm num h-8 min-h-8 px-2"
+                            className="btn btn-sm num h-7 min-h-7 px-2 text-base font-bold"
                             aria-label={`${dice}${resolved.type ? ` ${resolved.type}` : ''}${divisor}`}
                             onClick={() =>
                               openRoll({
@@ -574,28 +646,36 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                             }
                           >
                             {dice}
-                            {divisor}
+                            {resolved.type && (
+                              <span className="text-xs font-normal text-base-content/70 sm:hidden">
+                                {resolved.type}
+                              </span>
+                            )}
+                            {divisor && <span className="font-normal">{divisor}</span>}
                           </button>
                         ) : (
-                          <span className="text-xs text-base-content/60">
+                          <span className="inline-block py-1.5 text-xs whitespace-normal text-base-content/70">
                             {mode?.raw ?? line.damage ?? '—'}
                           </span>
                         )}
-                        {resolved && finalDice && (
-                          <ModifierBreakdown
-                            baseLabel="Parsed damage"
-                            baseValue={formatDamageDice({
-                              ...resolved.unconvertedDice,
-                              adds: resolved.unconvertedDice.adds - effectTotal(damageEffects),
-                            })}
-                            weaponEffects={damageEffects}
-                            finalValue={formatDamageDice(finalDice)}
-                          />
-                        )}
                       </td>
-                      <td className="num text-xs text-base-content/70">{mode?.type ?? '—'}</td>
-                      <td className="num whitespace-nowrap text-xs text-base-content/70">
-                        {line.reach ?? '—'}
+                      <td
+                        className={`${CELL} ${rule} pt-2 text-xs text-base-content/70 max-sm:hidden`}
+                      >
+                        {mode?.type ?? '—'}
+                      </td>
+                      <td
+                        className={`border-0 px-1 py-0.5 align-top max-sm:col-start-4 max-sm:px-0 ${rule} ${lineRow} ${modifierSections.length ? '' : 'max-sm:hidden'}`}
+                      >
+                        <ModifierTooltip
+                          label={`Modifiers: ${w.name}${line.modeName ? `, ${line.modeName}` : ''}`}
+                          sections={modifierSections}
+                        />
+                      </td>
+                      <td
+                        className={`${CELL} ${rule} pt-2 text-xs text-base-content/70 max-sm:col-span-4 max-sm:col-start-1 max-sm:pt-0 max-sm:pb-1 max-sm:pl-4 ${rangeRow} ${rangeText ? '' : 'max-sm:hidden'}`}
+                      >
+                        {rangeText ?? (firstOfLine ? '—' : null)}
                       </td>
                     </tr>
                   );
