@@ -120,6 +120,7 @@ test('API-seeded campaign effects and skill actions survive offline use and reco
   await context.setOffline(true);
   await selectCharacterSection(page, 'Skills');
   // Skill actions live under "Source & rules" in the row's inline editor.
+  await page.getByRole('button', { name: 'View Athletics', exact: true }).click();
   await page.getByRole('button', { name: 'Edit Athletics', exact: true }).click();
   await page.getByText('Source & rules', { exact: true }).click();
   await page.getByRole('button', { name: 'Preview Jump', exact: true }).click();

@@ -360,6 +360,7 @@ test('resolves and reopens an item price without clipping the modal at supported
   await traitDialog.getByRole('button', { name: 'Use these values' }).click();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('Variable Focus', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'View Variable Focus' }).click();
   await page.getByRole('button', { name: 'Edit Variable Focus' }).click();
   await expect(page.getByText('Saved point cost')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recalculate points' })).toBeVisible();

@@ -311,6 +311,7 @@ test('skill, technique, and language rows reflow into readable mobile cards at 3
   const skillForm = page.getByLabel(/^skill$/i).locator('xpath=ancestor::form');
   await page.getByLabel(/^skill$/i).fill(skillName);
   await skillForm.getByRole('button', { name: /^add$/i }).click();
+  await page.getByRole('button', { name: `View ${skillName}` }).click();
   await page.getByRole('button', { name: `Edit ${skillName}` }).click();
   const skillNameInput = page.getByLabel(`${skillName} name`);
   await expect(skillNameInput).toBeVisible();

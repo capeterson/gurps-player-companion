@@ -235,8 +235,15 @@ function renderOwnedTrait() {
   return renderCharacterTraits([ownedTrait]);
 }
 
+function openTraitEditor(name = 'Weapon Mastery') {
+  if (!screen.queryByRole('button', { name: `Edit ${name}` })) {
+    fireEvent.click(screen.getByRole('button', { name: `View ${name}` }));
+  }
+  fireEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
+}
+
 function addDxEffect() {
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor();
   fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
   fireEvent.change(screen.getByLabelText('Effect 1 target'), { target: { value: 'dx' } });
@@ -259,7 +266,7 @@ it('saves character-owned effects through the trait outbox field', async () => {
 
 it('can remove an empty Effects section without writing a trait patch', () => {
   renderOwnedTrait();
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
   expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible();
@@ -271,7 +278,7 @@ it('removes saved effects through the outbox and restores the compact add contro
   renderCharacterTraits([
     { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
   ]);
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   fireEvent.click(screen.getByText('Effects (1)'));
   fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
   await waitFor(() =>
@@ -287,7 +294,7 @@ it('keeps saved effects visible and flashes the editor if removal fails', async 
   renderCharacterTraits([
     { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
   ]);
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   fireEvent.click(screen.getByText('Effects (1)'));
   fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
   await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/);
@@ -404,7 +411,7 @@ it('uses the same compact searchable and sortable table pattern as skills', () =
   for (const label of ['Trait', 'Type', 'Points', 'Level']) {
     expect(screen.getByRole('button', { name: `Sort by ${label}` })).toBeVisible();
   }
-  expect(within(table).getAllByRole('button', { name: /^Reorder / })).toHaveLength(2);
+  expect(within(table).queryByRole('button', { name: /^Reorder / })).not.toBeInTheDocument();
   expect(screen.queryByLabelText('Trait name')).not.toBeInTheDocument();
 
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search traits' }), {
@@ -423,7 +430,7 @@ it('uses the same compact searchable and sortable table pattern as skills', () =
 it('opens one full-width trait editor and keeps unset advanced details out of the way', () => {
   renderOwnedTrait();
   expect(screen.queryByRole('heading', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   expect(screen.queryByRole('heading', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Weapon Mastery name')).toBeVisible();
   expect(screen.getByLabelText('Weapon Mastery points')).toBeVisible();
@@ -455,7 +462,7 @@ it('preserves unsaved custom-effect drafts when disclosures close or search hide
       points: 5,
     },
   ]);
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
 
@@ -467,7 +474,7 @@ it('preserves unsaved custom-effect drafts when disclosures close or search hide
   fireEvent.change(screen.getByLabelText('Effect 1 target'), { target: { value: 'dx' } });
   fireEvent.change(screen.getByLabelText('Effect 1 bonus'), { target: { value: '2' } });
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Fit' }));
+  openTraitEditor('Fit');
   fireEvent.click(screen.getByRole('button', { name: 'Done' }));
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search traits' }), {
     target: { value: 'no matching trait' },
@@ -475,7 +482,7 @@ it('preserves unsaved custom-effect drafts when disclosures close or search hide
   fireEvent.change(screen.getByRole('searchbox', { name: 'Search traits' }), {
     target: { value: '' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  openTraitEditor('Weapon Mastery');
   expect(screen.getByLabelText('Effect 1 bonus')).toHaveValue('2');
   expect(enqueueFieldPatch).not.toHaveBeenCalled();
 });
@@ -520,7 +527,8 @@ it('keeps browsing controls available while removing trait mutations for readers
 
   expect(screen.getByRole('searchbox', { name: 'Search traits' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Sort by Trait' })).toBeVisible();
-  expect(screen.getByRole('button', { name: /^Reorder Weapon Mastery/ })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'View Weapon Mastery' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '+ Add trait' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'View Weapon Mastery' }));
@@ -528,4 +536,40 @@ it('keeps browsing controls available while removing trait mutations for readers
   expect(screen.getByText('+2 to Damage Resistance at Torso')).toBeVisible();
   expect(screen.getByText(/\+1 to Weapon Accuracy for “Fine sword”/)).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Delete trait' })).not.toBeInTheDocument();
+});
+
+it('shows No notes. and the pencil for a writer, and Done returns to details', () => {
+  renderCharacterTraits([{ ...ownedTrait, description: null, notes: null }]);
+  expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Close / })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'View Weapon Mastery' }));
+  expect(screen.getByText('No notes.')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit Weapon Mastery' }));
+  expect(screen.getByLabelText('Weapon Mastery name')).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+  expect(screen.getByLabelText('Weapon Mastery name')).not.toBeVisible();
+  expect(screen.getByText('No notes.')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Hide Weapon Mastery' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+});
+
+it('collapses a row straight from the editor with the chevron', () => {
+  renderOwnedTrait();
+  openTraitEditor();
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Weapon Mastery' }));
+  expect(screen.getByLabelText('Weapon Mastery name')).not.toBeVisible();
+  expect(screen.getByRole('button', { name: 'View Weapon Mastery' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+});
+
+it('gives a reader no chevron on a row with nothing to show', () => {
+  renderCharacterTraits(
+    [{ ...ownedTrait, description: null, notes: null, libraryMechanics: undefined }],
+    false,
+  );
+  expect(screen.queryByRole('button', { name: 'View Weapon Mastery' })).not.toBeInTheDocument();
 });

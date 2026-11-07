@@ -546,7 +546,8 @@ test('Protection before penetration links active trait DR to its highlighted tra
   const traitBody = row.locator('xpath=..');
   await expect(row).toBeVisible();
   await expect(row).toHaveAttribute('aria-current', 'true');
-  const edit = row.getByRole('button', { name: 'Edit Iron Skin' });
+  const edit = traitBody.getByRole('button', { name: 'Edit Iron Skin' });
+  if (!(await edit.isVisible())) await row.getByRole('button', { name: 'View Iron Skin' }).click();
   await expect(edit).toBeVisible();
   await expect(traitBody.getByRole('heading', { name: 'Edit Iron Skin' })).toHaveCount(0);
   await edit.click();

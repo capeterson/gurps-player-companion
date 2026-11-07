@@ -229,6 +229,7 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   await page.getByRole('button', { name: '+ Add trait' }).click();
   await page.getByLabel('Trait name').fill(traitName);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: `View ${traitName}`, exact: true }).click();
   const editTraitButton = page.getByRole('button', { name: `Edit ${traitName}`, exact: true });
   await expect(editTraitButton).toBeVisible();
   await editTraitButton.click();
@@ -250,7 +251,7 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   await traitNotesEditor.blur();
   const traitDetailRow = traitNotesEditor.locator('xpath=ancestor::tr').last();
   await expect(traitDetailRow.getByText('Saving…')).toHaveCount(0);
-  await page.getByRole('button', { name: `View ${traitName}`, exact: true }).click();
+  await traitDetailRow.getByRole('button', { name: 'Done', exact: true }).click();
   const traitPreview = page
     .locator('table[aria-label="Traits"] tbody')
     .filter({ hasText: traitName })

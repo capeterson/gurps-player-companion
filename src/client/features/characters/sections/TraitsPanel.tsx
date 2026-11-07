@@ -1,4 +1,4 @@
-import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { locationLabel } from '../../../../shared/constants/hitLocations.ts';
 import { computeTraitCost } from '../../../../shared/domain/traitCost.ts';
 import { formatSigned } from '../../../../shared/format/number.ts';
@@ -12,7 +12,6 @@ import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { RichTextEditor } from '../../../components/markdown/RichTextEditor.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
-import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../components/ui/FoldSection.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import {
@@ -530,15 +529,9 @@ interface TraitRowProps {
   inventory: CharacterDetail['inventory'];
   canWrite: boolean;
   mode: TraitRowMode;
-  position: number;
-  dragging: boolean;
   visible: boolean;
   highlighted: boolean;
   onMode: (mode: TraitRowMode) => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
-  onDragEnd: () => void;
-  onDrop: () => void;
-  onMove: (direction: -1 | 1) => void;
 }
 
 const characterEffectsSchema = traitEffect.array().max(50);
@@ -753,15 +746,9 @@ function TraitRow({
   canWrite,
   activeEffectsSnapshot,
   mode,
-  position,
-  dragging,
   visible,
   highlighted,
   onMode,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  onMove,
 }: TraitRowProps) {
   const activeEffectsEnabled = useExperimentalActiveEffects(campaignId, activeEffectsSnapshot);
   const rowPatch = useEntityRowPatch('character_trait', trait.id, characterId, trait.name);
@@ -782,7 +769,6 @@ function TraitRow({
     onSave: (v) => rowPatch.patch('notes', v),
     flashKey: rowPatch.flashKey('notes'),
   });
-  const saving = nameField.isSaving || pointsField.isSaving || notesField.isSaving;
   const hasSourceRules = Boolean(trait.libraryMechanics || trait.modifiers.length > 0);
   const hasCustomEffects = (trait.customEffects ?? []).some(
     (effect) => activeEffectsEnabled || !effect.conditionGroup,
@@ -814,27 +800,25 @@ function TraitRow({
           }
         : {})}
       aria-label={trait.name}
-      className={dragging ? 'opacity-50' : undefined}
       hidden={!visible && !highlighted}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
     >
       <tr
         id={`trait-${trait.id}`}
         aria-current={highlighted ? true : undefined}
         className={`${highlighted ? 'bg-primary/20 outline outline-2 outline-primary ' : expanded ? 'bg-primary/5 ' : ''}scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary`}
       >
-        <td className="w-9 px-1 sm:px-2">
-          <DragHandle
-            aria-label={`Reorder ${trait.name}, row ${position + 1}`}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-              event.preventDefault();
-              onMove(event.key === 'ArrowUp' ? -1 : 1);
-            }}
-          />
+        <td className="w-11 px-0 text-center sm:w-9 sm:px-2">
+          {(canWrite || hasDetails) && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs min-h-11 min-w-11 px-1 text-base-content/60 sm:min-h-0 sm:min-w-0"
+              onClick={() => onMode(expanded ? 'closed' : 'details')}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Hide' : 'View'} ${trait.name}`}
+            >
+              <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={16} />
+            </button>
+          )}
         </td>
         <td className="min-w-0 py-2 pl-1 sm:pl-2">
           <span className="block min-w-0 break-words font-medium">{trait.name}</span>
@@ -854,44 +838,10 @@ function TraitRow({
         <td className="num w-12 text-right text-xs text-base-content/70 sm:w-16">
           {trait.level ?? '—'}
         </td>
-        <td className={`px-1 text-right sm:px-2 ${canWrite ? 'w-24 sm:w-36' : 'w-14 sm:w-20'}`}>
-          <span className="flex items-center justify-end gap-0.5">
-            {hasDetails && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs min-h-11 min-w-0 gap-1 px-1 sm:min-h-0"
-                onClick={() => onMode(mode === 'details' ? 'closed' : 'details')}
-                aria-expanded={mode === 'details'}
-                aria-label={`${mode === 'details' ? 'Hide' : 'View'} ${trait.name}`}
-              >
-                <span className="hidden sm:inline">Details</span>
-                <AppIcon name={mode === 'details' ? 'chevronDown' : 'chevronRight'} size={14} />
-              </button>
-            )}
-            {canWrite && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-xs min-h-11 min-w-0 gap-1 px-1 sm:min-h-0"
-                onClick={() => onMode(mode === 'edit' ? 'closed' : 'edit')}
-                aria-expanded={mode === 'edit'}
-                aria-label={`${mode === 'edit' ? 'Close' : 'Edit'} ${trait.name}`}
-              >
-                <span className="hidden sm:inline">{mode === 'edit' ? 'Done' : 'Edit'}</span>
-                {saving && (
-                  <span
-                    className="loading loading-spinner size-3.5 text-warning"
-                    role="status"
-                    aria-label="Saving trait"
-                  />
-                )}
-              </button>
-            )}
-          </span>
-        </td>
       </tr>
       {canWrite && (
         <tr hidden={mode !== 'edit'}>
-          <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
+          <td colSpan={5} className="border-b border-base-300 bg-base-200 p-0">
             <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
               <RepriceEntry section="traits" entry={trait} />
               <div
@@ -981,7 +931,7 @@ function TraitRow({
                 >
                   Delete trait
                 </button>
-                <button type="button" className="btn btn-sm" onClick={() => onMode('closed')}>
+                <button type="button" className="btn btn-sm" onClick={() => onMode('details')}>
                   Done
                 </button>
               </footer>
@@ -992,18 +942,34 @@ function TraitRow({
       )}
       {mode === 'details' && (
         <tr>
-          <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
-            <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
-              {trait.notes && <Markdown source={trait.notes} />}
-              {hasSourceRules && (
-                <TraitConfiguredDetails trait={trait} activeEffectsEnabled={activeEffectsEnabled} />
-              )}
-              {hasCustomEffects && (
-                <TraitCustomEffects
-                  trait={trait}
-                  inventory={inventory}
-                  activeEffectsEnabled={activeEffectsEnabled}
-                />
+          <td colSpan={5} className="border-b border-base-300 bg-base-200 p-0">
+            <div className="flex items-start gap-3 px-3 py-4 text-sm md:px-14 md:py-5">
+              <div className="min-w-0 flex-1 space-y-3">
+                {trait.notes && <Markdown source={trait.notes} />}
+                {hasSourceRules && (
+                  <TraitConfiguredDetails
+                    trait={trait}
+                    activeEffectsEnabled={activeEffectsEnabled}
+                  />
+                )}
+                {hasCustomEffects && (
+                  <TraitCustomEffects
+                    trait={trait}
+                    inventory={inventory}
+                    activeEffectsEnabled={activeEffectsEnabled}
+                  />
+                )}
+                {!hasDetails && <p className="text-base-content/60">No notes.</p>}
+              </div>
+              {canWrite && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-square btn-sm min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
+                  onClick={() => onMode('edit')}
+                  aria-label={`Edit ${trait.name}`}
+                >
+                  <AppIcon name="edit" size={16} />
+                </button>
               )}
             </div>
           </td>
@@ -1063,15 +1029,11 @@ function TraitsTable({
   const {
     preferences,
     saveFailed,
-    draggingId,
-    setDraggingId,
     announcement,
     sortedRows: sortedTraits,
     visibleRows: visibleTraits,
     visibleIds: visibleTraitIds,
     sortBy,
-    move: moveTrait,
-    moveBy,
   } = useSortableCharacterRows<TraitOut, TraitSort>({
     rows: character.traits,
     characterId: character.id,
@@ -1170,13 +1132,11 @@ function TraitsTable({
               className="table table-sm w-full table-fixed"
               aria-label="Traits"
             >
-              <caption className="sr-only">
-                Character traits. Sort with column headings or use row handles for custom order.
-              </caption>
+              <caption className="sr-only">Character traits. Sort with column headings.</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="w-9 px-1 sm:px-2">
-                    <span className="sr-only">Custom order</span>
+                  <th scope="col" className="w-11 px-0 sm:w-9 sm:px-2">
+                    <span className="sr-only">Details</span>
                   </th>
                   <SortableHeader
                     label="Trait"
@@ -1208,9 +1168,6 @@ function TraitsTable({
                     headerClassName="w-12 text-right sm:w-16"
                     shortLabel="Lvl"
                   />
-                  <th scope="col" className="w-14 px-1 sm:w-20 sm:px-2">
-                    <span className="sr-only">Actions</span>
-                  </th>
                 </tr>
               </thead>
               {sortedTraits.map((trait) => (
@@ -1224,8 +1181,6 @@ function TraitsTable({
                   inventory={character.inventory}
                   canWrite={canWrite}
                   mode={expanded?.id === trait.id ? expanded.mode : 'closed'}
-                  position={visibleTraits.findIndex((candidate) => candidate.id === trait.id)}
-                  dragging={draggingId === trait.id}
                   visible={visibleTraitIds.has(trait.id)}
                   highlighted={
                     anchorTraitId === trait.id && (revealingAnchor || query.trim() === '')
@@ -1233,17 +1188,6 @@ function TraitsTable({
                   onMode={(next) =>
                     setExpanded(next === 'closed' ? null : { id: trait.id, mode: next })
                   }
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', trait.id);
-                    event.dataTransfer.effectAllowed = 'move';
-                    setDraggingId(trait.id);
-                  }}
-                  onDragEnd={() => setDraggingId(null)}
-                  onDrop={() => {
-                    if (draggingId) moveTrait(draggingId, trait.id);
-                    setDraggingId(null);
-                  }}
-                  onMove={(direction) => moveBy(trait.id, direction)}
                 />
               ))}
             </Table>

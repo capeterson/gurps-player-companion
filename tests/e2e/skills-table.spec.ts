@@ -117,6 +117,10 @@ test('skill table and inline editor stay compact across mobile and desktop break
       await expectInsideViewport(page, page.getByRole('tooltip'), true);
       await page.mouse.move(0, 0);
 
+      await table
+        .getByRole('button', { name: /^View / })
+        .first()
+        .click();
       const edit = table.getByRole('button', { name: /^Edit / }).first();
       await edit.click();
       await expect(page.getByRole('heading', { name: /^Edit / })).toHaveCount(0);
@@ -146,6 +150,11 @@ test('skill table and inline editor stay compact across mobile and desktop break
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
         .toBe(true);
       await editor.getByRole('button', { name: 'Done' }).click();
+      await expect(name).not.toBeVisible();
+      await table
+        .getByRole('button', { name: /^Hide / })
+        .first()
+        .click();
     }
   } finally {
     await removeBrowserSkillModifier(page, characterId, traitId);
@@ -164,7 +173,7 @@ test('skill controls remain read-only for the GM on mobile and desktop', async (
     const table = page.getByRole('table', { name: 'Skills' });
     await expect(page.getByRole('searchbox', { name: 'Search skills' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sort by Skill' })).toBeVisible();
-    await expect(table.getByRole('button', { name: /^Reorder / }).first()).toBeVisible();
+    await expect(table.getByRole('button', { name: /^Reorder / })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '+ Add skill' })).toHaveCount(0);
     await expect(table.getByRole('button', { name: /^Edit / })).toHaveCount(0);
     const details = table.locator('button[aria-expanded][aria-label^="View "]').first();
@@ -172,7 +181,7 @@ test('skill controls remain read-only for the GM on mobile and desktop', async (
     await details.click();
     await expect(page.getByRole('button', { name: 'Delete skill' })).toHaveCount(0);
     await expect(page.getByLabel(/ name$/)).toHaveCount(0);
-    await table.locator('button[aria-expanded][aria-label^="Close "]').first().click();
+    await table.locator('button[aria-expanded][aria-label^="Hide "]').first().click();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
