@@ -1038,6 +1038,13 @@ function StatusPanel({ character }: { character: CharacterDetail }) {
   );
 }
 
+/** Folded ledger summary: total, plus how far from the campaign point cap. */
+function pointsSummary(total: number, pointTarget: number | null): string {
+  const unspent = pointTarget != null ? pointTarget - total : 0;
+  if (unspent === 0) return `${total} pts`;
+  return `${total} pts · ${unspent < 0 ? 'Over' : 'Unspent'} ${Math.abs(unspent)}`;
+}
+
 function PointsPanel({
   character,
   pointTarget,
@@ -1138,7 +1145,6 @@ const ENCUMBRANCE_TONE = [
 
 function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const e = character.encumbrance;
-  const d = character.derived;
   const bl = e.basicLift;
   const tiers = [
     { label: 'None', from: 0, to: bl, level: 0 },
@@ -1159,17 +1165,6 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
   const lbToNext = Math.max(0, nextThresholdLb - e.playerWeightLbs);
   const atCap = !nextTier && e.playerWeightLbs >= maxWeight;
   const tone = ENCUMBRANCE_TONE[e.level] ?? ENCUMBRANCE_TONE[0];
-
-  // Move at encumbrance is floor(Basic Move × multiplier) but never
-  // below 1 while the load is legal (B17); past 10×BL you can't move.
-  const overCarryCap = e.ratio > 10;
-  const moveFloor = d.basicMove > 0 ? 1 : 0;
-  const moveNet = overCarryCap
-    ? 0
-    : Math.max(moveFloor, Math.floor(d.basicMove * e.moveMultiplier));
-  const movePenalty = d.basicMove - moveNet;
-  const dodgePenaltyAbs = -e.dodgePenalty;
-  const dodgeNet = d.dodge + e.dodgePenalty;
 
   const tierBreakdown = (
     <div className="grid gap-1.5">
@@ -1193,16 +1188,6 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
         ))}
       </ul>
     </div>
-  );
-
-  const equation = (base: number, penalty: number, net: number) => (
-    <span className="num">
-      <span className="text-base-content/60">{base}</span>
-      <span className="text-base-content/40"> − </span>
-      <span className="text-base-content/60">{penalty}</span>
-      <span className="text-base-content/40"> = </span>
-      <span className="font-semibold text-base-content">{net}</span>
-    </span>
   );
 
   return (
@@ -1243,40 +1228,6 @@ function EncumbrancePanel({ character }: { character: CharacterDetail }) {
             {atCap ? 'Maxed out' : `${lbToNext.toFixed(1)} lb until ${nextThresholdLabel}`}
           </div>
         </div>
-
-        <ul className="text-sm space-y-1 border-t border-base-300/60 pt-2">
-          <li className="flex justify-between gap-2">
-            <InfoTooltip
-              content={
-                <div className="grid gap-1">
-                  <div className="font-semibold text-base-content">Move</div>
-                  <div>
-                    Move at encumbrance = Basic Move × encumbrance multiplier, rounded down.
-                  </div>
-                  <div className="num text-base-content/60">
-                    × <span className="text-base-content">{e.moveMultiplier}</span> at {e.label}
-                  </div>
-                </div>
-              }
-            >
-              <span>Move</span>
-            </InfoTooltip>
-            {equation(d.basicMove, movePenalty, moveNet)}
-          </li>
-          <li className="flex justify-between gap-2">
-            <InfoTooltip
-              content={
-                <div className="grid gap-1">
-                  <div className="font-semibold text-base-content">Dodge</div>
-                  <div>Each encumbrance level subtracts 1 from Dodge.</div>
-                </div>
-              }
-            >
-              <span>Dodge</span>
-            </InfoTooltip>
-            {equation(d.dodge, dodgePenaltyAbs, dodgeNet)}
-          </li>
-        </ul>
       </div>
     </StatCard>
   );
@@ -1715,7 +1666,7 @@ export function CharacterSheetPage() {
                       preferenceKey={`${character.id}:PointsPanel`}
                       title="Point ledger"
                       defaultOpen={false}
-                      summary={`${character.points.total} pts`}
+                      summary={pointsSummary(character.points.total, pointTarget)}
                     >
                       <PointsPanel character={character} pointTarget={pointTarget} />
                     </FoldSection>
