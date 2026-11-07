@@ -443,8 +443,10 @@ describe('durable character mechanics', () => {
     expect(screen.getByLabelText('Current route')).toHaveTextContent(
       `/characters/${CID}#trait-${TRAIT}`,
     );
-    expect(screen.getByRole('button', { name: 'Edit Reflexes' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'View Reflexes' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit Reflexes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Edit Reflexes' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Reflexes' }));
     fireEvent.click(screen.getByRole('button', { name: 'Edit Reflexes' }));
     expect(screen.getByText('Source & rules')).toBeVisible();
   });

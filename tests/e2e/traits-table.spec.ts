@@ -146,11 +146,11 @@ test('trait table and expanded editor wrap long names, notes, and modifiers resp
       }
 
       const row = table.getByRole('rowgroup', { name: traitName });
-      const traitHandleBox = await row.getByRole('button', { name: /^Reorder / }).boundingBox();
       const pointsBefore = await page.getByRole('button', { name: 'Sort by Points' }).boundingBox();
       const levelBefore = await page.getByRole('button', { name: 'Sort by Level' }).boundingBox();
+      await row.getByRole('button', { name: `View ${traitName}` }).click();
       await row.getByRole('button', { name: `Edit ${traitName}` }).click();
-      const closeButton = row.getByRole('button', { name: `Close ${traitName}` });
+      const closeButton = row.getByRole('button', { name: `Hide ${traitName}` });
       await expect(closeButton).toBeVisible();
       const actionCellBox = await closeButton.locator('xpath=..').boundingBox();
       const closeButtonBox = await closeButton.boundingBox();
@@ -169,19 +169,8 @@ test('trait table and expanded editor wrap long names, notes, and modifiers resp
       await expectInsideViewport(page, editor);
       await expect(editor.getByLabel(`${traitName} name`)).toBeVisible();
       await expect(editor.getByLabel(`${traitName} points`)).toBeVisible();
-      await expect(editor.getByLabel(`${traitName} description and notes`)).toBeVisible();
+      await expect(editor.getByLabel(`${traitName} description`)).toBeVisible();
       await expect(editor.getByText('Source & rules')).toBeVisible();
-      const notePreviewToggle = editor.getByRole('button', { name: 'Preview description' });
-      if ((await notePreviewToggle.getAttribute('aria-expanded')) !== 'true') {
-        await notePreviewToggle.click();
-      }
-      const renderedNotes = editor.locator('.markdown-body');
-      await expect(renderedNotes).toContainText(notes);
-      const noteMetrics = await renderedNotes.evaluate((element) => ({
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth,
-      }));
-      expect(noteMetrics.scrollWidth).toBeLessThanOrEqual(noteMetrics.clientWidth + 1);
       const sourceRulesSummary = editor.locator('summary').filter({ hasText: 'Source & rules' });
       const sourceRulesOpen = await sourceRulesSummary.evaluate((element) =>
         Boolean(element.parentElement && (element.parentElement as HTMLDetailsElement).open),
@@ -237,16 +226,16 @@ test('trait table and expanded editor wrap long names, notes, and modifiers resp
         });
       }
       await doneEditing.click();
+      const renderedNotes = row.locator('.markdown-body');
+      await expect(renderedNotes).toContainText(notes);
+      const noteMetrics = await renderedNotes.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+      expect(noteMetrics.scrollWidth).toBeLessThanOrEqual(noteMetrics.clientWidth + 1);
+      await expect(editor.getByLabel(`${traitName} name`)).not.toBeVisible();
+      await closeButton.click();
 
-      await selectCharacterSection(page, 'Skills');
-      const skillHandleBox = await page
-        .getByRole('table', { name: 'Skills' })
-        .getByRole('button', { name: /^Reorder / })
-        .first()
-        .boundingBox();
-      expect(traitHandleBox?.x).toBeCloseTo(skillHandleBox?.x ?? 0, 0);
-      expect(traitHandleBox?.width).toBeCloseTo(skillHandleBox?.width ?? 0, 0);
-      await selectCharacterSection(page, 'Traits');
       await expect
         .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
         .toBe(true);
@@ -281,7 +270,7 @@ test('trait browsing stays available without mutation controls for a read-only c
         .getByRole('rowgroup', { name: traitName });
       await expect(row).toBeVisible();
       await expect(readerPage.getByRole('button', { name: 'Sort by Trait' })).toBeVisible();
-      await expect(row.getByRole('button', { name: /^Reorder / })).toBeVisible();
+      await expect(row.getByRole('button', { name: `View ${traitName}` })).toBeVisible();
       await expect(readerPage.getByRole('button', { name: '+ Add trait' })).toHaveCount(0);
       await expect(row.getByRole('button', { name: `Edit ${traitName}` })).toHaveCount(0);
       await row.getByRole('button', { name: `View ${traitName}` }).click();
@@ -289,7 +278,7 @@ test('trait browsing stays available without mutation controls for a read-only c
         row.getByText('A compact browser-test trait with searchable notes.', { exact: true }),
       ).toBeVisible();
       await expect(readerPage.getByRole('button', { name: 'Delete trait' })).toHaveCount(0);
-      await row.getByRole('button', { name: `Close ${traitName}` }).click();
+      await row.getByRole('button', { name: `Hide ${traitName}` }).click();
       await expect
         .poll(() => readerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
         .toBe(true);
@@ -301,9 +290,7 @@ test('trait browsing stays available without mutation controls for a read-only c
   }
 });
 
-test('committing a trait note on blur does not move the preview toggle under the pointer', async ({
-  page,
-}) => {
+test('committing a trait note on blur does not swallow the click on Done', async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await signIn(page, 'rowan@example.invalid');
@@ -314,23 +301,21 @@ test('committing a trait note on blur does not move the preview toggle under the
     traitId = await addBrowserTrait(page, characterId, traitName, 'Initial note');
     await page.reload();
     await selectCharacterSection(page, 'Traits');
+    await page.getByRole('button', { name: `View ${traitName}`, exact: true }).click();
     await page.getByRole('button', { name: `Edit ${traitName}`, exact: true }).click();
     const editor = page
       .getByLabel(`${traitName} name`, { exact: true })
       .locator('xpath=ancestor::tr');
-    const notes = editor.getByLabel(`${traitName} description and notes`);
-    const toggle = editor.getByRole('button', { name: 'Preview description' });
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await notes.fill('Edited note while the toggle is collapsed');
-    // Page coordinates: the page may scroll while the click lands.
-    const pageY = () => toggle.evaluate((el) => el.getBoundingClientRect().y + window.scrollY);
-    const before = await pageY();
+    const notes = editor.getByLabel(`${traitName} description`);
+    const done = editor.getByRole('button', { name: 'Done' });
+    await notes.fill('Edited note while the textarea is focused');
     // Clicking straight from the focused textarea blurs it, which commits the
-    // draft. The press must still reach the toggle and nothing may move it.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(editor.locator('.markdown-body')).toContainText('Edited note');
-    expect(Math.abs((await pageY()) - before)).toBeLessThanOrEqual(1);
+    // draft. The press must still reach Done.
+    await done.click();
+    await expect(editor).toBeHidden();
+    await expect(
+      page.locator('.markdown-body').filter({ hasText: 'Edited note while the textarea' }),
+    ).toBeVisible();
   } finally {
     if (traitId) await removeBrowserTrait(page, characterId, traitId);
   }

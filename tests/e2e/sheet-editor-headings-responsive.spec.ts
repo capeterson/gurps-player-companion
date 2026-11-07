@@ -78,6 +78,10 @@ test('inline sheet editors use their summary rows for context at responsive widt
     for (const entry of entries) {
       await page.setViewportSize({ width: 1280, height: 800 });
       await selectCharacterSection(page, entry.section);
+      const usesDetailsView = entry.collection === 'traits' || entry.collection === 'skills';
+      if (usesDetailsView) {
+        await page.getByRole('button', { name: `View ${entry.name}`, exact: true }).click();
+      }
       const edit = page.getByRole('button', { name: `Edit ${entry.name}`, exact: true });
       await edit.click();
       const summary = page.getByRole('row').filter({ hasText: entry.name }).first();
@@ -126,7 +130,9 @@ test('inline sheet editors use their summary rows for context at responsive widt
       }
       await page
         .getByRole('button', {
-          name: `${entry.collection === 'spells' ? 'Done editing' : 'Close'} ${entry.name}`,
+          name: `${
+            entry.collection === 'spells' ? 'Done editing' : usesDetailsView ? 'Hide' : 'Close'
+          } ${entry.name}`,
           exact: true,
         })
         .click();

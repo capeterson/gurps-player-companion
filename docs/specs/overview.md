@@ -436,8 +436,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   only to attack, damage and Accuracy; global item effects reach each mode once.
   The sheet presents traits in one compact searchable table that mirrors Skills:
   Trait, Type, Points, and Level headings sort in place, Type folds into the trait
-  row on narrow screens, and the shared row handle supports drag and keyboard
-  ordering. Sort and custom order are device-only per-character preferences.
+  row on narrow screens. A chevron in the first column expands the row's details,
+  where a pencil opens the editor. Sort order is a device-only per-character preference.
   Adding is collapsed until requested, and one full-width row editor opens at a
   time. The summary row supplies the name, so the editor starts with its fields.
   Notes, source rules, modifiers, and custom mechanics remain available
@@ -452,9 +452,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   The sheet presents skills as one compact searchable table. Its Skill,
   Attr/Dif, Points, and Level headings sort in place; the narrower mobile table
   folds Attr/Dif into the skill row while keeping its visible headings clickable.
-  The shared row handle supports drag and keyboard ordering. Sort and custom
-  order are device-only per-character preferences, survive reloads, and clear on
-  logout. A row opens one full-width inline editor; the add form stays collapsed
+  Sort order is a device-only per-character preference, survives reloads, and clears on
+  logout. A first-column chevron expands each row's details and a pencil there opens one full-width inline editor; the add form stays collapsed
   until requested. Hovering or focusing its points input previews the net level
   as points are typed, with an attribute/training/default/modifier breakdown and
   clickable contributor links. The tooltip wraps and scrolls within the viewport;

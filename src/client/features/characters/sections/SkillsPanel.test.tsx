@@ -125,6 +125,13 @@ function makeCharacter(skills: SkillOut[]): CharacterDetail {
   } as unknown as CharacterDetail;
 }
 
+function openSkillEditor(name = 'Broadsword') {
+  if (!screen.queryByRole('button', { name: `Edit ${name}` })) {
+    fireEvent.click(screen.getByRole('button', { name: `View ${name}` }));
+  }
+  fireEvent.click(screen.getByRole('button', { name: `Edit ${name}` }));
+}
+
 function renderPanel(
   character: CharacterDetail,
   canWrite = false,
@@ -381,7 +388,7 @@ describe('SkillsPanel', () => {
       true,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Current Affairs/Popular Culture' }));
+    openSkillEditor('Current Affairs/Popular Culture');
     const name = screen.getByLabelText('Current Affairs/Popular Culture name');
     const specialization = screen.getByLabelText('Current Affairs/Popular Culture specialization');
     expect(name).toHaveValue('Current Affairs');
@@ -399,12 +406,45 @@ describe('SkillsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close add form' }));
     expect(screen.queryByLabelText('Skill')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    openSkillEditor('Broadsword');
     expect(screen.queryByText('Source & rules')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Broadsword description and notes')).toBeInTheDocument();
   });
 
-  it('sorts from clickable headers and persists custom keyboard ordering', () => {
+  it('shows No notes. and the pencil for a writer; Done returns to details', () => {
+    renderPanel(makeCharacter([makeSkill()]), true);
+    expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Close / })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'View Broadsword' }));
+    expect(screen.getByText('No notes.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    expect(screen.getByLabelText('Broadsword name')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.queryByLabelText('Broadsword name')).not.toBeInTheDocument();
+    expect(screen.getByText('No notes.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Hide Broadsword' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('collapses a row straight from the editor with the chevron', () => {
+    renderPanel(makeCharacter([makeSkill()]), true);
+    openSkillEditor();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Broadsword' }));
+    expect(screen.queryByLabelText('Broadsword name')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View Broadsword' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('gives a reader no chevron on a row with nothing to show', () => {
+    renderPanel(makeCharacter([makeSkill()]), false);
+    expect(screen.queryByRole('button', { name: 'View Broadsword' })).not.toBeInTheDocument();
+  });
+
+  it('sorts from clickable headers', () => {
     renderPanel(
       makeCharacter([
         makeSkill({ id: 'z', name: 'Zephyr', points: 2, level: 11 }),
@@ -419,16 +459,6 @@ describe('SkillsPanel', () => {
     expect(pointsHeading).toHaveAttribute('aria-sort', 'ascending');
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Points' }));
     expect(pointsHeading).toHaveAttribute('aria-sort', 'descending');
-
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Reorder Zephyr, row 2' }), {
-      key: 'ArrowUp',
-    });
-    expect(screen.getByText('Zephyr moved to position 1.')).toBeInTheDocument();
-    expect(JSON.parse(localStorage.getItem('gurps:skillTable:char-1') ?? '{}')).toMatchObject({
-      order: ['z', 'a'],
-      sort: 'custom',
-      descending: false,
-    });
   });
 
   it('filters by details without exposing a second browsing column', () => {
@@ -453,7 +483,7 @@ describe('SkillsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Edit Stealth' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Sort by Skill' })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search skills' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reorder Stealth, row 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Reorder / })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'View Stealth' }));
     expect(await screen.findByText('Move quietly')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Delete skill' })).not.toBeInTheDocument();
@@ -463,7 +493,7 @@ describe('SkillsPanel', () => {
   it('saves an inline field and rolls it back with a toast and flash on failure', async () => {
     enqueueFieldPatch.mockRejectedValueOnce(new Error('Disk full'));
     renderPanel(makeCharacter([makeSkill()]), true);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    openSkillEditor('Broadsword');
     const points = screen.getByLabelText('Broadsword points');
     fireEvent.change(points, { target: { value: '12' } });
     fireEvent.blur(points);
@@ -487,7 +517,7 @@ describe('SkillsPanel', () => {
         }),
     );
     renderPanel(makeCharacter([makeSkill()]), true);
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Broadsword' }));
+    openSkillEditor('Broadsword');
 
     const name = screen.getByLabelText('Broadsword name');
     fireEvent.change(name, { target: { value: 'Longsword' } });

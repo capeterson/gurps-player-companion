@@ -69,7 +69,7 @@ test('MCP Apps bridge renders shared sheet details in an opaque sandbox, with bo
     await expect(app.getByText('Broadsword', { exact: true })).toBeVisible();
     await app.getByRole('button', { name: 'View Broadsword' }).click();
     await expect(app.getByText('blade', { selector: 'strong' })).toBeVisible();
-    await app.getByRole('button', { name: 'Close Broadsword' }).click();
+    await app.getByRole('button', { name: 'Hide Broadsword' }).click();
     await expect(app.getByRole('button', { name: '+ Add skill' })).toHaveCount(0);
     await app.getByRole('button', { name: /Sort by Skill/ }).click({ button: 'right' });
     const menu = app.getByRole('dialog', { name: 'Filter Skill' });

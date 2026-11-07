@@ -118,7 +118,7 @@ test('character and campaign history wrap long summaries and keep expanded detai
     await page.getByLabel('Trait name').fill(TRAIT_NAME);
     await page.getByRole('button', { name: /^add$/i }).click();
     await expect(
-      page.getByRole('button', { name: `Edit ${TRAIT_NAME}`, exact: true }),
+      page.getByRole('button', { name: `View ${TRAIT_NAME}`, exact: true }),
     ).toBeVisible();
     await expect
       .poll(async () => {

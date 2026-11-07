@@ -89,6 +89,7 @@ test('Skills and techniques keep long names and default references inside the sh
     });
     await expect(skillsTable).toBeVisible();
     await expect(skillRow).toBeVisible();
+    await page.getByRole('button', { name: `View ${skillDisplayName}`, exact: true }).click();
     await skillEditorToggle.click();
     const skillEditorName = page.getByRole('textbox', {
       name: `${skillDisplayName} name`,

@@ -53,6 +53,7 @@ test('draft skill points show a live linked breakdown inside the viewport', asyn
     const traitId = (trait.trait ?? trait).id as string;
     await page.goto(`/characters/${characterId}`);
     await selectCharacterSection(page, 'Skills');
+    await page.getByRole('button', { name: `View ${name}`, exact: true }).click();
     await page.getByRole('button', { name: `Edit ${name}`, exact: true }).click();
     const input = page.getByRole('textbox', { name: `${name} points`, exact: true });
     const tooltip = page.getByRole('tooltip');
@@ -150,6 +151,7 @@ test('draft skill points show a live linked breakdown inside the viewport', asyn
     await expect(page).toHaveURL(new RegExp(`#trait-${traitId}$`));
     await expect(page.locator(`#trait-${traitId}`)).toBeVisible();
     await selectCharacterSection(page, 'Skills');
+    await page.getByRole('button', { name: `View ${name}`, exact: true }).click();
     await page.getByRole('button', { name: `Edit ${name}`, exact: true }).click();
     await input.focus();
     await expect(input).toHaveValue('4');

@@ -213,8 +213,8 @@ and its contributors, personal/racial training, the difficulty ladder, the
 winning declared default (including TL penalties and virtual buy-up credit),
 and active skill modifiers. An invalid draft shows the permitted points range.
 The existing draft save, queue, rejection toast and flash remain on the input.
-Saving feedback replaces the row action's icon without adding an editor row,
-so committing the input does not move a contributor link during a click.
+Saving is a local write, so the editor shows no saving indicator and nothing
+moves when the input commits on blur; a contributor link stays under the pointer.
 
 Contributing attributes, skills, traits, equipment, racial training and active
 instances link to their sheet controls. Links select the matching destination
@@ -246,7 +246,7 @@ plain text. Armor layers and natural skull protection retain their existing rows
 
 A trait link selects the Traits destination, opens its folded panel, reveals the
 owned row despite search/column filters, and highlights it. Editing remains an
-explicit action. Trait rows have a **Details** control that expands a read-only view (rendered Markdown description, source rules and effects) and, for editors, a separate **Edit** control for the form; the Description field is a Markdown editor. `SheetAnchorLink` shares the router-aware anchor behavior with
+explicit action. Trait and skill rows share one model: a chevron in the first column expands a read-only view (rendered Markdown description, source rules and effects; "No notes." when empty), and for editors a pencil inside that view opens the form, whose Done returns to the view while the chevron collapses the row. There are no Details/Edit text buttons or actions column. The Description field is a Markdown editor. `SheetAnchorLink` shares the router-aware anchor behavior with
 existing equipment links and supports ordinary anchors outside a router.
 
 ## One heading and one interaction per purpose
@@ -430,10 +430,9 @@ can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
 Expanded editors begin with labeled fields, using the summary row for context.
-Saving feedback appears only while a field is being saved, as a spinner beside
-the row's Edit/Done control (traits, languages and techniques, as skills do),
-never as a line inserted into the editor: committing an input on blur must not
-move the control the user is clicking. Trait modifier
+Trait and skill editors show no saving indicator (saves are local; the sync
+indicator and rollback toast cover the rest), and nothing is inserted into the
+editor: committing an input on blur must not move the control the user is clicking. Trait modifier
 names and descriptions wrap inside the expanded editor when they contain long
 unbroken text.
 

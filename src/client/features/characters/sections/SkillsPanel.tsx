@@ -1,4 +1,4 @@
-import { type DragEvent, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { skillDisplayName } from '../../../../shared/domain/defenseCalc.ts';
 import {
   type ResolvedLibrarySkillSpecialization,
@@ -13,7 +13,6 @@ import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
-import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { InfoTooltip } from '../../../components/ui/InfoTooltip.tsx';
 import { LibraryAutocomplete } from '../../../components/ui/LibraryAutocomplete.tsx';
 import { RollLevelChip } from '../../../components/ui/RollLevelChip.tsx';
@@ -371,18 +370,14 @@ function AddSkillForm({ characterId, campaignId, canWrite }: AddSkillFormProps) 
   );
 }
 
+type SkillRowMode = 'closed' | 'details' | 'edit';
+
 interface SkillRowProps {
   characterId: string;
   skill: SkillOut;
   canWrite: boolean;
-  expanded: boolean;
-  position: number;
-  dragging: boolean;
-  onToggle: () => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
-  onDragEnd: () => void;
-  onDrop: () => void;
-  onMove: (direction: -1 | 1) => void;
+  mode: SkillRowMode;
+  onMode: (mode: SkillRowMode) => void;
   onRoll: (req: RollRequest) => void;
   effects: CharacterDetail['effects'];
 }
@@ -486,21 +481,7 @@ function SkillConfiguredDetails({
   );
 }
 
-function SkillRow({
-  characterId,
-  skill,
-  canWrite,
-  expanded,
-  position,
-  dragging,
-  onToggle,
-  onDragStart,
-  onDragEnd,
-  onDrop,
-  onMove,
-  onRoll,
-  effects,
-}: SkillRowProps) {
+function SkillRow({ characterId, skill, canWrite, mode, onMode, onRoll, effects }: SkillRowProps) {
   const displayName = skillDisplayName(skill.name, skill.specialization);
   const bonusEffects = skillEffectsForRow(effects, skill.name, skill.specialization);
   const modifierTooltip = (
@@ -566,18 +547,10 @@ function SkillRow({
     onSave: (value) => rowPatch.patch('techLevel', value),
     flashKey: rowPatch.flashKey('techLevel'),
   });
-  const saving =
-    nameField.isSaving ||
-    pointsField.isSaving ||
-    attributeField.isSaving ||
-    difficultyField.isSaving ||
-    specializationField.isSaving ||
-    notesField.isSaving ||
-    techLevelField.isSaving;
   const hasConfiguredRules = Boolean(skill.libraryMechanics || skill.procedures);
   const hasAdvancedDetails = hasConfiguredRules || skill.techLevel != null;
-  const canExpand =
-    canWrite || Boolean(skill.notes) || hasConfiguredRules || skill.raceGranted === true;
+  const hasDetails = Boolean(skill.notes) || hasConfiguredRules || skill.raceGranted === true;
+  const expanded = mode !== 'closed';
 
   const deletion = useConfirmedEntityDelete({
     entityClass: 'character_skill',
@@ -596,25 +569,23 @@ function SkillRow({
         level: skill.effectiveLevel ?? skill.level,
       }}
       aria-label={displayName}
-      className={dragging ? 'opacity-50' : undefined}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
     >
       <tr
         id={`skill-${skill.id}`}
         className={`${expanded ? 'bg-primary/5 ' : ''}scroll-mt-24 target:!bg-primary/20 target:outline target:outline-2 target:outline-primary`}
       >
-        <td className="w-9 px-1 sm:px-2">
-          <DragHandle
-            aria-label={`Reorder ${displayName}, row ${position + 1}`}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-              event.preventDefault();
-              onMove(event.key === 'ArrowUp' ? -1 : 1);
-            }}
-          />
+        <td className="w-11 px-0 text-center sm:w-9 sm:px-2">
+          {(canWrite || hasDetails) && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs min-h-11 min-w-11 px-1 text-base-content/60 sm:min-h-0 sm:min-w-0"
+              onClick={() => onMode(expanded ? 'closed' : 'details')}
+              aria-expanded={expanded}
+              aria-label={`${expanded ? 'Hide' : 'View'} ${displayName}`}
+            >
+              <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={16} />
+            </button>
+          )}
         </td>
         <td className="min-w-0 py-2 pl-1 sm:pl-2">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -679,35 +650,11 @@ function SkillRow({
             }
           />
         </td>
-        <td className="w-10 px-1 text-right sm:w-16 sm:px-2">
-          {canExpand && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs min-h-11 px-1 sm:min-h-0 sm:px-2"
-              onClick={onToggle}
-              aria-expanded={expanded}
-              aria-label={`${expanded ? 'Close' : canWrite ? 'Edit' : 'View'} ${displayName}`}
-            >
-              <span className="hidden sm:inline">
-                {expanded ? 'Done' : canWrite ? 'Edit' : 'Details'}
-              </span>
-              {saving ? (
-                <span
-                  className="loading loading-spinner size-3.5 text-warning"
-                  role="status"
-                  aria-label="Saving skill"
-                />
-              ) : (
-                <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
-              )}
-            </button>
-          )}
-        </td>
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
-            {canWrite ? (
+          <td colSpan={5} className="border-b border-base-300 bg-base-200 p-0">
+            {mode === 'edit' && canWrite ? (
               <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_7rem_6rem_5rem] md:gap-3">
                   <fieldset className="fieldset min-w-0 p-0">
@@ -824,20 +771,37 @@ function SkillRow({
                   >
                     Delete skill
                   </button>
-                  <button type="button" className="btn btn-sm" onClick={onToggle}>
+                  <button type="button" className="btn btn-sm" onClick={() => onMode('details')}>
                     Done
                   </button>
                 </footer>
                 {deletion.dialog}
               </div>
             ) : (
-              <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
-                {skill.raceGranted && (
-                  <p>Included in your race. Change this purchase through Race in Overview.</p>
-                )}
-                {skill.notes && <Markdown source={skill.notes} />}
-                {hasConfiguredRules && (
-                  <SkillConfiguredDetails skill={skill} displayName={displayName} onRoll={onRoll} />
+              <div className="flex items-start gap-3 px-3 py-4 text-sm md:px-14 md:py-5">
+                <div className="min-w-0 flex-1 space-y-3">
+                  {skill.raceGranted && (
+                    <p>Included in your race. Change this purchase through Race in Overview.</p>
+                  )}
+                  {skill.notes && <Markdown source={skill.notes} />}
+                  {hasConfiguredRules && (
+                    <SkillConfiguredDetails
+                      skill={skill}
+                      displayName={displayName}
+                      onRoll={onRoll}
+                    />
+                  )}
+                  {!hasDetails && <p className="text-base-content/60">No notes.</p>}
+                </div>
+                {canWrite && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-square btn-sm min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
+                    onClick={() => onMode('edit')}
+                    aria-label={`Edit ${displayName}`}
+                  >
+                    <AppIcon name="edit" size={16} />
+                  </button>
                 )}
               </div>
             )}
@@ -871,17 +835,13 @@ function SkillsTable({
   const [rollRequest, setRollRequest] = useState<RollRequest | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<{ id: string; mode: SkillRowMode } | null>(null);
   const {
     preferences,
     saveFailed,
-    draggingId,
-    setDraggingId,
     announcement,
     visibleRows: visibleSkills,
     sortBy,
-    move: moveSkill,
-    moveBy,
   } = useSortableCharacterRows<SkillOut, SkillSort>({
     rows: character.skills,
     characterId: character.id,
@@ -989,13 +949,11 @@ function SkillsTable({
               className="table table-sm w-full table-fixed"
               aria-label="Skills"
             >
-              <caption className="sr-only">
-                Character skills. Sort with column headings or use row handles for custom order.
-              </caption>
+              <caption className="sr-only">Character skills. Sort with column headings.</caption>
               <thead>
                 <tr>
-                  <th scope="col" className="w-9 px-1 sm:px-2">
-                    <span className="sr-only">Custom order</span>
+                  <th scope="col" className="w-11 px-0 sm:w-9 sm:px-2">
+                    <span className="sr-only">Details</span>
                   </th>
                   <SortableHeader
                     label="Skill"
@@ -1027,35 +985,19 @@ function SkillsTable({
                     headerClassName="w-12 text-right sm:w-16"
                     shortLabel="Lvl"
                   />
-                  <th scope="col" className="w-10 px-1 sm:w-16 sm:px-2">
-                    <span className="sr-only">Actions</span>
-                  </th>
                 </tr>
               </thead>
-              {visibleSkills.map((skill, position) => {
+              {visibleSkills.map((skill) => {
                 return (
                   <SkillRow
                     key={skill.id}
                     characterId={character.id}
                     skill={skill}
                     canWrite={canWrite && !skill.raceGranted}
-                    expanded={expandedId === skill.id}
-                    position={position}
-                    dragging={draggingId === skill.id}
-                    onToggle={() =>
-                      setExpandedId((current) => (current === skill.id ? null : skill.id))
+                    mode={expanded?.id === skill.id ? expanded.mode : 'closed'}
+                    onMode={(next) =>
+                      setExpanded(next === 'closed' ? null : { id: skill.id, mode: next })
                     }
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData('text/plain', skill.id);
-                      event.dataTransfer.effectAllowed = 'move';
-                      setDraggingId(skill.id);
-                    }}
-                    onDragEnd={() => setDraggingId(null)}
-                    onDrop={() => {
-                      if (draggingId) moveSkill(draggingId, skill.id);
-                      setDraggingId(null);
-                    }}
-                    onMove={(direction) => moveBy(skill.id, direction)}
                     onRoll={setRollRequest}
                     effects={character.effects}
                   />
