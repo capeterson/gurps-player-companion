@@ -1093,6 +1093,31 @@ describe('whole-cycle failures', () => {
     }
   });
 
+  it('keeps HTTP 502 failures out of the journal for both upload and pull', async () => {
+    await seedCharacter();
+    login();
+    const db = getLocalDb();
+    await enqueueFieldPatch({
+      entityClass: 'character',
+      entityId: CHAR_ID,
+      fieldPath: 'st',
+      attemptedValue: 12,
+      prevValue: 10,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('bad gateway', { status: 502 })),
+    );
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow();
+    expect((await db.outbox.toArray())[0]).toMatchObject({ status: 'transient_retry' });
+    expect(await db.syncLog.count()).toBe(0);
+    expect(syncStateStore.status.error?.reason ?? '').not.toContain('502');
+
+    await db.outbox.clear();
+    await expect(getSyncOrchestrator().syncNow()).rejects.toThrow();
+    expect(await db.syncLog.count()).toBe(0);
+  });
+
   it('journals a failed pull with its HTTP status and names the reason on the indicator', async () => {
     await seedCharacter();
     login();

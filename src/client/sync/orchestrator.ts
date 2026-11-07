@@ -1033,9 +1033,10 @@ class SyncOrchestrator {
         }
         if (!this.sessionIsCurrent(generation)) return;
         if (!isNetworkError(err)) this.markCycleFailed();
+        // A 502 only delays the retry; it earns no journal entry.
         await appendSyncLogEntries(
           ops
-            .filter((op) => op.status !== 'transient_retry')
+            .filter((op) => op.status !== 'transient_retry' && !isBadGatewayError(err))
             .map((op) => ({
               direction: 'push',
               result: 'retrying',
@@ -2927,7 +2928,7 @@ async function reportCycleFailure(
   direction: 'push' | 'pull' | 'local' = 'local',
   extraDetails?: Record<string, unknown>,
 ): Promise<void> {
-  if (isNetworkError(err)) {
+  if (isNetworkError(err) || isBadGatewayError(err)) {
     connectionStore.markUnavailable();
     return;
   }
@@ -2948,16 +2949,21 @@ async function reportCycleFailure(
   syncStateStore.setError(reason);
 }
 
+/** A 502 means the proxy could not reach the server: a transient delay, not an audit event. */
+function isBadGatewayError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 502;
+}
+
+function isClientOutdatedError(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 426;
+}
+
 /**
  * A short, user-facing sentence for a whole-cycle failure.  HTTP status
  * is included because "HTTP 530" is the difference between "my server
  * is down" and "my edit was rejected" -- and the user is the one who
  * has to tell those apart when the badge goes red.
  */
-function isClientOutdatedError(err: unknown): boolean {
-  return err instanceof ApiError && err.status === 426;
-}
-
 function failureReason(err: unknown, prefix: string): string {
   if (err instanceof ApiError) {
     const detail = err.message === `HTTP ${err.status}` ? '' : ` — ${err.message}`;
