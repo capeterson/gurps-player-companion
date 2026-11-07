@@ -14,7 +14,7 @@
  * the one place that owns the full flow.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from '../db/client.ts';
 import { campaignMemberships, campaigns } from '../db/schema.ts';
 import { decideCharacterAccess } from '../routes/sync.ts';
@@ -59,7 +59,7 @@ export async function resolveCharacterView(
       allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
     })
     .from(campaigns)
-    .where(eq(campaigns.id, character.campaignId));
+    .where(and(eq(campaigns.id, character.campaignId), isNull(campaigns.deletedAt)));
   if (!camp) return 'forbidden';
 
   const isCampaignOwner = camp.ownerId === viewerId;

@@ -202,6 +202,13 @@ const router = createBrowserRouter([
                 path: '/settings',
                 element: page(() => import('./features/settings/SettingsPage.tsx'), 'SettingsPage'),
               },
+              {
+                path: '/recycle-bin',
+                element: page(
+                  () => import('./features/recycleBin/RecycleBinPage.tsx'),
+                  'RecycleBinPage',
+                ),
+              },
             ],
           },
         ],

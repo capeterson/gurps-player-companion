@@ -14,7 +14,7 @@
  * routes/characterSubResources.ts; both now call this instead.
  */
 
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import {
   type CharacterDetailInput,
@@ -98,7 +98,10 @@ export async function loadCharacterDetail(
   id: string,
   db: ReturnType<typeof getDb> | AuditTx = getDb(),
 ) {
-  const [c] = await db.select().from(characters).where(eq(characters.id, id));
+  const [c] = await db
+    .select()
+    .from(characters)
+    .where(and(eq(characters.id, id), isNull(characters.deletedAt)));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
   // Delegated operations intentionally run the whole shared handler on one
   // transaction/connection. Keep these queries sequential; node-postgres does
@@ -136,7 +139,7 @@ export async function loadCharacterDetail(
   const combat =
     (await db.select().from(combatStates).where(eq(combatStates.characterId, id)))[0] ?? null;
   const campaign = c.campaignId
-    ? ((await db.select().from(campaigns).where(eq(campaigns.id, c.campaignId)))[0] ?? null)
+    ? ((await db.select().from(campaigns).where(eq(campaigns.id, c.campaignId)))[0] ?? null) // recycle-bin: a live character's own campaign is never binned
     : null;
   return buildCharacterDetail({
     character: c,

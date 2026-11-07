@@ -386,6 +386,32 @@ export async function rememberRevokedCampaigns(ids: Iterable<string>): Promise<v
   }
 }
 
+/**
+ * Access came back (for instance a restore from the recycle bin): stop treating
+ * these ids as revoked so their new log entries are shown. Entries already
+ * redacted at rest stay redacted.
+ */
+export async function forgetRegainedAccess(
+  characterIds: ReadonlySet<string>,
+  campaignIds: ReadonlySet<string>,
+): Promise<void> {
+  try {
+    const db = getLocalDb();
+    const [characters, campaigns] = await Promise.all([
+      readRevokedCharacters(),
+      readRevokedCampaigns(),
+    ]);
+    const keptCharacters = characters.filter((id) => !characterIds.has(id));
+    if (keptCharacters.length !== characters.length)
+      await db.syncMeta.put({ key: REVOKED_CHARACTERS_KEY, value: keptCharacters });
+    const keptCampaigns = campaigns.filter((id) => !campaignIds.has(id));
+    if (keptCampaigns.length !== campaigns.length)
+      await db.syncMeta.put({ key: REVOKED_CAMPAIGNS_KEY, value: keptCampaigns });
+  } catch {
+    // Best-effort; staying redacted is the safe failure.
+  }
+}
+
 export async function readRevokedCampaigns(): Promise<string[]> {
   try {
     const row = await getLocalDb().syncMeta.get(REVOKED_CAMPAIGNS_KEY);

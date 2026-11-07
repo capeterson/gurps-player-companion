@@ -5,7 +5,7 @@
  * permission checks across handlers.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import type { AuditTx } from '../db/auditContext.ts';
 import { getDb } from '../db/client.ts';
@@ -21,14 +21,17 @@ import {
 
 export type CampaignRole = DbCampaignMembership['role'];
 
-interface CampaignRoleLookup {
+export interface CampaignRoleLookup {
   readonly campaign: DbCampaign;
   /** `null` means "campaign exists but `userId` has no role on it." */
   readonly role: CampaignRole | null;
 }
 
-/** Shared query behind both `loadCampaignOr403` and `tryLoadCampaignRole`. */
-async function lookupCampaignRole(
+/**
+ * Shared query behind both `loadCampaignOr403` and `tryLoadCampaignRole`.
+ * A campaign in the recycle bin does not exist for any caller.
+ */
+export async function lookupCampaignRole(
   campaignId: string,
   userId: string,
   db: ReturnType<typeof getDb> | AuditTx = getDb(),
@@ -40,7 +43,7 @@ async function lookupCampaignRole(
       campaignMemberships,
       and(eq(campaignMemberships.campaignId, campaigns.id), eq(campaignMemberships.userId, userId)),
     )
-    .where(eq(campaigns.id, campaignId));
+    .where(and(eq(campaigns.id, campaignId), isNull(campaigns.deletedAt)));
   const row = rows[0];
   if (!row) return null;
   const role: CampaignRole | null =
@@ -148,7 +151,12 @@ export async function loadCharacterOr403(
   userId: string,
 ): Promise<CharacterAccess> {
   const db = getDb();
-  const rows = await db.select().from(characters).where(eq(characters.id, characterId));
+  // A binned character does not exist for any caller; the recycle bin
+  // (services/recycleBin.ts) has its own loader.
+  const rows = await db
+    .select()
+    .from(characters)
+    .where(and(eq(characters.id, characterId), isNull(characters.deletedAt)));
   const character = rows[0];
   if (!character) throw new HTTPException(404, { message: 'character not found' });
   if (character.ownerId === userId) return { character, canWrite: true };

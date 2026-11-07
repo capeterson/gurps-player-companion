@@ -1,10 +1,10 @@
 /**
- * Owner-only campaign deletion dialog with the same retype-name gate
- * as TransferOwnershipDialog — both are thin wrappers around the
- * shared RetypeToConfirmDialog shell.
+ * Owner-only campaign deletion dialog. Deleting moves the campaign to the
+ * recycle bin, so a plain confirmation is enough; permanently deleting it from
+ * the bin keeps the retype-name gate.
  */
 
-import { RetypeToConfirmDialog } from '../../components/ui/RetypeToConfirmDialog.tsx';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.tsx';
 
 export function DeleteCampaignDialog({
   open,
@@ -20,20 +20,21 @@ export function DeleteCampaignDialog({
   onCancel: () => void;
 }) {
   return (
-    <RetypeToConfirmDialog
+    <ConfirmDialog
       open={open}
       title="Delete campaign?"
-      expectedText={campaignName}
       confirmLabel="Delete campaign"
       pendingLabel="Deleting…"
+      tone="error"
       pending={pending}
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
       <p>
-        <strong>{campaignName}</strong> and all of its memberships will be removed for everyone.
-        Characters in it will become campaign-less. This cannot be undone from the UI.
+        <strong>{campaignName}</strong> moves to the recycle bin and is permanently deleted after 30
+        days. Members lose access and its characters leave the campaign; restoring it brings them
+        back.
       </p>
-    </RetypeToConfirmDialog>
+    </ConfirmDialog>
   );
 }

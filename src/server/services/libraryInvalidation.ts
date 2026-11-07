@@ -22,7 +22,7 @@ export async function publishLibraryInvalidation(campaignId: string): Promise<vo
     const db = getDb();
     const [campaign] = await db
       .select({ ownerId: campaigns.ownerId })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: includes binned: nudge recipients
       .where(eq(campaigns.id, campaignId));
     if (!campaign) return;
     const members = await db

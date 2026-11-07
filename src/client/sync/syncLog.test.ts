@@ -11,6 +11,7 @@ import {
   appendSyncLog,
   appendSyncLogEntries,
   flushSyncLogPrune,
+  forgetRegainedAccess,
   lastChangesSyncKey,
   lastSuccessfulSyncKey,
   markRejectionDismissed,
@@ -261,6 +262,14 @@ describe('revoked-character ledger', () => {
 
   it('reads as empty when nothing was recorded', async () => {
     expect(await readRevokedCharacters()).toEqual([]);
+  });
+
+  it('forgets ids whose access came back, leaving the rest revoked', async () => {
+    await rememberRevokedCharacters(['restored', 'still-gone']);
+    await rememberRevokedCampaigns(['restored-campaign', 'gone-campaign']);
+    await forgetRegainedAccess(new Set(['restored']), new Set(['restored-campaign']));
+    expect(await readRevokedCharacters()).toEqual(['still-gone']);
+    expect(await readRevokedCampaigns()).toEqual(['gone-campaign']);
   });
 });
 

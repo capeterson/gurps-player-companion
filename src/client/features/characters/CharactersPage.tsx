@@ -1,15 +1,17 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useIsGuestSession } from '../../lib/guestSession.ts';
 import { readUserIdFromToken } from '../../lib/tokenStore.ts';
 import { enqueueCreate, newClientId } from '../../sync/outbox.ts';
 import { CharacterCard } from './CharacterCard.tsx';
+import { CharacterCardMenu } from './CharacterCardMenu.tsx';
 import { useCharactersList } from './useCharacterDetail.ts';
 
 export function CharactersPage() {
   const navigate = useNavigate();
   const guest = useIsGuestSession();
   const characters = useCharactersList();
+  const myId = readUserIdFromToken();
 
   const [name, setName] = useState('');
   const latestName = useRef('');
@@ -106,13 +108,28 @@ export function CharactersPage() {
       <ul className="grid md:grid-cols-2 gap-3">
         {(characters ?? []).map((c) => (
           <li key={c.id} className="min-w-0">
-            <CharacterCard character={c} />
+            <CharacterCard
+              character={c}
+              menu={
+                !guest && c.ownerId === myId ? (
+                  <CharacterCardMenu character={{ id: c.id, name: c.name }} />
+                ) : undefined
+              }
+            />
           </li>
         ))}
         {characters && characters.length === 0 && (
           <li className="text-base-content/60 text-sm">No characters yet.</li>
         )}
       </ul>
+
+      {!guest && (
+        <p className="text-right text-sm">
+          <Link to="/recycle-bin" className="link link-hover text-muted">
+            Recycle bin
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

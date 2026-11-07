@@ -58,6 +58,7 @@ to confirm the original or destination campaign in the sync log before replay.
 | [notifications.md](notifications.md) | Notification recipients, account settings, email policy, desktop opt-in and durable delivery. |
 | [equipment-loadouts.md](equipment-loadouts.md) | Named equipment loadouts, the atomic Equip/Restore switch, Last Equipped and the active-loadout display. |
 | [json-fields.md](json-fields.md) | Catalog of every JSON/JSONB field, its Zod schema, and where it's validated. |
+| [recycle-bin.md](recycle-bin.md) | The 30-day recycle bin for characters and campaigns: soft delete, restore, nightly purge, sync behaviour and the agent restriction. |
 | [preview-mode.md](preview-mode.md) | The read-only guest preview: guest tokens, the route allow-list, the database guard, system accounts and provisioning. |
 
 The **rules of engagement** (invariants you must not break, and the multi-site
@@ -1044,7 +1045,9 @@ settings sections; switching sections retains drafts.
   campaign displays it read-only, resolved the same way `manaLevel` is.
 - **Roles**: `owner` (GM), `manager`, `member`.
 - **Membership management**: add/remove members, change roles, **transfer
-  ownership**, delete campaign.
+  ownership**, delete campaign. Deleting moves the campaign to the **recycle
+  bin** for 30 days (members lose access and its characters leave it); the owner
+  can restore it, which re-attaches the characters. See [recycle-bin.md](recycle-bin.md).
 - **Invitations**: invite by handle (email or display name), inbox to
   accept/reject, notifications. Pending invitation cards wrap long campaign
   names on narrow screens. See [campaign-content-sharing.md](campaign-content-sharing.md).
@@ -1329,6 +1332,11 @@ wait for an IndexedDB bootstrap; expired or cleared sessions return to admin sig
 Password recovery from admin sign-in opens the player recovery entry through a
 full navigation, so its form remains reachable across the bundle boundary.
 
+The nightly job (`services/nightlyMaintenance.ts`) runs the recycle-bin sweep
+(`services/recycleBin.ts`) after the account purge: characters and campaigns deleted
+more than 30 days ago are hard-deleted, never earlier (see
+[recycle-bin.md](recycle-bin.md)).
+
 The same server runs `services/userPurge.ts` nightly at **03:00 UTC**, deleting
 suspended accounts whose 30-day deadline has elapsed. No purge runs at startup;
 overdue accounts are handled on the next nightly run. A database advisory lock
@@ -1388,6 +1396,8 @@ src/
                  notificationEvents, notificationEmails, notificationMaintenance
                  (durable audit fan-out, invitation/security mail and lifecycle),
                  userPurge (nightly account deletion and refresh-token expiry cleanup at 03:00 UTC),
+                 nightlyMaintenance (the 03:00 UTC scheduler for userPurge and recycleBin),
+                 recycleBin (30-day soft delete, restore, purge and sweep for characters/campaigns),
                  defaultCampaignSources (new-campaign GURPS 4e source list),
                  libraryReferences (transactional source authorization for all
                  six character reference types plus nested item enchantments), ownedLibraryMechanics (saved

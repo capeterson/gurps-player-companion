@@ -19,32 +19,45 @@ export function CharacterCard({
   character,
   hideAttributes = false,
   openInNewTab = false,
+  menu,
   children,
 }: {
   character: CharacterCardIdentity;
   hideAttributes?: boolean;
   openInNewTab?: boolean;
+  /** Optional actions menu shown beside the name. */
+  menu?: ReactNode;
   children?: ReactNode;
 }) {
+  const heading = (
+    <h2 className="font-display no-cap text-xl font-semibold [overflow-wrap:anywhere]">
+      <Link
+        to={`/characters/${character.id}`}
+        className="link link-hover"
+        target={openInNewTab ? '_blank' : undefined}
+        rel={openInNewTab ? 'noreferrer' : undefined}
+      >
+        <MediaImage
+          targetType="character"
+          targetId={character.id}
+          assetId={character.portraitAssetId}
+          name={character.name}
+          thumbnail
+        />
+        {character.name}
+      </Link>
+    </h2>
+  );
   return (
     <article className="card block min-w-0 p-4 transition hover:border-border-strong">
-      <h2 className="font-display no-cap text-xl font-semibold [overflow-wrap:anywhere]">
-        <Link
-          to={`/characters/${character.id}`}
-          className="link link-hover"
-          target={openInNewTab ? '_blank' : undefined}
-          rel={openInNewTab ? 'noreferrer' : undefined}
-        >
-          <MediaImage
-            targetType="character"
-            targetId={character.id}
-            assetId={character.portraitAssetId}
-            name={character.name}
-            thumbnail
-          />
-          {character.name}
-        </Link>
-      </h2>
+      {menu ? (
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">{heading}</div>
+          {menu}
+        </div>
+      ) : (
+        heading
+      )}
       {character.campaignId && character.campaignName && (
         <p className="mt-0.5 text-sm text-base-content/70 [overflow-wrap:anywhere]">
           Campaign:{' '}

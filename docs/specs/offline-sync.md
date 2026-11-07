@@ -49,6 +49,12 @@ Everything else is either read-only in the local store or fully online:
   character inputs can resolve campaign names and the default-on
   `enforceAttributeCaps` rule offline). Only `coverAssetId` mutations go through
   the outbox; other campaign settings and membership writes still use REST.
+- **Recycle bin**: deleting a character goes through the outbox like any delete,
+  but the server moves it to the recycle bin instead of removing it. A bin is an
+  access contraction (the row leaves `accessible` and is pruned locally, with no
+  tombstone) and a restore an access expansion (cursors reset, full backfill).
+  Restore and Delete now are online-only REST calls followed by a pull. See
+  [recycle-bin.md](recycle-bin.md).
 - **Online-only** (HTTP + React Query, no offline support): adventure log,
   invitations, notifications, settings, admin, and the library **YAML
   import** (see [Campaign library](#campaign-library)).

@@ -10,7 +10,7 @@ import { productionHttps } from '../https.ts';
 import { resolveOAuthAccessToken } from '../oauth/service.ts';
 import { createOpenApiApp } from '../openapi/app.ts';
 import type { TrustedExecutionContext } from '../services/executionContext.ts';
-import { stopUserPurgeMaintenance } from '../services/userPurge.ts';
+import { stopNightlyMaintenance } from '../services/nightlyMaintenance.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { executeOperation } from './executor.ts';
 import { type IncludedOperation, TOOLS } from './operationManifest.ts';
@@ -133,7 +133,7 @@ describe('production MCP reads through the real authenticated route graph', () =
       await getDb().delete(users).where(eq(users.id, userId));
       await getDb().delete(oauthClients).where(eq(oauthClients.id, clientDbId));
     } finally {
-      await stopUserPurgeMaintenance();
+      await stopNightlyMaintenance();
       await closeDb();
     }
   });

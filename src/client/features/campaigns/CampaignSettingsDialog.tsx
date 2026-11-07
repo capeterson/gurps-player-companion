@@ -228,7 +228,25 @@ export function CampaignSettingsDialog({
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       setConfirmDelete(false);
       onClose();
-      toasts.push(`Deleted ${campaign.name}`, { kind: 'success' });
+      toasts.push(`Deleted ${campaign.name}`, {
+        kind: 'success',
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            api<void>(`/campaigns/${campaign.id}/restore`, { method: 'POST' })
+              .then(() => {
+                qc.invalidateQueries({ queryKey: ['campaigns'] });
+                toasts.push(`Restored ${campaign.name}`, { kind: 'success' });
+              })
+              .catch((err: unknown) =>
+                toasts.push(
+                  `Couldn't restore ${campaign.name} — ${err instanceof Error ? err.message : 'please try again'}`,
+                  { kind: 'error' },
+                ),
+              );
+          },
+        },
+      });
     },
     onError: (err) => {
       setConfirmDelete(false);

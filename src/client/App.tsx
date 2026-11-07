@@ -225,7 +225,8 @@ export function App() {
     </nav>
   );
 
-  if (guest && location.pathname.startsWith('/settings')) return <Navigate to="/" replace />;
+  if (guest && (location.pathname.startsWith('/settings') || location.pathname === '/recycle-bin'))
+    return <Navigate to="/" replace />;
 
   return (
     <CharacterHeaderChromeContext.Provider

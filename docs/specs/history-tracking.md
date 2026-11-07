@@ -319,6 +319,14 @@ archive. See [media-uploads.md](media-uploads.md).
 
 `campaign_library_race` has revision, history and tombstone triggers; definition writes use existing audited library handlers. Character `race` changes use the existing root history trigger and summaries identify the before/after public race name. Restricted race definitions follow the library history visibility guard. See [races.md](races.md).
 
+## Recycle bin
+
+Moving a character or campaign to the recycle bin, and restoring it, are `update`
+events that set or clear `deleted_at`; `summarizeEvent` reports them as "Moved … to
+the recycle bin" and "Restored … from the recycle bin". Only the final purge is a
+`delete` event. Notification fan-out treats a `deleted_at` transition as a deletion
+or restoration. See [recycle-bin.md](recycle-bin.md).
+
 ## Equipment loadouts
 
 `character_loadouts` has revision, tombstone, history and preview-guard

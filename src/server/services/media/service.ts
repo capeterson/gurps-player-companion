@@ -359,13 +359,13 @@ export async function takeDownMedia(actorId: string, id: string) {
     if (asset.targetType === 'character')
       await tx
         .select({ id: characters.id })
-        .from(characters)
+        .from(characters) // recycle-bin: admin takedown includes binned targets
         .where(eq(characters.id, asset.targetId))
         .for('update');
     else
       await tx
         .select({ id: campaigns.id })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: admin takedown includes binned targets
         .where(eq(campaigns.id, asset.targetId))
         .for('update');
     // Parent-before-asset lock order matches ordinary attachment writes.

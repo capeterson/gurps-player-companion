@@ -20,7 +20,7 @@ export async function prepareRace(
   const [previous] = characterId
     ? await tx
         .select({ race: characters.race, campaignId: characters.campaignId })
-        .from(characters)
+        .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(characters.id, characterId))
         .for('update')
     : [];
@@ -54,7 +54,7 @@ export async function prepareRace(
   await requireCampaignMember(effectiveCampaignId, actorId, tx);
   const [campaign] = await tx
     .select({ ownerId: campaigns.ownerId })
-    .from(campaigns)
+    .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
     .where(eq(campaigns.id, effectiveCampaignId));
   const rows = await tx
     .select()

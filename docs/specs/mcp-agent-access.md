@@ -324,8 +324,11 @@ clear result for partial/bulk failures consistent with the underlying operation.
 ## Operation execution and parity evidence
 
 `src/server/mcp/operationManifest.ts` is the exact mapping for every OpenAPI
-method/path. It exposes 52 player-domain tools covering 109 exact operations and gives each excluded
-infrastructure operation its own reason. `docs/mcp-tools.json` is the generated
+method/path. It exposes 55 player-domain tools covering 118 exact operations and gives each excluded
+operation its own reason. Agents can list the recycle bin (`list_recycle_bin`) and
+restore characters and campaigns; permanent deletion from the bin
+(`DELETE /api/v1/recycle-bin/characters/{id}` and `/campaigns/{id}`) is excluded and
+refused to delegated callers, so only people can delete for good. `docs/mcp-tools.json` is the generated
 catalog; `mcp:check` fails on route, mapping, name, scope, annotation, or schema
 drift. Tool schemas come from the OpenAPI routes and responses are also checked
 against the original Zod response schemas retained by the registry.

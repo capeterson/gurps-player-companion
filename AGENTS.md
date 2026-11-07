@@ -56,6 +56,8 @@ requirement — not optional documentation.**
   - `json-fields.md` — catalog of every JSON/JSONB field and its Zod
     schema; a new JSON-typed field is incomplete without a schema and a
     catalog row.
+  - `recycle-bin.md` — 30-day soft delete of characters and campaigns, restore,
+    the nightly purge and the agent restriction on permanent deletion.
   - `preview-mode.md` — the read-only guest preview: guest tokens, the route
     allow-list, the database guard and system accounts.
 - **These docs describe *what exists*; this file (`AGENTS.md`) prescribes
@@ -286,9 +288,13 @@ The outbox + cursor system covers the character classes (`character`,
 local-first like the character sheet: every library read comes from Dexie,
 and every library create/edit/delete goes through the outbox. Do not add a
 React Query/HTTP read or a direct REST write for library entries in the PWA.
-The one deliberate exception is the **YAML import**: a server-side bulk
-upsert/prune of up to 20 MB that stays an online-only REST call, followed by a
-cursor pull. (Broken once: the library shipped as an online-only React Query
+The deliberate exceptions are the **YAML import** (a server-side bulk
+upsert/prune of up to 20 MB) and the **recycle bin's restore and Delete now**
+(the bin's contents are not local data); both stay online-only REST calls
+followed by a cursor pull. Deleting a character or campaign moves it to the
+recycle bin (`docs/specs/recycle-bin.md`); every server query that reads
+`characters` or `campaigns` must filter `deletedAt` or justify itself
+(`recycleBinReadGuard.test.ts`). (Broken once: the library shipped as an online-only React Query
 surface, so it was laggy, unavailable offline and outside the outbox.)
 
 Campaigns are pulled through `/sync/cursor` for minimal-view sweeps and offline

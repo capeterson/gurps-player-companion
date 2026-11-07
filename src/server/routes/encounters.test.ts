@@ -575,13 +575,26 @@ describe('encounter member projection', () => {
     });
     expect(deleted.status).toBe(204);
 
-    const projected = await app.request(
-      `/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`,
-      {
+    const project = () =>
+      app.request(`/api/v1/campaigns/${campaign.id}/encounters/${encounter.id}`, {
         headers: { Authorization: `Bearer ${gm.accessToken}` },
-      },
-    );
-    expect(await projected.json()).toMatchObject({
+      });
+    // While the character is in the recycle bin the combatant keeps its link.
+    expect(await (await project()).json()).toMatchObject({
+      combatants: [
+        expect.objectContaining({ kind: 'pc', characterId: character.id, name: 'Departed PC' }),
+      ],
+    });
+    // Permanent deletion detaches it but retains the combatant.
+    expect(
+      (
+        await app.request(`/api/v1/recycle-bin/characters/${character.id}`, {
+          method: 'DELETE',
+          headers: jsonHeaders(gm.accessToken),
+        })
+      ).status,
+    ).toBe(204);
+    expect(await (await project()).json()).toMatchObject({
       combatants: [expect.objectContaining({ kind: 'pc', characterId: null, name: 'Departed PC' })],
     });
   });

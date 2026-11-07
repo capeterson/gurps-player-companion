@@ -187,7 +187,7 @@ export async function projectEncountersForViewer(
   const encounterIds = rows.map((row) => row.id);
   const campaignRows = await db
     .select({ id: campaigns.id, shareCharacterSheets: campaigns.shareCharacterSheets })
-    .from(campaigns)
+    .from(campaigns) // recycle-bin: post-authorization lookup; binned PCs stay in an encounter until purged
     .where(inArray(campaigns.id, [...new Set(rows.map((row) => row.campaignId))]));
   const shareByCampaign = new Map(
     campaignRows.map((campaign) => [campaign.id, campaign.shareCharacterSheets]),
@@ -223,7 +223,7 @@ export async function projectEncountersForViewer(
           (
             await db
               .select({ id: characters.id })
-              .from(characters)
+              .from(characters) // recycle-bin: post-authorization lookup; binned PCs stay in an encounter until purged
               .where(
                 and(
                   eq(characters.ownerId, userId),
@@ -306,7 +306,7 @@ async function invalidateEncounter(campaignId: string, encounterId: string) {
   const owner = (
     await getDb()
       .select({ ownerId: campaigns.ownerId })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: post-authorization lookup; binned PCs stay in an encounter until purged
       .where(eq(campaigns.id, campaignId))
   )[0];
   const recipients = new Set(memberships.map((membership) => membership.userId));
@@ -362,7 +362,7 @@ async function projectCombatantForActor(
   if (row.kind === 'pc' && row.characterId && !canManage && !campaign.shareCharacterSheets) {
     const owned = await getDb()
       .select({ id: characters.id })
-      .from(characters)
+      .from(characters) // recycle-bin: post-authorization lookup; binned PCs stay in an encounter until purged
       .where(and(eq(characters.ownerId, userId), eq(characters.id, row.characterId)));
     ownedCharacterIds = new Set(owned.map((character) => character.id));
   }

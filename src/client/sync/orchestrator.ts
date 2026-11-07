@@ -91,6 +91,7 @@ import {
   type NewSyncLogEntry,
   appendSyncLog,
   appendSyncLogEntries,
+  forgetRegainedAccess,
   invalidatePendingSyncLogWrites,
   pruneRejectionToasts,
   redactSyncLogForCampaigns,
@@ -2637,6 +2638,7 @@ class SyncOrchestrator {
     const db = getLocalDb();
     const accessibleCharacterIds = new Set(accessible.characterIds);
     const accessibleCampaignIds = new Set(accessible.campaignIds);
+    await forgetRegainedAccess(accessibleCharacterIds, accessibleCampaignIds);
 
     const [chars, camps] = await Promise.all([db.characters.toArray(), db.campaigns.toArray()]);
 

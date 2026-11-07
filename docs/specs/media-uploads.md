@@ -145,6 +145,10 @@ are protected with an additional grace period. Parent references are checked
 under locks before objects are deleted; a failed deletion remains retryable.
 History retains reference UUIDs, not an indefinite archive of old photographs.
 
+A character or campaign in the recycle bin keeps its portrait or cover: the row and
+its reference remain, so cleanup leaves the assets alone. They become orphans, and
+are reclaimed on the next sweep, only when the item is permanently deleted.
+
 ## API, MCP and code map
 
 Authenticated `/api/v1/media`: `GET /capabilities`, `POST /uploads` (metadata plus

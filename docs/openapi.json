@@ -15674,7 +15674,7 @@
         "tags": [
           "campaigns"
         ],
-        "summary": "Delete a campaign (owner only). Cascades to memberships, library, log.",
+        "summary": "Move a campaign to the recycle bin (owner only). Members lose access and its characters leave it; permanently deleted after 30 days.",
         "security": [
           {
             "bearerAuth": []
@@ -15693,7 +15693,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Deleted"
+            "description": "Moved to the recycle bin"
           },
           "403": {
             "description": "Forbidden",
@@ -15707,6 +15707,55 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/campaigns/{id}/restore": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Restore a campaign from the recycle bin (owner only) and re-attach the characters it released",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Restored"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the recycle bin",
             "content": {
               "application/json": {
                 "schema": {
@@ -16805,6 +16854,208 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recycle-bin": {
+      "get": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "summary": "List the characters and campaigns you can restore",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recycle bin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "characters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "deletedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "purgeAfter": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "deletedAt",
+                          "purgeAfter"
+                        ]
+                      }
+                    },
+                    "campaigns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "deletedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "purgeAfter": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "characterCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "deletedAt",
+                          "purgeAfter",
+                          "characterCount"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "characters",
+                    "campaigns"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recycle-bin/characters/{id}": {
+      "delete": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "summary": "Permanently delete a character that is in the recycle bin (not available to agents)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Permanently deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the recycle bin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recycle-bin/campaigns/{id}": {
+      "delete": {
+        "tags": [
+          "recycle-bin"
+        ],
+        "summary": "Permanently delete a campaign that is in the recycle bin (not available to agents)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Permanently deleted"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the recycle bin",
             "content": {
               "application/json": {
                 "schema": {
@@ -50458,6 +50709,7 @@
         "tags": [
           "characters"
         ],
+        "summary": "Move a character to the recycle bin (permanently deleted after 30 days)",
         "security": [
           {
             "bearerAuth": []
@@ -50476,7 +50728,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Deleted"
+            "description": "Moved to the recycle bin"
           },
           "403": {
             "description": "Forbidden",
@@ -60301,6 +60553,55 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters/{id}/restore": {
+      "post": {
+        "tags": [
+          "characters"
+        ],
+        "summary": "Restore a character from the recycle bin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Restored"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in the recycle bin",
             "content": {
               "application/json": {
                 "schema": {

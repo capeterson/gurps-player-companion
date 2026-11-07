@@ -509,11 +509,19 @@ export const campaigns = pgTable(
       .default('block'),
     experimentalTurnTracker: boolean('experimental_turn_tracker').notNull().default(false),
     experimentalActiveEffects: boolean('experimental_active_effects').notNull().default(false),
+    /** Recycle bin: set while the campaign awaits restore or its 30-day purge. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedBy: uuid('deleted_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
   },
-  (t) => ({ ownerIdx: index('campaigns_owner_idx').on(t.ownerId) }),
+  (t) => ({
+    ownerIdx: index('campaigns_owner_idx').on(t.ownerId),
+    deletedAtIdx: index('campaigns_deleted_at_idx')
+      .on(t.deletedAt)
+      .where(sql`deleted_at is not null`),
+  }),
 );
 
 /** Internal development-tool progress; never exposed through player APIs/sync. */
@@ -689,11 +697,24 @@ export const characters = pgTable(
      * (src/shared/schemas/loadout.ts); null before the first switch. */
     lastEquipmentSwitch: jsonb('last_equipment_switch').$type<EquipmentSwitch | null>(),
 
+    /** Recycle bin: set while the character awaits restore or its 30-day purge. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    deletedBy: uuid('deleted_by').references(() => users.id, { onDelete: 'set null' }),
+    /** Campaign the character was detached from when that campaign was binned.
+     * Soft reference (no FK): purging the campaign must not rewrite characters. */
+    recycledFromCampaignId: uuid('recycled_from_campaign_id'),
+
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     revision: revision(),
   },
   (t) => ({
+    deletedAtIdx: index('characters_deleted_at_idx')
+      .on(t.deletedAt)
+      .where(sql`deleted_at is not null`),
+    recycledFromCampaignIdx: index('characters_recycled_from_campaign_idx')
+      .on(t.recycledFromCampaignId)
+      .where(sql`recycled_from_campaign_id is not null`),
     ownerIdx: index('characters_owner_idx').on(t.ownerId),
     ownerRevisionIdx: index('characters_owner_revision_idx').on(t.ownerId, t.revision),
     campaignIdx: index('characters_campaign_idx').on(t.campaignId),

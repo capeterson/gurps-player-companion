@@ -612,7 +612,7 @@ router.openapi(
     const result = await withAudit(user.id, undefined, async (tx) => {
       await tx
         .select({ id: campaigns.id })
-        .from(campaigns)
+        .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(campaigns.id, id))
         .for('update');
       const currentGraph = await loadLibraryGraph(tx, id);

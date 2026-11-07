@@ -76,6 +76,42 @@ describe('summarizeEvent character', () => {
     expect(summary).toContain('Bob');
   });
 
+  it('recycle bin: moving a character to the bin and back is explicit', () => {
+    const binned = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { name: 'Bob', deleted_at: null },
+      newRow: { name: 'Bob', deleted_at: '2026-11-06T00:00:00Z' },
+    });
+    expect(binned.summary).toBe('Moved character Bob to the recycle bin');
+    const restored = summarizeEvent({
+      entityClass: 'character',
+      op: 'update',
+      oldRow: { name: 'Bob', deleted_at: '2026-11-06T00:00:00Z' },
+      newRow: { name: 'Bob', deleted_at: null },
+    });
+    expect(restored.summary).toBe('Restored character Bob from the recycle bin');
+  });
+
+  it('recycle bin: campaigns report the same transitions', () => {
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign',
+        op: 'update',
+        oldRow: { name: 'Lantern Coast', deleted_at: null },
+        newRow: { name: 'Lantern Coast', deleted_at: '2026-11-06T00:00:00Z' },
+      }).summary,
+    ).toBe('Moved campaign Lantern Coast to the recycle bin');
+    expect(
+      summarizeEvent({
+        entityClass: 'campaign',
+        op: 'update',
+        oldRow: { name: 'Lantern Coast', deleted_at: '2026-11-06T00:00:00Z' },
+        newRow: { name: 'Lantern Coast', deleted_at: null },
+      }).summary,
+    ).toBe('Restored campaign Lantern Coast from the recycle bin');
+  });
+
   it('attribute change: "ST 10 → 12"', () => {
     const { summary } = summarizeEvent({
       entityClass: 'character',

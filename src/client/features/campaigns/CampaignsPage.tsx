@@ -191,6 +191,14 @@ export function CampaignsPage() {
         })}
       </div>
 
+      {!guest && (
+        <p className="text-right text-sm">
+          <Link to="/recycle-bin" className="link link-hover text-muted">
+            Recycle bin
+          </Link>
+        </p>
+      )}
+
       {settingsCampaign &&
         (() => {
           const myMembership = settingsCampaign.members.find((m) => m.userId === myId);

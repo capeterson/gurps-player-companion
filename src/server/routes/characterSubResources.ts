@@ -1030,7 +1030,7 @@ router.openapi(
     const next = await withAudit(user.id, undefined, async (tx) => {
       const [row] = await tx
         .select({ activeConditionGroups: characters.activeConditionGroups })
-        .from(characters)
+        .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(characters.id, id))
         .for('update');
       if (!row) throw new HTTPException(404, { message: 'character not found' });
@@ -1075,7 +1075,7 @@ router.openapi(
     const next = await withAudit(user.id, undefined, async (tx) => {
       const [row] = await tx
         .select({ activeConditionGroups: characters.activeConditionGroups })
-        .from(characters)
+        .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(characters.id, id))
         .for('update');
       if (!row) throw new HTTPException(404, { message: 'character not found' });

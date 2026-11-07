@@ -1,5 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, desc, eq, ilike, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import { selectInventoryItemDetail } from '../../shared/domain/inventoryDetails.ts';
 import { raceName } from '../../shared/domain/race.ts';
@@ -30,6 +30,11 @@ import { prepareMediaAttachment } from '../services/media/service.ts';
 import { detachLibraryReferencesForTransfer } from '../services/ownedLibraryMechanics.ts';
 import { buildPatchSet } from '../services/patchSet.ts';
 import { prepareRace } from '../services/races.ts';
+import {
+  binCharacter,
+  loadBinnedCharacterOr403,
+  restoreCharacter,
+} from '../services/recycleBin.ts';
 import { decideCharacterAccess } from './sync.ts';
 
 const router = createOpenApiApp();
@@ -43,13 +48,16 @@ router.use('/characters/*', requireActiveUser);
  */
 async function loadMinimalCharacter(id: string): Promise<CharacterMinimalOut> {
   const db = getDb();
-  const [c] = await db.select().from(characters).where(eq(characters.id, id));
+  const [c] = await db
+    .select()
+    .from(characters)
+    .where(and(eq(characters.id, id), isNull(characters.deletedAt)));
   if (!c) throw new HTTPException(404, { message: 'character not found' });
   let techLevel: number | null = null;
   if (c.campaignId) {
     const [campaign] = await db
       .select({ techLevel: campaigns.techLevel })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
       .where(eq(campaigns.id, c.campaignId));
     techLevel = campaign?.techLevel ?? null;
   }
@@ -96,10 +104,12 @@ router.openapi(
       .from(campaignMemberships)
       .where(eq(campaignMemberships.userId, user.id));
     const campaignIds = accessibleCampaigns.map((m) => m.id);
-    const accessWhere =
+    const accessWhere = and(
+      isNull(characters.deletedAt),
       campaignIds.length === 0
         ? eq(characters.ownerId, user.id)
-        : or(eq(characters.ownerId, user.id), inArray(characters.campaignId, campaignIds));
+        : or(eq(characters.ownerId, user.id), inArray(characters.campaignId, campaignIds)),
+    );
     // Only the listed columns: the full row carries every JSONB blob.
     const rows = await db
       .select({
@@ -115,7 +125,7 @@ router.openapi(
         updatedAt: characters.updatedAt,
         revision: characters.revision,
       })
-      .from(characters)
+      .from(characters) // recycle-bin: filtered by the deletedAt predicate in `accessWhere` above
       .where(
         search
           ? and(accessWhere, ilike(characters.name, `%${escapeLikePattern(search)}%`))
@@ -141,7 +151,7 @@ router.openapi(
               allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
               viewerRole: campaignMemberships.role,
             })
-            .from(campaigns)
+            .from(campaigns) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
             .leftJoin(
               campaignMemberships,
               and(
@@ -318,7 +328,7 @@ router.openapi(
     await withAudit(user.id, undefined, async (tx) => {
       await tx
         .select({ id: characters.id })
-        .from(characters)
+        .from(characters) // recycle-bin: authorized by loadCampaignOr403/loadCharacterOr403, which hide binned rows
         .where(eq(characters.id, id))
         .for('update');
       await prepareRace(
@@ -348,10 +358,11 @@ router.openapi(
     method: 'delete',
     path: '/characters/{id}',
     tags: ['characters'],
+    summary: 'Move a character to the recycle bin (permanently deleted after 30 days)',
     security: [{ bearerAuth: [] }],
     request: { params: z.object({ id: uuid }) },
     responses: {
-      204: { description: 'Deleted' },
+      204: { description: 'Moved to the recycle bin' },
       403: errorResponse('Forbidden'),
       404: errorResponse('Not found'),
     },
@@ -361,7 +372,31 @@ router.openapi(
     const { id } = c.req.valid('param');
     const access = await loadCharacterOr403(id, user.id);
     assertWrite(access);
-    await withAudit(user.id, undefined, (tx) => tx.delete(characters).where(eq(characters.id, id)));
+    await withAudit(user.id, undefined, (tx) => binCharacter(tx, id, user.id));
+    return c.body(null, 204);
+  },
+);
+
+router.openapi(
+  createRoute({
+    method: 'post',
+    path: '/characters/{id}/restore',
+    tags: ['characters'],
+    summary: 'Restore a character from the recycle bin',
+    security: [{ bearerAuth: [] }],
+    request: { params: z.object({ id: uuid }) },
+    responses: {
+      204: { description: 'Restored' },
+      403: errorResponse('Forbidden'),
+      404: errorResponse('Not in the recycle bin'),
+    },
+  }),
+  async (c) => {
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    await loadBinnedCharacterOr403(id, user.id);
+    const restored = await withAudit(user.id, undefined, (tx) => restoreCharacter(tx, id));
+    if (!restored) throw new HTTPException(404, { message: 'character not found' });
     return c.body(null, 204);
   },
 );

@@ -18,7 +18,7 @@ import { campaignLibraryActiveEffects } from '../db/schema.ts';
  */
 
 import { createRoute } from '@hono/zod-openapi';
-import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
   type EntityClass,
@@ -312,7 +312,12 @@ async function listAccessibleCampaignIds(userId: string): Promise<string[]> {
       campaignMemberships,
       and(eq(campaignMemberships.campaignId, campaigns.id), eq(campaignMemberships.userId, userId)),
     )
-    .where(or(eq(campaigns.ownerId, userId), eq(campaignMemberships.userId, userId)));
+    .where(
+      and(
+        isNull(campaigns.deletedAt),
+        or(eq(campaigns.ownerId, userId), eq(campaignMemberships.userId, userId)),
+      ),
+    );
   return rows.map((r) => r.id);
 }
 
@@ -384,17 +389,21 @@ async function loadCharacterAccess(
   campaignIds: string[],
 ): Promise<Map<string, CharacterAccessMode>> {
   const db = getDb();
-  const where =
+  // Recycle-binned characters are absent from the access set, so every device
+  // prunes them locally; restoring one re-enters the set and backfills.
+  const where = and(
+    isNull(characters.deletedAt),
     campaignIds.length === 0
       ? eq(characters.ownerId, userId)
-      : or(eq(characters.ownerId, userId), inArray(characters.campaignId, [...campaignIds]));
+      : or(eq(characters.ownerId, userId), inArray(characters.campaignId, [...campaignIds])),
+  );
   const rows = await db
     .select({
       id: characters.id,
       ownerId: characters.ownerId,
       campaignId: characters.campaignId,
     })
-    .from(characters)
+    .from(characters) // recycle-bin: filtered by the deletedAt predicate in `where` above
     .where(where);
 
   const relevantCampaignIds = [
@@ -410,7 +419,7 @@ async function loadCharacterAccess(
         allowGmCharacterEditing: campaigns.allowGmCharacterEditing,
         viewerRole: campaignMemberships.role,
       })
-      .from(campaigns)
+      .from(campaigns) // recycle-bin: access sets are already filtered; this reads rows of those sets
       .leftJoin(
         campaignMemberships,
         and(
@@ -551,9 +560,14 @@ async function fetchClassUpserts(args: {
         .from(characters)
         .where(
           accessibleCharacterIds.length === 0
-            ? and(gt(characters.revision, sinceRevision), eq(characters.ownerId, userId))
+            ? and(
+                gt(characters.revision, sinceRevision),
+                isNull(characters.deletedAt),
+                eq(characters.ownerId, userId),
+              )
             : and(
                 gt(characters.revision, sinceRevision),
+                isNull(characters.deletedAt),
                 inArray(characters.id, [...accessibleCharacterIds]),
               ),
         )
@@ -567,7 +581,12 @@ async function fetchClassUpserts(args: {
         // client's `shouldUseMinimalView`-equivalent gate works.
         const access = characterAccess.get(row.id) ?? 'full';
         const projected = access === 'minimal' ? projectCharacterRow(row) : row;
-        return upsertChange('character', row.id, Number(row.revision), projected);
+        return upsertChange(
+          'character',
+          row.id,
+          Number(row.revision),
+          withoutRecycleMarkers(projected),
+        );
       });
     }
     case 'character_trait':
@@ -630,6 +649,7 @@ async function fetchClassUpserts(args: {
         .where(
           and(
             gt(campaigns.revision, sinceRevision),
+            isNull(campaigns.deletedAt),
             inArray(campaigns.id, [...accessibleCampaignIds]),
           ),
         )
@@ -648,7 +668,7 @@ async function fetchClassUpserts(args: {
         : [];
       return rows.map(({ campaign, viewerRole }) =>
         upsertChange('campaign', campaign.id, Number(campaign.revision), {
-          ...campaign,
+          ...withoutRecycleMarkers(campaign),
           activeEffectDefinitions: definitions
             .filter(
               (d) => d.campaignId === campaign.id && (campaign.ownerId === userId || !d.restricted),
@@ -713,7 +733,7 @@ async function fetchLibraryClass(
   const rows = (await getDb()
     .select({ row: table, ownerId: campaigns.ownerId })
     .from(table)
-    .innerJoin(campaigns, eq(cfg.table.campaignId, campaigns.id))
+    .innerJoin(campaigns, eq(cfg.table.campaignId, campaigns.id)) // recycle-bin: access sets are already filtered; this reads rows of those sets
     .where(
       and(
         gt(table.revision, sinceRevision),
@@ -866,6 +886,9 @@ function projectCharacterRow(row: DbCharacter): DbCharacter & { raceName: string
     dismissedWarnings: [],
     activeConditionGroups: [],
     lastEquipmentSwitch: null,
+    deletedAt: null,
+    deletedBy: null,
+    recycledFromCampaignId: null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     revision: row.revision,
@@ -878,6 +901,19 @@ function projectCharacterRow(row: DbCharacter): DbCharacter & { raceName: string
  * timezone.  Numeric columns (drizzle decimal mapping returns string)
  * are also normalized to numbers where appropriate.
  */
+/** Recycle-bin bookkeeping is server-only; clients learn of a bin by loss of access. */
+function withoutRecycleMarkers<T extends object>(
+  row: T,
+): Omit<T, 'deletedAt' | 'deletedBy' | 'recycledFromCampaignId'> {
+  const {
+    deletedAt: _a,
+    deletedBy: _b,
+    recycledFromCampaignId: _c,
+    ...rest
+  } = row as T & Record<string, unknown>;
+  return rest as never;
+}
+
 function serializeRow(data: unknown): unknown {
   if (data === null || typeof data !== 'object') return data;
   const out: Record<string, unknown> = {};
