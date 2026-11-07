@@ -77,7 +77,7 @@ test('Overview stat cards align without gaps and utilities retain their natural 
         await expect(page.locator('#attribute-Per')).toContainText('15');
         await expect(page.locator('#attribute-Move')).toContainText('9');
       }
-      for (const theme of ['gilded-tome', 'illuminated-manuscript']) {
+      for (const theme of ['gilded-tome', 'sunbolt']) {
         await page.evaluate(
           (name) => document.documentElement.setAttribute('data-theme', name),
           theme,

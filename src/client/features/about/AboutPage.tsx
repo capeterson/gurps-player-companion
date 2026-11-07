@@ -3,9 +3,9 @@ export function AboutPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <header className="space-y-2">
         <p className="label-eyebrow">About</p>
-        <h1 className="font-display text-3xl">GURPS Player Companion</h1>
+        <h1 className="font-display text-3xl">Sunbolt</h1>
         <p className="max-w-2xl text-sm text-muted">
-          A game aid designed to work for <strong>GURPS 4th Edition</strong> rules.
+          A <strong>GURPS 4th edition</strong> companion.
         </p>
       </header>
 

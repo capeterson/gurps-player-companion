@@ -62,7 +62,7 @@ export function AdminLayout() {
           <a href="/" className="flex items-center gap-2 no-cap sm:gap-3">
             <BrandMark />
             <span className="hidden font-display text-base font-semibold sm:inline">
-              Player Companion · Admin
+              Sunbolt · Admin
             </span>
           </a>
           <nav className="flex items-center gap-1">

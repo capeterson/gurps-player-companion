@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "GURPS Player Companion API",
+    "title": "Sunbolt API",
     "version": "0.1.0",
     "description": "Local-first GURPS character + campaign companion."
   },
@@ -55,7 +55,7 @@
           "lightTheme": {
             "type": "string",
             "enum": [
-              "illuminated-manuscript",
+              "sunbolt",
               "heraldic-vellum",
               "arcane-light"
             ]
@@ -81,7 +81,7 @@
           "lightTheme": {
             "type": "string",
             "enum": [
-              "illuminated-manuscript",
+              "sunbolt",
               "heraldic-vellum",
               "arcane-light"
             ]

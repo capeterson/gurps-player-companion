@@ -61,20 +61,46 @@ describe('theme mode', () => {
     expect(readStoredMode()).toBe('dark');
   });
 
-  it('defaults to Gilded Tome in dark mode and Illuminated Manuscript in light mode', () => {
+  it('defaults to Gilded Tome in dark mode and Sunbolt in light mode', () => {
     localStorage.setItem('gpc.theme', 'dark');
     applyStoredTheme();
     expect(document.documentElement.dataset.theme).toBe('gilded-tome');
     localStorage.setItem('gpc.theme', 'light');
     applyStoredTheme();
-    expect(document.documentElement.dataset.theme).toBe('illuminated-manuscript');
+    expect(document.documentElement.dataset.theme).toBe('sunbolt');
+  });
+
+  it('shows Sunbolt to a device that stored the retired Illuminated Manuscript palette', () => {
+    localStorage.setItem('gpc.theme', 'light');
+    localStorage.setItem(
+      'gpc.themePreferences',
+      JSON.stringify({ darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' }),
+    );
+    applyStoredTheme();
+    expect(document.documentElement.dataset.theme).toBe('sunbolt');
+    resetThemeStoreForTests();
+    expect(getThemeState().preferences).toEqual({
+      darkTheme: 'midnight-gilt',
+      lightTheme: 'sunbolt',
+    });
+  });
+
+  it('keeps every theme-color tag in step with the applied theme', () => {
+    document.head.innerHTML =
+      '<meta name="theme-color" content="#f9f2df" media="(prefers-color-scheme: light)">' +
+      '<meta name="theme-color" content="#16110d" media="(prefers-color-scheme: dark)">';
+    localStorage.setItem('gpc.theme', 'light');
+    applyStoredTheme();
+    const tags = [...document.querySelectorAll('meta[name="theme-color"]')];
+    expect(tags.map((tag) => tag.getAttribute('content'))).toEqual(['#f9f2df', '#f9f2df']);
+    document.head.innerHTML = '';
   });
 
   it('switches mode locally without contacting the server', () => {
     localStorage.setItem('gpc.theme', 'dark');
     resetThemeStoreForTests();
     setThemeMode('light');
-    expect(document.documentElement.dataset.theme).toBe('illuminated-manuscript');
+    expect(document.documentElement.dataset.theme).toBe('sunbolt');
     expect(localStorage.getItem('gpc.theme')).toBe('light');
     expect(apiMock).not.toHaveBeenCalled();
   });
@@ -89,7 +115,7 @@ describe('theme preferences sync', () => {
   it('applies immediately and clears pending once the server confirms', async () => {
     apiMock.mockResolvedValueOnce({
       darkTheme: 'midnight-gilt',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
     setThemePreference('darkTheme', 'midnight-gilt');
     expect(document.documentElement.dataset.theme).toBe('midnight-gilt');
@@ -99,9 +125,7 @@ describe('theme preferences sync', () => {
       pending: true,
     });
     await flush();
-    expect(patchBodies()).toEqual([
-      { darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' },
-    ]);
+    expect(patchBodies()).toEqual([{ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' }]);
     expect(getThemeState().pending).toBe(false);
   });
 
@@ -128,7 +152,7 @@ describe('theme preferences sync', () => {
       if ((init as { method?: string } | undefined)?.method === 'PATCH') {
         throw new ApiError(422, 'invalid theme');
       }
-      return { darkTheme: 'gilded-tome', lightTheme: 'illuminated-manuscript' };
+      return { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' };
     });
     setThemePreference('darkTheme', 'midnight-gilt');
     await flush();
@@ -146,17 +170,17 @@ describe('theme preferences sync', () => {
     apiMock.mockReturnValueOnce(first.promise as Promise<never>);
     apiMock.mockResolvedValueOnce({
       darkTheme: 'gilded-tome',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
     setThemePreference('darkTheme', 'midnight-gilt');
     setThemePreference('darkTheme', 'gilded-tome');
     expect(patchBodies()).toHaveLength(1);
 
-    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' });
+    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' });
     await flush();
     expect(patchBodies()).toEqual([
-      { darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' },
-      { darkTheme: 'gilded-tome', lightTheme: 'illuminated-manuscript' },
+      { darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' },
+      { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' },
     ]);
     expect(getThemeState()).toMatchObject({
       pending: false,
@@ -172,7 +196,7 @@ describe('theme preferences sync', () => {
     setThemePreference('darkTheme', 'midnight-gilt');
     setThemePreference('lightTheme', 'heraldic-vellum');
 
-    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' });
+    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' });
     await flush();
     expect(getThemeState().preferences).toEqual({
       darkTheme: 'midnight-gilt',
@@ -202,12 +226,12 @@ describe('theme preferences sync', () => {
     apiMock.mockReturnValueOnce(read.promise as Promise<never>);
     apiMock.mockResolvedValueOnce({
       darkTheme: 'midnight-gilt',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
     const fetching = fetchServerThemePreferences();
     setThemePreference('darkTheme', 'midnight-gilt');
     await flush();
-    read.resolve({ darkTheme: 'gilded-tome', lightTheme: 'illuminated-manuscript' });
+    read.resolve({ darkTheme: 'gilded-tome', lightTheme: 'sunbolt' });
     await fetching;
     expect(getThemeState().preferences.darkTheme).toBe('midnight-gilt');
   });
@@ -218,7 +242,7 @@ describe('theme preferences sync', () => {
     await flush();
     clearPendingThemePreferences();
     expect(getThemeState().pending).toBe(false);
-    adoptServerThemePreferences({ darkTheme: 'gilded-tome', lightTheme: 'illuminated-manuscript' });
+    adoptServerThemePreferences({ darkTheme: 'gilded-tome', lightTheme: 'sunbolt' });
     expect(document.documentElement.dataset.theme).toBe('gilded-tome');
   });
 });

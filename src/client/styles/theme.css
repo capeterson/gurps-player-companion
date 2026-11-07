@@ -1,11 +1,11 @@
 /* ============================================================
-   GURPS Companion · gold themes
+   Sunbolt · gold themes
    Seven DaisyUI 5 themes. Each device switches between a dark and a
    light mode; the user's synced preferences pick which palette each
    mode uses (see src/client/lib/theme.ts):
 
      dark:  "gilded-tome" (default) · "midnight-gilt" · "verdigris-brass" · "arcane-dark"
-     light: "illuminated-manuscript" (default) · "heraldic-vellum" · "arcane-light"
+     light: "sunbolt" (default) · "heraldic-vellum" · "arcane-light"
 
    Tuned for "stare at this for hours" comfort, carried over from the
    original Arcane handoff:
@@ -328,36 +328,40 @@
   --noise: 0;
 }
 
-/* ----- Illuminated Manuscript (default light) ----------------- */
+/* ----- Sunbolt (light) ---------------------------------------- */
 @plugin "daisyui/theme" {
-  name: "illuminated-manuscript";
+  name: "sunbolt";
   default: false;
   prefersdark: false;
   color-scheme: light;
 
-  /* base = parchment; antique gold dark enough for white text on fills
-     and gold text on paper; lapis secondary */
-  --color-base-100: oklch(0.985 0.012 90);
-  --color-base-200: oklch(0.95 0.022 85);
-  --color-base-300: oklch(0.84 0.035 80);
-  --color-base-content: oklch(0.25 0.02 60);
+  /* base = sunlit vellum: a touch brighter and yellower than the retired
+     Illuminated Manuscript palette, chroma still kept <= 0.03 on reading surfaces. Sun-amber
+     gold dark enough for light text on fills and gold text on paper;
+     lapis-sky secondary as the cool counterpoint. */
+  --color-base-100: oklch(0.99 0.014 95); /* surface (cards, panels) */
+  --color-base-200: oklch(0.962 0.026 90); /* page bg (canvas) */
+  --color-base-300: oklch(0.855 0.045 85); /* default border */
+  --color-base-content: oklch(0.255 0.03 62);
 
-  --color-primary: oklch(0.52 0.115 70);
-  --color-primary-content: oklch(0.99 0.01 90);
-  --color-secondary: oklch(0.48 0.13 255);
+  --color-primary: oklch(0.52 0.125 68); /* burnished sun-gold */
+  --color-primary-content: oklch(0.995 0.008 95);
+  --color-secondary: oklch(0.47 0.13 252); /* lapis sky */
   --color-secondary-content: oklch(1 0 0);
-  --color-accent: oklch(0.52 0.115 70);
-  --color-accent-content: oklch(0.99 0.01 90);
-  --color-neutral: oklch(0.93 0.02 85);
-  --color-neutral-content: oklch(0.25 0.02 60);
+  /* accent = the bright "bolt" gold. Fill/ornament only (dark content on it);
+     never text on paper. --gild stays on primary for drop caps and strokes. */
+  --color-accent: oklch(0.83 0.15 88);
+  --color-accent-content: oklch(0.25 0.05 65);
+  --color-neutral: oklch(0.935 0.025 88);
+  --color-neutral-content: oklch(0.255 0.03 62);
 
-  --color-info: oklch(0.5 0.1 220);
+  --color-info: oklch(0.5 0.11 235);
   --color-info-content: oklch(1 0 0);
-  --color-success: oklch(0.52 0.12 145);
+  --color-success: oklch(0.52 0.12 150);
   --color-success-content: oklch(1 0 0);
-  --color-warning: oklch(0.6 0.14 60);
-  --color-warning-content: oklch(0.16 0.01 60);
-  --color-error: oklch(0.5 0.18 25);
+  --color-warning: oklch(0.62 0.15 58);
+  --color-warning-content: oklch(0.18 0.02 60);
+  --color-error: oklch(0.5 0.18 27);
   --color-error-content: oklch(1 0 0);
 
   --radius-selector: 0.75rem;
@@ -518,33 +522,38 @@
   --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
 }
 
-[data-theme="illuminated-manuscript"] {
-  --text-muted: oklch(0.45 0.025 65);
-  --sync-attention: oklch(0.52 0.13 40);
-  --text-dim: oklch(0.54 0.03 70);
-  --border-strong: oklch(0.74 0.05 78);
-  --accent-soft: oklch(0.9 0.06 85 / 0.7);
+[data-theme="sunbolt"] {
+  --text-muted: oklch(0.45 0.03 65);
+  --sync-attention: oklch(0.52 0.14 42);
+  --text-dim: oklch(0.53 0.035 70);
+  --border-strong: oklch(0.74 0.06 80);
+  --accent-soft: oklch(0.93 0.07 92 / 0.75);
   --gild: var(--color-primary);
-  --surface-deep: oklch(0.92 0.022 85);
+  --surface-deep: oklch(0.935 0.024 88);
 
-  --hp-full: oklch(0.52 0.11 185);
-  --hp-good: oklch(0.52 0.12 145);
-  --hp-warn: oklch(0.58 0.13 95);
-  --hp-low: oklch(0.55 0.16 50);
+  /* HP severity ramp — full (sky) → critical → unconscious */
+  --hp-full: oklch(0.52 0.11 215);
+  --hp-good: oklch(0.52 0.12 148);
+  --hp-warn: oklch(0.6 0.14 95);
+  --hp-low: oklch(0.56 0.16 52);
   --hp-crit: oklch(0.5 0.18 25);
   --hp-out: oklch(0.4 0.1 320);
 
-  /* Paler vignette so the parchment keeps reading flat under long use. */
-  --arcane-edge-warm: oklch(0.9 0.07 80 / 0.55);
-  --arcane-edge-violet: oklch(0.9 0.05 30 / 0.35);
+  /* Light magic via the shared vignette: a sun-glow pooling in the top
+     right (brighter than the canvas, so it reads as light, not stain) and
+     a clear-sky wash in the bottom left. */
+  --arcane-edge-warm: oklch(0.975 0.075 95 / 0.9);
+  --arcane-edge-violet: oklch(0.93 0.04 235 / 0.45);
 
-  --card-sheen: oklch(1 0 0 / 0.55);
-  --card-etch: color-mix(in oklch, var(--gild) 12%, transparent);
+  /* Sunlit top edge on every card; gilt etch a shade stronger than IM. */
+  --card-sheen: oklch(1 0.025 95 / 0.75);
+  --card-etch: color-mix(in oklch, var(--gild) 14%, transparent);
 
-  --shadow-1: 0 1px 2px oklch(0.45 0.05 70 / 0.1), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.45 0.08 70 / 0.25), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(1 0 0 / 0.6);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
+  --shadow-1: 0 1px 2px oklch(0.45 0.06 70 / 0.1), 0 0 0 1px var(--color-base-300);
+  --shadow-2: 0 12px 40px -14px oklch(0.5 0.1 75 / 0.28), 0 0 0 1px var(--color-base-300), inset 0
+    1px 0 oklch(1 0 0 / 0.7);
+  /* Radiant halo: bolt-gold light rather than a primary-coloured smudge. */
+  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 28px -2px oklch(0.85 0.16 90 / 0.85);
 }
 
 [data-theme="heraldic-vellum"] {

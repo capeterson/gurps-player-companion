@@ -154,7 +154,7 @@ describe('guest preview session', () => {
   it('sends a guest token to every API operation and refuses all but the allow-list', async () => {
     const document = app.getOpenAPIDocument({
       openapi: '3.0.0',
-      info: { title: 'GURPS Player Companion API', version: '0.1.0' },
+      info: { title: 'Sunbolt API', version: '0.1.0' },
     }) as unknown as { paths: Record<string, Record<string, unknown>> };
     const operations = Object.entries(document.paths).flatMap(([path, methods]) =>
       Object.keys(methods)

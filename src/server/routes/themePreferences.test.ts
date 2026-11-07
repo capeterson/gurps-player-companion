@@ -28,7 +28,7 @@ function patch(token: string, body: unknown) {
 }
 
 describe('/api/v1/auth/preferences', () => {
-  it('defaults to the Gilded Tome and Illuminated Manuscript palettes and persists changes', async () => {
+  it('defaults to the Gilded Tome and Sunbolt palettes and persists changes', async () => {
     const token = await register();
     const initial = await app.request('/api/v1/auth/preferences', {
       headers: { Authorization: `Bearer ${token}` },
@@ -36,14 +36,14 @@ describe('/api/v1/auth/preferences', () => {
     expect(initial.status).toBe(200);
     expect(await initial.json()).toEqual({
       darkTheme: 'gilded-tome',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
 
     const dark = await patch(token, { darkTheme: 'midnight-gilt' });
     expect(dark.status).toBe(200);
     expect(await dark.json()).toEqual({
       darkTheme: 'midnight-gilt',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
 
     const verdigris = await patch(token, { darkTheme: 'verdigris-brass' });

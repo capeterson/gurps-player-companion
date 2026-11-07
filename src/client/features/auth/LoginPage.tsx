@@ -77,7 +77,7 @@ export function LoginPage({ defaultReturnTo = '/' }: { defaultReturnTo?: '/' | '
           login.mutate();
         }}
       >
-        <p className="label-eyebrow">Player Companion</p>
+        <p className="label-eyebrow">Sunbolt</p>
         <h1 className="font-display text-3xl font-semibold">Sign in</h1>
         {isOAuthReauthentication && (
           <p className="text-sm text-muted">

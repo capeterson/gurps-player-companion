@@ -22,6 +22,7 @@ import {
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
   type DarkThemeName,
+  LEGACY_THEME_ALIASES,
   LIGHT_THEMES,
   type LightThemeName,
   THEME_LABELS,
@@ -68,7 +69,7 @@ const THEME_COLORS: Record<ThemeName, string> = {
   'gilded-tome': '#16110d',
   'midnight-gilt': '#0d1220',
   'verdigris-brass': '#0c1715',
-  'illuminated-manuscript': '#f3ecdc',
+  sunbolt: '#f9f2df',
   'heraldic-vellum': '#f2f4f8',
 };
 
@@ -100,7 +101,11 @@ function readStoredPreferences(): { preferences: ThemePreferences; pending: bool
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
     const dark = darkThemeName.safeParse(value.darkTheme);
-    const light = lightThemeName.safeParse(value.lightTheme);
+    const light = lightThemeName.safeParse(
+      typeof value.lightTheme === 'string'
+        ? (LEGACY_THEME_ALIASES[value.lightTheme] ?? value.lightTheme)
+        : value.lightTheme,
+    );
     return {
       preferences: {
         darkTheme: dark.success ? dark.data : DEFAULT_DARK_THEME,
@@ -124,7 +129,12 @@ export function resolveTheme(mode: ThemeMode, preferences: ThemePreferences): Th
 export function applyTheme(theme: ThemeName) {
   if (typeof document === 'undefined') return;
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLORS[theme]);
+  // The HTML ships one tag per OS colour scheme for the moment before scripts
+  // run; once a theme is applied every tag follows the app's own choice.
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute('content', THEME_COLORS[theme]);
+    meta.removeAttribute('media');
+  }
 }
 
 /** Apply the stored theme before React renders, so there is no flash of the default. */

@@ -342,11 +342,11 @@ export function createMcpHandler(
     }
 
     const server = new Server(
-      { name: 'gurps-player-companion', version: '0.1.0' },
+      { name: 'sunbolt', version: '0.1.0' },
       {
         capabilities: { tools: {}, resources: {} },
         instructions:
-          'Tools cover the GPC player API; task tools have explicit typed actions. Mutations return a compact acknowledgement; use a read action or tool for refreshed state. Image uploads combine metadata and bytes in one call: reuse clientUploadId and identical content after a lost response, then attach resourceId through a character/campaign update. Non-media mutations accept idempotencyKey; reuse it after a lost response.',
+          'Tools cover the Sunbolt player API; task tools have explicit typed actions. Mutations return a compact acknowledgement; use a read action or tool for refreshed state. Image uploads combine metadata and bytes in one call: reuse clientUploadId and identical content after a lost response, then attach resourceId through a character/campaign update. Non-media mutations accept idempotencyKey; reuse it after a lost response.',
       },
     );
     server.setRequestHandler(ListToolsRequestSchema, async () => ({

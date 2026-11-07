@@ -45,7 +45,7 @@ export function ResetPasswordPage() {
     return (
       <div className="arcane-edge flex min-h-screen items-center justify-center bg-base-200 p-6">
         <div className="card relative z-10 flex w-full max-w-sm flex-col gap-3 p-card">
-          <p className="label-eyebrow">Player Companion</p>
+          <p className="label-eyebrow">Sunbolt</p>
           <h1 className="font-display text-3xl font-semibold">Reset password</h1>
           <p className="alert alert-error text-sm">
             Missing reset token. Please use the link from your email.
@@ -72,7 +72,7 @@ export function ResetPasswordPage() {
           reset.mutate();
         }}
       >
-        <p className="label-eyebrow">Player Companion</p>
+        <p className="label-eyebrow">Sunbolt</p>
         <h1 className="font-display text-3xl font-semibold">Reset password</h1>
         <label className="form-control">
           <span className="label-text">New password</span>

@@ -28,7 +28,7 @@ test('expired reset links offer a reachable request-new-link action on mobile an
       await page.goto('/reset-password?token=expired');
       await expect(page.locator('html')).toHaveAttribute(
         'data-theme',
-        mode === 'dark' ? 'gilded-tome' : 'illuminated-manuscript',
+        mode === 'dark' ? 'gilded-tome' : 'sunbolt',
       );
       await expect(
         page.getByRole('heading', { name: 'Reset password', exact: true }),

@@ -1,6 +1,6 @@
 ---
 name: gpc-library-authoring
-description: Create or revise campaign-approved GPC library definitions from supplied rules or sources, including skill policies, prerequisites, effects, and equipment mechanics. Use for campaign library authoring and review, not importing an entire sourcebook by implication.
+description: Create or revise campaign-approved Sunbolt library definitions from supplied rules or sources, including skill policies, prerequisites, effects, and equipment mechanics. Use for campaign library authoring and review, not importing an entire sourcebook by implication.
 ---
 
 Translate the supplied campaign rules into searchable, usable library entries without filling gaps with invented mechanics.

@@ -124,11 +124,11 @@ export default defineConfig(async () => {
         manifest: {
           // Preserve the identity previously inferred from start_url.
           id: '/',
-          name: 'GURPS Player Companion',
-          short_name: 'GURPS PC',
-          description: 'Local-first GURPS character + campaign companion',
-          theme_color: '#16110d',
-          background_color: '#16110d',
+          name: 'Sunbolt',
+          short_name: 'Sunbolt',
+          description: 'A GURPS 4th edition companion',
+          theme_color: '#1c2350',
+          background_color: '#1c2350',
           display: 'standalone',
           start_url: '/',
           scope: '/',

@@ -60,7 +60,7 @@ try {
   await page.screenshot({ path: resolve(output, 'damage-mobile.png'), animations: 'disabled' });
   await damage.getByRole('button', { name: 'Cancel' }).click();
   console.log('Mobile captures saved; damage not applied');
-  await page.setViewportSize({ width: 1440, height: 2200 });
+  await page.setViewportSize({ width: 1440, height: 3000 });
   await section('Inventory');
   await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
   await page.getByText('Trail pack', { exact: true }).waitFor();

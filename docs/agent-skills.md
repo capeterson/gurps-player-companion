@@ -1,6 +1,6 @@
-# GPC workflow skills and evals
+# Sunbolt workflow skills and evals
 
-The portable skills in `skills/` help agents combine GPC tools into player and GM
+The portable skills in `skills/` help agents combine Sunbolt tools into player and GM
 workflows. They use the connected client's actual tool names and advertised schemas.
 Explicit requests to apply a fully specified change authorize that change; draft
 requests remain read-only. Server permissions and validation still decide what can
@@ -17,7 +17,7 @@ be applied.
 Each folder contains `SKILL.md`, optional client display metadata in
 `agents/openai.yaml`, and four synthetic scenarios in `evals/evals.json`.
 Copy the selected skill folders into the target client's supported plugin skill
-directory and package them with its GPC MCP connection. Follow that client's plugin
+directory and package them with its Sunbolt MCP connection. Follow that client's plugin
 format; this repository does not contain private connection registrations or a
 universal install manifest. The skills can run with the current tool catalog.
 Focused item/library cards are optional when advertised by the connected server.
@@ -46,7 +46,7 @@ prepared files omit the `checks` field and include the prompt, available tool
 schemas, synthetic response projections, and trace format. Paths generated inside
 Docker start with `/app`; resolve them relative to the checkout when evaluating on
 the host. Evaluators simulate calls against these responses and never call a live
-GPC account.
+Sunbolt account.
 
 Record one trace per case in a JSON array:
 

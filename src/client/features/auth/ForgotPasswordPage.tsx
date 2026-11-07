@@ -20,7 +20,7 @@ export function ForgotPasswordPage() {
   return (
     <div className="arcane-edge flex min-h-screen items-center justify-center bg-base-200 p-6">
       <div className="card relative z-10 flex w-full max-w-sm flex-col gap-3 p-card">
-        <p className="label-eyebrow">Player Companion</p>
+        <p className="label-eyebrow">Sunbolt</p>
         <h1 className="font-display text-3xl font-semibold">Forgot password</h1>
         {submitted ? (
           <>

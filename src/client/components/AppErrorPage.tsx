@@ -51,7 +51,7 @@ export function AppErrorPage({ homeHref = '/' }: { homeHref?: string }) {
         <div className="border-b border-base-300 bg-base-200/50 px-5 py-4 sm:px-7">
           <a href={homeHref} className="flex w-fit items-center gap-3 no-cap">
             <BrandMark className="h-8 w-8" />
-            <span className="font-display font-semibold">Player Companion</span>
+            <span className="font-display font-semibold">Sunbolt</span>
           </a>
         </div>
 

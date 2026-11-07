@@ -1,4 +1,4 @@
-# GURPS Player Companion — agent notes
+# Sunbolt — agent notes
 
 Compact, durable rules for anyone (human or agent) editing this repo. Keep
 it short; add a section only when a rule has been broken at least once.

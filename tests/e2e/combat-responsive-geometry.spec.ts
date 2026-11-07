@@ -267,9 +267,7 @@ test('Combat names illegal armor in the warning and incoming damage dialog acros
     await attachReviewScreenshot(page, testInfo, 'armor-warning-sheet-dark-375', {
       animations: 'disabled',
     });
-    await page
-      .locator('html')
-      .evaluate((node) => node.setAttribute('data-theme', 'illuminated-manuscript'));
+    await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'sunbolt'));
     await attachReviewScreenshot(page, testInfo, 'armor-warning-sheet-light-375', {
       animations: 'disabled',
     });

@@ -61,7 +61,7 @@ test('MCP Apps bridge renders shared sheet details in an opaque sandbox, with bo
     app.getByText('ST', { exact: true }).locator('..').getByText('15', { exact: true }),
   ).toBeVisible();
   await page.evaluate(() => window.mcpTestHost.theme('light'));
-  await expect(app.locator('html')).toHaveAttribute('data-theme', 'illuminated-manuscript');
+  await expect(app.locator('html')).toHaveAttribute('data-theme', 'sunbolt');
 
   for (const width of [320, 639, 640, 641, 767, 768, 769]) {
     await page.setViewportSize({ width, height: 1000 });

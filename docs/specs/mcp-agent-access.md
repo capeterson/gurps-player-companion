@@ -6,10 +6,10 @@ connected-app UI, exact operation coverage, and parity drift guards ship togethe
 
 ## Decision: host with the normal app server
 
-GPC serves remote MCP at `/mcp` using Streamable HTTP in the existing Bun /
+Sunbolt serves remote MCP at `/mcp` using Streamable HTTP in the existing Bun /
 Hono process, on the app's origin and port. The same process hosts the OAuth
 authorization server. Neither requires another application, container, database,
-or public origin. MCP is a transport adapter over GPC operations.
+or public origin. MCP is a transport adapter over Sunbolt operations.
 
 The protocol baseline is MCP **2025-11-25** with the SDK pinned to `1.30.0`.
 Initialization tests pin negotiated versions. Upgrading
@@ -144,13 +144,13 @@ Implemented modules:
 
 | ID | Required behavior |
 |---|---|
-| AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on GPC using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication before rendering approval controls for a new grant; a stale session returns directly to login with the complete authorization request preserved. Recheck freshness when approval is submitted. |
+| AUTH-1 | Authorization-code flow with PKCE S256 for public clients. Login and consent happen on Sunbolt using existing password/passkey authentication; agents never receive player passwords, app refresh tokens, or newly minted API keys. Require recent primary authentication before rendering approval controls for a new grant; a stale session returns directly to login with the complete authorization request preserved. Recheck freshness when approval is submitted. |
 | AUTH-2 | Publish `/.well-known/oauth-protected-resource/mcp` with the canonical `/mcp` resource and authorization server, and `/.well-known/oauth-authorization-server` with issuer, authorization/token endpoints, scopes, and PKCE support. Unauthenticated MCP requests return 401 with a discoverable `WWW-Authenticate` challenge. Canonical URLs come from trusted deployment configuration, never arbitrary Host/forwarded headers. |
 | AUTH-3 | Provide `/oauth/authorize`, `/oauth/token`, `/oauth/revoke`, and `/oauth/register`. Bind one-time, short-lived codes to player, client, exact redirect URI, PKCE challenge, granted scopes, and resource. Validate the requested resource at authorization and token exchange; reject a mismatched audience on MCP calls. Protect browser consent against CSRF, preserve client state, and reject unregistered redirects before redirecting anywhere. No implicit or password grant. |
 | AUTH-4 | Support Client ID Metadata Documents (CIMD), Dynamic Client Registration (DCR), and optional operator-configured clients. Advertise CIMD and DCR in authorization-server metadata so standards-compatible public clients need no per-client server configuration. Resolve CIMD only from public HTTPS port 443 with pinned public DNS, no redirects, bounded/time-limited JSON responses, exact client-ID and safe redirect validation, and a capped cache. DCR accepts only public clients using authorization code + PKCE and safe HTTPS or loopback callbacks; it is body/rate limited and returns no client secret. |
 | AUTH-5 | Issue separate short-lived, audience-bound OAuth access tokens and rotating refresh tokens. Persist grants and token-family state in Postgres; store opaque token/code secrets only as hashes. Check revocation, user suspension/deletion, authentication version, and current permissions on every call. Password change/recovery invalidates delegated sessions too. Refresh cannot widen scope or change resource/client; replay revokes the family. |
 | AUTH-6 | Settings lists connected clients, scopes, creation/last-use time, and a revoke action. Revocation requires an explicit confirmation that names the app and explains the immediate loss of access. Confirmed revocation invalidates the entire grant, including outstanding access and refresh tokens, on the next request; cancellation leaves the grant untouched. Ordinary app logout clears local account state but leaves explicitly approved grants; show this distinction to players. Account recovery revokes all grants. |
-| AUTH-7 | Effective authority is the intersection of the user's current GPC permissions and granted scopes. No client-selected actor ID, impersonation, superuser elevation, or scope bypass through REST/sync. OAuth tokens for `/mcp` are rejected by existing app-session/API-key endpoints; shared handlers receive a trusted actor context rather than a forwarded token. |
+| AUTH-7 | Effective authority is the intersection of the user's current Sunbolt permissions and granted scopes. No client-selected actor ID, impersonation, superuser elevation, or scope bypass through REST/sync. OAuth tokens for `/mcp` are rejected by existing app-session/API-key endpoints; shared handlers receive a trusted actor context rather than a forwarded token. |
 
 The scope vocabulary is `gpc:read` for player-domain reads (including the
 current-user identity), `gpc:write` for ordinary creates/updates, and
@@ -414,14 +414,14 @@ authorization code, PKCE S256, and bearer protected resources need only the
 `/mcp` URL. Authorization-server discovery advertises both
 `client_id_metadata_document_supported: true` and `/oauth/register`:
 
-- ChatGPT can identify itself with its HTTPS Client ID Metadata Document. GPC
+- ChatGPT can identify itself with its HTTPS Client ID Metadata Document. Sunbolt
   fetches and validates that document on first authorization and caches the
   resulting public-client registration for at most one hour. The SSRF-safe
   fetch connects directly to a validated public DNS address while retaining
   the original hostname for TLS certificate verification and HTTP virtual
   hosting; it does not perform a second, rebinding-prone lookup.
 - Claude and other DCR clients can register their callback automatically at
-  `/oauth/register`. GPC creates an opaque public client ID and never issues a
+  `/oauth/register`. Sunbolt creates an opaque public client ID and never issues a
   client secret.
 
 `OAUTH_CLIENTS` remains an optional compatibility and operator-control mechanism,
@@ -448,7 +448,7 @@ and private registered-app mappings remain local artifacts, excluded from source
 control and Docker build contexts. Configure
 clients with the target instance's `/mcp` URL: `https://gurps.abundant.zip/mcp`
 for the hosted production instance, or `https://gurps-dev.abundant.zip/mcp`
-for development testing. Each user signs in and consents with their own GPC account.
+for development testing. Each user signs in and consents with their own Sunbolt account.
 
 Client setup uses the `/mcp` resource URL. Discovery supplies the authorization
 server and endpoints. The client sends its registered ID, exact callback,

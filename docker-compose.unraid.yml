@@ -1,4 +1,4 @@
-# GURPS Player Companion — Unraid production (released versions) compose
+# Sunbolt — Unraid production (released versions) compose
 #
 # Pulls a prebuilt image from GHCR (published by .github/workflows/publish-image.yml).
 # No source on the server, no on-server build, no `context:` paths to get wrong.

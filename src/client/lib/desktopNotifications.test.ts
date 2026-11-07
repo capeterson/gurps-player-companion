@@ -138,7 +138,7 @@ describe('desktop notification delivery', () => {
     expect(FakeNotification.instances).toHaveLength(1);
     expect(FakeNotification.instances[0]?.title).toBe('Character updated');
     expect(FakeNotification.instances[0]?.options?.body).toBe(
-      'Open Player Companion to view this notification.',
+      'Open Sunbolt to view this notification.',
     );
   });
 

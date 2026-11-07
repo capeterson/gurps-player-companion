@@ -11,7 +11,7 @@ export const DARK_THEMES = [
   'verdigris-brass',
   'arcane-dark',
 ] as const;
-export const LIGHT_THEMES = ['illuminated-manuscript', 'heraldic-vellum', 'arcane-light'] as const;
+export const LIGHT_THEMES = ['sunbolt', 'heraldic-vellum', 'arcane-light'] as const;
 
 export const darkThemeName = z.enum(DARK_THEMES);
 export const lightThemeName = z.enum(LIGHT_THEMES);
@@ -20,7 +20,15 @@ export type LightThemeName = z.infer<typeof lightThemeName>;
 export type ThemeName = DarkThemeName | LightThemeName;
 
 export const DEFAULT_DARK_THEME: DarkThemeName = 'gilded-tome';
-export const DEFAULT_LIGHT_THEME: LightThemeName = 'illuminated-manuscript';
+export const DEFAULT_LIGHT_THEME: LightThemeName = 'sunbolt';
+
+/**
+ * Palette ids that were renamed or retired. Stored copies (localStorage, older
+ * clients) resolve to the palette that replaced them.
+ */
+export const LEGACY_THEME_ALIASES: Readonly<Record<string, LightThemeName>> = {
+  'illuminated-manuscript': 'sunbolt',
+};
 
 export const THEME_LABELS: Record<ThemeName, string> = {
   'arcane-dark': 'Arcane Purple',
@@ -28,7 +36,7 @@ export const THEME_LABELS: Record<ThemeName, string> = {
   'gilded-tome': 'Gilded Tome',
   'midnight-gilt': 'Midnight Gilt',
   'verdigris-brass': 'Verdigris & Brass',
-  'illuminated-manuscript': 'Illuminated Manuscript',
+  sunbolt: 'Sunbolt',
   'heraldic-vellum': 'Heraldic Vellum',
 };
 

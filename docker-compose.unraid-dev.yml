@@ -1,4 +1,4 @@
-# GURPS Player Companion — Unraid DEV (bleeding-edge) compose
+# Sunbolt — Unraid DEV (bleeding-edge) compose
 #
 # Pulls the `dev` tag from GHCR, which is rebuilt on every push to `main`
 # by .github/workflows/publish-image.yml. This stack is intentionally
