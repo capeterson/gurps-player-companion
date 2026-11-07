@@ -15,7 +15,13 @@ function item(
   id: string,
   name: string,
   parentId: string | null,
-  options: { container?: boolean; weapon?: boolean; worn?: boolean; equipped?: boolean } = {},
+  options: {
+    container?: boolean;
+    weapon?: boolean;
+    worn?: boolean;
+    equipped?: boolean;
+    location?: string;
+  } = {},
 ): InventoryItemOut {
   return {
     id,
@@ -26,7 +32,7 @@ function item(
     cost: 1,
     notes: null,
     parentId,
-    externalLocation: null,
+    externalLocation: options.location ?? null,
     worn: options.worn ?? parentId === null,
     equipped: options.equipped ?? false,
     isContainer: options.container ?? false,
@@ -349,6 +355,118 @@ describe('Inventory selection dismissal', () => {
   });
 });
 
+const LAMP_ID = '0193b3c0-f1f0-7000-8000-00000000c204';
+
+describe('Stashed inventory by location', () => {
+  const stashedInventory = [
+    item('0193b3c0-f1f0-7000-8000-00000000c201', 'Tent', null, {
+      worn: false,
+      location: 'Party handcart',
+    }),
+    item('0193b3c0-f1f0-7000-8000-00000000c202', 'Rope', null, {
+      worn: false,
+      location: 'party handcart',
+    }),
+    item('0193b3c0-f1f0-7000-8000-00000000c203', 'Spare cloak', null, {
+      worn: false,
+      location: 'Greyhaven inn',
+    }),
+    item('0193b3c0-f1f0-7000-8000-00000000c204', 'Lamp', null, { worn: false }),
+    item('0193b3c0-f1f0-7000-8000-00000000c205', 'Chest', null, {
+      worn: false,
+      container: true,
+      location: 'Greyhaven inn',
+    }),
+    item(
+      '0193b3c0-f1f0-7000-8000-00000000c206',
+      'Coin purse',
+      '0193b3c0-f1f0-7000-8000-00000000c205',
+    ),
+  ];
+
+  it('groups stashed items by location with unlocated items last', () => {
+    renderPanel(undefined, { inventory: stashedInventory });
+    const stashed = screen.getByRole('table', { name: 'Stashed inventory' });
+    expect(
+      within(stashed)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Greyhaven inn', 'Party handcart', 'No location']);
+    const handcart = within(stashed)
+      .getByRole('rowheader', { name: /Party handcart/ })
+      .closest('tbody');
+    expect(within(handcart as HTMLElement).getByText('Tent')).toBeVisible();
+    expect(within(handcart as HTMLElement).getByText('Rope')).toBeVisible();
+    const inn = within(stashed)
+      .getByRole('rowheader', { name: /Greyhaven inn/ })
+      .closest('tbody');
+    expect(within(inn as HTMLElement).getByText('Chest')).toBeVisible();
+    expect(within(inn as HTMLElement).queryByText('Tent')).toBeNull();
+    // The section names the location, so rows do not repeat it.
+    expect(within(inn as HTMLElement).getAllByText('Greyhaven inn')).toHaveLength(1);
+  });
+
+  it('switches the stashed list between location and type sections', () => {
+    renderPanel(undefined, { inventory: stashedInventory });
+    const stashed = screen.getByRole('table', { name: 'Stashed inventory' });
+    const heading = within(stashed).getByRole('button', { name: 'Sort by Item' }).closest('th');
+    if (!heading) throw new Error('Item heading missing');
+    fireEvent.contextMenu(heading);
+    const menu = screen.getByRole('dialog', { name: 'Filter Item type' });
+    const toggle = within(menu).getByRole('switch', { name: 'Group by type' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(
+      within(stashed)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Container', 'Other']);
+    fireEvent.click(toggle);
+    expect(
+      within(stashed)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Greyhaven inn', 'Party handcart', 'No location']);
+  });
+
+  it('folds a location and remembers it', () => {
+    const first = renderPanel(undefined, { inventory: stashedInventory });
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Party handcart' }));
+    expect(screen.getByText('Tent', { exact: true })).not.toBeVisible();
+    expect(screen.getByLabelText('2 items')).toBeVisible();
+    first.unmount();
+    renderPanel(undefined, { inventory: stashedInventory });
+    expect(screen.getByRole('button', { name: 'Expand Party handcart' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Collapse Greyhaven inn' })).toBeVisible();
+  });
+
+  it('offers existing stash locations in a combobox that still accepts a new one', async () => {
+    const db = getLocalDb();
+    await db.characterInventory.bulkPut(
+      stashedInventory.map((entry) => ({ ...entry, revision: 1 })),
+    );
+    renderPanel(undefined, { canWrite: true, inventory: stashedInventory });
+    fireEvent.click(within(row('Lamp')).getByRole('button', { name: /Edit/ }));
+    const field = await screen.findByRole('combobox', { name: 'Stash location' });
+    const listed = Array.from(
+      document.querySelectorAll(`datalist[id="${field.getAttribute('list')}"] option`),
+    ).map((option) => option.getAttribute('value'));
+    expect(listed).toEqual(['Greyhaven inn', 'Party handcart']);
+    fireEvent.change(field, { target: { value: 'Party handcart' } });
+    fireEvent.blur(field);
+    await waitFor(async () =>
+      expect((await db.characterInventory.get(LAMP_ID))?.externalLocation).toBe('Party handcart'),
+    );
+
+    // A value that is not in the list is kept as typed.
+    fireEvent.change(field, { target: { value: 'Cellar' } });
+    fireEvent.blur(field);
+    await waitFor(async () =>
+      expect((await db.characterInventory.get(LAMP_ID))?.externalLocation).toBe('Cellar'),
+    );
+  });
+});
+
 describe('Inventory group by type', () => {
   function openItemTypeMenu(tableName: string) {
     const table = screen.getByRole('table', { name: tableName });
@@ -377,9 +495,13 @@ describe('Inventory group by type', () => {
     expect(within(row('Broadsword')).getByText('in Backpack')).toBeVisible();
     expect(within(row('Moon Gem')).getByText('in Small pouch')).toBeVisible();
     expect(within(carried).queryByRole('button', { name: 'Expand contents' })).toBeNull();
-    // The other list keeps its own choice.
+    // Stashed is grouped by location, not by type.
     const stashed = screen.getByRole('table', { name: 'Stashed inventory' });
-    expect(within(stashed).queryAllByRole('rowheader')).toHaveLength(0);
+    expect(
+      within(stashed)
+        .getAllByRole('rowheader')
+        .map((header) => header.textContent),
+    ).toEqual(['No location']);
 
     fireEvent.click(screen.getByText('Broadsword', { exact: true }));
     fireEvent.click(screen.getByText('Apple', { exact: true }), { ctrlKey: true });

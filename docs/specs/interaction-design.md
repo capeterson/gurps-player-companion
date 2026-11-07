@@ -261,7 +261,7 @@ Secondary attributes use three columns from 640–767px and from 1024px upward,
 so wide paired cards display their values in two rows rather than leaving a hole
 below Attributes. Numeric value/modifier groups can wrap within their cells.
 The utility column keeps its own panels at content height: the non-folding
-Point ledger (a header-only data card whose total opens the bucket breakdown in
+Points card (a header-only data card whose total opens the bucket breakdown in
 a tooltip), plus Encumbrance and Conditional effects, which show only their
 headings when folded. Status uses a four-column grid with single-line labels so
 its height matches that column. Conditional effects owns its fold and
@@ -467,7 +467,8 @@ location. Equipped means worn or wielded for use and is valid only on the
 player; the add form disables Equipped for a Stashed or stashed-container
 location. The item-details editor has one **Location** select (On the player,
 Stashed, or In each eligible container) that replaces the former External
-location field: Stashed reveals its **Stash location** text, and the item itself
+location field: Stashed reveals its **Stash location** combobox (it suggests the character's
+existing stash locations as you type but keeps any new value as entered), and the item itself
 and its contents are never offered. Every move — this select, the bulk **Move to**
 menu and drag and drop — goes through `inventory/inventoryMoves.ts`, which applies
 the same patches, self/container/cycle checks and unequips anything the move takes
@@ -558,6 +559,12 @@ collapsed, remember the fold per character, list and type on this device, open
 while searching or filtering, and open to reveal a deep-linked item; searching
 lists only direct matches. Each list keeps its own grouping choice as a
 device-local preference cleared at logout, and sections follow the list's sort.
+The Stashed list defaults to folding **stash location** sections (spelling-case variants
+share one; alphabetical, **No location** last) holding the stashed root items and, in
+tree order, their contents; the **Group by type** switch replaces them with type
+sections. Location sections fold, remember the fold, open while filtering or revealing a
+deep link, and deselect what they hide like type sections; they are never containers
+or drop targets, so dropping anywhere in Stashed still moves an item to its top level.
 Qty, Wt and Cost filter with the shared range filter. There is no separate tag selector in the toolbar. Below
 640px the headings stay visible as one compact row so phones can sort and filter. Category chips remain the
 route to category editors. **+ Category** lives in the item-details editor the

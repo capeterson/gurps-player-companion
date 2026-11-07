@@ -50,6 +50,7 @@ import { enqueueDeletes, enqueueFieldPatches } from '../../../sync/outbox.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../useCharacterDetail.ts';
 import { FacetChipRow } from './FacetChips.tsx';
 import { InventoryRow } from './InventoryRow.tsx';
+import { InventoryLocationGroup } from './inventory/InventoryLocationGroup.tsx';
 import { InventoryTypeGroup } from './inventory/InventoryTypeGroup.tsx';
 import { LoadoutEditor } from './inventory/LoadoutEditor.tsx';
 import { LoadoutsMenu } from './inventory/LoadoutsMenu.tsx';
@@ -74,6 +75,7 @@ import {
   descendantsOf,
   filterInventoryTree,
   flattenDFS,
+  groupInventoryByLocation,
   groupInventoryByType,
   inventoryComparator,
   inventoryCostTotals,
@@ -230,12 +232,17 @@ export function InventoryPanel({
   }
   const wornGroups = typeGroups('worn');
   const stashedGroups = typeGroups('stashed');
+  // Stashed groups by stash location unless grouped by type.
+  const stashedLocationGroups = stashedGroups ? [] : groupInventoryByLocation(stashedRoots);
 
   // Range selection follows the displayed order of each list.
   const orderedIds = [
     ...(wornGroups?.flatMap((group) => group.items) ?? flattenDFS(carriedRoots, wornByParent)),
     ...(stashedGroups?.flatMap((group) => group.items) ??
-      flattenDFS(stashedRoots, stashedByParent)),
+      flattenDFS(
+        stashedLocationGroups.flatMap((group) => group.items),
+        stashedByParent,
+      )),
   ].map((i) => i.id);
   const { selectedIds, isSelected, handleClick, clear, replace, count } =
     useRangeSelect(orderedIds);
@@ -1170,7 +1177,18 @@ export function InventoryPanel({
                   {tableHead('stashed')}
                   {stashedGroups
                     ? renderGroups('stashed', stashedGroups)
-                    : renderRows(stashedRoots, { inStashed: true })}
+                    : stashedLocationGroups.map((group) => (
+                        <InventoryLocationGroup
+                          key={group.key}
+                          characterId={characterId}
+                          group={group}
+                          byParent={stashedByParent}
+                          revealItemId={anchorItemId ?? null}
+                          forceOpen={filterActive}
+                          onCollapse={deselectWithin}
+                          rowProps={rowProps(true)}
+                        />
+                      ))}
                 </Table>
               </div>
             )}

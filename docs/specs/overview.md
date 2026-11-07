@@ -294,10 +294,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   stats, status, ledger, encumbrance and conditional effects) directly under the
   Overview heading, above the non-collapsible Identity card; other destinations
   do not display them. Attributes, Secondary attributes, and Status stay expanded inside
-  it, with one heading each. The Point ledger is a compact, non-folding card
-  showing the total (a tooltip target listing every bucket), the campaign cap, and
-  unspent/over points. Encumbrance and Conditional effects fold independently;
-  Encumbrance keeps its tier badge beside the title and shows only the carry bar
+  it, with one heading each. The Points card is a compact, non-folding card
+  showing the total (a tooltip target listing every bucket and the cap) and
+  **Available** points, which is negative when over the cap. The identity header has no separate points widget. Encumbrance and Conditional effects fold independently;
+  Encumbrance keeps its tier badge right-aligned in the header and shows only the carry bar
   (Move and Dodge live in Secondary attributes). Folded sections shrink to their
   headings without stretching to fill neighboring cards. Conditional effects is absent unless the campaign active-effects
   experiment is enabled and condition groups exist. Skills, Traits, Inventory, and main Combat sections have keyboard-accessible
@@ -360,7 +360,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   dedicated temporary HP/FP modifiers change those maxima (M37). Basic
   Lift rounds to the nearest whole number once it reaches 10 (B15). All
   GURPS math is pure and shared (`src/shared/domain/`).
-- **Point ledger.** Live point totals vs the campaign point target, with
+- **Points.** Live point totals vs the campaign point target (the header shows the total and **Available**, which goes negative when over), with
   disadvantage / quirk cap warnings. Warning codes stay stable for API and
   dismissal persistence, while every active and dismissed warning is presented
   with a human-readable label; legacy unknown codes receive a readable fallback.
@@ -518,7 +518,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   too); null-level rows stay plain text. On narrow screens, each skill
   becomes a labeled card row so its name keeps the full content width instead
   of being squeezed by the attribute, points, level, and action columns.
-- **Point ledger** with one bucket per source: attributes, secondary
+- **Points** with one bucket per source: attributes, secondary
   characteristics, advantages, disadvantages, quirks, languages, skills,
   spells, and techniques, plus a derived `unspent`
   (`campaign.pointTarget - total`; 0 when the campaign sets no target).
@@ -644,7 +644,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   plus Other) and Qty/Wt/Cost ranges. The Item type filter's **Group by type** switch shows
   a list as folding type sections instead of its container tree: presentation only, never
   API containers or drop targets, with each item once under its first category and its
-  container named on the row. Results retain the ancestor containers needed to locate matching
+  container named on the row (Stashed defaults to stash-location sections, with
+  **No location** last, until the switch is turned on). Results retain the ancestor containers needed to locate matching
   nested items while hiding every non-matching sibling and descendant. Containers
   start collapsed; their expanded/collapsed choice is remembered per character and
   container in device-local `localStorage`, never synced. A collapsed container
@@ -683,7 +684,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   applies to armor typed DR, crushing DR, defense bonus, facing and notes;
   weapon ST, shield DB, structured ranged range (fixed yards or ST multiplier), alternate modes and notes; powerstone and
   magic-item notes; enchantment details; and basic notes. Item details hold one **Location** select (On the player, Stashed
-  with its stash location, or In a container) sharing the bulk Move menu's checks
+  with its stash location combobox, or In a container) sharing the bulk Move menu's checks
   and unequip rules; Equipped is disabled with a reason off the player. Linked
   items name their library item and offer **Unlink**. Enchantments edit full typed
   effects, levels, applicability and combining in a validated form; linked ones
