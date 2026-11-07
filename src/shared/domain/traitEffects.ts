@@ -57,6 +57,8 @@ export interface ResolvedEffect {
   readonly skillName?: string;
   readonly skillSpecialty?: string;
   readonly hitLocation?: string;
+  /** Damage type of a weapon_damage bonus when it differs from the weapon's own. */
+  readonly damageType?: string;
   readonly weaponSelector?: WeaponSelector;
   readonly conditionGroup?: string;
   readonly conditionLabel?: string;

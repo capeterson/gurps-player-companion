@@ -8571,6 +8571,11 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 160
+                              },
+                              "damageType": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
                               }
                             },
                             "required": [
@@ -8626,6 +8631,11 @@
                                       "type": "string",
                                       "minLength": 1,
                                       "maxLength": 160
+                                    },
+                                    "damageType": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
                                     }
                                   },
                                   "required": [
@@ -9937,6 +9947,11 @@
                                   "type": "string",
                                   "minLength": 1,
                                   "maxLength": 160
+                                },
+                                "damageType": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 40
                                 }
                               },
                               "required": [
@@ -9992,6 +10007,11 @@
                                         "type": "string",
                                         "minLength": 1,
                                         "maxLength": 160
+                                      },
+                                      "damageType": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 40
                                       }
                                     },
                                     "required": [
@@ -21238,6 +21258,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -21293,6 +21318,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -21750,6 +21780,11 @@
                                       "type": "string",
                                       "minLength": 1,
                                       "maxLength": 160
+                                    },
+                                    "damageType": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
                                     }
                                   },
                                   "required": [
@@ -21804,6 +21839,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -27902,6 +27942,11 @@
                                     "type": "string",
                                     "minLength": 1,
                                     "maxLength": 160
+                                  },
+                                  "damageType": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
                                   }
                                 },
                                 "required": [
@@ -27957,6 +28002,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -28727,6 +28777,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -28782,6 +28837,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -29675,6 +29735,11 @@
                                     "type": "string",
                                     "minLength": 1,
                                     "maxLength": 160
+                                  },
+                                  "damageType": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
                                   }
                                 },
                                 "required": [
@@ -29730,6 +29795,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -30497,6 +30567,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -30552,6 +30627,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -32677,6 +32757,11 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 160
+                        },
+                        "damageType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -32732,6 +32817,11 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 160
+                              },
+                              "damageType": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
                               }
                             },
                             "required": [
@@ -32888,6 +32978,11 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 160
+                              },
+                              "damageType": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
                               }
                             },
                             "required": [
@@ -32942,6 +33037,11 @@
                                       "type": "string",
                                       "minLength": 1,
                                       "maxLength": 160
+                                    },
+                                    "damageType": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
                                     }
                                   },
                                   "required": [
@@ -33210,6 +33310,11 @@
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 160
+                        },
+                        "damageType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -33265,6 +33370,11 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 160
+                              },
+                              "damageType": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
                               }
                             },
                             "required": [
@@ -33418,6 +33528,11 @@
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 160
+                              },
+                              "damageType": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 40
                               }
                             },
                             "required": [
@@ -33472,6 +33587,11 @@
                                       "type": "string",
                                       "minLength": 1,
                                       "maxLength": 160
+                                    },
+                                    "damageType": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 40
                                     }
                                   },
                                   "required": [
@@ -41818,6 +41938,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -41873,6 +41998,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -42640,6 +42770,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -45596,6 +45729,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -45651,6 +45789,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -46418,6 +46561,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -49641,6 +49787,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -49696,6 +49847,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -50463,6 +50619,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -51532,6 +51691,11 @@
                                     "type": "string",
                                     "minLength": 1,
                                     "maxLength": 160
+                                  },
+                                  "damageType": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
                                   }
                                 },
                                 "required": [
@@ -51587,6 +51751,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -52348,6 +52517,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -52403,6 +52577,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -55729,6 +55908,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -55784,6 +55968,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -56551,6 +56740,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -59519,6 +59711,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -59574,6 +59771,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -60341,6 +60543,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -63349,6 +63554,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -63404,6 +63614,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -64171,6 +64386,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -68032,6 +68250,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -68087,6 +68310,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -68854,6 +69082,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -72736,6 +72967,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -72791,6 +73027,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -73558,6 +73799,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -76516,6 +76760,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -76571,6 +76820,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -77338,6 +77592,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -80833,6 +81090,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -80888,6 +81150,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -81655,6 +81922,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -85170,6 +85440,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -85225,6 +85500,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -85992,6 +86272,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -88950,6 +89233,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -89005,6 +89293,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -89772,6 +90065,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -92896,6 +93192,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -92951,6 +93252,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -93718,6 +94024,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -96864,6 +97173,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -96919,6 +97233,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -97686,6 +98005,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -100644,6 +100966,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -100699,6 +101026,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -101466,6 +101798,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -104535,6 +104870,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -104590,6 +104930,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -105357,6 +105702,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -108448,6 +108796,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -108503,6 +108856,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -109270,6 +109628,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -112228,6 +112589,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -112283,6 +112649,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -113050,6 +113421,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -116138,6 +116512,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -116193,6 +116572,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -116960,6 +117344,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -120069,6 +120456,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -120124,6 +120516,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -120891,6 +121288,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -123849,6 +124249,11 @@
                                             "type": "string",
                                             "minLength": 1,
                                             "maxLength": 160
+                                          },
+                                          "damageType": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 40
                                           }
                                         },
                                         "required": [
@@ -123904,6 +124309,11 @@
                                                   "type": "string",
                                                   "minLength": 1,
                                                   "maxLength": 160
+                                                },
+                                                "damageType": {
+                                                  "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 40
                                                 }
                                               },
                                               "required": [
@@ -124671,6 +125081,9 @@
                             "type": "string"
                           },
                           "hitLocation": {
+                            "type": "string"
+                          },
+                          "damageType": {
                             "type": "string"
                           },
                           "weaponSelector": {
@@ -125601,6 +126014,11 @@
                                     "type": "string",
                                     "minLength": 1,
                                     "maxLength": 160
+                                  },
+                                  "damageType": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 40
                                   }
                                 },
                                 "required": [
@@ -125656,6 +126074,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -126420,6 +126843,11 @@
                                           "type": "string",
                                           "minLength": 1,
                                           "maxLength": 160
+                                        },
+                                        "damageType": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 40
                                         }
                                       },
                                       "required": [
@@ -126475,6 +126903,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -129801,6 +130234,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -129856,6 +130294,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -130623,6 +131066,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -133698,6 +134144,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -133753,6 +134204,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -134520,6 +134976,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -137481,6 +137940,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -137536,6 +138000,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -138303,6 +138772,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -141262,6 +141734,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -141317,6 +141794,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -142084,6 +142566,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -146003,6 +146488,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -146058,6 +146548,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -146825,6 +147320,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {
@@ -149952,6 +150450,11 @@
                                                 "type": "string",
                                                 "minLength": 1,
                                                 "maxLength": 160
+                                              },
+                                              "damageType": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 40
                                               }
                                             },
                                             "required": [
@@ -150007,6 +150510,11 @@
                                                       "type": "string",
                                                       "minLength": 1,
                                                       "maxLength": 160
+                                                    },
+                                                    "damageType": {
+                                                      "type": "string",
+                                                      "minLength": 1,
+                                                      "maxLength": 40
                                                     }
                                                   },
                                                   "required": [
@@ -150774,6 +151282,9 @@
                                 "type": "string"
                               },
                               "hitLocation": {
+                                "type": "string"
+                              },
+                              "damageType": {
                                 "type": "string"
                               },
                               "weaponSelector": {

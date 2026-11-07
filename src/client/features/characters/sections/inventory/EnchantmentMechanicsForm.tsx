@@ -17,6 +17,7 @@ export interface EffectDraft {
   target: EnchantmentEffectTarget;
   value: string;
   skillName: string;
+  damageType: string;
 }
 export interface LevelDraft {
   key: string;
@@ -39,6 +40,7 @@ function effectDraft(effect?: EnchantmentMechanics['effects'][number]): EffectDr
     target: effect?.target ?? 'dr',
     value: effect ? String(effect.value) : '1',
     skillName: effect?.skillName ?? '',
+    damageType: effect?.damageType ?? '',
   };
 }
 
@@ -64,6 +66,7 @@ const LEVEL_ERROR = 'Enter a whole number from 1 to 100';
 function messageFor(path: string, message: string): string {
   if (path.endsWith('.value')) return VALUE_ERROR;
   if (path.endsWith('.skillName')) return 'Choose a skill';
+  if (path.endsWith('.damageType')) return 'Use up to 40 characters';
   if (path.endsWith('.label')) return 'Use up to 80 characters';
   if (path === 'stackingPolicy.key') return 'Name the group (up to 80 characters)';
   if (/^levels\.\d+\.level$/.test(path))
@@ -85,6 +88,9 @@ export function parseMechanicsDraft(
         target: effect.target,
         value: Number(effect.value.trim()),
         ...(effect.target === 'skill' ? { skillName: effect.skillName.trim() } : {}),
+        ...(effect.target === 'weapon_damage' && effect.damageType.trim()
+          ? { damageType: effect.damageType.trim() }
+          : {}),
       };
     });
   const candidate = {
@@ -197,6 +203,16 @@ function EffectRows({
                 />
                 <FieldError id={`${id}-${index}-skill`} message={skillError} />
               </div>
+            )}
+            {effect.target === 'weapon_damage' && (
+              <input
+                aria-label={`${name} damage type`}
+                value={effect.damageType}
+                onChange={(event) => update(index, { damageType: event.target.value })}
+                placeholder="Damage type (e.g. fire)"
+                maxLength={40}
+                className="input input-sm input-bordered min-w-0 flex-[1_1_9rem]"
+              />
             )}
             <button
               type="button"

@@ -526,11 +526,23 @@ chip); damage is a separate dice button, so levels and damage each scan down a
 fixed column. Type and Reach / Range stay visible as muted text; a mode shows its
 ranged stat line or, for melee, its reach. ST-shortfall and bow-ST warnings are a
 short line under the affected attack. Each mode with attack, Accuracy or damage
-effects, or an ST shortfall, gets one **±** control: a portaled, scrollable
+effects, or an ST shortfall, gets one **✦** control: a portaled, scrollable
 `InfoTooltip` with titled Attack, Accuracy and Damage breakdowns
 (`ModifierTooltip`). Column headers are the only sort controls and handles are
 always present, as in Active defenses; moving a weapon while sorted turns the
-visible order into the custom order. Below 640px the same table rows become a
+visible order into the custom order. Damage-bonus effects (enchantments such as
+Flaming Weapon) are listed under the damage chip as signed lines (`+2 Flaming
+Weapon`) in addition to the ✦ breakdown. The **Dual-Weapon Attack** chip above
+the table turns on a checkbox per attack line; two lines from different weapons
+may be chosen (a third, or a second line of the same weapon, is disabled), and
+each chosen line shows its target −4 (MA83, MA127), waived under All-Out Attack.
+The −1 is the foe's penalty to defend against the attack (MA83), so it is stated
+in the status line and tooltip, never subtracted from the player's own defenses.
+A character without Ambidexterity names which chosen attack uses the off hand and
+that line takes a further −4 (B14, MA83) unless Off-Hand Weapon Training covers
+its skill (MA50). The choice is turn-local, held in `DualWeaponProvider`, and
+cleared by a new maneuver or character. B417 itself was not readable; the rule is
+taken from the Martial Arts entries that restate it. Below 640px the same table rows become a
 grid: the weapon name and handle take the group's first line, each mode keeps its
 skill/level and damage/type chips on one line, Reach / Range drops to a muted
 line beneath it, and the Type and Reach / Range headings are hidden, so Type is

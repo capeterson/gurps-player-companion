@@ -948,7 +948,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     group beside the first mode. Each row shows the mode and governing skill with
     the final target in one roll button, the damage dice as a roll button, the
     damage type, and a **Reach / Range** column (the ranged stat line for ranged
-    modes, reach otherwise). Weapon, governing skill, and damage type headers are
+    modes, reach otherwise). Damage-bonus effects such as enchantments are listed
+    under the damage chip. A **Dual-Weapon Attack** chip lets the player choose two
+    attacks from different weapons (−4 each unless All-Out Attack, off-hand −4 for
+    non-Ambidextrous characters; the foe defends at −1). Weapon, governing skill, and damage type headers are
     the only sort controls and toggle ascending / descending. Drag handles
     (including touch long-press) are always present; focused handles also move
     with the up/down arrow keys, and moving a weapon while sorted returns the table

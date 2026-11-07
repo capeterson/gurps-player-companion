@@ -242,6 +242,7 @@ export const resolvedEffectOut = z.object({
   skillName: z.string().optional(),
   skillSpecialty: z.string().optional(),
   hitLocation: z.string().optional(),
+  damageType: z.string().optional(),
   weaponSelector: weaponSelector.optional(),
   matchedInventoryItemIds: z.array(uuid).optional(),
   weaponMatchStatus: z.enum(['zero', 'one', 'multiple']).optional(),

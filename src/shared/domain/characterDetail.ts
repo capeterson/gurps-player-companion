@@ -986,6 +986,7 @@ export function buildCharacterDetail(
       skillName: e.skillName,
       skillSpecialty: e.skillSpecialty,
       hitLocation: e.hitLocation,
+      damageType: e.damageType,
       weaponSelector: e.weaponSelector,
       matchedInventoryItemIds: weaponMatch ? [...weaponMatch.matchedInventoryItemIds] : undefined,
       weaponMatchStatus: weaponMatch?.matchStatus,
