@@ -128,6 +128,15 @@ describe('MCP Apps character resource', () => {
       )
     ).json();
     expect(initialized.result.capabilities).toMatchObject({ tools: {}, resources: {} });
+    expect(initialized.result.serverInfo).toMatchObject({
+      name: 'sunbolt',
+      title: 'Sunbolt',
+      icons: [
+        { src: 'http://localhost:3001/icon-192.png', mimeType: 'image/png', sizes: ['192x192'] },
+        { src: 'http://localhost:3001/icon-256.png' },
+        { src: 'http://localhost:3001/icon-512.png' },
+      ],
+    });
     const listed = await (
       await handle(request({ jsonrpc: '2.0', id: 9, method: 'resources/list' }))
     ).json();

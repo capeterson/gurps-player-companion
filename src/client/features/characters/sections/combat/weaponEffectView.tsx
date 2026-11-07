@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   normalizeMechanicalName,
   weaponSelectorMatchesSkill,
@@ -6,6 +7,7 @@ import { type ResolvedEffect, skillBonusFor } from '../../../../../shared/domain
 import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { ResolvedEffectOut } from '../../../../../shared/schemas/character.ts';
 import type { WeaponEffectTarget } from '../../../../../shared/schemas/effects.ts';
+import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
 
 export function weaponEffectsForRow(
   effects: readonly ResolvedEffectOut[],
@@ -56,7 +58,7 @@ export interface ModifierBreakdownProps {
   finalValue: number | string;
 }
 
-function hasModifierEffects({
+export function hasModifierEffects({
   inputEffects = [],
   globalEffects = [],
   weaponEffects = [],
@@ -106,15 +108,52 @@ export function ModifierBreakdownContent({
   );
 }
 
-export function ModifierBreakdown(props: ModifierBreakdownProps) {
-  if (!hasModifierEffects(props)) return null;
+export interface ModifierSection {
+  readonly title: string;
+  /** Arithmetic that precedes the effect list, such as an ST shortfall. */
+  readonly note?: ReactNode;
+  readonly breakdown: ModifierBreakdownProps;
+}
+
+/**
+ * One ± control per attack row: a viewport-bounded, scrollable tooltip that
+ * lists the attack, Accuracy and damage breakdowns together.
+ */
+export function ModifierTooltip({
+  label,
+  sections,
+}: {
+  /** Accessible name of the trigger, e.g. "Modifiers: Rapier, Swing". */
+  label: string;
+  sections: readonly ModifierSection[];
+}) {
+  if (sections.length === 0) return null;
   return (
-    <details className="not-num text-[11px] text-base-content/60">
-      <summary className="cursor-pointer">Modifiers</summary>
-      <div className="mt-1 rounded bg-base-200/60 p-2">
-        <ModifierBreakdownContent {...props} />
-      </div>
-    </details>
+    <InfoTooltip
+      portal
+      scrollable
+      side="bottom"
+      ariaLabel={label}
+      contentClassName="w-72"
+      triggerClassName="btn btn-ghost btn-circle btn-xs h-7 min-h-7 w-7 border border-base-300 font-normal text-base-content/70"
+      content={
+        <div className="space-y-2">
+          {sections.map((section) => (
+            <section key={section.title} aria-label={section.title}>
+              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-base-content/70">
+                {section.title}
+              </h4>
+              {section.note && (
+                <div className="text-[11px] text-base-content/70">{section.note}</div>
+              )}
+              <ModifierBreakdownContent {...section.breakdown} />
+            </section>
+          ))}
+        </div>
+      }
+    >
+      <span aria-hidden="true">±</span>
+    </InfoTooltip>
   );
 }
 

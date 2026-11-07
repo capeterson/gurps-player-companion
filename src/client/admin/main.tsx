@@ -26,6 +26,7 @@ import { ToastProvider } from '../lib/toast.tsx';
 import '../styles/theme.css';
 import { AdminLayout } from './AdminLayout.tsx';
 import { AdminRequireAuth } from './AdminRequireAuth.tsx';
+import { AdminHomePage } from './pages/AdminHomePage.tsx';
 import { CampaignDetailPage } from './pages/CampaignDetailPage.tsx';
 import { CampaignsPage } from './pages/CampaignsPage.tsx';
 import { UserDetailPage } from './pages/UserDetailPage.tsx';
@@ -49,7 +50,7 @@ const router = createBrowserRouter([
           {
             element: <AdminLayout />,
             children: [
-              { path: '/admin', element: <Navigate to="/admin/users" replace /> },
+              { path: '/admin', element: <AdminHomePage /> },
               { path: '/admin/media', element: <MediaPage /> },
               { path: '/admin/users', element: <UsersPage /> },
               { path: '/admin/users/:id', element: <UserDetailPage /> },

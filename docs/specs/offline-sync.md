@@ -418,6 +418,7 @@ new shape; the reloaded build runs that upgrade before it sends anything.
 | `transient` | Backoff with jitter, retry **forever** — capped at 60s while fresh, relaxing to a ~5-min cadence after `MAX_ATTEMPTS` (8). Never gives up. |
 | `suspended` | Permanent fail; toast surfaces the reason. |
 | network error | Whole batch moves to `transient_retry` without reverting local edits; loop retries quietly and connectivity shows offline. Expected browser connection failures do not append `failed` or `retrying` journal entries. |
+| HTTP 502 | Treated like a connection failure: the batch retries with backoff, connectivity shows unavailable, and no `failed`/`retrying` journal entry or red badge is produced. Other 5xx codes are still journalled. |
 | HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and a persistent toast offers Reload when the user is ready (see *Sync protocol version*). |
 
 ## The session must survive a server outage

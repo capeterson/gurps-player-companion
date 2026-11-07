@@ -4,7 +4,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  CircleCheck,
+  CircleDot,
   Compass,
   Dice6,
   Ellipsis,
@@ -32,7 +32,7 @@ import {
 
 const ICONS = {
   combat: Swords,
-  equipped: CircleCheck,
+  equipped: CircleDot,
   powerstone: Gem,
   magicItem: WandSparkles,
   identity: UserRound,

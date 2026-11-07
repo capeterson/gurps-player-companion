@@ -342,7 +342,17 @@ export function createMcpHandler(
     }
 
     const server = new Server(
-      { name: 'sunbolt', version: '0.1.0' },
+      {
+        name: 'sunbolt',
+        title: 'Sunbolt',
+        version: '0.1.0',
+        // Same-origin icons let MCP clients show the Sunbolt mark beside the connector.
+        icons: [192, 256, 512].map((size) => ({
+          src: new URL(`/icon-${size}.png`, resource).href,
+          mimeType: 'image/png',
+          sizes: [`${size}x${size}`],
+        })),
+      },
       {
         capabilities: { tools: {}, resources: {} },
         instructions:

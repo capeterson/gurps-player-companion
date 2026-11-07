@@ -1088,8 +1088,6 @@ test('attribute modifier popovers keep their actions reachable on a short mobile
   await page.getByRole('button', { name: /^create$/i }).click();
   await expectCharacterNavigationReady(page);
   await selectCharacterSection(page, 'Overview');
-  const overview = page.getByRole('button', { name: /Sheet overview/ });
-  if ((await overview.getAttribute('aria-expanded')) === 'false') await overview.click();
   await page.getByRole('button', { name: 'Edit IQ modifiers' }).click();
 
   const apply = page.getByRole('dialog', { name: 'Modifiers for IQ' }).getByRole('button', {

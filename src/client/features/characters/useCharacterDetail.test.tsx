@@ -317,7 +317,7 @@ describe('durable character mechanics', () => {
     },
   );
 
-  it('shows Sheet overview above Identity only in Overview while Current Status stays available', async () => {
+  it('shows the overview cards above Identity only in Overview while Current Status stays available', async () => {
     await seed();
     await getLocalDb().campaigns.put({
       id: CAMPAIGN,
@@ -358,12 +358,14 @@ describe('durable character mechanics', () => {
       expect(screen.getByRole('button', { name: 'Open character navigation' })).toBeEnabled(),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
-    expect(screen.getByRole('button', { name: /^Sheet overview/ })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Combat' }));
+    expect(screen.getByRole('heading', { name: 'Attributes' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Sheet overview/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Combat' }));
+    expect(screen.queryByRole('heading', { name: 'Attributes' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open character navigation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
-    expect(screen.getByRole('button', { name: /^Sheet overview/ })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Attributes' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Identity' })).toBeVisible();
     await waitFor(() =>
       expect(screen.getByRole('group', { name: 'Character description' })).toBeInTheDocument(),
     );
@@ -698,12 +700,7 @@ describe('durable character mechanics', () => {
       expect(screen.queryByRole('button', { name: 'Conditional effects' })).not.toBeInTheDocument(),
     );
     expect((await getLocalDb().characters.get(CID))?.activeConditionGroups).toEqual(['focused']);
-    const sheetOverview = screen.getByRole('button', { name: /^Sheet overview/ });
-    fireEvent.click(sheetOverview);
-    expect(sheetOverview).toHaveTextContent('ST 10 · DX 10');
     await getLocalDb().campaigns.update(CAMPAIGN, { experimentalActiveEffects: true });
-    await waitFor(() => expect(sheetOverview).toHaveTextContent('ST 10 · DX 12'));
-    fireEvent.click(sheetOverview);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Conditional effects' })).toBeVisible(),
     );

@@ -246,22 +246,25 @@ plain text. Armor layers and natural skull protection retain their existing rows
 
 A trait link selects the Traits destination, opens its folded panel, reveals the
 owned row despite search/column filters, and highlights it. Editing remains an
-explicit action. `SheetAnchorLink` shares the router-aware anchor behavior with
+explicit action. Trait rows have a **Details** control that expands a read-only view (rendered Markdown description, source rules and effects) and, for editors, a separate **Edit** control for the form; the Description field is a Markdown editor. `SheetAnchorLink` shares the router-aware anchor behavior with
 existing equipment links and supports ordinary anchors outside a router.
 
 ## One heading and one interaction per purpose
 
 Overview's Attributes, Secondary attributes, and Status cards are always visible
-inside the outer Sheet overview disclosure. Each owns one heading without an
-individual fold. Overview uses one column below 768px and two equal columns
+directly under the Overview heading, with no outer disclosure. Each owns one
+heading without an individual fold. The Identity card follows with an icon and
+title but is not collapsible. Overview uses one column below 768px and two equal columns
 from 768px, retaining two columns on wide desktops. Paired stat cards share top
 and bottom edges, with Status starting one standard gap below Attributes.
 Secondary attributes use three columns from 640–767px and from 1024px upward,
 so wide paired cards display their values in two rows rather than leaving a hole
 below Attributes. Numeric value/modifier groups can wrap within their cells.
-The utility column keeps its own folded panels at content height: folded Point
-ledger, Encumbrance, and Conditional effects show only their headings rather
-than stretching to the stat cards' height. Conditional effects owns its fold and
+The utility column keeps its own panels at content height: the non-folding
+Point ledger (a header-only data card whose total opens the bucket breakdown in
+a tooltip), plus Encumbrance and Conditional effects, which show only their
+headings when folded. Status uses a four-column grid with single-line labels so
+its height matches that column. Conditional effects owns its fold and
 is absent unless the campaign active-effects experiment is enabled and condition
 groups are declared. The controls omit explanatory source captions.
 Campaign settings has the owner-only **Enable active effects** experiment, off by
@@ -476,7 +479,7 @@ category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
 Magic item, Enchantments); no category is hidden by a priority icon. Category
 icons open the existing editor and reveal names/details on hover or focus through
 `InfoTooltip`, portaled above the table so clipping ancestors cannot hide content.
-Equipped uses a separate check-circle icon with a tooltip.
+Equipped uses a separate icon with a tooltip, left of the name in its own reserved slot so names stay aligned. Containers show the Container icon with a small chevron in the leading slot as the expand control; container settings open from a cog beside the name.
 Read-only category icons retain labels and tooltips, with the existing Details action.
 The move menu
 wraps long container names, scrolls internally, and uses shared viewport collision
@@ -512,6 +515,23 @@ generate client IDs through the shared safe ID helper, so creating them also
 works on non-secure HTTP IP origins where `crypto.randomUUID()` is unavailable.
 Long unspaced solo-tracker combatant names wrap inside the tracker, and armor
 names in the protection-layer breakdown shrink and wrap beside their DR values.
+
+Combat **Attacks** is a ledger: one dense row per attack mode, grouped by weapon.
+The weapon name starts its group beside the first mode. The whole governing-skill
+cell is the attack roll button (mode name, muted skill name, level in a tinted
+chip); damage is a separate dice button, so levels and damage each scan down a
+fixed column. Type and Reach / Range stay visible as muted text; a mode shows its
+ranged stat line or, for melee, its reach. ST-shortfall and bow-ST warnings are a
+short line under the affected attack. Each mode with attack, Accuracy or damage
+effects, or an ST shortfall, gets one **±** control: a portaled, scrollable
+`InfoTooltip` with titled Attack, Accuracy and Damage breakdowns
+(`ModifierTooltip`). Column headers are the only sort controls and handles are
+always present, as in Active defenses; moving a weapon while sorted turns the
+visible order into the custom order. Below 640px the same table rows become a
+grid: the weapon name and handle take the group's first line, each mode keeps its
+skill/level and damage/type chips on one line, Reach / Range drops to a muted
+line beneath it, and the Type and Reach / Range headings are hidden, so Type is
+not sortable there. The table elements keep their native roles at every width.
 
 Inventory uses `useTableRowMatches` to share the table's existing predicate.
 Search and column filters retain the ancestors of matching entries, and hide
@@ -646,6 +666,7 @@ are inspected alongside bounding-box and overlap assertions.
 | Spells, reference and energy payment | `src/client/features/characters/sections/SpellsPanel.tsx`, `CastSpellDialog.tsx`, `spellTablePreferences.ts` |
 | Magic tab, shared search, stored energy and item spells | `src/client/features/characters/sections/MagicSection.tsx`, `PowerstonesPanel.tsx`, `ItemSpellsPanel.tsx`, `magicActionStyles.ts` |
 | Languages and techniques | `src/client/features/characters/sections/LanguagesPanel.tsx`, `TechniquesPanel.tsx` |
+| Combat attack ledger and modifier breakdowns | `src/client/features/characters/sections/combat/AttacksCard.tsx`, `weaponEffectView.tsx` |
 | Inventory responsive item layout | `src/client/features/characters/sections/InventoryPanel.tsx`, `InventoryRow.tsx`, `inventory/inventory.css` |
 | Draft serialization and rollback feedback | `src/client/hooks/useDraftField.ts`, `src/client/features/characters/sections/useEntityRowPatch.ts` |
 | Visible rollback feedback for closed disclosures | `src/client/hooks/useFlashGroup.ts`, `useFlashState.ts` |

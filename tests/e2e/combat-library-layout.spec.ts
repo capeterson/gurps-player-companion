@@ -183,18 +183,18 @@ test('Current Status stays available and combat stays compact across mobile and 
       weaponData: { db: 1, skill: 'Shield', wieldedSide: 'left' },
     });
     await page.goto(`/characters/${character.id}`);
-    const overview = page.getByRole('button', { name: /^Sheet overview/ });
-    await expect(overview).toHaveCount(0);
+    const attributes = page.getByRole('heading', { name: 'Attributes', exact: true });
+    await expect(attributes).toHaveCount(0);
     await selectCharacterSection(page, 'Overview');
-    await expect(overview).toBeVisible();
-    await expect(overview).toHaveAttribute('aria-expanded', 'true');
-    const overviewBox = await overview.boundingBox();
-    const identityBox = await page
-      .getByRole('button', { name: 'Identity', exact: true })
-      .boundingBox();
-    expect(overviewBox).not.toBeNull();
+    await expect(attributes).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Sheet overview/ })).toHaveCount(0);
+    const attributesBox = await attributes.boundingBox();
+    const identity = page.getByRole('heading', { name: 'Identity', exact: true });
+    await expect(identity).toBeVisible();
+    const identityBox = await identity.boundingBox();
+    expect(attributesBox).not.toBeNull();
     expect(identityBox).not.toBeNull();
-    if (overviewBox && identityBox) expect(overviewBox.y).toBeLessThan(identityBox.y);
+    if (attributesBox && identityBox) expect(attributesBox.y).toBeLessThan(identityBox.y);
     const status = page.getByRole('complementary', { name: 'Current Status' });
     await expect(status).toBeVisible();
     await expect(status.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
@@ -217,7 +217,7 @@ test('Current Status stays available and combat stays compact across mobile and 
         .first(),
     ).toHaveText('Field guide');
     await selectCharacterSection(page, 'Combat');
-    await expect(overview).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Attributes', exact: true })).toHaveCount(0);
     await expect(status).toBeVisible();
     await expect(page.getByRole('group', { name: 'Hit points', exact: true })).toHaveCount(0);
     const incomingAttack = page.getByRole('region', { name: 'Incoming attack' });

@@ -354,3 +354,344 @@ test('Combat names illegal armor in the warning and incoming damage dialog acros
     }
   }
 });
+
+test('Attacks keep one dense, contained row per attack mode across viewports', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !process.env.ADMIN_E2E_DATABASE_URL,
+    'Set ADMIN_E2E_DATABASE_URL to this worktree test database so generated fixtures can be removed',
+  );
+  test.setTimeout(180_000);
+  const pool = new Pool({
+    connectionString: process.env.ADMIN_E2E_DATABASE_URL,
+    connectionTimeoutMillis: 5_000,
+  });
+  const id = runId();
+  const email = `attack-ledger-${id}@example.com`;
+  const longPistol = 'Bluesteel Pistol – Dexter of the Lantern Coast Irregulars';
+  const rifle = 'Bluesteel Rifle – Caliban';
+  let campaignId: string | undefined;
+  let characterId: string | undefined;
+
+  try {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/register');
+    await page.getByLabel(/email/i).fill(email);
+    await page.getByLabel(/display name/i).fill('Attack Ledger QA');
+    await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+    await page.getByRole('button', { name: /create account/i }).click();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible({
+      timeout: 15_000,
+    });
+    const token = await page.evaluate(
+      () => JSON.parse(localStorage.getItem('gpc.tokenPair.v1') ?? '{}').accessToken as string,
+    );
+    async function post(path: string, data: object) {
+      const response = await page.request.post(`/api/v1${path}`, {
+        data,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(response.ok(), await response.text()).toBeTruthy();
+      return response.json() as Promise<{ id: string }>;
+    }
+
+    campaignId = (await post('/campaigns', { name: `Attack ledger ${id}` })).id;
+    characterId = (
+      await post('/characters', { name: 'Ledger Duelist', campaignId, st: 11, dx: 14 })
+    ).id;
+    for (const [name, specialization, difficulty] of [
+      ['Guns', 'Pistol', 'E'],
+      ['Guns', 'Rifle', 'E'],
+      ['Brawling', null, 'E'],
+      ['Rapier', null, 'A'],
+      ['Main-Gauche', null, 'A'],
+      ['Knife', null, 'E'],
+      ['Thrown Weapon', 'Knife', 'E'],
+    ] as const) {
+      await post(`/characters/${characterId}/skills`, {
+        name,
+        specialization,
+        attribute: 'DX',
+        difficulty,
+        points: 8,
+      });
+    }
+    const weapons = [
+      {
+        name: longPistol,
+        modes: [
+          {
+            key: 'shot',
+            name: 'Shot',
+            skill: 'Guns (Pistol)',
+            damage: '2d+1 pi+',
+            ranged: {
+              acc: 3,
+              range: { kind: 'fixed', halfDamageYards: 1600, maxYards: 2000 },
+              rof: '3',
+              shots: '30+1(3)',
+              bulk: -2,
+              recoil: 3,
+            },
+          },
+          { key: 'grip', name: 'Pistol grip', skill: 'Brawling', damage: 'thr+1 cr', reach: 'C,1' },
+        ],
+      },
+      {
+        name: 'Rapier',
+        modes: [
+          { key: 'swing', name: 'Swing', skill: 'Rapier', damage: 'sw cut', reach: '1,2' },
+          { key: 'thrust', name: 'Thrust', skill: 'Rapier', damage: 'thr+1 imp', reach: '1,2' },
+        ],
+      },
+      {
+        name: 'Main-Gauche',
+        modes: [
+          { key: 'thrust', name: 'Thrust', skill: 'Main-Gauche', damage: 'thr imp', reach: 'C,1' },
+          { key: 'swing', name: 'Swing', skill: 'Main-Gauche', damage: 'sw-3 cut', reach: 'C,1' },
+        ],
+      },
+      {
+        name: 'Large Knife',
+        modes: [
+          { key: 'swing', name: 'Swing', skill: 'Knife', damage: 'sw-2 cut', reach: 'C,1' },
+          { key: 'thrust', name: 'Thrust', skill: 'Knife', damage: 'thr imp', reach: 'C' },
+          {
+            key: 'thrown',
+            name: 'Thrown',
+            skill: 'Thrown Weapon (Knife)',
+            damage: 'thr imp',
+            ranged: {
+              acc: 0,
+              range: { kind: 'fixed', halfDamageYards: 9, maxYards: 15 },
+              rof: '1',
+              shots: 'T(1)',
+              bulk: -2,
+            },
+          },
+        ],
+      },
+      {
+        name: rifle,
+        modes: [
+          {
+            key: 'shot',
+            name: 'Shot',
+            skill: 'Guns (Rifle)',
+            damage: '4d+2 pi+',
+            stRequired: 12,
+            ranged: {
+              acc: 5,
+              range: { kind: 'fixed', halfDamageYards: 160, maxYards: 1600 },
+              rof: '1',
+              shots: '1(3)',
+              bulk: -5,
+              recoil: 3,
+            },
+          },
+        ],
+      },
+      {
+        name: 'Brass Knuckles',
+        modes: [
+          { key: 'primary', name: 'Primary', skill: 'Brawling', damage: 'thr cr', reach: 'C' },
+        ],
+      },
+    ];
+    for (const weapon of weapons) {
+      await post(`/characters/${characterId}/inventory`, {
+        name: weapon.name,
+        worn: true,
+        equipped: true,
+        weaponData: { modes: weapon.modes },
+      });
+    }
+
+    await page.goto(`/characters/${characterId}`);
+    await selectCharacterSection(page, 'Combat');
+    const attacks = page.getByRole('table', { name: 'Attacks' });
+    await expect(attacks).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Attack order' })).toHaveCount(0);
+    const groups = attacks.getByRole('rowgroup').filter({ has: page.getByRole('rowheader') });
+    await expect(groups).toHaveCount(6);
+    const rifleGroup = attacks.getByRole('rowgroup', { name: rifle });
+    await expect(rifleGroup.getByText('ST 12 (−1)', { exact: true })).toBeVisible();
+    const modifiers = rifleGroup.getByRole('button', { name: `Modifiers: ${rifle}, Shot` });
+    await expect(attacks.getByRole('button', { name: /^Modifiers:/ })).toHaveCount(1);
+
+    const viewports = [
+      { width: 320, height: 568 },
+      { width: 375, height: 812 },
+      { width: 568, height: 320 },
+      { width: 639, height: 800 },
+      { width: 640, height: 800 },
+      { width: 641, height: 800 },
+      { width: 768, height: 1024 },
+      { width: 1023, height: 800 },
+      { width: 1024, height: 768 },
+      { width: 1280, height: 800 },
+      { width: 1440, height: 900 },
+    ];
+    for (const viewport of viewports) {
+      await test.step(`${viewport.width}×${viewport.height}`, async () => {
+        await page.setViewportSize(viewport);
+        await expect(attacks.getByRole('link', { name: longPistol })).toHaveText(longPistol);
+        await expect(
+          attacks.getByRole('rowgroup', { name: 'Rapier' }).getByRole('button', {
+            name: /^Rapier · Swing \d+$/,
+          }),
+        ).toBeVisible();
+        const geometry = await attacks.evaluate((table) => {
+          const box = (element: Element | null) => {
+            if (!element) return null;
+            const rect = element.getBoundingClientRect();
+            return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+          };
+          const wrapper = table.parentElement as HTMLElement;
+          return {
+            documentWidth: document.documentElement.scrollWidth,
+            tableHeight: table.getBoundingClientRect().height,
+            wrapper: box(wrapper),
+            wrapperOverflow: wrapper.scrollWidth - wrapper.clientWidth,
+            groups: [...table.querySelectorAll('tbody[aria-label]')].map((group) => ({
+              name: group.getAttribute('aria-label'),
+              weapon: box(group.querySelector('th a')),
+              rows: [...group.querySelectorAll('tr')].map((row) => {
+                const buttons = [...row.querySelectorAll('button')];
+                // The attack roll is named by its visible skill, mode and level.
+                const skill = buttons.find((button) => !button.hasAttribute('aria-label'));
+                const damage = buttons.find((button) =>
+                  /^\d+d/.test(button.getAttribute('aria-label') ?? ''),
+                );
+                const modifier = buttons.find((button) =>
+                  (button.getAttribute('aria-label') ?? '').startsWith('Modifiers:'),
+                );
+                return {
+                  skill: box(skill?.querySelector('.num') ?? null),
+                  skillButton: box(skill ?? null),
+                  damage: box(damage ?? null),
+                  modifier: box(modifier ?? null),
+                };
+              }),
+            })),
+          };
+        });
+        expect(geometry.documentWidth).toBeLessThanOrEqual(viewport.width);
+        expect(geometry.wrapperOverflow).toBeLessThanOrEqual(0);
+        const wrapper = geometry.wrapper;
+        expect(wrapper).not.toBeNull();
+        if (!wrapper) return;
+        const inside = (rect: { left: number; right: number } | null) => {
+          expect(rect).not.toBeNull();
+          if (!rect) return;
+          expect(rect.left).toBeGreaterThanOrEqual(wrapper.left - 0.5);
+          expect(rect.right).toBeLessThanOrEqual(wrapper.right + 0.5);
+        };
+        const apart = (
+          a: { left: number; right: number; top: number; bottom: number } | null,
+          b: { left: number; right: number; top: number; bottom: number } | null,
+        ) => {
+          if (!a || !b) return;
+          const overlaps =
+            a.left < b.right - 0.5 &&
+            b.left < a.right - 0.5 &&
+            a.top < b.bottom - 0.5 &&
+            b.top < a.bottom - 0.5;
+          expect(overlaps).toBe(false);
+        };
+        for (const group of geometry.groups) {
+          inside(group.weapon);
+          const first = group.rows[0];
+          expect(first?.skillButton).toBeTruthy();
+          if (group.weapon && first?.skillButton) {
+            if (viewport.width >= 640) {
+              // The weapon name starts its group beside the first attack.
+              expect(Math.abs(group.weapon.top - first.skillButton.top)).toBeLessThanOrEqual(8);
+            } else {
+              expect(group.weapon.bottom).toBeLessThanOrEqual(first.skillButton.top + 0.5);
+            }
+          }
+          for (const row of group.rows) {
+            inside(row.skill);
+            inside(row.damage);
+            if (row.modifier) inside(row.modifier);
+            apart(row.skill, row.damage);
+            apart(row.skill, row.modifier);
+            apart(row.damage, row.modifier);
+          }
+        }
+        if (viewport.width === 1280) expect(geometry.tableHeight).toBeLessThanOrEqual(480);
+
+        if (viewport.width === 375 || viewport.width === 1280) {
+          // The phone grid keeps native table semantics.
+          await expect(rifleGroup.getByRole('rowheader', { name: rifle })).toBeVisible();
+          await expect(rifleGroup.getByRole('row')).toHaveCount(1);
+          await expect(
+            attacks.getByRole('rowgroup', { name: 'Large Knife' }).getByRole('row'),
+          ).toHaveCount(3);
+          await expect(
+            attacks.getByRole('rowgroup', { name: 'Large Knife' }).getByRole('cell', {
+              name: 'Acc 0 · 9/15 · RoF 1 · Shots T(1) · Bulk −2',
+            }),
+          ).toBeVisible();
+        }
+
+        // Open the breakdown with its trigger near the bottom of the viewport.
+        await modifiers.evaluate((node) => node.scrollIntoView({ block: 'end' }));
+        await modifiers.click();
+        const tooltip = page.getByRole('tooltip');
+        await expect(tooltip.getByRole('region', { name: 'Attack' })).toContainText('ST (B270)');
+        const headerBottom = await page
+          .locator('header')
+          .first()
+          .evaluate((node) => node.getBoundingClientRect().bottom);
+        const bounds = await tooltip.boundingBox();
+        expect(bounds).not.toBeNull();
+        if (bounds) {
+          expect(bounds.x).toBeGreaterThanOrEqual(0);
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+          expect(bounds.y).toBeGreaterThanOrEqual(headerBottom);
+          expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
+        }
+        if ([375, 640, 1280].includes(viewport.width)) {
+          await attachReviewScreenshot(page, testInfo, `attacks-tooltip-${viewport.width}`, {
+            animations: 'disabled',
+          });
+        }
+        // Keyboard users dismiss it with Escape and stay on the trigger.
+        await page.mouse.move(0, 0);
+        await modifiers.blur();
+        await modifiers.focus();
+        await expect(tooltip).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(tooltip).toHaveCount(0);
+        await expect(modifiers).toBeFocused();
+        if ([320, 375, 640, 1024, 1280].includes(viewport.width)) {
+          await attacks.scrollIntoViewIfNeeded();
+          for (const theme of ['sunbolt', 'gilded-tome']) {
+            await page.locator('html').evaluate((node, name) => {
+              node.setAttribute('data-theme', name);
+            }, theme);
+            await attachReviewScreenshot(attacks, testInfo, `attacks-${theme}-${viewport.width}`, {
+              animations: 'disabled',
+            });
+          }
+          await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'sunbolt'));
+        }
+      });
+    }
+  } finally {
+    try {
+      if (characterId) {
+        await pool.query('delete from inventory_items where character_id=$1', [characterId]);
+        await pool.query('delete from character_skills where character_id=$1', [characterId]);
+        await pool.query('delete from characters where id=$1', [characterId]);
+      }
+      if (campaignId) await pool.query('delete from campaigns where id=$1', [campaignId]);
+      await pool.query('delete from users where email=$1', [email]);
+    } finally {
+      await pool.end();
+    }
+  }
+});

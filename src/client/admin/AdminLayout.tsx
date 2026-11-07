@@ -67,6 +67,19 @@ export function AdminLayout() {
           </a>
           <nav className="flex items-center gap-1">
             <NavLink
+              to="/admin"
+              end
+              className={({ isActive }) =>
+                `rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  isActive
+                    ? 'bg-base-200 text-base-content'
+                    : 'text-muted hover:bg-base-200 hover:text-base-content'
+                }`
+              }
+            >
+              Overview
+            </NavLink>
+            <NavLink
               to="/admin/users"
               className={({ isActive }) =>
                 `rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${

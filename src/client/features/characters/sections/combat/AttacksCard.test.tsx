@@ -207,10 +207,47 @@ describe('AttacksCard', () => {
     expect(weaponOrder()).toEqual(['Axe', 'Bow', 'Sword']);
     fireEvent.click(screen.getByRole('button', { name: 'Type' }));
     expect(weaponOrder()).toEqual(['Axe', 'Sword', 'Bow']);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Attack order' }), {
-      target: { value: 'custom' },
-    });
+    expect(screen.getByRole('columnheader', { name: /Type/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+    // Headers are the only sort control; there is no separate order selector.
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByText('3 equipped weapons')).not.toBeInTheDocument();
+  });
+
+  it('keeps reorder handles in every sort and turns a sorted view into custom order when moved', () => {
+    render(<AttacksCard character={withMultipleWeapons()} openRoll={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Weapon' }));
+    expect(weaponOrder()).toEqual(['Axe', 'Bow', 'Sword']);
+    for (const name of ['Axe', 'Bow', 'Sword']) {
+      expect(
+        within(screen.getByRole('rowgroup', { name })).getByRole('button', { name: /Reorder/ }),
+      ).toBeVisible();
+    }
+    fireEvent.keyDown(
+      within(screen.getByRole('rowgroup', { name: 'Sword' })).getByRole('button', {
+        name: /Reorder/,
+      }),
+      { key: 'ArrowUp' },
+    );
+    // The sorted order on screen seeds the new custom order.
+    expect(weaponOrder()).toEqual(['Axe', 'Sword', 'Bow']);
+    expect(screen.getByRole('columnheader', { name: /Weapon/ })).toHaveAttribute(
+      'aria-sort',
+      'none',
+    );
+    expect(screen.getByText('Sword moved to position 2.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Governing skill' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Governing skill' }));
     expect(weaponOrder()).toEqual(['Sword', 'Bow', 'Axe']);
+    fireEvent.keyDown(
+      within(screen.getByRole('rowgroup', { name: 'Axe' })).getByRole('button', {
+        name: /Reorder/,
+      }),
+      { key: 'ArrowUp' },
+    );
+    expect(weaponOrder()).toEqual(['Sword', 'Axe', 'Bow']);
   });
 
   it('persists keyboard custom ordering across remounts and keeps preferences separate per character', () => {
@@ -317,12 +354,111 @@ describe('AttacksCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '1d imp' }));
     expect(openRoll.mock.calls[0]?.[0].damage.dice).toEqual({ dice: 1, adds: 0 });
-    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword 15' }));
     expect(openRoll.mock.calls[1]?.[0].baseTarget).toBe(15);
     expect(openRoll.mock.calls[1]?.[0].attack.accuracy).toBe(3);
-    expect(screen.getAllByText('Weapon Bond').length).toBeGreaterThan(0);
-    expect(screen.getByText('Accuracy')).toBeInTheDocument();
-    expect(screen.getByText('Puissance')).toBeInTheDocument();
+    expect(screen.queryByText('Weapon Bond')).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'Modifiers: Broadsword' });
+    fireEvent.click(trigger);
+    const tooltip = screen.getByRole('tooltip');
+    const attack = within(tooltip).getByRole('region', { name: 'Attack' });
+    expect(attack).toHaveTextContent('Skill after ST: 14');
+    expect(within(attack).getByText('Weapon Bond')).toBeInTheDocument();
+    expect(attack).toHaveTextContent('Final: 15');
+    const accuracy = within(tooltip).getByRole('region', { name: 'Accuracy' });
+    expect(accuracy).toHaveTextContent('Accuracy: 2');
+    expect(accuracy).toHaveTextContent('+1 Accuracy');
+    expect(accuracy).toHaveTextContent('Final: 3');
+    const damage = within(tooltip).getByRole('region', { name: 'Damage' });
+    expect(within(damage).getByText('Puissance')).toBeInTheDocument();
+    expect(damage).toHaveTextContent('Final: 1d');
+    // Escape dismisses the breakdown.
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('shows one row per attack mode with its skill, level, damage, type and reach', () => {
+    const character = makeCharacter('sw+1 cut', { name: 'Rapier', skill: 'Broadsword' });
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing weapon fixture');
+    weapon.weaponData.reach = '1,2';
+    weapon.weaponData.alternateModes = [{ name: 'Thrust', damage: 'thr+2 imp' }];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    const rows = within(screen.getByRole('rowgroup', { name: 'Rapier' })).getAllByRole('row');
+    expect(rows).toHaveLength(2);
+    const [primary, thrust] = rows as [HTMLElement, HTMLElement];
+    expect(within(primary).getByRole('link', { name: 'Rapier' })).toBeInTheDocument();
+    expect(within(primary).getByRole('button', { name: 'Broadsword 14' })).toHaveTextContent(
+      /Broadsword\s*14/,
+    );
+    expect(within(primary).getByRole('button', { name: '1d+1 cut' })).toHaveTextContent('1d+1');
+    expect(within(primary).getByRole('cell', { name: 'cut' })).toBeInTheDocument();
+    expect(within(primary).getByRole('cell', { name: /^(Reach )?1,2$/ })).toBeInTheDocument();
+    const thrustSkill = within(thrust).getByRole('button', { name: 'Broadsword · Thrust 14' });
+    expect(within(thrustSkill).getByText('Thrust')).toBeVisible();
+    expect(within(thrustSkill).getByText('14')).toBeVisible();
+    expect(within(thrust).getByRole('button', { name: '1d imp' })).toBeInTheDocument();
+    expect(within(thrust).getByRole('cell', { name: 'imp' })).toBeInTheDocument();
+    expect(within(thrust).getByRole('cell', { name: /^(Reach )?1,2$/ })).toBeInTheDocument();
+    // No effects and no ST shortfall: no modifier control.
+    expect(screen.queryByRole('button', { name: /^Modifiers/ })).not.toBeInTheDocument();
+  });
+
+  it('shows ranged stats in the same row and a modifier control only on affected modes', () => {
+    const character = makeCharacter('1d+1 imp', { name: 'Pistol' });
+    character.skills = [
+      { id: 's1', name: 'Pistol', level: 15 },
+    ] as unknown as CharacterDetail['skills'];
+    const weapon = character.inventory[0];
+    if (!weapon?.weaponData) throw new Error('Missing weapon fixture');
+    weapon.weaponData.modes = [
+      {
+        key: 'shot',
+        name: 'Shot',
+        damage: '1d+1 imp',
+        stRequired: 12,
+        ranged: {
+          acc: 3,
+          range: { kind: 'fixed', halfDamageYards: 55, maxYards: 540 },
+          rof: '1',
+          shots: '1(3)',
+          bulk: null,
+          recoil: 3,
+        },
+      },
+      { key: 'grip', name: 'Pistol grip', damage: 'thr cr', reach: 'C', ranged: null },
+    ] as never;
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    const [shot, grip] = within(screen.getByRole('rowgroup', { name: 'Pistol' })).getAllByRole(
+      'row',
+    ) as [HTMLElement, HTMLElement];
+    expect(within(shot).getByRole('button', { name: 'Pistol · Shot 13' })).toBeInTheDocument();
+    expect(within(shot).getByText('ST 12 (−2)')).toBeVisible();
+    expect(
+      within(shot).getByRole('cell', { name: 'Acc 3 · 55/540 · RoF 1 · Shots 1(3) · Rcl 3' }),
+    ).toBeInTheDocument();
+    expect(within(grip).getByRole('button', { name: 'Pistol · Pistol grip 15' })).toBeVisible();
+    expect(within(grip).getByRole('cell', { name: /^(Reach )?C$/ })).toBeInTheDocument();
+    expect(within(grip).queryByRole('button', { name: /^Modifiers/ })).not.toBeInTheDocument();
+    fireEvent.click(within(shot).getByRole('button', { name: 'Modifiers: Pistol, Shot' }));
+    const attack = within(screen.getByRole('tooltip')).getByRole('region', { name: 'Attack' });
+    expect(attack).toHaveTextContent('15 − 2 ST (B270)');
+    expect(attack).toHaveTextContent('Final: 13');
+  });
+
+  it('disables the attack roll and explains when a bow is stronger than usable ST', () => {
+    const character = makeCharacter('thr imp', {
+      name: 'Longbow',
+      skill: 'Bow',
+      stRequired: 14,
+      weaponSt: 14,
+      strengthKind: 'bow',
+    });
+    character.skills = [{ id: 'bow', name: 'Bow', level: 13 }] as CharacterDetail['skills'];
+    render(<AttacksCard character={character} openRoll={vi.fn()} />);
+    const group = screen.getByRole('rowgroup', { name: 'Longbow' });
+    expect(within(group).getByText('Bow ST exceeds usable ST (B275)')).toBeVisible();
+    expect(within(group).getByRole('button', { name: /^Bow/ })).toBeDisabled();
   });
 
   function scopedEffect(
@@ -379,7 +515,11 @@ describe('AttacksCard', () => {
       damageType: 'imp',
       armorDivisor: '5',
     });
-    expect(screen.getByText('Thrust weapon_damage')).toBeInTheDocument();
+    expect(screen.queryByText('Thrust weapon_damage')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Modifiers: Broadsword, Thrust' }));
+    expect(
+      within(screen.getByRole('tooltip')).getByText('Thrust weapon_damage'),
+    ).toBeInTheDocument();
   });
 
   it('offers an unmodified alternate roll when only the primary mode gets an attack bonus', () => {
@@ -658,7 +798,7 @@ describe('AttacksCard', () => {
     render(<AttacksCard character={character} openRoll={openRoll} />);
 
     expect(screen.getByText('ST 12 (−2)')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Broadsword/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Broadsword 12' }));
     const call = openRoll.mock.calls[0] as [RollRequest];
     expect(call[0].baseTarget).toBe(12);
   });
@@ -755,9 +895,9 @@ describe('AttacksCard', () => {
     // Two impulse damage chips (thrust + thrown) at ST 10 (thr = 1d-2).
     expect(screen.getAllByRole('button', { name: '1d-2 imp' })).toHaveLength(2);
 
-    // Dedicated reach cells align each mode's inherited or overridden reach.
-    expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument();
-    expect(screen.getAllByRole('cell', { name: '1' })).toHaveLength(2);
+    // Reach / Range cells align each mode's inherited or overridden reach.
+    expect(screen.getByRole('cell', { name: /^(Reach )?2$/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('cell', { name: /^(Reach )?1$/ })).toHaveLength(2);
 
     // Rolling the thrust mode labels the roll with "Rapier (Thrust)".
     const thrustChips = screen.getAllByRole('button', { name: '1d-2 imp' });

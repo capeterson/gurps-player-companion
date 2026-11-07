@@ -16,6 +16,7 @@ import { clearAllSkillTablePreferences } from './features/characters/sections/sk
 import { clearAllSpellTablePreferences } from './features/characters/sections/spellTablePreferences.ts';
 import { clearAllTraitTablePreferences } from './features/characters/sections/traitTablePreferences.ts';
 import { clearAllLibraryTablePreferences } from './features/library/libraryTablePreferences.ts';
+import { useEntityDocumentTitle } from './hooks/useEntityDocumentTitle.ts';
 import { useUnsyncedChangesGuard } from './hooks/useUnsyncedChangesGuard.tsx';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
@@ -146,6 +147,8 @@ export function App() {
     setThemeMode(oppositeMode(mode));
   }
 
+  useEntityDocumentTitle(entityBreadcrumb?.name);
+
   const characterName = entityBreadcrumb?.kind === 'character' ? entityBreadcrumb.name : null;
   const mobileCharacterMenu = (
     <nav aria-label="Character and app navigation" className="min-w-0 overflow-visible">
@@ -197,14 +200,9 @@ export function App() {
             <Link to="/about">About</Link>
           </li>
           {me.data?.isSuperuser && (
-            <>
-              <li>
-                <a href="/admin/users">Admin users</a>
-              </li>
-              <li>
-                <a href="/admin/campaigns">Admin campaigns</a>
-              </li>
-            </>
+            <li>
+              <a href="/admin">Admin</a>
+            </li>
           )}
           <li>
             {guest ? (
@@ -402,20 +400,12 @@ export function App() {
                   </li>
                 )}
                 {me.data?.isSuperuser && (
-                  <>
-                    <li className="menu-title px-3 pt-2">
-                      <span>Admin</span>
-                    </li>
-                    {/* Hard-anchor: admin lives in a separate Vite entry
-                      (see src/client/admin/main.tsx) so SPA Link won't
-                      cross the bundle boundary. */}
-                    <li>
-                      <a href="/admin/users">Users</a>
-                    </li>
-                    <li>
-                      <a href="/admin/campaigns">Campaigns</a>
-                    </li>
-                  </>
+                  /* Hard-anchor: admin lives in a separate Vite entry
+                    (see src/client/admin/main.tsx) so SPA Link won't
+                    cross the bundle boundary. */
+                  <li>
+                    <a href="/admin">Admin</a>
+                  </li>
                 )}
                 <li>
                   {guest ? (

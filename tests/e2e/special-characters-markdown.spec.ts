@@ -239,8 +239,10 @@ test('Markdown source stays inert and readable through editor toggles, save, and
     '',
     '[safe notes link](https://example.com/trait-notes)',
   ].join('\n');
+  // Raw Markdown mode keeps the literal source intact while typing.
+  await page.getByRole('button', { name: 'Edit raw markdown' }).click();
   const traitNotesEditor = page.getByRole('textbox', {
-    name: `${traitName} description and notes`,
+    name: `${traitName} description`,
   });
   await traitNotesEditor.fill(traitNotes);
   // Blurring commits the draft and briefly inserts a "Saving…" line above the
@@ -248,15 +250,18 @@ test('Markdown source stays inert and readable through editor toggles, save, and
   await traitNotesEditor.blur();
   const traitDetailRow = traitNotesEditor.locator('xpath=ancestor::tr').last();
   await expect(traitDetailRow.getByText('Saving…')).toHaveCount(0);
-  const traitPreviewToggle = traitDetailRow.getByRole('button', { name: 'Preview description' });
-  await traitPreviewToggle.click();
-  await expect(traitPreviewToggle).toHaveAttribute('aria-expanded', 'true');
-  const traitPreview = traitDetailRow.locator('.markdown-body');
+  await page.getByRole('button', { name: `View ${traitName}`, exact: true }).click();
+  const traitPreview = page
+    .locator('table[aria-label="Traits"] tbody')
+    .filter({ hasText: traitName })
+    .locator('tr')
+    .last()
+    .locator('.markdown-body');
   await expect(traitPreview).toBeVisible();
   await expect(traitPreview).toContainText('café 東京 مرحبا 🐉');
   const renderedTraitNotes = await assertNoExecutableMarkdown(
     page,
-    'table[aria-label="Traits"] .markdown-body',
+    'table[aria-label="Traits"] tbody tr:last-child .markdown-body',
   );
   expect(renderedTraitNotes.activeElements).toBe(0);
   expect(renderedTraitNotes.text).toContain('<img src=x onerror="window.__markdownCanary = 7">');
@@ -284,23 +289,18 @@ test('Markdown source stays inert and readable through editor toggles, save, and
     await page.evaluate(() => (window as Window & { __markdownCanary: number }).__markdownCanary),
   ).toBe(0);
   await selectCharacterSection(page, 'Traits');
-  await page.getByRole('button', { name: `Edit ${traitName}`, exact: true }).click();
-  const reloadedTraitNotesEditor = page.getByRole('textbox', {
-    name: `${traitName} description and notes`,
-  });
-  const reloadedTraitDetail = reloadedTraitNotesEditor.locator('xpath=ancestor::tr').last();
-  const reloadedTraitPreviewToggle = reloadedTraitDetail.getByRole('button', {
-    name: 'Preview description',
-  });
-  if ((await reloadedTraitPreviewToggle.getAttribute('aria-expanded')) !== 'true') {
-    await reloadedTraitPreviewToggle.click();
-  }
-  const reloadedTraitPreview = reloadedTraitDetail.locator('.markdown-body');
+  await page.getByRole('button', { name: `View ${traitName}`, exact: true }).click();
+  const reloadedTraitPreview = page
+    .locator('table[aria-label="Traits"] tbody')
+    .filter({ hasText: traitName })
+    .locator('tr')
+    .last()
+    .locator('.markdown-body');
   await expect(reloadedTraitPreview).toBeVisible();
   await expect(reloadedTraitPreview).toContainText('café 東京 مرحبا 🐉');
   const reloadedTraitRender = await assertNoExecutableMarkdown(
     page,
-    'table[aria-label="Traits"] .markdown-body',
+    'table[aria-label="Traits"] tbody tr:last-child .markdown-body',
   );
   expect(reloadedTraitRender.activeElements).toBe(0);
   expect(reloadedTraitRender.text).toContain('Trait notes: quotes');

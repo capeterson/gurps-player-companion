@@ -290,13 +290,16 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Other editable identity names use smaller display type below 640px so ordinary
   names fit on phones; unusually long names remain scrollable within the input.
   Read-only identity headings wrap long names within the content width.
-  The Overview section places the foldable sheet overview (attributes, secondary
-  stats, status, ledger, encumbrance and conditional effects) above the Identity
-  panel; other destinations do not display it. When folded, it shows effective
-  ST/DX/IQ/HT. Attributes, Secondary attributes, and Status stay expanded inside
-  it, with one heading each. Point ledger, Encumbrance, and Conditional effects
-  fold independently and shrink to their headings without stretching to fill
-  neighboring cards. Conditional effects is absent unless the campaign active-effects
+  The Overview section places the sheet overview cards (attributes, secondary
+  stats, status, ledger, encumbrance and conditional effects) directly under the
+  Overview heading, above the non-collapsible Identity card; other destinations
+  do not display them. Attributes, Secondary attributes, and Status stay expanded inside
+  it, with one heading each. The Point ledger is a compact, non-folding card
+  showing the total (a tooltip target listing every bucket), the campaign cap, and
+  unspent/over points. Encumbrance and Conditional effects fold independently;
+  Encumbrance keeps its tier badge beside the title and shows only the carry bar
+  (Move and Dodge live in Secondary attributes). Folded sections shrink to their
+  headings without stretching to fill neighboring cards. Conditional effects is absent unless the campaign active-effects
   experiment is enabled and condition groups exist. Skills, Traits, Inventory, and main Combat sections have keyboard-accessible
   folding headers. Magic collections instead have plain headings and compact tables. On Combat, Attacks, Incoming attack, and the optional Turn
   tracker fold independently. Incoming attack groups the body map, target/facing
@@ -701,7 +704,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Library templates still populate the quick-add form, and its small optional
   category/equipped controls and location selector remain available; detailed editing uses the
   new item's category icons.
-  Every category has its own icon; Equipped uses a separate check-circle tooltip.
+  Every category has its own icon; Equipped uses a separate tooltip icon left of the name; containers expand from a Container icon with a small chevron.
   Container expansion keeps its chevron, and each
   nesting level indents one step with a faint guide line under its parent's
   chevron; a collapsed container shows its contained-item count. Below 640px
@@ -939,11 +942,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     Dodge has no minimum introduced by pool reductions. Changing character/maneuver
     clears that selection. Breakdowns name pool/posture/stun/maneuver adjustments;
     unmodeled tactical situations and custom maneuvers remain player-supplied.
-  - **Attacks** — a compact table groups equipped weapons and their alternate
-    modes, with aligned governing-skill/target, damage, damage-type, and reach
-    columns. Weapon, governing skill, and damage type headers toggle ascending /
-    descending sorting. **Custom** order exposes drag handles (including touch
-    long-press); focused handles also move with the up/down arrow keys. Sort and
+  - **Attacks** — a ledger table with one dense row per attack mode, grouped by
+    equipped weapon; the weapon name (linked to its inventory entry) starts its
+    group beside the first mode. Each row shows the mode and governing skill with
+    the final target in one roll button, the damage dice as a roll button, the
+    damage type, and a **Reach / Range** column (the ranged stat line for ranged
+    modes, reach otherwise). Weapon, governing skill, and damage type headers are
+    the only sort controls and toggle ascending / descending. Drag handles
+    (including touch long-press) are always present; focused handles also move
+    with the up/down arrow keys, and moving a weapon while sorted returns the table
+    to custom order starting from the visible order. Below 640px each mode stacks
+    under its weapon name with Reach / Range on a muted line, the damage chip shows
+    the type, and Type is not sortable. Sort and
     custom weapon order are saved per character on this device, survive reloads,
     and are cleared on logout. These are presentation preferences, not inventory
     edits, and are not server-synced (`combat/attackTablePreferences.ts`). New
@@ -956,10 +966,13 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     unsupported expressions and recorded weapon/enchantment data stay unchanged.
     The same dice power combat displays, previews and rolls. Damage chips are **tappable buttons that
     roll damage** (NdM+adds, B269, with the type/cut/imp/piercing
-    1-point floor from B378), reach, an ST-shortfall badge/caption
+    1-point floor from B378), reach, an ST-shortfall warning line
     (B270, applied to the roll target), a ranged stat line (Acc/Range/
     RoF/Shots/Bulk/Recoil) when the weapon has one, and the resolved
-    skill as a compact roll button. Attack rolls open separate range, Aim,
+    skill as a compact roll button. A mode with attack, Accuracy or damage
+    effects, or an ST shortfall, has one **±** control whose viewport-bounded
+    tooltip lists the Attack (including the ST arithmetic), Accuracy and Damage
+    breakdowns with their source names. Attack rolls open separate range, Aim,
     hit-location and Other controls. Fixed-yard and ST-multiplier ranges use a
     structured weapon value, with the speed/range slider stopping at the
     mode's resolved Max. Aim offers none, 1, 2 or 3+ seconds (Acc, Acc+1,
@@ -1204,6 +1217,9 @@ settings sections; switching sections retains drafts.
   selection into `Campaign › <campaign name> › Log/Library`. The first level
   returns to its collection and the named level returns to that entity's main
   page. Campaign sub-navigation carries the current campaign into Log/Library.
+  The window title shows `<name> · Sunbolt` while a character or campaign is
+  open (`useEntityDocumentTitle`) and otherwise keeps the default
+  `Sunbolt · A GURPS 4th edition companion`.
   Long account names stay truncated at every width so the user-menu
   trigger fits alongside the other header controls; the menu retains the account
   email within viewport bounds.
@@ -1326,6 +1342,8 @@ account immediately and revokes existing JWT sessions, refresh tokens, API keys
 and OAuth grants. Cancellation leaves the account suspended; unsuspension is
 blocked until the purge is cancelled. Administrators cannot suspend or purge
 themselves, and account actions serialize while the displayed state refreshes.
+The player app's account menu shows a single **Admin** link (superusers only) to `/admin`, a landing page linking Users, Campaigns and Images; the admin header also links back to that Overview.
+
 The admin entry uses `AdminRequireAuth` and `/admin/login`, with sign-in returning
 to the requested admin page. It does not start the player sync orchestrator or
 wait for an IndexedDB bootstrap; expired or cleared sessions return to admin sign-in.

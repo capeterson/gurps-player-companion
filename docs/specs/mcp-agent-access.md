@@ -572,6 +572,8 @@ input; four in-flight requests per process bound aggregate memory. Full lifecycl
 
 `src/server/db/seeds/lanternCoastContent.ts` is the shared content recipe for the
 standard REST seed and the connector bridge (`scripts/seed-lantern-mcp.ts`).
+The MCP `serverInfo` carries the title `Sunbolt` and same-origin `icons` (`/icon-192.png`, `/icon-256.png`, `/icon-512.png`) so clients that support server icons show the Sunbolt mark.
+
 `lanternCoastMcp.ts` resolves exact manifest operations and consumes normal compact
 mutation acknowledgements; encounter creation re-reads through MCP to obtain
 combatant IDs. Every domain write goes through an existing tool/handler.
