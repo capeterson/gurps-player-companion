@@ -788,6 +788,9 @@ function TraitRow({
     (effect) => activeEffectsEnabled || !effect.conditionGroup,
   );
   const expanded = mode !== 'closed';
+  // Mount the Markdown editor on first edit, then keep it so drafts survive closing.
+  const [editorMounted, setEditorMounted] = useState(false);
+  if (mode === 'edit' && !editorMounted) setEditorMounted(true);
   const hasDetails = Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
 
   const deletion = useConfirmedEntityDelete({
@@ -937,14 +940,16 @@ function TraitRow({
               )}
               <fieldset className="fieldset min-w-0 p-0">
                 <legend className="fieldset-legend text-xs">Description</legend>
-                <RichTextEditor
-                  aria-label={`${trait.name} description`}
-                  value={notesField.value}
-                  onChange={notesField.setValue}
-                  onBlur={notesField.inputProps.onBlur}
-                  data-flashing={notesField.inputProps['data-flashing']}
-                  data-flash-parity={notesField.inputProps['data-flash-parity']}
-                />
+                {editorMounted && (
+                  <RichTextEditor
+                    aria-label={`${trait.name} description`}
+                    value={notesField.value}
+                    onChange={notesField.setValue}
+                    onBlur={notesField.inputProps.onBlur}
+                    data-flashing={notesField.inputProps['data-flashing']}
+                    data-flash-parity={notesField.inputProps['data-flash-parity']}
+                  />
+                )}
               </fieldset>
               {hasSourceRules && (
                 <details className="border-t border-base-300 pt-1">

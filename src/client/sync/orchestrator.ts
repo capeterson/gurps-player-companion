@@ -2928,7 +2928,9 @@ async function reportCycleFailure(
   direction: 'push' | 'pull' | 'local' = 'local',
   extraDetails?: Record<string, unknown>,
 ): Promise<void> {
-  if (isNetworkError(err) || isBadGatewayError(err)) {
+  // A 502 answered, so reachability is unchanged; it only delays the retry.
+  if (isBadGatewayError(err)) return;
+  if (isNetworkError(err)) {
     connectionStore.markUnavailable();
     return;
   }
