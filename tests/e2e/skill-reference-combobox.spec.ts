@@ -16,7 +16,7 @@ test('skill reference suggestions stay inside the viewport at supported widths',
   await page.getByRole('link', { name: 'The Lantern Coast' }).first().click();
   await page.getByRole('link', { name: 'Library' }).click();
   await page.getByRole('button', { name: /^\+ Add trait$/ }).click();
-  await page.locator('summary').filter({ hasText: 'Mechanical effects' }).click();
+  await page.locator('summary').filter({ hasText: 'Effects and capabilities' }).click();
   await page.getByRole('button', { name: '+ Add effect' }).click();
   await page.getByLabel('Effect 1 target').selectOption('skill');
 

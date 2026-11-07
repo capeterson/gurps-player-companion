@@ -243,9 +243,14 @@ test('Markdown source stays inert and readable through editor toggles, save, and
     name: `${traitName} description and notes`,
   });
   await traitNotesEditor.fill(traitNotes);
+  // Blurring commits the draft and briefly inserts a "Saving…" line above the
+  // controls. Wait for it to clear so the toggle does not move under the click.
+  await traitNotesEditor.blur();
   const traitDetailRow = traitNotesEditor.locator('xpath=ancestor::tr').last();
+  await expect(traitDetailRow.getByText('Saving…')).toHaveCount(0);
   const traitPreviewToggle = traitDetailRow.getByRole('button', { name: 'Preview description' });
   await traitPreviewToggle.click();
+  await expect(traitPreviewToggle).toHaveAttribute('aria-expanded', 'true');
   const traitPreview = traitDetailRow.locator('.markdown-body');
   await expect(traitPreview).toBeVisible();
   await expect(traitPreview).toContainText('café 東京 مرحبا 🐉');

@@ -52,7 +52,8 @@ test('library preserves special text and each Unicode group jump reaches its own
   const canary = '<img src=x onerror="window.__gpcCanary=1">';
   const visibleName = `Spell "quotes" & <angle> \\ % _ # café 東京 אבג 😀 ${canary}`;
   const visibleDescription = `Damage > 10; HP < 5; **Bold** & "quotes" \\ % _ # café 東京 אבג 😀`;
-  const collapsedDescription = `Damage > 10; HP < 5; **Bold** & "quotes" \\ % _ # café 東京 אבג 😀`;
+  // Collapsed rows strip Markdown strong markers from the excerpt.
+  const collapsedDescription = `Damage > 10; HP < 5; Bold & "quotes" \\ % _ # café 東京 אבג 😀`;
   const { id: librarySpellId } = await createLibrarySpell(page, campaignId, {
     key: 'qa-special-text',
     name: visibleName,
