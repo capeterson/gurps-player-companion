@@ -66,6 +66,12 @@ async function bodyWithinLimit(request: Request): Promise<boolean> {
   }
 }
 
+function logOAuthFailure(operation: string, clientId: string | undefined, error: OAuthError) {
+  console.warn(
+    `[oauth] ${operation} rejected: client_id=${clientId ?? 'unknown'} code=${error.code} reason=${error.message}`,
+  );
+}
+
 function oauthFailure(error: unknown): { error: string; error_description: string } {
   if (error instanceof OAuthError) {
     return { error: error.code, error_description: error.message };
@@ -398,6 +404,7 @@ export function createOAuthAccountRouter(config: AppConfig) {
           return c.json({ error: error.message }, 403);
         }
         if (error instanceof OAuthError) {
+          logOAuthFailure('authorization', c.req.valid('query').client_id, error);
           return c.json({ error: oauthFailure(error).error_description }, 400);
         }
         throw error;
@@ -445,6 +452,7 @@ export function createOAuthAccountRouter(config: AppConfig) {
         return c.json({ redirectTo }, 200);
       } catch (error) {
         if (error instanceof OAuthError) {
+          logOAuthFailure('consent decision', body.client_id, error);
           return c.json({ error: oauthFailure(error).error_description }, 400);
         }
         throw error;

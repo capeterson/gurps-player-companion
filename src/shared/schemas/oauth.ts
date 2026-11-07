@@ -112,22 +112,24 @@ export const oauthDynamicClientRegistrationResponse = z.object({
   scope: z.string(),
 });
 
+/**
+ * Client ID Metadata Documents are authored by third parties, so advertised
+ * capabilities stay open-ended (Claude lists a jwt-bearer grant, for example).
+ * `fetchClientMetadataDocument` enforces the subset we actually require:
+ * public-client auth (`none`) and the authorization_code grant.
+ */
 export const oauthClientMetadataDocument = z.object({
   client_id: z.string().url().max(2048),
   client_name: z.string().min(1).max(120).optional(),
   redirect_uris: oauthRedirectUris,
-  token_endpoint_auth_method: z.enum(['none', 'private_key_jwt']).optional(),
+  token_endpoint_auth_method: z.string().min(1).max(100).optional(),
   token_endpoint_auth_methods_supported: z
-    .array(z.enum(['none', 'private_key_jwt']))
+    .array(z.string().min(1).max(100))
     .min(1)
-    .max(2)
+    .max(20)
     .optional(),
-  grant_types: z
-    .array(z.enum(['authorization_code', 'refresh_token']))
-    .min(1)
-    .max(2)
-    .optional(),
-  response_types: z.array(z.literal('code')).min(1).max(1).optional(),
+  grant_types: z.array(z.string().min(1).max(200)).min(1).max(20).optional(),
+  response_types: z.array(z.string().min(1).max(100)).min(1).max(10).optional(),
 });
 export type OAuthClientMetadataDocument = z.infer<typeof oauthClientMetadataDocument>;
 

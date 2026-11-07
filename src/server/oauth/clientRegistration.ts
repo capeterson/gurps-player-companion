@@ -270,9 +270,12 @@ export async function fetchClientMetadataDocument(
   const cacheMs = Math.min(MAX_CACHE_MS, Math.max(0, response.cacheMs));
   const parsed = oauthClientMetadataDocument.safeParse(body);
   if (!parsed.success) {
+    const fields = [
+      ...new Set(parsed.error.issues.map((issue) => issue.path.join('.') || '(root)')),
+    ];
     throw new ClientRegistrationError(
       'invalid_client_metadata',
-      'CIMD document has invalid client metadata',
+      `CIMD document has invalid client metadata (${fields.slice(0, 5).join(', ')})`,
     );
   }
   if (parsed.data.client_id !== clientId) {
@@ -294,6 +297,12 @@ export async function fetchClientMetadataDocument(
     throw new ClientRegistrationError(
       'invalid_client_metadata',
       'CIMD client must support public-client token exchange',
+    );
+  }
+  if (parsed.data.response_types && !parsed.data.response_types.includes('code')) {
+    throw new ClientRegistrationError(
+      'invalid_client_metadata',
+      'CIMD client must support the code response type',
     );
   }
   if (parsed.data.grant_types && !parsed.data.grant_types.includes('authorization_code')) {

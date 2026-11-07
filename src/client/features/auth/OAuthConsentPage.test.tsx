@@ -124,11 +124,31 @@ describe('OAuth consent', () => {
     expect(screen.queryByText('recent authentication required')).not.toBeInTheDocument();
   });
 
-  it('never offers approval for invalid consent details', async () => {
-    vi.mocked(api).mockRejectedValue(new ApiError(400, 'invalid request'));
+  it('never offers approval for invalid consent details and shows the server reason', async () => {
+    vi.mocked(api).mockRejectedValue(
+      new ApiError(400, 'CIMD document has invalid client metadata (grant_types)'),
+    );
     mount();
-    await screen.findByText('This authorization request is invalid or expired.');
+    await screen.findByText(
+      "This authorization request can't be approved: CIMD document has invalid client metadata (grant_types).",
+    );
+    expect(screen.getByText('Return to the app and start connecting again.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Authorize' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+
+  it('offers a retry when Sunbolt cannot be reached and then shows consent', async () => {
+    let fail = true;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === '/auth/me') return { displayName: 'Ada', email: 'ada@example.com' } as never;
+      if (fail) throw new TypeError('Failed to fetch');
+      return details as never;
+    });
+    mount();
+    await screen.findByText("Couldn't reach Sunbolt to check this authorization request.");
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('button', { name: 'Authorize' })).toBeInTheDocument();
   });
 
   it('renders consent metadata and account identity as inert text', async () => {

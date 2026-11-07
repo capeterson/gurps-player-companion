@@ -65,7 +65,16 @@ export function OAuthConsentPage() {
         </div>
         {details.isPending && <p>Checking this request…</p>}
         {details.isError && (
-          <p className="alert alert-error">This authorization request is invalid or expired.</p>
+          <div className="alert alert-error flex-col items-start gap-2 text-sm">
+            <p>{consentFailureMessage(details.error)}</p>
+            {isTransientFailure(details.error) ? (
+              <button type="button" className="btn btn-sm" onClick={() => details.refetch()}>
+                Try again
+              </button>
+            ) : (
+              <p>Return to the app and start connecting again.</p>
+            )}
+          </div>
         )}
         {details.data && (
           <>
@@ -116,6 +125,20 @@ export function OAuthConsentPage() {
       </section>
     </main>
   );
+}
+
+function isTransientFailure(error: unknown): boolean {
+  return !(error instanceof ApiError) || error.status >= 500;
+}
+
+function consentFailureMessage(error: unknown): string {
+  if (isTransientFailure(error)) {
+    return "Couldn't reach Sunbolt to check this authorization request.";
+  }
+  const reason = error instanceof Error ? error.message.trim() : '';
+  return reason
+    ? `This authorization request can't be approved: ${reason}.`
+    : 'This authorization request is invalid or expired.';
 }
 
 function requiresRecentAuthentication(error: unknown): boolean {
