@@ -206,6 +206,9 @@ export function resolveItemEnchantments(
         ...(target === 'skill'
           ? { skillName: candidate.effect.skillName as string }
           : { weaponSelector: { kind: 'inventory_item' as const, inventoryItemId: item.id } }),
+        ...(target === 'weapon_damage' && candidate.effect.damageType
+          ? { damageType: candidate.effect.damageType }
+          : {}),
         active: true,
       },
     ];

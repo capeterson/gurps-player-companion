@@ -610,17 +610,19 @@ REST endpoints: `GET /api/v1/characters/:id/history`, `GET /api/v1/campaigns/:id
 
 ## Test discipline
 
-- **Use a low-cost test subagent for test work.** Always delegate test
-  execution and test-failure triage to a subagent to reduce token cost.
-  Latest Luna and latest Claude Sonnet are equivalent for this: use whichever the
-  current harness offers (Luna under Codex, a Sonnet subagent under Claude
-  Code), without needing to justify the choice. Use the latest available Sol,
-  Terra, and Luna versions (GPT 6.0 or newer where available), rather than
-  pinning an iteration. Latest Claude Opus is equivalent to latest Sol/Terra.
-  The primary agent still selects the applicable tests, reviews the evidence,
-  applies fixes, and owns final
-  verification and PR readiness. If neither is available, state that explicitly
-  and use the best available subagent rather than silently skipping delegation.
+- **Use the cheapest capable subagent for CI runs and other babysitting work.**
+  Always delegate test execution, the pre-push CI parity sequence, watching
+  GitHub checks, long builds and image rebuilds, log scraping, and the
+  triage of straightforward test failures to the lowest-cost agent tier: the
+  latest Luna under Codex, or the latest Claude Haiku subagent under Claude
+  Code. Do not use Sonnet or Opus for this verbose, low-judgement work, and do
+  not pin an iteration: use the latest available version. Escalate a single
+  failure to a Sonnet-class (or Sol/Terra/Opus-class) subagent only when
+  diagnosing it needs real debugging, and say why. The primary agent still
+  selects the applicable tests, reviews the evidence, applies fixes, and owns
+  final verification and PR readiness. If the cheapest tier is unavailable,
+  state that explicitly and use the next cheapest subagent rather than
+  silently skipping delegation.
 - **Minimize public-auth registrations in browser tests.** Durable source rate
   limits are active during testing. A scenario that checks multiple widths or
   states MUST reuse one account and page within that scenario/worker instead of

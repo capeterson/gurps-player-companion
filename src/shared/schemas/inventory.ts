@@ -289,9 +289,17 @@ export const enchantmentEffect = z
     target: enchantmentEffectTarget,
     value: z.number().int().min(-100).max(100),
     skillName: z.string().trim().min(1).max(160).optional(),
+    /** Damage type of a `weapon_damage` bonus (e.g. "fire" for Flaming Weapon); omitted = the weapon's own type. */
+    damageType: z.string().trim().min(1).max(40).optional(),
   })
   .strict()
   .superRefine((effect, ctx) => {
+    if (effect.damageType && effect.target !== 'weapon_damage')
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['damageType'],
+        message: "damageType is only allowed when target='weapon_damage'",
+      });
     if (effect.target === 'skill' && !effect.skillName)
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

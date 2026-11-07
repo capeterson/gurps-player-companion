@@ -18,6 +18,7 @@ import { ActiveEffectsPanel } from './ActiveEffectsPanel.tsx';
 import { AttacksCard } from './AttacksCard.tsx';
 import { useCombatStatus } from './CombatStatusProvider.tsx';
 import { DrSummaryCard } from './DrSummaryCard.tsx';
+import { DualWeaponProvider } from './DualWeaponContext.tsx';
 import { SoloTrackerCard } from './SoloTrackerCard.tsx';
 
 export interface CombatTabProps {
@@ -38,26 +39,28 @@ export function CombatTab({
   const { bumpers, openRoll } = useCombatStatus();
 
   return (
-    <div className="space-y-4 pb-4">
-      <AttacksCard character={character} openRoll={openRoll} />
-      <DrSummaryCard
-        key={character.id}
-        character={character}
-        canWrite={canWrite}
-        hpMax={bumpers.hpMax}
-        bumpHp={(delta) => bumpers.bumpHp(delta, { separateGesture: true })}
-        openRoll={openRoll}
-      />
-      {experimentalActiveEffects && (
-        <ActiveEffectsPanel
+    <DualWeaponProvider characterId={character.id} maneuver={character.combat?.maneuver}>
+      <div className="space-y-4 pb-4">
+        <AttacksCard character={character} openRoll={openRoll} />
+        <DrSummaryCard
+          key={character.id}
           character={character}
           canWrite={canWrite}
-          anchorActiveEffectId={anchorActiveEffectId}
+          hpMax={bumpers.hpMax}
+          bumpHp={(delta) => bumpers.bumpHp(delta, { separateGesture: true })}
+          openRoll={openRoll}
         />
-      )}
-      {experimentalTurnTracker && (
-        <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
-      )}
-    </div>
+        {experimentalActiveEffects && (
+          <ActiveEffectsPanel
+            character={character}
+            canWrite={canWrite}
+            anchorActiveEffectId={anchorActiveEffectId}
+          />
+        )}
+        {experimentalTurnTracker && (
+          <SoloTrackerCard characterId={character.id} canWrite={canWrite} />
+        )}
+      </div>
+    </DualWeaponProvider>
   );
 }

@@ -327,3 +327,38 @@ describe('resolveItemEnchantments', () => {
     });
   });
 });
+
+describe('weapon_damage damageType', () => {
+  const flaming = (effect: Record<string, unknown>) =>
+    resolveItemEnchantments({
+      ...base,
+      equipped: true,
+      weaponData: weaponData.parse({ damage: 'sw cut' }),
+      enchantments: [
+        {
+          spellName: 'Flaming Weapon',
+          spellLevel: 15,
+          mechanics: {
+            applicability: 'weapon',
+            effects: [effect],
+            levels: [],
+            stackingPolicy: { kind: 'stack' },
+          },
+        },
+      ],
+    } as never);
+
+  it('carries the damage type onto the resolved effect', () => {
+    const result = flaming({ target: 'weapon_damage', value: 2, damageType: 'fire' });
+    const effect = result.effects.find((e) => e.target === 'weapon_damage');
+    expect(effect?.value).toBe(2);
+    expect(effect?.damageType).toBe('fire');
+  });
+
+  it('omits damageType when the effect has none', () => {
+    const result = flaming({ target: 'weapon_damage', value: 2 });
+    const effect = result.effects.find((e) => e.target === 'weapon_damage');
+    expect(effect).toBeDefined();
+    expect(effect && 'damageType' in effect).toBe(false);
+  });
+});

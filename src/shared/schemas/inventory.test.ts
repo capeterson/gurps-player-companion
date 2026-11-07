@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  enchantmentEffect,
   enchantmentRef,
   inventoryItemCreate,
   magicItemData,
@@ -156,6 +157,37 @@ describe('inventoryItemCreate.enchantments', () => {
         name: 'Cloak',
         enchantments: [...enchantments, { spellName: 'One too many' }],
       }),
+    ).toThrow();
+  });
+});
+
+describe('enchantmentEffect.damageType', () => {
+  it('accepts a damage type on a weapon_damage effect', () => {
+    expect(
+      enchantmentEffect.parse({ target: 'weapon_damage', value: 2, damageType: 'fire' }),
+    ).toEqual({ target: 'weapon_damage', value: 2, damageType: 'fire' });
+  });
+
+  it('rejects a damage type on any other target', () => {
+    expect(() => enchantmentEffect.parse({ target: 'dr', value: 2, damageType: 'fire' })).toThrow();
+    expect(() =>
+      enchantmentEffect.parse({ target: 'weapon_attack', value: 1, damageType: 'fire' }),
+    ).toThrow();
+  });
+
+  it('trims the value and rejects empty or over-long types', () => {
+    expect(
+      enchantmentEffect.parse({ target: 'weapon_damage', value: 1, damageType: '  fire  ' })
+        .damageType,
+    ).toBe('fire');
+    expect(() =>
+      enchantmentEffect.parse({ target: 'weapon_damage', value: 1, damageType: '' }),
+    ).toThrow();
+    expect(() =>
+      enchantmentEffect.parse({ target: 'weapon_damage', value: 1, damageType: '   ' }),
+    ).toThrow();
+    expect(() =>
+      enchantmentEffect.parse({ target: 'weapon_damage', value: 1, damageType: 'x'.repeat(41) }),
     ).toThrow();
   });
 });

@@ -12,6 +12,14 @@ import {
   skillDisplayName,
   stShortfallPenalty,
 } from '../../../../../shared/domain/defenseCalc.ts';
+import {
+  DUAL_WEAPON_ATTACK_PENALTY,
+  DUAL_WEAPON_TARGET_DEFENSE_PENALTY,
+  OFF_HAND_PENALTY,
+  canPick,
+  hasAmbidexterity,
+  hasOffHandWeaponTraining,
+} from '../../../../../shared/domain/dualWeaponAttack.ts';
 import { availableEquipment } from '../../../../../shared/domain/inventoryAvailability.ts';
 import { formatRangedRange, resolveRangedRange } from '../../../../../shared/domain/rangedRange.ts';
 import {
@@ -19,6 +27,7 @@ import {
   weaponStrengthKind,
 } from '../../../../../shared/domain/weaponDamage.ts';
 import { weaponModes } from '../../../../../shared/domain/weaponModes.ts';
+import { formatSigned } from '../../../../../shared/format/number.ts';
 import type { RangedData, WeaponData } from '../../../../../shared/schemas/inventory.ts';
 import { DragHandle } from '../../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../../components/ui/FoldSection.tsx';
@@ -27,6 +36,7 @@ import { InventoryAnchorLink } from '../../InventoryAnchorLink.tsx';
 import { mechanicsUnavailableReason } from '../../mechanicsUnavailableReason.ts';
 import type { EffectAwareCharacterDetail as CharacterDetail } from '../../useCharacterDetail.ts';
 import type { RollRequest } from '../rollTypes.ts';
+import { useDualWeapon } from './DualWeaponContext.tsx';
 import {
   type AttackSort,
   type AttackTablePreferences,
@@ -88,7 +98,7 @@ function damageLinesFor(weaponName: string, wd: WeaponData): DamageLine[] {
 
 /*
  * Below 640px each attack row becomes a four-column grid (handle gutter, skill,
- * damage, ±): the weapon name takes the group's first line and Reach / Range
+ * damage, ✦): the weapon name takes the group's first line and Reach / Range
  * drops to a muted line under its attack. The table elements keep their native
  * roles; only their display changes.
  */
@@ -241,6 +251,46 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
     );
   }
 
+  const dual = useDualWeapon();
+  const ambidextrous = hasAmbidexterity(character.traits ?? []);
+  const dualKey = (weaponId: string, modeKey: string | undefined) =>
+    `${weaponId}|${modeKey ?? 'primary'}`;
+  const dualLines = sortedWeapons.flatMap((weapon) => {
+    const wd = weapon.weaponData;
+    if (!wd) return [];
+    return damageLinesFor(weapon.name, wd).flatMap((line) => {
+      const mode = line.weaponMode;
+      const resolution = resolveWeaponSkill(
+        weapon.name,
+        mode ? mode.skill : wd.skill,
+        skillCandidates,
+      );
+      if (resolution.kind !== 'matched') return [];
+      const tooStrong =
+        mode &&
+        weaponStrengthKind(mode) === 'bow' &&
+        (mode.weaponSt ?? mode.stRequired ?? 0) > state.strength(character.derived.effectiveSt);
+      if (tooStrong) return [];
+      return [
+        {
+          key: dualKey(weapon.id, line.modeKey),
+          label: `${weapon.name}${line.modeName ? ` ${line.modeName}` : ''}`,
+          skill: resolution.name,
+        },
+      ];
+    });
+  });
+  // All-Out Attack waives the Dual-Weapon -4 (MA83); the foe's -1 to defend remains.
+  const dualPenalty = state.maneuver === 'all_out_attack' ? 0 : DUAL_WEAPON_ATTACK_PENALTY;
+  const dualLabel = (key: string) => dualLines.find((line) => line.key === key)?.label ?? '';
+  const dualStatus =
+    dual.state.picks.length === 0
+      ? 'Choose two attacks.'
+      : dual.state.picks.length === 1
+        ? 'Choose one more attack.'
+        : `${dualLabel(dual.state.picks[0] ?? '')} and ${dualLabel(dual.state.picks[1] ?? '')}: ${dualPenalty ? `${dualPenalty} each` : 'no −4 under All-Out Attack'}; the foe defends at ${DUAL_WEAPON_TARGET_DEFENSE_PENALTY}. Clear one to choose another.`;
+  const needsOffHand = dual.state.active && dual.state.picks.length === 2 && !ambidextrous;
+
   if (weapons.length === 0) {
     return (
       <FoldSection preferenceKey={`${character.id}:AttacksCard`} title="Attacks" icon="combat">
@@ -262,6 +312,45 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
           ST-based damage is unavailable until linked library effects load.{' '}
           {mechanicsUnavailableReason(character)}
         </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={`chip${dual.state.active ? ' on' : ''}`}
+          aria-pressed={dual.state.active}
+          onClick={dual.toggle}
+        >
+          Dual-Weapon Attack
+        </button>
+        {dual.state.active && (
+          <output className="text-xs text-base-content/70">{dualStatus}</output>
+        )}
+      </div>
+      {needsOffHand && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span id={`${character.id}-off-hand`}>
+            {dual.state.offHand ? 'Off hand' : 'Which attack uses your off hand?'}
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby={`${character.id}-off-hand`}
+            className="flex flex-wrap gap-2"
+          >
+            {dual.state.picks.map((key) => (
+              <button
+                key={key}
+                type="button"
+                // biome-ignore lint/a11y/useSemanticElements: chip-styled toggle buttons in a radiogroup match the app's chip pattern.
+                role="radio"
+                aria-checked={dual.state.offHand === key}
+                className={`chip${dual.state.offHand === key ? ' on' : ''}`}
+                onClick={() => dual.setOffHand(key)}
+              >
+                {dualLabel(key)}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       <WeaponEffectDiagnostics
         effects={effects.filter((effect) =>
@@ -437,6 +526,23 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     resolution.kind === 'matched' && !bowTooStrong
                       ? resolution.level - stPenalty + effectTotal(attackEffects)
                       : 0;
+                  const rowDualKey = dualKey(w.id, line.modeKey);
+                  const dualPicked = dual.state.active && dual.state.picks.includes(rowDualKey);
+                  const dualSelectable =
+                    dual.state.active &&
+                    firstOfLine &&
+                    dualLines.some((entry) => entry.key === rowDualKey);
+                  const offHandPenalty =
+                    dualPicked &&
+                    !ambidextrous &&
+                    dual.state.offHand === rowDualKey &&
+                    resolution.kind === 'matched' &&
+                    !hasOffHandWeaponTraining(character.traits ?? [], resolution.name);
+                  const dualAdjustment = dualPicked
+                    ? dualPenalty + (offHandPenalty ? OFF_HAND_PENALTY : 0)
+                    : 0;
+                  const shownTarget =
+                    finalTarget > 0 || dualPicked ? finalTarget + dualAdjustment : finalTarget;
                   const bases = weaponDamageBases(
                     currentMode,
                     character.derived.effectiveSt,
@@ -483,6 +589,27 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                     if (ranged && hasModifierEffects(accuracyBreakdown)) {
                       modifierSections.push({ title: 'Accuracy', breakdown: accuracyBreakdown });
                     }
+                  }
+                  if (dualPicked && showSkill && resolution.kind === 'matched') {
+                    modifierSections.push({
+                      title: 'Dual-Weapon Attack',
+                      note: (
+                        <ul>
+                          <li>
+                            {dualPenalty
+                              ? `${dualPenalty} Dual-Weapon Attack (MA83)`
+                              : 'No Dual-Weapon penalty under All-Out Attack (MA83)'}
+                          </li>
+                          {offHandPenalty && <li>{OFF_HAND_PENALTY} Off hand (B14, MA83)</li>}
+                          <li>Foe defends at {DUAL_WEAPON_TARGET_DEFENSE_PENALTY} (MA83)</li>
+                        </ul>
+                      ),
+                      breakdown: {
+                        baseLabel: 'Attack',
+                        baseValue: finalTarget,
+                        finalValue: shownTarget,
+                      },
+                    });
                   }
                   if (resolved && finalDice && damageEffects.length > 0) {
                     modifierSections.push({
@@ -564,43 +691,57 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                       >
                         {showSkill &&
                           (resolution.kind === 'matched' ? (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm h-auto min-h-7 w-full flex-nowrap justify-between gap-1.5 px-1.5 py-0 max-sm:px-1 text-left font-normal"
-                              disabled={bowTooStrong}
-                              onClick={() =>
-                                openRoll({
-                                  label: attackLabel,
-                                  baseTarget: finalTarget,
-                                  attack: {
-                                    ranged: !!ranged,
-                                    range: resolveRangedRange(
-                                      ranged?.range,
-                                      state.strength(character.derived.effectiveSt),
-                                      currentMode?.weaponSt ?? currentMode?.stRequired,
-                                    ),
-                                    accuracy,
-                                    canTargetVitals: canHitVitals,
-                                  },
-                                })
-                              }
-                            >
-                              {/* Mode reads first; the accessible name keeps "Skill · Mode N". */}
-                              <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm">
-                                <span className="min-w-0 break-words text-xs text-base-content/70">
-                                  {resolution.name}
+                            <div className="flex items-center gap-1">
+                              {dualSelectable && (
+                                <input
+                                  type="checkbox"
+                                  className="checkbox checkbox-sm shrink-0"
+                                  aria-label={`Dual-Weapon Attack with ${attackLabel}`}
+                                  checked={dualPicked}
+                                  disabled={!dualPicked && !canPick(dual.state, rowDualKey)}
+                                  onChange={() => dual.pick(rowDualKey)}
+                                />
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm h-auto min-h-7 min-w-0 flex-1 flex-nowrap justify-between gap-1.5 px-1.5 py-0 max-sm:px-1 text-left font-normal"
+                                disabled={bowTooStrong}
+                                onClick={() =>
+                                  openRoll({
+                                    label: dualPicked
+                                      ? `${attackLabel} (Dual-Weapon Attack)`
+                                      : attackLabel,
+                                    baseTarget: shownTarget,
+                                    attack: {
+                                      ranged: !!ranged,
+                                      range: resolveRangedRange(
+                                        ranged?.range,
+                                        state.strength(character.derived.effectiveSt),
+                                        currentMode?.weaponSt ?? currentMode?.stRequired,
+                                      ),
+                                      accuracy,
+                                      canTargetVitals: canHitVitals,
+                                    },
+                                  })
+                                }
+                              >
+                                {/* Mode reads first; the accessible name keeps "Skill · Mode N". */}
+                                <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-sm">
+                                  <span className="min-w-0 break-words text-xs text-base-content/70">
+                                    {resolution.name}
+                                  </span>
+                                  {line.modeName && (
+                                    <>
+                                      <span className="sr-only"> · </span>
+                                      {modeLabel}
+                                    </>
+                                  )}
+                                </span>{' '}
+                                <span className="num shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-base font-bold text-primary">
+                                  {shownTarget}
                                 </span>
-                                {line.modeName && (
-                                  <>
-                                    <span className="sr-only"> · </span>
-                                    {modeLabel}
-                                  </>
-                                )}
-                              </span>{' '}
-                              <span className="num shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-base font-bold text-primary">
-                                {finalTarget}
-                              </span>
-                            </button>
+                              </button>
+                            </div>
                           ) : (
                             <p className="flex flex-wrap items-baseline gap-x-1.5 px-1.5 py-1.5 text-xs text-base-content/70">
                               {modeLabel}
@@ -657,6 +798,27 @@ function AttackTable({ character, openRoll }: AttacksCardProps) {
                           <span className="inline-block py-1.5 text-xs whitespace-normal text-base-content/70">
                             {mode?.raw ?? line.damage ?? '—'}
                           </span>
+                        )}
+                        {resolved && damageEffects.length > 0 && (
+                          <ul
+                            className="text-[11px] leading-tight whitespace-normal md:whitespace-nowrap text-base-content/70"
+                            aria-label={`Extra damage: ${w.name}${line.modeName ? `, ${line.modeName}` : ''}`}
+                          >
+                            {damageEffects.map((effect, index) => (
+                              <li key={`${effect.sourceId}-${effect.value}-${index}`}>
+                                {formatSigned(effect.value)}{' '}
+                                {effect.damageType &&
+                                  effect.damageType.toLowerCase() !==
+                                    (resolved.type ?? '').toLowerCase() && (
+                                    <span>{effect.damageType} </span>
+                                  )}
+                                <br className="md:hidden" />
+                                {effect.sourceName.startsWith(`${w.name}: `)
+                                  ? effect.sourceName.slice(w.name.length + 2)
+                                  : effect.sourceName}
+                              </li>
+                            ))}
+                          </ul>
                         )}
                       </td>
                       <td
