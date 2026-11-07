@@ -361,7 +361,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       </>
                     }
                   >
-                    <AppIcon name="equipped" size={16} />
+                    <AppIcon name="equipped" size={15} />
                   </InfoTooltip>
                 </span>
               ) : (
