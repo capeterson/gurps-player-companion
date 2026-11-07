@@ -246,7 +246,7 @@ plain text. Armor layers and natural skull protection retain their existing rows
 
 A trait link selects the Traits destination, opens its folded panel, reveals the
 owned row despite search/column filters, and highlights it. Editing remains an
-explicit action. `SheetAnchorLink` shares the router-aware anchor behavior with
+explicit action. Trait rows have a **Details** control that expands a read-only view (rendered Markdown description, source rules and effects) and, for editors, a separate **Edit** control for the form; the Description field is a Markdown editor. `SheetAnchorLink` shares the router-aware anchor behavior with
 existing equipment links and supports ordinary anchors outside a router.
 
 ## One heading and one interaction per purpose
@@ -479,7 +479,7 @@ category has its own distinct icon (Armor, Weapon/Shield, Container, Powerstone,
 Magic item, Enchantments); no category is hidden by a priority icon. Category
 icons open the existing editor and reveal names/details on hover or focus through
 `InfoTooltip`, portaled above the table so clipping ancestors cannot hide content.
-Equipped uses a separate check-circle icon with a tooltip.
+Equipped uses a separate icon with a tooltip, left of the name in its own reserved slot so names stay aligned. Containers show the Container icon with a small chevron in the leading slot as the expand control; container settings open from a cog beside the name.
 Read-only category icons retain labels and tooltips, with the existing Details action.
 The move menu
 wraps long container names, scrolls internally, and uses shared viewport collision

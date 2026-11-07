@@ -164,7 +164,7 @@ export function InventoryRow(props: InventoryRowProps) {
     setSection(null);
     triggerRef.current?.focus();
   }
-  function categoryIcon(category: ItemCategory, children: ReactNode) {
+  function categoryIcon(category: ItemCategory, children: ReactNode, iconName?: AppIconName) {
     const icons = CATEGORY_ICONS;
     return (
       <InfoTooltip
@@ -192,7 +192,7 @@ export function InventoryRow(props: InventoryRowProps) {
           </>
         }
       >
-        <AppIcon name={icons[category]} size={16} />
+        <AppIcon name={iconName ?? icons[category]} size={16} />
       </InfoTooltip>
     );
   }
@@ -304,56 +304,74 @@ export function InventoryRow(props: InventoryRowProps) {
         <td className="align-top sm:align-middle">
           <div className="inventory-item-heading flex flex-col flex-wrap items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span className="inventory-item-name flex min-w-0 items-start gap-2">
-              {hasChildren && !contentsForcedOpen ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    stop(e);
-                    const next = !contentsOpen;
-                    setOpen(next);
-                    writeContainerExpanded(item.characterId, item.id, next);
-                    if (!next) onCollapse?.(item.id);
-                  }}
-                  className="inventory-slot inventory-expand btn btn-ghost btn-xs text-base-content/60"
-                  aria-expanded={contentsOpen}
-                  aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
-                >
-                  <AppIcon name={contentsOpen ? 'chevronDown' : 'chevronRight'} size={15} />
-                </button>
-              ) : hasChildren ? (
-                <span className="inventory-slot text-base-content/60" aria-hidden>
-                  <AppIcon name="chevronDown" size={15} />
-                </span>
+              {item.isContainer ? (
+                hasChildren && !contentsForcedOpen ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      stop(e);
+                      const next = !contentsOpen;
+                      setOpen(next);
+                      writeContainerExpanded(item.characterId, item.id, next);
+                      if (!next) onCollapse?.(item.id);
+                    }}
+                    className="inventory-slot inventory-expand gap-0 overflow-visible rounded text-base-content/70 hover:bg-base-300/60"
+                    aria-expanded={contentsOpen}
+                    aria-label={contentsOpen ? 'Collapse contents' : 'Expand contents'}
+                  >
+                    <AppIcon name="inventory" size={14} />
+                    <span className="text-base-content/60" aria-hidden>
+                      <AppIcon name={contentsOpen ? 'chevronDown' : 'chevronRight'} size={10} />
+                    </span>
+                  </button>
+                ) : (
+                  <span
+                    className="inventory-slot gap-0 overflow-visible text-base-content/70"
+                    title={`Container${reductionLabel ? ` ${reductionLabel}` : ''}`}
+                  >
+                    <AppIcon name="inventory" size={14} />
+                    {hasChildren && (
+                      <span className="text-base-content/45" aria-hidden>
+                        <AppIcon name="chevronDown" size={10} />
+                      </span>
+                    )}
+                  </span>
+                )
               ) : (
                 <span className="inventory-slot text-base-content/60" aria-hidden />
+              )}
+              {item.equipped ? (
+                <span className="inventory-slot">
+                  <InfoTooltip
+                    ariaLabel={`Equipped: ${item.name}`}
+                    triggerClassName="inventory-equipped-icon inline-flex h-5 w-5 items-center justify-center rounded text-secondary"
+                    contentClassName="w-52"
+                    scrollable
+                    portal
+                    content={
+                      <>
+                        <strong className="block">Equipped</strong>
+                        <span className="block mt-1">
+                          {inStashed ||
+                          item.quantity === 0 ||
+                          equipmentAvailability?.get(item.id)?.equipped === false
+                            ? 'Unavailable while stashed or at quantity zero.'
+                            : 'Worn or wielded for use.'}
+                        </span>
+                      </>
+                    }
+                  >
+                    <AppIcon name="equipped" size={16} />
+                  </InfoTooltip>
+                </span>
+              ) : (
+                <span className="inventory-slot" aria-hidden />
               )}
               <span className="inventory-item-title font-medium">{item.name}</span>
             </span>
             <span className="inventory-item-badges flex min-w-0 flex-wrap items-center gap-1">
-              {item.equipped && (
-                <InfoTooltip
-                  ariaLabel={`Equipped: ${item.name}`}
-                  triggerClassName="inventory-equipped-icon btn btn-ghost btn-sm text-secondary"
-                  contentClassName="w-52"
-                  scrollable
-                  portal
-                  content={
-                    <>
-                      <strong className="block">Equipped</strong>
-                      <span className="block mt-1">
-                        {inStashed ||
-                        item.quantity === 0 ||
-                        equipmentAvailability?.get(item.id)?.equipped === false
-                          ? 'Unavailable while stashed or at quantity zero.'
-                          : 'Worn or wielded for use.'}
-                      </span>
-                    </>
-                  }
-                >
-                  <AppIcon name="equipped" size={16} />
-                </InfoTooltip>
-              )}
               {item.isContainer &&
+                canEdit &&
                 categoryIcon(
                   'container',
                   <>
@@ -364,6 +382,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       </span>
                     )}
                   </>,
+                  'settings',
                 )}
               {hasChildren && !contentsOpen && (
                 <span

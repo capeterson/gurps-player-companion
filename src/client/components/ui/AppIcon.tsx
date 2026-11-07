@@ -4,7 +4,6 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
-  CircleCheck,
   Compass,
   Dice6,
   Ellipsis,
@@ -12,6 +11,7 @@ import {
   Fingerprint,
   Gem,
   GripVertical,
+  HandGrab,
   History,
   Map as MapIcon,
   Menu,
@@ -32,7 +32,7 @@ import {
 
 const ICONS = {
   combat: Swords,
-  equipped: CircleCheck,
+  equipped: HandGrab,
   powerstone: Gem,
   magicItem: WandSparkles,
   identity: UserRound,

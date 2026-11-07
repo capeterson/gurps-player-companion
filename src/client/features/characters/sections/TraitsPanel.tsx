@@ -10,6 +10,7 @@ import { libraryMechanics } from '../../../../shared/schemas/libraryMechanics.ts
 import type { TraitModifier as AppliedTraitModifier } from '../../../../shared/schemas/trait.ts';
 import type { TraitOut, TraitVariant } from '../../../../shared/schemas/trait.ts';
 import { Markdown } from '../../../components/markdown/Markdown.tsx';
+import { RichTextEditor } from '../../../components/markdown/RichTextEditor.tsx';
 import { AppIcon } from '../../../components/ui/AppIcon.tsx';
 import { DragHandle } from '../../../components/ui/DragHandle.tsx';
 import { FoldSection } from '../../../components/ui/FoldSection.tsx';
@@ -518,6 +519,8 @@ function AddTraitForm({ characterId, campaignId, canWrite }: AddTraitFormProps) 
   );
 }
 
+type TraitRowMode = 'closed' | 'details' | 'edit';
+
 interface TraitRowProps {
   activeEffectsSnapshot?: boolean | undefined;
   characterId: string;
@@ -526,12 +529,12 @@ interface TraitRowProps {
   trait: TraitOut;
   inventory: CharacterDetail['inventory'];
   canWrite: boolean;
-  expanded: boolean;
+  mode: TraitRowMode;
   position: number;
   dragging: boolean;
   visible: boolean;
   highlighted: boolean;
-  onToggle: () => void;
+  onMode: (mode: TraitRowMode) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
   onDragEnd: () => void;
   onDrop: () => void;
@@ -749,12 +752,12 @@ function TraitRow({
   inventory,
   canWrite,
   activeEffectsSnapshot,
-  expanded,
+  mode,
   position,
   dragging,
   visible,
   highlighted,
-  onToggle,
+  onMode,
   onDragStart,
   onDragEnd,
   onDrop,
@@ -784,7 +787,8 @@ function TraitRow({
   const hasCustomEffects = (trait.customEffects ?? []).some(
     (effect) => activeEffectsEnabled || !effect.conditionGroup,
   );
-  const canExpand = canWrite || Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
+  const expanded = mode !== 'closed';
+  const hasDetails = Boolean(trait.notes) || hasSourceRules || hasCustomEffects;
 
   const deletion = useConfirmedEntityDelete({
     entityClass: 'character_trait',
@@ -847,157 +851,156 @@ function TraitRow({
         <td className="num w-12 text-right text-xs text-base-content/70 sm:w-16">
           {trait.level ?? '—'}
         </td>
-        <td className="w-14 px-1 text-right sm:w-20 sm:px-2">
-          {canExpand && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs min-h-11 w-full min-w-0 gap-1 px-0 sm:min-h-0 sm:px-1"
-              onClick={onToggle}
-              aria-expanded={expanded}
-              aria-label={`${expanded ? 'Close' : canWrite ? 'Edit' : 'View'} ${trait.name}`}
-            >
-              <span className="hidden sm:inline">
-                {expanded ? 'Done' : canWrite ? 'Edit' : 'Details'}
-              </span>
-              {saving ? (
-                <span
-                  className="loading loading-spinner size-3.5 text-warning"
-                  role="status"
-                  aria-label="Saving trait"
-                />
-              ) : (
-                <AppIcon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
-              )}
-            </button>
-          )}
+        <td className={`px-1 text-right sm:px-2 ${canWrite ? 'w-24 sm:w-36' : 'w-14 sm:w-20'}`}>
+          <span className="flex items-center justify-end gap-0.5">
+            {hasDetails && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs min-h-11 min-w-0 gap-1 px-1 sm:min-h-0"
+                onClick={() => onMode(mode === 'details' ? 'closed' : 'details')}
+                aria-expanded={mode === 'details'}
+                aria-label={`${mode === 'details' ? 'Hide' : 'View'} ${trait.name}`}
+              >
+                <span className="hidden sm:inline">Details</span>
+                <AppIcon name={mode === 'details' ? 'chevronDown' : 'chevronRight'} size={14} />
+              </button>
+            )}
+            {canWrite && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs min-h-11 min-w-0 gap-1 px-1 sm:min-h-0"
+                onClick={() => onMode(mode === 'edit' ? 'closed' : 'edit')}
+                aria-expanded={mode === 'edit'}
+                aria-label={`${mode === 'edit' ? 'Close' : 'Edit'} ${trait.name}`}
+              >
+                <span className="hidden sm:inline">{mode === 'edit' ? 'Done' : 'Edit'}</span>
+                {saving && (
+                  <span
+                    className="loading loading-spinner size-3.5 text-warning"
+                    role="status"
+                    aria-label="Saving trait"
+                  />
+                )}
+              </button>
+            )}
+          </span>
         </td>
       </tr>
-      {(canWrite || expanded) && (
-        <tr hidden={!expanded}>
+      {canWrite && (
+        <tr hidden={mode !== 'edit'}>
           <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
-            {canWrite ? (
-              <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
-                <RepriceEntry section="traits" entry={trait} />
-                <div
-                  className={`grid grid-cols-1 gap-2 md:gap-3 ${
-                    trait.level == null
-                      ? 'md:grid-cols-[minmax(0,1fr)_10rem_6rem]'
-                      : 'md:grid-cols-[minmax(0,1fr)_10rem_6rem_6rem]'
-                  }`}
-                >
-                  <fieldset className="fieldset min-w-0 p-0">
-                    <legend className="fieldset-legend text-xs">Name</legend>
-                    <input
-                      aria-label={`${trait.name} name`}
-                      className={`${DRAFT_FIELD_CLASS} input input-sm w-full`}
-                      {...nameField.inputProps}
-                    />
-                  </fieldset>
-                  <fieldset className="fieldset min-w-0 p-0">
-                    <legend className="fieldset-legend text-xs">Type</legend>
-                    <span className="flex min-h-8 items-center text-sm capitalize text-base-content/70">
-                      {traitKindLabel(trait.kind)}
-                    </span>
-                  </fieldset>
-                  {trait.level != null && (
-                    <fieldset className="fieldset min-w-0 p-0">
-                      <legend className="fieldset-legend text-xs">Level</legend>
-                      <span className="num flex min-h-8 items-center justify-end text-sm text-base-content/70">
-                        {trait.level}
-                      </span>
-                    </fieldset>
-                  )}
-                  <fieldset className="fieldset min-w-0 p-0">
-                    <legend className="fieldset-legend text-xs">Points</legend>
-                    <input
-                      aria-label={`${trait.name} points`}
-                      className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
-                      inputMode="numeric"
-                      {...pointsField.inputProps}
-                    />
-                  </fieldset>
-                </div>
-                {trait.variantName && (
-                  <p className="text-xs text-base-content/70">
-                    <span className="font-medium">Variant:</span> {trait.variantName}
-                  </p>
-                )}
+            <div className="space-y-3 px-3 py-4 md:px-14 md:py-5">
+              <RepriceEntry section="traits" entry={trait} />
+              <div
+                className={`grid grid-cols-1 gap-2 md:gap-3 ${
+                  trait.level == null
+                    ? 'md:grid-cols-[minmax(0,1fr)_10rem_6rem]'
+                    : 'md:grid-cols-[minmax(0,1fr)_10rem_6rem_6rem]'
+                }`}
+              >
                 <fieldset className="fieldset min-w-0 p-0">
-                  <legend className="fieldset-legend text-xs">Description &amp; notes</legend>
-                  <textarea
-                    aria-label={`${trait.name} description and notes`}
-                    className={`${DRAFT_FIELD_CLASS} textarea textarea-sm min-h-20 w-full`}
-                    value={notesField.value}
-                    onChange={(event) => notesField.setValue(event.target.value)}
-                    onBlur={notesField.inputProps.onBlur}
-                    data-flashing={notesField.inputProps['data-flashing']}
-                    data-flash-parity={notesField.inputProps['data-flash-parity']}
+                  <legend className="fieldset-legend text-xs">Name</legend>
+                  <input
+                    aria-label={`${trait.name} name`}
+                    className={`${DRAFT_FIELD_CLASS} input input-sm w-full`}
+                    {...nameField.inputProps}
                   />
                 </fieldset>
-                {notesField.value && (
-                  <FoldSection
-                    preferenceKey={`${trait.id}:description-preview`}
-                    title="Preview description"
-                    defaultOpen={false}
-                    className="text-xs"
-                  >
-                    <Markdown source={notesField.value} />
-                  </FoldSection>
+                <fieldset className="fieldset min-w-0 p-0">
+                  <legend className="fieldset-legend text-xs">Type</legend>
+                  <span className="flex min-h-8 items-center text-sm capitalize text-base-content/70">
+                    {traitKindLabel(trait.kind)}
+                  </span>
+                </fieldset>
+                {trait.level != null && (
+                  <fieldset className="fieldset min-w-0 p-0">
+                    <legend className="fieldset-legend text-xs">Level</legend>
+                    <span className="num flex min-h-8 items-center justify-end text-sm text-base-content/70">
+                      {trait.level}
+                    </span>
+                  </fieldset>
                 )}
-                {hasSourceRules && (
-                  <details className="border-t border-base-300 pt-1">
-                    <summary className="cursor-pointer py-2 text-xs text-base-content/70">
-                      Source &amp; rules
-                    </summary>
-                    <div className="pb-2">
-                      <TraitConfiguredDetails
-                        trait={trait}
-                        activeEffectsEnabled={activeEffectsEnabled}
-                      />
-                    </div>
-                  </details>
-                )}
-                <div className={hasSourceRules ? undefined : 'border-t border-base-300 pt-3'}>
-                  <CharacterEffectsEditor
-                    trait={trait}
-                    inventory={inventory}
-                    campaignId={campaignId}
-                    characterSkills={characterSkills}
-                    rowPatch={rowPatch}
+                <fieldset className="fieldset min-w-0 p-0">
+                  <legend className="fieldset-legend text-xs">Points</legend>
+                  <input
+                    aria-label={`${trait.name} points`}
+                    className={`${DRAFT_FIELD_CLASS} input input-sm num w-full text-right`}
+                    inputMode="numeric"
+                    {...pointsField.inputProps}
                   />
-                </div>
-                <footer className="flex items-center justify-between gap-3 border-t border-base-300 pt-3">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm text-error"
-                    onClick={deletion.request}
-                  >
-                    Delete trait
-                  </button>
-                  <button type="button" className="btn btn-sm" onClick={onToggle}>
-                    Done
-                  </button>
-                </footer>
-                {deletion.dialog}
+                </fieldset>
               </div>
-            ) : (
-              <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
-                {trait.notes && <Markdown source={trait.notes} />}
-                {hasSourceRules && (
-                  <TraitConfiguredDetails
-                    trait={trait}
-                    activeEffectsEnabled={activeEffectsEnabled}
-                  />
-                )}
-                {hasCustomEffects && (
-                  <TraitCustomEffects
-                    trait={trait}
-                    inventory={inventory}
-                    activeEffectsEnabled={activeEffectsEnabled}
-                  />
-                )}
+              {trait.variantName && (
+                <p className="text-xs text-base-content/70">
+                  <span className="font-medium">Variant:</span> {trait.variantName}
+                </p>
+              )}
+              <fieldset className="fieldset min-w-0 p-0">
+                <legend className="fieldset-legend text-xs">Description</legend>
+                <RichTextEditor
+                  aria-label={`${trait.name} description`}
+                  value={notesField.value}
+                  onChange={notesField.setValue}
+                  onBlur={notesField.inputProps.onBlur}
+                  data-flashing={notesField.inputProps['data-flashing']}
+                  data-flash-parity={notesField.inputProps['data-flash-parity']}
+                />
+              </fieldset>
+              {hasSourceRules && (
+                <details className="border-t border-base-300 pt-1">
+                  <summary className="cursor-pointer py-2 text-xs text-base-content/70">
+                    Source &amp; rules
+                  </summary>
+                  <div className="pb-2">
+                    <TraitConfiguredDetails
+                      trait={trait}
+                      activeEffectsEnabled={activeEffectsEnabled}
+                    />
+                  </div>
+                </details>
+              )}
+              <div className={hasSourceRules ? undefined : 'border-t border-base-300 pt-3'}>
+                <CharacterEffectsEditor
+                  trait={trait}
+                  inventory={inventory}
+                  campaignId={campaignId}
+                  characterSkills={characterSkills}
+                  rowPatch={rowPatch}
+                />
               </div>
-            )}
+              <footer className="flex items-center justify-between gap-3 border-t border-base-300 pt-3">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-error"
+                  onClick={deletion.request}
+                >
+                  Delete trait
+                </button>
+                <button type="button" className="btn btn-sm" onClick={() => onMode('closed')}>
+                  Done
+                </button>
+              </footer>
+              {deletion.dialog}
+            </div>
+          </td>
+        </tr>
+      )}
+      {mode === 'details' && (
+        <tr>
+          <td colSpan={6} className="border-b border-base-300 bg-base-200 p-0">
+            <div className="space-y-3 px-3 py-4 text-sm md:px-14 md:py-5">
+              {trait.notes && <Markdown source={trait.notes} />}
+              {hasSourceRules && (
+                <TraitConfiguredDetails trait={trait} activeEffectsEnabled={activeEffectsEnabled} />
+              )}
+              {hasCustomEffects && (
+                <TraitCustomEffects
+                  trait={trait}
+                  inventory={inventory}
+                  activeEffectsEnabled={activeEffectsEnabled}
+                />
+              )}
+            </div>
           </td>
         </tr>
       )}
@@ -1040,7 +1043,7 @@ function TraitsTable({
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [query, setQuery] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<{ id: string; mode: TraitRowMode } | null>(null);
   const [revealedAnchor, setRevealedAnchor] = useState<string | null>(null);
   const revealingAnchor = !!anchorTraitId && anchorTraitId !== revealedAnchor;
   useEffect(() => {
@@ -1215,15 +1218,15 @@ function TraitsTable({
                   activeEffectsSnapshot={activeEffectsSnapshot}
                   inventory={character.inventory}
                   canWrite={canWrite}
-                  expanded={expandedId === trait.id}
+                  mode={expanded?.id === trait.id ? expanded.mode : 'closed'}
                   position={visibleTraits.findIndex((candidate) => candidate.id === trait.id)}
                   dragging={draggingId === trait.id}
                   visible={visibleTraitIds.has(trait.id)}
                   highlighted={
                     anchorTraitId === trait.id && (revealingAnchor || query.trim() === '')
                   }
-                  onToggle={() =>
-                    setExpandedId((current) => (current === trait.id ? null : trait.id))
+                  onMode={(next) =>
+                    setExpanded(next === 'closed' ? null : { id: trait.id, mode: next })
                   }
                   onDragStart={(event) => {
                     event.dataTransfer.setData('text/plain', trait.id);

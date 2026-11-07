@@ -704,7 +704,7 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Library templates still populate the quick-add form, and its small optional
   category/equipped controls and location selector remain available; detailed editing uses the
   new item's category icons.
-  Every category has its own icon; Equipped uses a separate check-circle tooltip.
+  Every category has its own icon; Equipped uses a separate tooltip icon left of the name; containers expand from a Container icon with a small chevron.
   Container expansion keeps its chevron, and each
   nesting level indents one step with a faint guide line under its parent's
   chevron; a collapsed container shows its contained-item count. Below 640px

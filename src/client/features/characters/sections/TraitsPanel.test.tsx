@@ -427,10 +427,22 @@ it('opens one full-width trait editor and keeps unset advanced details out of th
   expect(screen.queryByRole('heading', { name: 'Edit Weapon Mastery' })).not.toBeInTheDocument();
   expect(screen.getByLabelText('Weapon Mastery name')).toBeVisible();
   expect(screen.getByLabelText('Weapon Mastery points')).toBeVisible();
-  expect(screen.getByLabelText('Weapon Mastery description and notes')).toBeVisible();
+  expect(screen.getByLabelText('Weapon Mastery description')).toBeVisible();
   expect(screen.queryByText('Source & rules')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible();
   expect(screen.getByRole('button', { name: 'Delete trait' })).toBeVisible();
+});
+
+it('shows rendered Markdown details without opening the editor', () => {
+  renderCharacterTraits([{ ...ownedTrait, notes: 'Use **either hand** freely' }]);
+  fireEvent.click(screen.getByRole('button', { name: 'View Weapon Mastery' }));
+  expect(screen.getByText('either hand').tagName).toBe('STRONG');
+  expect(screen.getByLabelText('Weapon Mastery name')).not.toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Hide Weapon Mastery' }));
+  expect(screen.getByRole('button', { name: 'View Weapon Mastery' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
 });
 
 it('preserves unsaved custom-effect drafts when disclosures close or search hides the row', () => {
