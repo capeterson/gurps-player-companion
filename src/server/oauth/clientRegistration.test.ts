@@ -26,6 +26,77 @@ describe('OAuth client registration', () => {
     });
   });
 
+  const claudeDocument = {
+    client_id: 'https://claude.ai/oauth/mcp-oauth-client-metadata',
+    client_name: 'Claude',
+    client_uri: 'https://claude.ai',
+    redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+    grant_types: [
+      'authorization_code',
+      'refresh_token',
+      'urn:ietf:params:oauth:grant-type:jwt-bearer',
+    ],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none',
+  };
+  const read = (body: unknown) => async () => ({ body, cacheMs: 1000 });
+
+  it("accepts Claude's published metadata document, including extra grant types", async () => {
+    const result = await fetchClientMetadataDocument(
+      claudeDocument.client_id,
+      read(claudeDocument),
+    );
+    expect(result.metadata.redirect_uris).toEqual(['https://claude.ai/api/mcp/auth_callback']);
+  });
+
+  it("accepts ChatGPT's published metadata document, which prefers private_key_jwt but supports none", async () => {
+    const chatgptId = 'https://chatgpt.com/oauth/client.json';
+    const result = await fetchClientMetadataDocument(
+      chatgptId,
+      read({
+        client_id: chatgptId,
+        client_uri: 'https://chatgpt.com/',
+        redirect_uris: ['https://chatgpt.com/connector_platform_oauth_redirect'],
+        token_endpoint_auth_method: 'private_key_jwt',
+        token_endpoint_auth_methods_supported: ['none', 'private_key_jwt'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        client_name: 'ChatGPT',
+        logo_uri: 'https://persistent.oaistatic.com/sonic/misc/openai-logo.png',
+        token_endpoint_auth_signing_alg: 'RS256',
+        jwks_uri: 'https://chatgpt.com/oauth/jwks.json',
+      }),
+    );
+    expect(result.metadata.client_name).toBe('ChatGPT');
+    expect(result.metadata.redirect_uris).toEqual([
+      'https://chatgpt.com/connector_platform_oauth_redirect',
+    ]);
+  });
+
+  it('still requires the authorization_code grant and public-client auth', async () => {
+    await expect(
+      fetchClientMetadataDocument(
+        claudeDocument.client_id,
+        read({ ...claudeDocument, grant_types: ['refresh_token'] }),
+      ),
+    ).rejects.toThrow('authorization_code');
+    await expect(
+      fetchClientMetadataDocument(
+        claudeDocument.client_id,
+        read({ ...claudeDocument, token_endpoint_auth_method: 'client_secret_basic' }),
+      ),
+    ).rejects.toThrow('public-client');
+  });
+
+  it('names the invalid fields when a document fails validation', async () => {
+    await expect(
+      fetchClientMetadataDocument(
+        claudeDocument.client_id,
+        read({ ...claudeDocument, redirect_uris: [] }),
+      ),
+    ).rejects.toThrow('invalid client metadata (redirect_uris)');
+  });
+
   it('accepts HTTPS and loopback HTTP redirects only', () => {
     expect(isSafeOAuthRedirectUri('https://chatgpt.com/connector/oauth/callback')).toBe(true);
     expect(isSafeOAuthRedirectUri('http://127.0.0.1:49152/callback')).toBe(true);
