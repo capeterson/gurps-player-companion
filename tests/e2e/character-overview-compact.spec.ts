@@ -520,7 +520,7 @@ test('overview stays compact and description and conditional effects work at sup
 
   const characterPath = new URL(page.url()).pathname;
   await expect(page.getByRole('heading', { name: 'Points', exact: true })).toBeVisible();
-  const foldNames = [/^Encumbrance/, /^Conditional effects$/];
+  const foldNames = [/^Conditional effects$/];
   const widths = [320, 767, 768, 769, 1279, 1280, 1281];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
@@ -550,6 +550,12 @@ test('overview stays compact and description and conditional effects work at sup
         expect(panelBox.height - headingBox.height).toBeLessThanOrEqual(2);
       }
     }
+    // Encumbrance is a plain stat card, never a fold.
+    await expect(page.getByRole('button', { name: /^Encumbrance/ })).toHaveCount(0);
+    const encumbranceCard = page
+      .getByRole('heading', { name: 'Encumbrance', exact: true })
+      .locator('xpath=ancestor::section[1]');
+    await expect(encumbranceCard.getByText('Carrying', { exact: true })).toBeVisible();
     const utilities = page.locator('.flex.min-w-0.flex-col.gap-4').filter({
       has: page.getByRole('button', { name: /^Conditional effects$/ }),
     });
@@ -562,6 +568,23 @@ test('overview stays compact and description and conditional effects work at sup
       expect(current).not.toBeNull();
       expect(next).not.toBeNull();
       if (current && next) expect(next.y - (current.y + current.height)).toBeLessThanOrEqual(20);
+    }
+    if (width >= 768) {
+      // The utility column's last panel and Status end on the same line.
+      const [statusBox, lastUtilityBox] = await Promise.all([
+        page
+          .getByRole('heading', { name: 'Status', exact: true })
+          .locator('xpath=ancestor::section[1]')
+          .boundingBox(),
+        utilityItems.last().boundingBox(),
+      ]);
+      expect(statusBox).not.toBeNull();
+      expect(lastUtilityBox).not.toBeNull();
+      if (statusBox && lastUtilityBox) {
+        expect(
+          Math.abs(statusBox.y + statusBox.height - (lastUtilityBox.y + lastUtilityBox.height)),
+        ).toBeLessThanOrEqual(1);
+      }
     }
     const documentWidth = await page.locator('html').evaluate((node) => node.scrollWidth);
     expect(documentWidth).toBeLessThanOrEqual(width);
