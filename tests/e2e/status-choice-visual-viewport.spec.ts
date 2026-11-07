@@ -266,8 +266,6 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     await page.keyboard.press('Escape');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/characters/${character.id}`);
-    const overview = page.getByRole('button', { name: /Sheet overview/ });
-    if ((await overview.getAttribute('aria-expanded')) === 'false') await overview.tap();
     const modifierTrigger = page.getByRole('button', { name: 'Edit IQ modifiers' });
     await modifierTrigger.scrollIntoViewIfNeeded();
     await modifierTrigger.tap();

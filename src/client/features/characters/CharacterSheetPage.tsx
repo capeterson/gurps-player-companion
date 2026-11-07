@@ -1696,57 +1696,44 @@ export function CharacterSheetPage() {
           {tab === 'Overview' && (
             <div className="space-y-4">
               {character.libraryEffectsKnown !== false && (
-                <FoldSection
-                  preferenceKey={`${character.id}:overview`}
-                  title="Sheet overview"
-                  forceOpen={anchor?.kind === 'attribute'}
-                  icon="identity"
-                  summary={`ST ${character.derived.effectiveSt} · DX ${character.derived.effectiveDx} · IQ ${character.derived.effectiveIq} · HT ${character.derived.effectiveHt}`}
-                >
-                  <div className="grid items-stretch gap-4 md:grid-cols-2">
-                    <AttributesPanel
-                      character={character}
-                      canWrite={canWrite}
-                      tempEffects={tempEffects}
-                      enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                    />
-                    <SecondaryModsPanel
-                      character={character}
-                      canWrite={canWrite}
-                      tempEffects={tempEffects}
-                      enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
-                    />
-                    <StatusPanel character={character} />
-                    <div className="flex min-w-0 flex-col gap-4">
-                      <FoldSection
-                        preferenceKey={`${character.id}:PointsPanel`}
-                        title="Point ledger"
-                        defaultOpen={false}
-                        summary={`${character.points.total} pts`}
-                      >
-                        <PointsPanel character={character} pointTarget={pointTarget} />
-                      </FoldSection>
-                      <FoldSection
-                        preferenceKey={`${character.id}:EncumbrancePanel`}
-                        title="Encumbrance"
-                      >
-                        <EncumbrancePanel character={character} />
-                      </FoldSection>
-                      {campaign?.experimentalActiveEffects === true && (
-                        <ActiveConditionsPanel character={character} canWrite={canWrite} foldable />
-                      )}
-                    </div>
+                <div className="grid items-stretch gap-4 md:grid-cols-2">
+                  <AttributesPanel
+                    character={character}
+                    canWrite={canWrite}
+                    tempEffects={tempEffects}
+                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                  />
+                  <SecondaryModsPanel
+                    character={character}
+                    canWrite={canWrite}
+                    tempEffects={tempEffects}
+                    enforceAttributeCaps={campaign?.enforceAttributeCaps ?? false}
+                  />
+                  <StatusPanel character={character} />
+                  <div className="flex min-w-0 flex-col gap-4">
+                    <FoldSection
+                      preferenceKey={`${character.id}:PointsPanel`}
+                      title="Point ledger"
+                      defaultOpen={false}
+                      summary={`${character.points.total} pts`}
+                    >
+                      <PointsPanel character={character} pointTarget={pointTarget} />
+                    </FoldSection>
+                    <FoldSection
+                      preferenceKey={`${character.id}:EncumbrancePanel`}
+                      title="Encumbrance"
+                    >
+                      <EncumbrancePanel character={character} />
+                    </FoldSection>
+                    {campaign?.experimentalActiveEffects === true && (
+                      <ActiveConditionsPanel character={character} canWrite={canWrite} foldable />
+                    )}
                   </div>
-                </FoldSection>
+                </div>
               )}
-              <FoldSection
-                preferenceKey={`${character.id}:IdentityPanel`}
-                title="Identity"
-                forceOpen={anchor?.kind === 'race'}
-                icon="identity"
-              >
+              <StatCard title="Identity" icon="identity">
                 <IdentityPanel key={character.id} character={character} canWrite={canWrite} />
-              </FoldSection>
+              </StatCard>
             </div>
           )}
           {tab === 'Traits' && (

@@ -516,10 +516,7 @@ test('overview stays compact and description and conditional effects work at sup
   await adrenaline.click();
   await expect(focused).toBeChecked();
   await expect(adrenaline).toBeChecked();
-  const sheetOverview = page.getByRole('button', { name: /^Sheet overview/ });
-  await sheetOverview.click();
-  await expect(sheetOverview).toContainText('ST 11 · DX 12');
-  await sheetOverview.click();
+  await expect(page.getByRole('heading', { name: 'Attributes', exact: true })).toBeVisible();
 
   const characterPath = new URL(page.url()).pathname;
   const foldNames = [/^Point ledger/, /^Encumbrance$/, /^Conditional effects$/];

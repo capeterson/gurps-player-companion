@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AppIcon, type AppIconName } from './AppIcon.tsx';
 
 /**
  * Card with a Fraunces title and an optional point-cost eyebrow.
@@ -7,12 +8,14 @@ import type { ReactNode } from 'react';
  */
 export function StatCard({
   title,
+  icon,
   points,
   children,
   className = '',
   headerExtra,
 }: {
   title: string;
+  icon?: AppIconName;
   points?: number | string;
   /** Extra content on the right of the header (e.g. a small action). */
   headerExtra?: ReactNode;
@@ -23,7 +26,10 @@ export function StatCard({
     <section className={`card bg-base-100 border border-base-300/60 rounded-2xl ${className}`}>
       <div className="card-body p-5">
         <header className="flex items-baseline justify-between mb-3.5 gap-3">
-          <h2 className="font-display text-lg font-semibold text-base-content">{title}</h2>
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-base-content">
+            {icon && <AppIcon name={icon} size={18} className="text-muted" />}
+            {title}
+          </h2>
           <span className="flex items-center gap-2">
             {headerExtra}
             {points !== undefined && (

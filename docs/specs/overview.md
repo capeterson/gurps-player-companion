@@ -290,10 +290,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Other editable identity names use smaller display type below 640px so ordinary
   names fit on phones; unusually long names remain scrollable within the input.
   Read-only identity headings wrap long names within the content width.
-  The Overview section places the foldable sheet overview (attributes, secondary
-  stats, status, ledger, encumbrance and conditional effects) above the Identity
-  panel; other destinations do not display it. When folded, it shows effective
-  ST/DX/IQ/HT. Attributes, Secondary attributes, and Status stay expanded inside
+  The Overview section places the sheet overview cards (attributes, secondary
+  stats, status, ledger, encumbrance and conditional effects) directly under the
+  Overview heading, above the non-collapsible Identity card; other destinations
+  do not display them. Attributes, Secondary attributes, and Status stay expanded inside
   it, with one heading each. Point ledger, Encumbrance, and Conditional effects
   fold independently and shrink to their headings without stretching to fill
   neighboring cards. Conditional effects is absent unless the campaign active-effects

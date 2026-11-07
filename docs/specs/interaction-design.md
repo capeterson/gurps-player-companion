@@ -252,8 +252,9 @@ existing equipment links and supports ordinary anchors outside a router.
 ## One heading and one interaction per purpose
 
 Overview's Attributes, Secondary attributes, and Status cards are always visible
-inside the outer Sheet overview disclosure. Each owns one heading without an
-individual fold. Overview uses one column below 768px and two equal columns
+directly under the Overview heading, with no outer disclosure. Each owns one
+heading without an individual fold. The Identity card follows with an icon and
+title but is not collapsible. Overview uses one column below 768px and two equal columns
 from 768px, retaining two columns on wide desktops. Paired stat cards share top
 and bottom edges, with Status starting one standard gap below Attributes.
 Secondary attributes use three columns from 640–767px and from 1024px upward,
