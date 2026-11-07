@@ -99,7 +99,11 @@ test('Overview stat cards align without gaps and utilities retain their natural 
             expect(b.x).toBeGreaterThanOrEqual(a.x + a.width);
             expect(Math.abs(s.x - a.x)).toBeLessThanOrEqual(1);
             expect(s.y - (a.y + a.height)).toBeCloseTo(16, 0);
-            const ledger = await box(page.getByRole('button', { name: /^Point ledger/ }));
+            const ledger = await box(
+              page
+                .getByRole('heading', { name: 'Points', exact: true })
+                .locator('xpath=ancestor::section[1]'),
+            );
             expect(Math.abs(ledger.y - s.y)).toBeLessThanOrEqual(1);
           } else {
             expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
@@ -120,7 +124,9 @@ test('Overview stat cards align without gaps and utilities retain their natural 
             expect(Math.abs(fp.y - move.y)).toBeLessThanOrEqual(1);
             expect(fp.y).toBeGreaterThan(hp.y);
           }
-          for (const name of ['Point ledger', 'Encumbrance']) {
+          // The Points card does not fold; it is a header-only card.
+          await expect(page.getByRole('heading', { name: 'Points', exact: true })).toBeVisible();
+          for (const name of ['Encumbrance']) {
             const trigger = page.getByRole('button', { name: new RegExp(`^${name}`) });
             await expect(trigger).toBeVisible();
             if ((await trigger.getAttribute('aria-expanded')) === 'true') await trigger.click();
@@ -150,7 +156,7 @@ test('Overview stat cards align without gaps and utilities retain their natural 
               }
             }
           }
-          const encumbrance = page.getByRole('button', { name: /^Encumbrance$/ });
+          const encumbrance = page.getByRole('button', { name: /^Encumbrance/ });
           await encumbrance.click();
           await expect(page.getByText('Carrying', { exact: true })).toBeVisible();
           if (state.name === 'modified' && [320, 1212, 1440].includes(width)) {

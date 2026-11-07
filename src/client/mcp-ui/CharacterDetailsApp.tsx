@@ -113,7 +113,7 @@ export function CharacterDetailsApp({
               ))}
             </div>
           </StatCard>
-          <StatCard title="Point ledger" points={data.points.total}>
+          <StatCard title="Points" points={data.points.total}>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {[
                 ['Attributes', data.points.attributes],

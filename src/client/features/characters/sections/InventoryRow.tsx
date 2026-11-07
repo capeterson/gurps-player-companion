@@ -56,6 +56,8 @@ export interface InventoryRowProps {
   // raw weight directly instead of the encumbrance-effective number plus a
   // confusing -100% reduction breakdown.
   inStashed?: boolean;
+  /** The enclosing section already names the stash location. */
+  hideStashLocation?: boolean;
   equipmentAvailability?: ReadonlyMap<string | undefined, { carried: boolean; equipped: boolean }>;
   /** Collapsing a container deselects (and un-highlights) its contents. */
   onCollapse?: (containerId: string) => void;
@@ -100,6 +102,7 @@ export function InventoryRow(props: InventoryRowProps) {
     highlightItemId,
     drag,
     inStashed,
+    hideStashLocation = false,
     equipmentAvailability,
     onCollapse,
     flat = false,
@@ -382,7 +385,7 @@ export function InventoryRow(props: InventoryRowProps) {
                       </span>
                     )}
                   </>,
-                  'settings',
+                  contentsOpen ? 'containerOpen' : 'container',
                 )}
               {hasChildren && !contentsOpen && (
                 <span
@@ -460,7 +463,7 @@ export function InventoryRow(props: InventoryRowProps) {
                 categoryIcon('enchantments', <>Enchantments · {item.enchantments.length}</>)}
             </span>
           </div>
-          {isRoot && !item.worn && item.externalLocation && (
+          {isRoot && !item.worn && !hideStashLocation && item.externalLocation && (
             <div className="inventory-item-detail text-base-content/60 text-xs mt-0.5">
               {item.externalLocation}
             </div>

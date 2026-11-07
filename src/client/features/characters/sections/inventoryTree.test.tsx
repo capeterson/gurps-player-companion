@@ -7,9 +7,11 @@ import {
   descendantsOf,
   filterInventoryTree,
   flattenDFS,
+  groupInventoryByLocation,
   inventoryCostTotals,
   inventoryTypeLabels,
   sortInventoryTree,
+  stashLocationNames,
 } from './inventoryTree.ts';
 
 function weapon(): NonNullable<InventoryItemOut['weaponData']> {
@@ -231,5 +233,33 @@ describe('descendantsOf', () => {
     ];
     const { byParent } = buildTree(items);
     expect([...descendantsOf('root', byParent)].sort()).toEqual(['leaf', 'mid']);
+  });
+});
+
+describe('stash locations', () => {
+  const at = (id: string, location: string | null) => ({
+    ...item(id, null, id),
+    externalLocation: location,
+  });
+  const items = [
+    at('a', 'Party handcart'),
+    at('b', ' party handcart '),
+    at('c', 'Greyhaven inn'),
+    at('d', null),
+    at('e', '   '),
+  ];
+
+  it('lists distinct locations alphabetically, merging case variants', () => {
+    expect(stashLocationNames(items)).toEqual(['Greyhaven inn', 'Party handcart']);
+  });
+
+  it('groups by location with unlocated items last', () => {
+    expect(
+      groupInventoryByLocation(items).map((g) => [g.location, g.items.map((i) => i.id)]),
+    ).toEqual([
+      ['Greyhaven inn', ['c']],
+      ['Party handcart', ['a', 'b']],
+      [null, ['d', 'e']],
+    ]);
   });
 });

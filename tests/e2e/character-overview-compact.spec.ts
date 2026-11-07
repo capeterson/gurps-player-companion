@@ -519,7 +519,7 @@ test('overview stays compact and description and conditional effects work at sup
   await expect(page.getByRole('heading', { name: 'Attributes', exact: true })).toBeVisible();
 
   const characterPath = new URL(page.url()).pathname;
-  await expect(page.getByRole('heading', { name: 'Point ledger', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Points', exact: true })).toBeVisible();
   const foldNames = [/^Encumbrance/, /^Conditional effects$/];
   const widths = [320, 767, 768, 769, 1279, 1280, 1281];
   for (const width of widths) {

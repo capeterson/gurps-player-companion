@@ -159,14 +159,14 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   const raceButton = page.getByRole('button', { name: 'Change race: Human', exact: true });
   await expect(raceButton).toBeVisible();
   await expect(page.getByText('Race', { exact: true }).last()).toBeVisible();
-  const ledger = page.getByRole('button', { name: /Point ledger/ });
-  await ledger.click();
+  const ledger = page.getByRole('button', { name: /\d+ pts$/ });
+  await ledger.hover();
   const raceLedgerRow = page
     .locator('li')
     .filter({ has: page.getByText('Race', { exact: true }) })
     .first();
   await expect(raceLedgerRow).toContainText('0');
-  await ledger.click();
+  await page.mouse.move(0, 0);
   await raceButton.click();
   const dialog = page.getByRole('dialog', { name: 'Choose race' });
   await expect(dialog).toBeVisible();
@@ -262,7 +262,7 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit Forest Lore' })).toHaveCount(0);
   await selectCharacterSection(page, 'Overview');
-  await ledger.click();
+  await ledger.focus();
   await expect(raceLedgerRow).toContainText('35');
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });

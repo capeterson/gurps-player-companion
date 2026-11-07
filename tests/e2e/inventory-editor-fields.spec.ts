@@ -253,7 +253,7 @@ test('inventory editor edits enchantment effects, library links and location', a
         const lanternRow = page.locator(`#inventory-${lantern.item.id}`);
         await lanternRow.getByRole('button', { name: `Edit ${LANTERN}` }).click();
         const lanternEditor = page.getByRole('region', { name: `${LANTERN}: Item details` });
-        const location = lanternEditor.getByRole('combobox', { name: 'Location' });
+        const location = lanternEditor.getByRole('combobox', { name: 'Location', exact: true });
         await expect(location).toHaveValue('player');
         await expect(lanternEditor.getByRole('checkbox', { name: 'Equipped' })).toBeEnabled();
         await expectInside(page, lanternEditor, 'location editor');
@@ -278,20 +278,22 @@ test('inventory editor edits enchantment effects, library links and location', a
         await expectInside(page, stashedEditor, 'stashed editor');
         await shot(stashedEditor, 'e2-location-stashed', viewport);
 
-        await stashedEditor.getByRole('combobox', { name: 'Location' }).selectOption({
+        await stashedEditor.getByRole('combobox', { name: 'Location', exact: true }).selectOption({
           label: `In ${POUCH}`,
         });
         const nestedEditor = page.getByRole('region', { name: `${LANTERN}: Item details` });
-        await expect(nestedEditor.getByRole('combobox', { name: 'Location' })).toHaveValue(
-          /^[0-9a-f-]{36}$/,
-        );
+        await expect(
+          nestedEditor.getByRole('combobox', { name: 'Location', exact: true }),
+        ).toHaveValue(/^[0-9a-f-]{36}$/);
         await expect(nestedEditor.getByLabel('Stash location')).toHaveCount(0);
         await expectSynced(page);
         await expectInside(page, nestedEditor, 'nested editor');
         await expectNoPageOverflow(page);
         await shot(nestedEditor, 'e3-location-in-container', viewport);
 
-        await nestedEditor.getByRole('combobox', { name: 'Location' }).selectOption('player');
+        await nestedEditor
+          .getByRole('combobox', { name: 'Location', exact: true })
+          .selectOption('player');
         const backOnPlayer = page
           .getByRole('table', { name: 'Carried inventory', exact: true })
           .getByRole('region', { name: `${LANTERN}: Item details` });

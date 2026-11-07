@@ -155,7 +155,7 @@ test('long inventories move rows without dragging and group by type', async ({
     ]);
     const dagger = carried.getByRole('row').filter({ hasText: 'Belt dagger' });
     await expect(dagger.getByText('in Backpack')).toBeVisible();
-    await expect(stashed.getByRole('rowheader')).toHaveCount(0);
+    await expect(stashed.getByRole('rowheader')).toHaveText(['No location']);
     await attachReviewScreenshot(page, testInfo, 'inventory-group-by-type-1280', {
       animations: 'disabled',
     });

@@ -142,6 +142,75 @@ export function groupInventoryByType(
   });
 }
 
+export interface InventoryLocationGroup {
+  /** Case-insensitive identity of the stash location; '' for none. */
+  readonly key: string;
+  /** The location as first entered, or null for stashed items without one. */
+  readonly location: string | null;
+  /** Stashed root items; their contents follow them in the tree. */
+  readonly items: readonly InventoryItemOut[];
+}
+
+const stashKey = (location: string | null | undefined) =>
+  (location ?? '').trim().toLocaleLowerCase();
+
+/**
+ * The label shown for each case-insensitive stash location: its most-used
+ * spelling, ties broken by code-unit order, so it never depends on row order.
+ */
+function stashLabels(
+  items: readonly { readonly externalLocation: string | null }[],
+): Map<string, string> {
+  const spellings = new Map<string, Map<string, number>>();
+  for (const item of items) {
+    const key = stashKey(item.externalLocation);
+    if (!key) continue;
+    const spelling = (item.externalLocation as string).trim();
+    const counts = spellings.get(key) ?? new Map<string, number>();
+    counts.set(spelling, (counts.get(spelling) ?? 0) + 1);
+    spellings.set(key, counts);
+  }
+  const labels = new Map<string, string>();
+  for (const [key, counts] of spellings) {
+    const [best] = [...counts].sort(([a, x], [b, y]) => y - x || (a < b ? -1 : a > b ? 1 : 0));
+    if (best) labels.set(key, best[0]);
+  }
+  return labels;
+}
+
+const byLocationName = (a: string, b: string) =>
+  a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+
+/** Distinct stash locations on a character, alphabetical, for suggestions. */
+export function stashLocationNames(
+  items: readonly { readonly externalLocation: string | null }[],
+): string[] {
+  return [...stashLabels(items).values()].sort(byLocationName);
+}
+
+/**
+ * Stashed root items grouped by stash location: named locations
+ * alphabetically (spelling and case variants share a group), then items with
+ * no location. Items keep the order they arrive in. Presentation only.
+ */
+export function groupInventoryByLocation(
+  roots: readonly InventoryItemOut[],
+): InventoryLocationGroup[] {
+  const labels = stashLabels(roots);
+  const groups = new Map<string, InventoryItemOut[]>();
+  for (const item of roots) {
+    const key = stashKey(item.externalLocation);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return [...groups.entries()]
+    .map(([key, items]) => ({ key, location: labels.get(key) ?? null, items }))
+    .sort((a, b) =>
+      a.location === null || b.location === null
+        ? Number(a.location === null) - Number(b.location === null)
+        : byLocationName(a.location, b.location),
+    );
+}
+
 /**
  * Filter inventory without losing the hierarchy needed to locate a match.
  * Only direct name matches and their ancestor containers remain; a matching
@@ -215,7 +284,7 @@ export function buildTree(items: readonly InventoryItemOut[]): InventoryTree {
  */
 export function flattenDFS(
   roots: readonly InventoryItemOut[],
-  byParent: Map<string | null, InventoryItemOut[]>,
+  byParent: ReadonlyMap<string | null, InventoryItemOut[]>,
 ): InventoryItemOut[] {
   const out: InventoryItemOut[] = [];
   const walk = (node: InventoryItemOut) => {

@@ -1072,7 +1072,7 @@ function PointsPanel({
   ];
   const breakdown = (
     <div className="grid gap-1.5">
-      <div className="font-semibold text-base-content">Point ledger</div>
+      <div className="font-semibold text-base-content">Points</div>
       <ul className="num grid gap-0.5">
         {rows.map((row) => (
           <li
@@ -1094,25 +1094,19 @@ function PointsPanel({
   );
   return (
     <StatCard
-      title="Point ledger"
+      title="Points"
       headerExtra={
         <span className="num flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1 text-sm">
           <InfoTooltip content={breakdown}>
             <span>
-              <span className="text-lg font-semibold">{p.total}</span>
+              <span className="font-semibold">{p.total}</span>
               <span className="text-base-content/60"> pts</span>
             </span>
           </InfoTooltip>
-          {pointTarget != null && (
-            <span>
-              <span className="label-eyebrow">Cap</span>{' '}
-              <span className="font-semibold">{pointTarget}</span>
-            </span>
-          )}
           {unspent != null && (
             <span className={unspent < 0 ? 'text-error' : 'text-primary'}>
-              <span className="label-eyebrow">{unspent < 0 ? 'Over' : 'Unspent'}</span>{' '}
-              <span className="font-semibold">{Math.abs(unspent)}</span>
+              <span className="label-eyebrow">Available</span>{' '}
+              <span className="font-semibold">{unspent}</span>
             </span>
           )}
         </span>
@@ -1298,21 +1292,18 @@ function WarningsPanel({
 /**
  * Identity hero — the design's full-width header on the sheet view:
  * eyebrow kicker → big display-font name (drop-cap fires automatically)
- * → a horizontal row of read-only Race/TL/Age/Height/Weight pairs →
- * Unspent badge on the right when the campaign defines a point target
- * (the running total lives in the Point Ledger card below).
+ * → a horizontal row of read-only TL/Age/Height/Weight pairs
+ * (the point total and Available live in the Points card below).
  *
  * The detail editors for each of those fields live in the Overview
  * section below; this hero is presentational + holds the inline name editor.
  */
 function IdentityHero({
   character,
-  pointTarget,
   canWrite,
   compact = false,
 }: {
   character: CharacterDetail;
-  pointTarget: number | null;
   canWrite: boolean;
   compact?: boolean;
 }) {
@@ -1332,13 +1323,8 @@ function IdentityHero({
     ['Weight', character.weight ?? '—'],
   ];
 
-  const total = character.points.total;
-  const remaining = pointTarget != null ? pointTarget - total : null;
-
   return (
-    <div
-      className={`grid items-end ${compact ? 'grid-cols-[minmax(0,1fr)_auto] gap-3' : 'gap-6 sm:grid-cols-[1fr_auto]'}`}
-    >
+    <div className="grid items-end">
       <div className="min-w-0">
         <p className="label-eyebrow">Player Character · 4e</p>
         {canWrite ? (
@@ -1364,21 +1350,6 @@ function IdentityHero({
             </span>
           ))}
         </div>
-      </div>
-      <div className="flex gap-2.5">
-        {remaining != null && (
-          <div className="card min-w-[6rem] px-4 py-2.5 text-center">
-            <p className="label-eyebrow">{remaining < 0 ? 'Over' : 'Unspent'}</p>
-            <p
-              className="num mt-0.5 text-2xl font-semibold"
-              style={{
-                color: remaining < 0 ? 'var(--color-error)' : 'var(--color-primary)',
-              }}
-            >
-              {remaining}
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -1589,12 +1560,7 @@ export function CharacterSheetPage() {
           )}
         </nav>
 
-        <IdentityHero
-          character={character}
-          pointTarget={pointTarget}
-          canWrite={canWrite}
-          compact={tab === 'Combat'}
-        />
+        <IdentityHero character={character} canWrite={canWrite} compact={tab === 'Combat'} />
 
         {character.libraryEffectsKnown === false && <MechanicsUnavailable character={character} />}
         {character.libraryEffectsKnown !== false &&

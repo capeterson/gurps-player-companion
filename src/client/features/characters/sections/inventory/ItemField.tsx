@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { InventoryItemOut } from '../../../../../shared/schemas/inventory.ts';
 import { SkillReferenceCombobox } from '../../../../components/ui/SkillReferenceCombobox.tsx';
+import { SuggestionCombobox } from '../../../../components/ui/SuggestionCombobox.tsx';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
 import { ItemLocationField } from './ItemLocationField.tsx';
@@ -15,6 +16,8 @@ export interface ItemFieldSpec {
   advanced?: boolean;
   choices?: readonly string[];
   choiceLabels?: Readonly<Record<string, string>>;
+  /** Existing values offered by a free-entry combobox. */
+  suggestions?: readonly string[];
   emptyChoiceLabel?: string;
   /** Short explanation shown under the control, e.g. why it is unavailable. */
   hint?: string;
@@ -153,6 +156,20 @@ function ScalarItemField({
               characterSkills={skillNames.map((name) => ({ name, specialization: null }))}
               inputClassName="field-rollback-flash"
               inputProps={common}
+            />
+          ) : spec.suggestions ? (
+            <SuggestionCombobox
+              aria-label={spec.label}
+              value={draft.value}
+              onChange={draft.setValue}
+              options={spec.suggestions}
+              inputClassName="field-rollback-flash"
+              inputProps={{
+                ...common,
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') draft.commit();
+                },
+              }}
             />
           ) : (
             <input

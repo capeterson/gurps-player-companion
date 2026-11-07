@@ -5,6 +5,7 @@ import { getLocalDb } from '../../../../db/dexie.ts';
 import { useDraftField } from '../../../../hooks/useDraftField.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { makeFlashKey } from '../../../../sync/flashBus.ts';
+import { stashLocationNames } from '../inventoryTree.ts';
 import { ItemField } from './ItemField.tsx';
 import { revealContainers } from './inventoryEditorState.ts';
 import {
@@ -76,6 +77,7 @@ export function ItemLocationField({ item, label }: { item: InventoryItemOut; lab
     flashKey: makeFlashKey('character_inventory', item.id, 'worn'),
   });
   const flash = [draft.flashing, parentFlash.flashing, stashFlash.flashing].some(Boolean);
+  const stashLocations = stashLocationNames(rows ?? []);
   const containers = moveTargetContainers(rows ?? [], [item.id]);
   // The current container stays listed while rows load or if it was renamed.
   const parentListed = !item.parentId || containers.some((row) => row.id === item.parentId);
@@ -112,7 +114,12 @@ export function ItemLocationField({ item, label }: { item: InventoryItemOut; lab
       {draft.value === 'stashed' && item.parentId === null && (
         <ItemField
           item={item}
-          spec={{ path: 'externalLocation', label: 'Stash location', optional: true }}
+          spec={{
+            path: 'externalLocation',
+            label: 'Stash location',
+            optional: true,
+            suggestions: stashLocations,
+          }}
           more
         />
       )}
