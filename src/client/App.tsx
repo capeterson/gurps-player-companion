@@ -200,14 +200,9 @@ export function App() {
             <Link to="/about">About</Link>
           </li>
           {me.data?.isSuperuser && (
-            <>
-              <li>
-                <a href="/admin/users">Admin users</a>
-              </li>
-              <li>
-                <a href="/admin/campaigns">Admin campaigns</a>
-              </li>
-            </>
+            <li>
+              <a href="/admin">Admin</a>
+            </li>
           )}
           <li>
             {guest ? (
@@ -405,20 +400,12 @@ export function App() {
                   </li>
                 )}
                 {me.data?.isSuperuser && (
-                  <>
-                    <li className="menu-title px-3 pt-2">
-                      <span>Admin</span>
-                    </li>
-                    {/* Hard-anchor: admin lives in a separate Vite entry
-                      (see src/client/admin/main.tsx) so SPA Link won't
-                      cross the bundle boundary. */}
-                    <li>
-                      <a href="/admin/users">Users</a>
-                    </li>
-                    <li>
-                      <a href="/admin/campaigns">Campaigns</a>
-                    </li>
-                  </>
+                  /* Hard-anchor: admin lives in a separate Vite entry
+                    (see src/client/admin/main.tsx) so SPA Link won't
+                    cross the bundle boundary. */
+                  <li>
+                    <a href="/admin">Admin</a>
+                  </li>
                 )}
                 <li>
                   {guest ? (

@@ -1332,6 +1332,8 @@ account immediately and revokes existing JWT sessions, refresh tokens, API keys
 and OAuth grants. Cancellation leaves the account suspended; unsuspension is
 blocked until the purge is cancelled. Administrators cannot suspend or purge
 themselves, and account actions serialize while the displayed state refreshes.
+The player app's account menu shows a single **Admin** link (superusers only) to `/admin`, a landing page linking Users, Campaigns and Images; the admin header also links back to that Overview.
+
 The admin entry uses `AdminRequireAuth` and `/admin/login`, with sign-in returning
 to the requested admin page. It does not start the player sync orchestrator or
 wait for an IndexedDB bootstrap; expired or cleared sessions return to admin sign-in.
