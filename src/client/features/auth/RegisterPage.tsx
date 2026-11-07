@@ -37,7 +37,7 @@ export function RegisterPage() {
           register.mutate();
         }}
       >
-        <p className="label-eyebrow">Player Companion</p>
+        <p className="label-eyebrow">Sunbolt</p>
         <h1 className="font-display text-3xl font-semibold">Create an account</h1>
         <label className="form-control">
           <span className="label-text">Email</span>

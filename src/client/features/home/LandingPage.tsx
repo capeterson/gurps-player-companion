@@ -29,7 +29,7 @@ export function LandingPage() {
       <header className="relative mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-8">
         <Link to="/" className="flex items-center gap-3 no-cap">
           <BrandMark />
-          <span className="font-display font-semibold">GURPS Player Companion</span>
+          <span className="font-display font-semibold">Sunbolt</span>
         </Link>
         <nav aria-label="Public navigation" className="flex items-center gap-2">
           <button
@@ -56,8 +56,8 @@ export function LandingPage() {
                 All on one sheet.
               </h1>
               <p className="text-lg leading-relaxed text-base-content/75">
-                Meet GPC, your character sheet, combat companion, and campaign notebook. Keep the
-                numbers straight and the rules close, so you can stay in the story.
+                Meet Sunbolt, your character sheet, combat companion, and campaign notebook. Keep
+                the numbers straight and the rules close, so you can stay in the story.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link to="/register" className="btn btn-primary">
@@ -83,7 +83,7 @@ export function LandingPage() {
             <figure className="w-full max-w-xs shrink-0 overflow-hidden rounded-box border border-base-300 shadow-arcane-lg">
               <img
                 src="/screenshots/combat-mobile.png"
-                alt="GPC combat sheet in Gilded Tome with HP, FP, attacks, and incoming attack controls."
+                alt="Sunbolt combat sheet in Gilded Tome with HP, FP, attacks, and incoming attack controls."
                 width="430"
                 height="932"
                 fetchPriority="high"
@@ -118,9 +118,9 @@ export function LandingPage() {
           <figure className="card card-border overflow-hidden bg-base-100">
             <img
               src="/screenshots/armor-desktop.png"
-              alt="GPC Combat section showing armor coverage, active defenses, and damage protection in Gilded Tome."
+              alt="Sunbolt Combat section showing armor coverage, active defenses, and damage protection in Gilded Tome."
               width="1224"
-              height="1284"
+              height="1179"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
@@ -131,9 +131,9 @@ export function LandingPage() {
           <figure className="card card-border overflow-hidden bg-base-100">
             <img
               src="/screenshots/inventory-desktop.png"
-              alt="GPC inventory in Illuminated Manuscript with carried equipment and nested containers."
+              alt="Sunbolt inventory in the Sunbolt theme with carried equipment and nested containers."
               width="1224"
-              height="1506"
+              height="1627"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
@@ -152,7 +152,7 @@ export function LandingPage() {
         </section>
       </main>
       <footer className="relative border-t border-base-300 px-5 py-6 text-center text-sm text-muted">
-        GURPS Player Companion · An independent companion for GURPS 4e. GURPS is a trademark of
+        Sunbolt · A GURPS 4th edition companion. An independent game aid; GURPS is a trademark of
         Steve Jackson Games.
       </footer>
     </div>

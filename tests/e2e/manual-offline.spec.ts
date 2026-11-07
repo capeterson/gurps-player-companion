@@ -44,7 +44,7 @@ test('intentional offline mode stays quiet, preserves edits and resumes after Go
     page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
   await expect(saved()).toBeVisible({ timeout: 15_000 });
   await page.setViewportSize({ width: 575, height: 900 });
-  if ((await page.locator('html').getAttribute('data-theme')) !== 'illuminated-manuscript') {
+  if ((await page.locator('html').getAttribute('data-theme')) !== 'sunbolt') {
     await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
   }
   await saved().click();
@@ -105,7 +105,7 @@ test('intentional offline mode stays quiet, preserves edits and resumes after Go
     if (await switchMode.isVisible()) await switchMode.click();
     await expect(page.locator('html')).toHaveAttribute(
       'data-theme',
-      mode === 'light' ? 'illuminated-manuscript' : 'gilded-tome',
+      mode === 'light' ? 'sunbolt' : 'gilded-tome',
     );
     for (const viewport of [
       { width: 375, height: 812 },

@@ -100,7 +100,7 @@ test('library help and About prose, links, code, and navigation fit responsive v
   }
 
   await page.goto('/about');
-  await expect(page.getByRole('heading', { name: 'GURPS Player Companion' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sunbolt', exact: true })).toBeVisible();
   const legal = page.getByRole('heading', { name: 'Legal' }).locator('xpath=..');
   const source = page.getByRole('heading', { name: 'Source' }).locator('xpath=..');
   const policyLink = legal.getByRole('link', { name: 'Steve Jackson Games Online Policy' });
@@ -113,7 +113,7 @@ test('library help and About prose, links, code, and navigation fit responsive v
   for (const viewport of VIEWPORTS) {
     await test.step(`About at ${viewport.width}×${viewport.height}`, async () => {
       await page.setViewportSize(viewport);
-      await expect(page.getByRole('heading', { name: 'GURPS Player Companion' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Sunbolt', exact: true })).toBeVisible();
       for (const link of [policyLink, sourceLink]) {
         const linkBox = await link.boundingBox();
         expect(linkBox).not.toBeNull();

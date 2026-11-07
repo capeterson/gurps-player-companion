@@ -83,7 +83,7 @@ export function desktopNotificationCopy(
   return parsed.success
     ? {
         title: parsed.data.title,
-        body: 'Open Player Companion to view this notification.',
+        body: 'Open Sunbolt to view this notification.',
         href: parsed.data.href,
       }
     : null;

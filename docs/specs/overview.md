@@ -1,14 +1,14 @@
 # Design Spec: Application Overview & Orientation
 
 > **Read this first.** This is the entry point for the design-spec set. It
-> describes the current state of GURPS Player Companion — what it does for
+> describes the current state of Sunbolt — what it does for
 > users, how the code is laid out, and where to go for the deep dives. It is
 > written so a fresh session (human or LLM) can get oriented **without**
 > scanning the whole tree first.
 
 ## What this is
 
-GURPS Player Companion is a **local-first Progressive Web App** for running
+Sunbolt is a **local-first Progressive Web App** for running
 GURPS 4e player characters, campaigns, shared campaign content, and delegated
 agent access. It is a single Bun process that serves the HTTP API, OAuth and
 MCP, a WebSocket push channel, the OpenAPI document, and the React PWA client —
@@ -138,9 +138,9 @@ Character, campaign, encounter and adventure-log text filters, plus admin user
 and campaign searches, treat `%`, `_` and backslash as literal characters rather
 than SQL pattern syntax. These searches remain case-insensitive.
 
-Reusable [GPC workflow skills](../agent-skills.md) cover character advancement,
+Reusable [Sunbolt workflow skills](../agent-skills.md) cover character advancement,
 equipment and packing, campaign-library authoring, session wrap-up, and encounter
-preparation. Clients can package these with their connected GPC tools. Synthetic
+preparation. Clients can package these with their connected Sunbolt tools. Synthetic
 behavioral evals check the skills against the emitted tool schemas; they do not
 change server permissions or install a client plugin automatically.
 
@@ -195,7 +195,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief GPC overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -1294,8 +1294,8 @@ settings sections; switching sections retains drafts.
   support correlation without exposing raw error details.
 - **Themes**: the header toggles dark/light mode per device (defaulting to the
   OS preference). Settings → **Appearance** picks the palette for each mode —
-  dark: **Gilded Tome** (default), **Midnight Gilt**, **Verdigris & Brass**, or classic **Arcane Purple**; light: **Illuminated
-  Manuscript** (default), **Heraldic Vellum**, or classic **Arcane Purple**. The palette choices are saved
+  dark: **Gilded Tome** (default), **Midnight Gilt**, **Verdigris & Brass**, or classic **Arcane Purple**; light: **Sunbolt**
+  (default), **Heraldic Vellum**, or classic **Arcane Purple**. The palette choices are saved
   to the account (`GET`/`PATCH /auth/preferences`, `users.dark_theme` /
   `light_theme`) so every device matches; changes apply immediately, are kept
   locally while offline and pushed when back online, and a server rejection
@@ -1570,7 +1570,7 @@ src/
                  replay lives in the page orchestrator; see src/sw/registerSW.ts.
 .agents/skills/  Project-local development skills; gpc-ui-design records established
                  UI expectations and is required by AGENTS.md before UI work
-skills/          Portable GPC workflow skills, client metadata, and synthetic eval cases
+skills/          Portable Sunbolt workflow skills, client metadata, and synthetic eval cases
 tests/
   skills/        Eval-grader regression tests, run by skills:check and CI
   acceptance/    Explicit full Lantern MCP seed check, outside normal CI discovery

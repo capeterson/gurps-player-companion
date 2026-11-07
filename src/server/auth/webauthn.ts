@@ -26,7 +26,7 @@ export function sha256(data: string | Uint8Array): Buffer {
 export function webauthnRp() {
   const config = loadConfig();
   const url = new URL(appUrl(config));
-  return { rpName: 'GURPS Player Companion', rpId: url.hostname, origin: url.origin };
+  return { rpName: 'Sunbolt', rpId: url.hostname, origin: url.origin };
 }
 
 export async function createChallenge(

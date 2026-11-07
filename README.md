@@ -1,4 +1,6 @@
-# GURPS Player Companion
+# Sunbolt
+
+*A GURPS 4th edition companion.*
 
 **Your character sheet, combat companion, and campaign notebook — at the table or on the go.**
 
@@ -14,7 +16,7 @@ explains why an existing installation can retain its previous icon.
 
 **[Play on the official hosted instance → gurps.abundant.zip](https://gurps.abundant.zip)**
 
-![Desktop armor view showing selectable body locations, mail armor protection, and active defenses.](public/screenshots/armor-desktop.png)
+![Desktop armor view showing selectable body locations, torso DR 8 from layered armor, and active defenses.](public/screenshots/armor-desktop.png)
 
 *Choose a hit location on the armor diagram to see its protection, defense bonuses, and incoming-damage options.*
 
@@ -27,7 +29,7 @@ explains why an existing installation can retain its previous icon.
 
 | Combat on your phone | Resolve incoming damage |
 | --- | --- |
-| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](public/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing a cutting hit against mail and its calculated injury.](public/screenshots/damage-mobile.png) |
+| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](public/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing 10 cutting damage against torso DR 8 yielding 3 injury.](public/screenshots/damage-mobile.png) |
 
 ## A character sheet that does the bookkeeping
 
@@ -47,7 +49,7 @@ Invite your players, set campaign point limits, tech level, mana, and house rule
 
 Build a shared library of traits, skills, spells, items, enchantments, and active effects. Portable YAML import/export lets you reuse campaign content, including languages, techniques, and styles. Record adventures with formatted session notes, locations, points gained (for all characters or a selected subset), and campaign-wide or private visibility.
 
-![Desktop campaign overview for The Lantern Coast, with its three-character roster, rules, and adventure-log navigation.](public/screenshots/campaign-desktop.png)
+![Desktop campaign overview for The Lantern Coast, with its six-character roster, rules, and adventure-log navigation.](public/screenshots/campaign-desktop.png)
 
 An **experimental turn tracker**, enabled in campaign settings, adds PC/NPC turn order and timed effects. A character also gets a personal initiative scratchpad when that setting is enabled.
 

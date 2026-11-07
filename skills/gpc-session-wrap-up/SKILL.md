@@ -1,13 +1,13 @@
 ---
 name: gpc-session-wrap-up
-description: Turn session notes into GPC adventure-log entries and explicitly requested point awards or loot updates, preserving shared versus private visibility. Use for recording or revising a played session, not inventing campaign events or rewards.
+description: Turn session notes into Sunbolt adventure-log entries and explicitly requested point awards or loot updates, preserving shared versus private visibility. Use for recording or revising a played session, not inventing campaign events or rewards.
 ---
 
 Record the session the user described, keeping campaign events, private character information, and mechanical changes distinct.
 
 ## Resolve the session
 
-Use the connected GPC tool schemas and actual tool names. Resolve the campaign, read `get_campaign`, and search `list_adventure_log` for the date/session number/title, paging as necessary. Check existing entries before creating a second account of the same session. Use the supplied session date and number; ask if a required date is missing rather than inventing one. Resolve award recipients or loot owners to stable character IDs.
+Use the connected Sunbolt tool schemas and actual tool names. Resolve the campaign, read `get_campaign`, and search `list_adventure_log` for the date/session number/title, paging as necessary. Check existing entries before creating a second account of the same session. Use the supplied session date and number; ask if a required date is missing rather than inventing one. Resolve award recipients or loot owners to stable character IDs.
 
 Draft/summary requests are read-only. An explicit request to post the log and stated awards authorizes those changes. Do not ask again for approval already given. Missing amounts, recipients, loot rules, or meaningful visibility choices need clarification before the dependent write.
 

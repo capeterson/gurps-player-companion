@@ -149,7 +149,7 @@ function requestSchema(
   }
   const bodyContents = Object.values(operation.requestBody?.content ?? {});
   if (bodyContents.length) {
-    // GPC's player API accepts JSON request bodies, including the YAML import
+    // Sunbolt's player API accepts JSON request bodies, including the YAML import
     // envelope. New media types need an explicit executor mapping, not guessing.
     const content = operation.requestBody?.content?.['application/json'];
     if (!content?.schema) throw new Error('MCP request body needs an explicit JSON media mapping');

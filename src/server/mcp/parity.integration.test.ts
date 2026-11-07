@@ -61,7 +61,7 @@ const config: AppConfig = {
 const app = createApp(config);
 const document = app.getOpenAPIDocument({
   openapi: '3.0.0',
-  info: { title: 'GURPS Player Companion API', version: '0.1.0' },
+  info: { title: 'Sunbolt API', version: '0.1.0' },
 });
 
 interface Actor {

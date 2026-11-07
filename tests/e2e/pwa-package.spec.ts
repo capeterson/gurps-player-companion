@@ -98,7 +98,7 @@ test('worker keeps protocol, admin documents and missing assets out of the playe
   const session = await page.context().newCDPSession(page);
   await session.send('Emulation.setScriptExecutionDisabled', { value: true });
   await page.goto('/admin.html?package-audit=1');
-  await expect(page).toHaveTitle('GURPS Player Companion · Admin');
+  await expect(page).toHaveTitle('Sunbolt · Admin');
   await expect(page.locator('link[rel="manifest"]')).toHaveCount(0);
   await session.send('Emulation.setScriptExecutionDisabled', { value: false });
   await page.goto('/admin/login');

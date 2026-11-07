@@ -4,7 +4,7 @@ The shared character-sheet presentation and editing contracts are documented in
 [interaction-design.md](interaction-design.md): summary tables, on-demand Add/Edit
 disclosures, responsive layouts, preserved drafts, and accessible shared primitives.
 
-Describes the current technical architecture of GURPS Player Companion. For
+Describes the current technical architecture of Sunbolt. For
 the product surface see [overview.md](overview.md); for the two key subsystems
 see [offline-sync.md](offline-sync.md) and
 [campaign-content-sharing.md](campaign-content-sharing.md). Invariants you must
@@ -119,11 +119,15 @@ are absent. The image's health probe uses IPv4 loopback to match the default
 `id`, `scope` and `start_url` at `/`, preserving the previous inferred identity,
 and uses standalone display without locking orientation. Existing mobile combat
 and desktop campaign captures supply labeled narrow/wide installation screenshots.
-The default launch background/theme color is Gilded Tome; `lib/theme.ts` updates
-the page's browser-chrome color as the selected palette changes.
+The app is named `Sunbolt` (`short_name` the same, description "A GURPS 4th
+edition companion"). The launch background and theme color is the icon's lapis
+field (`#1c2350`), so the splash matches the artwork. The player and admin HTML
+ship a light (`#f9f2df`) and a dark (`#16110d`) `theme-color` tag per OS color
+scheme for the moment before scripts run; `lib/theme.ts` then sets every tag to
+the selected palette's color and drops the media conditions.
 
 `src/build/pwaAssets.ts` derives installation artwork from the opaque brand PNGs
-in `public/`: unchanged 192/512px general icons, a separate 512px adaptive icon,
+in `public/` (the Sunbolt orb-and-beam mark on a flat lapis field, with all artwork inside the adaptive safe circle): unchanged 192/512px general icons, a separate 512px adaptive icon,
 180px Apple touch icon, and 32px favicon. Adaptive artwork fits inside a centered
 circle of radius 38% of the canvas, leaving margin inside Android's 40% safe zone.
 Generated files use content-hashed `/assets/` URLs and immutable HTTP caching;
@@ -186,7 +190,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Client | React 19, React Router 7, TanStack Query 5 |
 | Local store | Dexie 4 package (IndexedDB), application schema version 10 |
 | PWA | vite-plugin-pwa + Workbox |
-| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Illuminated Manuscript, Heraldic Vellum, plus classic Arcane Purple in dark/light modes — `src/client/styles/theme.css`) |
+| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Sunbolt, Heraldic Vellum, plus classic Arcane Purple in dark/light modes — `src/client/styles/theme.css`) |
 | Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys verified by `@simplewebauthn/server`; API keys |
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |

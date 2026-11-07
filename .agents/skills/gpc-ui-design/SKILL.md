@@ -1,9 +1,9 @@
 ---
 name: gpc-ui-design
-description: Implement or review GURPS Player Companion interface changes using the project's established layout, copy, navigation and calculation expectations. Use for sheet UI, forms, menus, tooltips and responsive visual regressions; exclude game-rule authoring and backend-only work.
+description: Implement or review Sunbolt interface changes using the project's established layout, copy, navigation and calculation expectations. Use for sheet UI, forms, menus, tooltips and responsive visual regressions; exclude game-rule authoring and backend-only work.
 ---
 
-# GPC UI design expectations
+# Sunbolt UI design expectations
 
 Apply this project skill alongside the installed official daisyUI guides. Read
 [AGENTS.md](../../../AGENTS.md) and the relevant parts of

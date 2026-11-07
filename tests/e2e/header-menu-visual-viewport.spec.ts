@@ -274,7 +274,7 @@ test('account and compact character menus remain touch reachable through resize 
   await expectReachableAfterScroll(page, about);
   await about.tap();
   await expect(page).toHaveURL(/\/about$/);
-  await expect(page.getByRole('heading', { name: 'GURPS Player Companion' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sunbolt', exact: true })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(characterUrl);
   await expect(compactNav.locator('summary')).toBeVisible();

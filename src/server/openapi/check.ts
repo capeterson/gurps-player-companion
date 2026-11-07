@@ -43,7 +43,7 @@ const app = createApp(config);
 const generated = app.getOpenAPIDocument({
   openapi: '3.0.0',
   info: {
-    title: 'GURPS Player Companion API',
+    title: 'Sunbolt API',
     version: '0.1.0',
     description: 'Local-first GURPS character + campaign companion.',
   },

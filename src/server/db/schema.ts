@@ -168,7 +168,7 @@ export const users = pgTable(
     lightTheme: varchar('light_theme', { length: 32 })
       .$type<LightThemeName>()
       .notNull()
-      .default('illuminated-manuscript'),
+      .default('sunbolt'),
     notificationPreferences: jsonb('notification_preferences')
       .$type<NotificationPreferences>()
       .notNull()

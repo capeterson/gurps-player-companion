@@ -2,7 +2,7 @@
 
 ## Context
 
-GURPS Player Companion is a local-first PWA (React 19 + Dexie/IndexedDB) backed by a Bun/Hono/Postgres/Drizzle server. Alongside current rows, revisions, and deletion tombstones, the app records an append-only audit log. Players can review sheet edits and campaign owners can inspect campaign history.
+Sunbolt is a local-first PWA (React 19 + Dexie/IndexedDB) backed by a Bun/Hono/Postgres/Drizzle server. Alongside current rows, revisions, and deletion tombstones, the app records an append-only audit log. Players can review sheet edits and campaign owners can inspect campaign history.
 
 Nightly account purges (`services/userPurge.ts`) run each account's deletion and
 surviving-character library detachment through `withAudit` with an empty actor,

@@ -267,7 +267,7 @@ describe('notification email policy', () => {
       expect(delivered).toHaveLength(1);
       expect(delivered[0]).toMatchObject({
         to: invitee.email,
-        subject: 'Player Companion security alert',
+        subject: 'Sunbolt security alert',
       });
       expect(delivered[0]?.message).toContain('password was changed');
       const sentSecurity = await getDb()

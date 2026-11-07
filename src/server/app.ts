@@ -227,7 +227,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   const openApiDocument = app.getOpenAPIDocument({
     openapi: '3.0.0',
     info: {
-      title: 'GURPS Player Companion API',
+      title: 'Sunbolt API',
       version: '0.1.0',
       description: 'Local-first GURPS character + campaign companion.',
     },
@@ -267,7 +267,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   assertExactCoverage(
     app.getOpenAPIDocument({
       openapi: '3.0.0',
-      info: { title: 'GURPS Player Companion API', version: '0.1.0' },
+      info: { title: 'Sunbolt API', version: '0.1.0' },
     }),
   );
 
@@ -276,7 +276,7 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     app.doc('/api/v1/openapi.json', {
       openapi: '3.0.0',
       info: {
-        title: 'GURPS Player Companion API',
+        title: 'Sunbolt API',
         version: '0.1.0',
         description: 'Local-first GURPS character + campaign companion.',
       },

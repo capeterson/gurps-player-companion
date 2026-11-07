@@ -257,9 +257,7 @@ export function App() {
           <div className="app-header-normal flex min-w-0 items-center gap-3 sm:gap-6">
             <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
               <BrandMark />
-              <span className="hidden font-display text-base font-semibold sm:inline">
-                Player Companion
-              </span>
+              <span className="hidden font-display text-base font-semibold sm:inline">Sunbolt</span>
             </Link>
             <nav
               aria-label="Primary navigation"

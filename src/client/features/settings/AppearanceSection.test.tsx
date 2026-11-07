@@ -15,7 +15,7 @@ import { ToastProvider } from '../../lib/toast.tsx';
 import { AppearanceSection } from './AppearanceSection.tsx';
 
 const apiMock = vi.mocked(api);
-const SERVER: ThemePreferences = { darkTheme: 'gilded-tome', lightTheme: 'illuminated-manuscript' };
+const SERVER: ThemePreferences = { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' };
 
 function Harness() {
   useThemePreferenceSync();
@@ -64,16 +64,14 @@ describe('AppearanceSection', () => {
     ).toEqual(['Gilded Tome', 'Midnight Gilt', 'Verdigris & Brass', 'Arcane Purple']);
     expect(
       Array.from((light as HTMLSelectElement).options).map((option) => option.textContent),
-    ).toEqual(['Illuminated Manuscript', 'Heraldic Vellum', 'Arcane Purple']);
+    ).toEqual(['Sunbolt', 'Heraldic Vellum', 'Arcane Purple']);
     expect((dark as HTMLSelectElement).value).toBe('gilded-tome');
 
     await userEvent.selectOptions(dark, 'Midnight Gilt');
     expect((dark as HTMLSelectElement).value).toBe('midnight-gilt');
     expect(document.documentElement.dataset.theme).toBe('midnight-gilt');
     await waitFor(() =>
-      expect(patchBodies()).toEqual([
-        { darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' },
-      ]),
+      expect(patchBodies()).toEqual([{ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' }]),
     );
     await waitFor(() =>
       expect(screen.queryByText('Saved on this device — syncing to your account…')).toBeNull(),
@@ -90,7 +88,7 @@ describe('AppearanceSection', () => {
     await userEvent.selectOptions(light, 'Heraldic Vellum');
 
     expect(await screen.findByText("Couldn't save light theme — theme not allowed")).toBeTruthy();
-    await waitFor(() => expect(light.value).toBe('illuminated-manuscript'));
+    await waitFor(() => expect(light.value).toBe('sunbolt'));
     expect(light.getAttribute('data-flashing')).toBe('true');
   });
 
@@ -105,7 +103,7 @@ describe('AppearanceSection', () => {
         await new Promise<void>((resolve) => {
           releaseFirst = resolve;
         });
-        return { ...body, lightTheme: 'illuminated-manuscript' };
+        return { ...body, lightTheme: 'sunbolt' };
       }
       return body;
     });
@@ -150,7 +148,7 @@ describe('AppearanceSection', () => {
     await waitFor(() => expect(patchBodies()).toHaveLength(2));
     expect(patchBodies()[1]).toEqual({
       darkTheme: 'gilded-tome',
-      lightTheme: 'illuminated-manuscript',
+      lightTheme: 'sunbolt',
     });
     expect(dark.value).toBe('gilded-tome');
     expect(document.documentElement.dataset.theme).toBe('gilded-tome');

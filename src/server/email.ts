@@ -15,11 +15,11 @@ export async function sendPasswordResetEmail(
   await resend.emails.send({
     from,
     to,
-    subject: 'Reset your Player Companion password',
+    subject: 'Reset your Sunbolt password',
     text: [
       `Hi ${displayName},`,
       '',
-      'Someone (hopefully you) requested a password reset for your Player Companion account.',
+      'Someone (hopefully you) requested a password reset for your Sunbolt account.',
       '',
       `Reset your password: ${resetUrl}`,
       '',
@@ -27,7 +27,7 @@ export async function sendPasswordResetEmail(
     ].join('\n'),
     html: `
 <p>Hi ${escapeHtml(displayName)},</p>
-<p>Someone (hopefully you) requested a password reset for your Player Companion account.</p>
+<p>Someone (hopefully you) requested a password reset for your Sunbolt account.</p>
 <p><a href="${escapeHtml(resetUrl)}">Reset your password</a></p>
 <p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>
     `.trim(),
@@ -52,8 +52,8 @@ export async function sendNotificationEmail(
       from,
       to: opts.to,
       subject: opts.subject,
-      text: `${opts.message}\n\nOpen Player Companion: ${opts.appUrl}`,
-      html: `<p>${escapeHtml(opts.message)}</p><p><a href="${escapeHtml(opts.appUrl)}">Open Player Companion</a></p>`,
+      text: `${opts.message}\n\nOpen Sunbolt: ${opts.appUrl}`,
+      html: `<p>${escapeHtml(opts.message)}</p><p><a href="${escapeHtml(opts.appUrl)}">Open Sunbolt</a></p>`,
     },
     { idempotencyKey: opts.idempotencyKey },
   );

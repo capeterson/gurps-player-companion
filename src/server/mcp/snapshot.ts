@@ -35,7 +35,7 @@ export function generateMcpSnapshot() {
   const app = createApp(snapshotConfig);
   const document = app.getOpenAPIDocument({
     openapi: '3.0.0',
-    info: { title: 'GURPS Player Companion API', version: '0.1.0' },
+    info: { title: 'Sunbolt API', version: '0.1.0' },
   });
   const catalog = buildToolCatalog(document, app.openAPIRegistry.definitions);
   return {

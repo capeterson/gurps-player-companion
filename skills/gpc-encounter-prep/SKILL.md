@@ -1,6 +1,6 @@
 ---
 name: gpc-encounter-prep
-description: Prepare a GPC campaign encounter from a GM's roster, NPC statistics, initial conditions, and timed effects. Use for encounter setup or revision, rather than automatically running combat or changing player character sheets.
+description: Prepare a Sunbolt campaign encounter from a GM's roster, NPC statistics, initial conditions, and timed effects. Use for encounter setup or revision, rather than automatically running combat or changing player character sheets.
 ---
 
 Turn the GM's encounter description into the requested tracker state, preserving hidden information and the current turn.
@@ -9,7 +9,7 @@ Turn the GM's encounter description into the requested tracker state, preserving
 
 Use the connected tools' actual names and current schemas. Resolve and read `get_campaign`, search `list_encounters`, and read `get_encounter` when modifying an existing encounter. Campaign owners/managers control encounters. A player read projection masks hidden NPCs and private PC combat values; never infer them or bypass that projection.
 
-PC combatants reference roster character IDs; let GPC populate their permitted stats. NPC creation needs name, Basic Speed, DX, and maximum HP. Resolve missing required stats before the dependent write, and distinguish user-approved invented NPC stats from published/library facts. Preserve `hiddenFromPlayers` for a hidden ambusher and any hidden-caster information. An experimental tracker being disabled does not authorize changing campaign settings.
+PC combatants reference roster character IDs; let Sunbolt populate their permitted stats. NPC creation needs name, Basic Speed, DX, and maximum HP. Resolve missing required stats before the dependent write, and distinguish user-approved invented NPC stats from published/library facts. Preserve `hiddenFromPlayers` for a hidden ambusher and any hidden-caster information. An experimental tracker being disabled does not authorize changing campaign settings.
 
 ## Set up the tracker
 

@@ -75,8 +75,7 @@ function EmbeddedCharacter() {
     const app = new App({ name: 'GURPS details', version: '0.1.0' }, {});
     appRef.current = app;
     const theme = (value?: string) => {
-      document.documentElement.dataset.theme =
-        value === 'light' ? 'illuminated-manuscript' : 'gilded-tome';
+      document.documentElement.dataset.theme = value === 'light' ? 'sunbolt' : 'gilded-tome';
     };
     app.onhostcontextchanged = ({ theme: value }) => theme(value);
     app.ontoolinput = ({ arguments: input }) => {

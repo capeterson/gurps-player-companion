@@ -265,12 +265,12 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     '/register',
   );
   await expect(page.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/login');
-  await expect(page.getByRole('img', { name: /GPC combat sheet/i })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Sunbolt combat sheet/i })).toBeVisible();
   await expect(
-    page.getByRole('img', { name: /GPC Combat section showing armor coverage/i }),
+    page.getByRole('img', { name: /Sunbolt Combat section showing armor coverage/i }),
   ).toBeVisible();
   await expect(
-    page.getByRole('img', { name: /GPC inventory in Illuminated Manuscript/i }),
+    page.getByRole('img', { name: /Sunbolt inventory in the Sunbolt theme/i }),
   ).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /built for long sessions|make it your companion/i }),
