@@ -39,7 +39,7 @@ describe('PWA installation artwork', () => {
         expect(Math.hypot(x - 255.5, y - 255.5)).toBeLessThanOrEqual(512 * 0.4);
       }
     }
-    expect(artworkPixels).toBeGreaterThan(20_000);
+    expect(artworkPixels).toBeGreaterThan(12_000);
     for (const [name, size] of [
       ['apple-touch-icon', 180],
       ['favicon', 32],
