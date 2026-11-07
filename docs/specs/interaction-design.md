@@ -427,7 +427,10 @@ can sit below the name with visible labels. Spoken and written language
 fluency remain distinguishable. Technique points and roll levels remain easy
 to scan beside the name; governing skill and default line remain readable.
 Expanded editors begin with labeled fields, using the summary row for context.
-Saving feedback appears only while a field is being saved. Trait modifier
+Saving feedback appears only while a field is being saved, as a spinner beside
+the row's Edit/Done control (traits, languages and techniques, as skills do),
+never as a line inserted into the editor: committing an input on blur must not
+move the control the user is clicking. Trait modifier
 names and descriptions wrap inside the expanded editor when they contain long
 unbroken text.
 

@@ -300,3 +300,38 @@ test('trait browsing stays available without mutation controls for a read-only c
     await ownerContext.close();
   }
 });
+
+test('committing a trait note on blur does not move the preview toggle under the pointer', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await signIn(page, 'rowan@example.invalid');
+  const characterId = await openSeedCharacter(page, 'Kestrel Vale');
+  const traitName = `Saving shift ${Date.now()}`;
+  let traitId: string | undefined;
+  try {
+    traitId = await addBrowserTrait(page, characterId, traitName, 'Initial note');
+    await page.reload();
+    await selectCharacterSection(page, 'Traits');
+    await page.getByRole('button', { name: `Edit ${traitName}`, exact: true }).click();
+    const editor = page
+      .getByLabel(`${traitName} name`, { exact: true })
+      .locator('xpath=ancestor::tr');
+    const notes = editor.getByLabel(`${traitName} description and notes`);
+    const toggle = editor.getByRole('button', { name: 'Preview description' });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await notes.fill('Edited note while the toggle is collapsed');
+    // Page coordinates: the page may scroll while the click lands.
+    const pageY = () => toggle.evaluate((el) => el.getBoundingClientRect().y + window.scrollY);
+    const before = await pageY();
+    // Clicking straight from the focused textarea blurs it, which commits the
+    // draft. The press must still reach the toggle and nothing may move it.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(editor.locator('.markdown-body')).toContainText('Edited note');
+    expect(Math.abs((await pageY()) - before)).toBeLessThanOrEqual(1);
+  } finally {
+    if (traitId) await removeBrowserTrait(page, characterId, traitId);
+  }
+});

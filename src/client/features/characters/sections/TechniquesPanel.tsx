@@ -316,6 +316,12 @@ function TechniqueRow({
     technique.name,
     technique.defaultModifier ?? 0,
   );
+  const saving =
+    nameField.isSaving ||
+    defaultSkillField.isSaving ||
+    difficultyField.isSaving ||
+    defaultModifierField.isSaving ||
+    pointsField.isSaving;
 
   const deletion = useConfirmedEntityDelete({
     entityClass: 'character_technique',
@@ -395,6 +401,15 @@ function TechniqueRow({
               onClick={() => setExpanded((current) => !current)}
             >
               {expanded ? 'Done' : 'Edit'}
+              <span className="inline-flex size-3.5 items-center justify-center">
+                {saving && (
+                  <span
+                    className="loading loading-spinner size-3.5 text-warning"
+                    role="status"
+                    aria-label="Saving technique"
+                  />
+                )}
+              </span>
             </button>
           )}
         </td>
@@ -402,13 +417,6 @@ function TechniqueRow({
       {canWrite && (
         <tr hidden={!expanded} id={editorId}>
           <td colSpan={7} className="bg-base-200 p-3 sm:p-4">
-            {(nameField.isSaving ||
-              defaultSkillField.isSaving ||
-              difficultyField.isSaving ||
-              defaultModifierField.isSaving ||
-              pointsField.isSaving) && (
-              <output className="mb-3 block text-right text-xs text-warning">Saving…</output>
-            )}
             <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
               <div className="col-span-2 min-w-0">
                 <span className="label-eyebrow mb-1 block">Name</span>
