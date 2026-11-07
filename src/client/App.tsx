@@ -16,6 +16,7 @@ import { clearAllSkillTablePreferences } from './features/characters/sections/sk
 import { clearAllSpellTablePreferences } from './features/characters/sections/spellTablePreferences.ts';
 import { clearAllTraitTablePreferences } from './features/characters/sections/traitTablePreferences.ts';
 import { clearAllLibraryTablePreferences } from './features/library/libraryTablePreferences.ts';
+import { useEntityDocumentTitle } from './hooks/useEntityDocumentTitle.ts';
 import { useUnsyncedChangesGuard } from './hooks/useUnsyncedChangesGuard.tsx';
 import { useViewportBoundedOverlay } from './hooks/useViewportBoundedOverlay.ts';
 import { api } from './lib/api.ts';
@@ -145,6 +146,8 @@ export function App() {
   function toggleTheme() {
     setThemeMode(oppositeMode(mode));
   }
+
+  useEntityDocumentTitle(entityBreadcrumb?.name);
 
   const characterName = entityBreadcrumb?.kind === 'character' ? entityBreadcrumb.name : null;
   const mobileCharacterMenu = (

@@ -1204,6 +1204,9 @@ settings sections; switching sections retains drafts.
   selection into `Campaign › <campaign name> › Log/Library`. The first level
   returns to its collection and the named level returns to that entity's main
   page. Campaign sub-navigation carries the current campaign into Log/Library.
+  The window title shows `<name> · Sunbolt` while a character or campaign is
+  open (`useEntityDocumentTitle`) and otherwise keeps the default
+  `Sunbolt · A GURPS 4th edition companion`.
   Long account names stay truncated at every width so the user-menu
   trigger fits alongside the other header controls; the menu retains the account
   email within viewport bounds.
