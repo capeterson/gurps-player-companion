@@ -471,9 +471,7 @@ function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
   const items = [...header.querySelectorAll<HTMLElement>('[data-header-row-item]')];
   const name = header.querySelector<HTMLElement>('[data-header-name]');
   const nameMax = name ? px(getComputedStyle(name).maxWidth) || Number.POSITIVE_INFINITY : 0;
-  const truncated = name
-    ? Math.max(0, Math.min(name.scrollWidth, nameMax) - name.clientWidth)
-    : 0;
+  const truncated = name ? Math.max(0, Math.min(name.scrollWidth, nameMax) - name.clientWidth) : 0;
   let used = rowGap * Math.max(0, items.length - 1) + truncated;
   for (const item of items) {
     if (item.hasAttribute('data-header-left')) {
