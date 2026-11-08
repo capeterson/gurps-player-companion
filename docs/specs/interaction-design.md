@@ -423,8 +423,33 @@ by destinations, Settings, the light/dark item and Logout, and does not repeat
 the character name. The light/dark control is never a header button: it is a
 menu item in that panel and in the desktop account menu (labelled for the mode
 it switches to, e.g. "Dark mode").
-Large current/maximum HP and FP values may wrap between the two numbers, and
-warnings wrap within their pool button so the adjacent header controls stay clear.
+From 1280px a character page's header is a single 60px row: brand mark, Character
+and Campaign navigation, then HP, FP, a divider, sync, the bell and the account menu
+("Signed in as" shows from 1536px). The row never wraps: the navigation group
+takes the leftover width (28rem minimum) and the character name truncates first;
+HP, FP and the right-hand controls keep their natural width. The HP/FP buttons are 36px tall, the height of the navigation
+links, so the row height and therefore the brand mark's centre (42/30px) never
+change; do not raise them without re-measuring `--sun-y`. The **Show status
+header** preference adds Posture, Maneuver and Conditions as one-line 36px
+triggers. `CurrentStatusBar` measures the row: when the free width beside the
+row's natural content holds all three (3 × 11rem + 2 × 0.5rem + the header gap, with
+a 16px hysteresis), they sit inline in the row; otherwise they form a strip below it.
+Natural content means the left group floored at its 28rem minimum and the character
+name's untruncated width up to its `max-w-80` cap.
+HP and FP count at their widest reachable state (an invisible probe: HP at "Stay conscious"
+and −5×max, FP at "Exhausted" and −max; values written outside that range by other
+clients can still exceed it), so stepping HP or FP never moves the strip between the row and
+its own line.
+Keyboard order follows the visual order (the portal slot sits between the left and
+right header groups; an inline strip is rendered before HP, and a strip on its own
+line is portaled into a second slot after the right-hand group);
+the strip is a labelled **Status header** group, outside the **Current Status**
+landmark (HP and FP) when it sits on its own line. With
+the preference off there is no strip. HP/FP and choice popovers open 13px below
+their trigger, at the header's bottom edge, and may cover the strip.
+Below 1280px, large current/maximum HP and FP values may wrap between the two
+numbers, and warnings wrap within their pool button so the adjacent header
+controls stay clear; from 1280px the pool buttons stay on one line.
 
 Detailed encounter NPC and effect forms open in the native dialog top layer, above the
 sticky app header. Their height stays within the dynamic viewport, with internal

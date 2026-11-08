@@ -33,12 +33,9 @@ export function SettingsPage() {
   });
   const statusBarPreferences = useStatusBarPreferences(me.data?.id);
 
-  const setStatusBarPreference = (
-    field: 'showPosture' | 'showManeuver' | 'showConditions',
-    value: boolean,
-  ) => {
+  const setShowStatusHeader = (value: boolean) => {
     if (!me.data?.id) return;
-    if (!writeStatusBarPreferences(me.data.id, { ...statusBarPreferences, [field]: value })) {
+    if (!writeStatusBarPreferences(me.data.id, { showStatusHeader: value })) {
       toasts.push("Couldn't save character sheet preferences on this device", { kind: 'error' });
     }
   };
@@ -127,45 +124,17 @@ export function SettingsPage() {
         <div className="card gap-4 p-card">
           <div>
             <p className="label-eyebrow">Preferences</p>
-            <h2 className="font-display text-2xl">Current Status controls</h2>
+            <h2 className="font-display text-2xl">Character sheet header</h2>
           </div>
           <label className="flex items-center justify-between gap-4">
-            <span>
-              <span className="block font-medium">Posture</span>
-            </span>
+            <span className="block font-medium">Show status header</span>
             <input
               type="checkbox"
               className="toggle toggle-sm shrink-0"
-              aria-label="Show posture in Current Status"
-              checked={statusBarPreferences.showPosture}
+              aria-label="Show status header"
+              checked={statusBarPreferences.showStatusHeader}
               disabled={!me.data}
-              onChange={(event) => setStatusBarPreference('showPosture', event.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4">
-            <span>
-              <span className="block font-medium">Maneuver</span>
-            </span>
-            <input
-              type="checkbox"
-              className="toggle toggle-sm shrink-0"
-              aria-label="Show maneuver in Current Status"
-              checked={statusBarPreferences.showManeuver}
-              disabled={!me.data}
-              onChange={(event) => setStatusBarPreference('showManeuver', event.target.checked)}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4">
-            <span>
-              <span className="block font-medium">Conditions</span>
-            </span>
-            <input
-              type="checkbox"
-              className="toggle toggle-sm shrink-0"
-              aria-label="Show conditions in Current Status"
-              checked={statusBarPreferences.showConditions}
-              disabled={!me.data}
-              onChange={(event) => setStatusBarPreference('showConditions', event.target.checked)}
+              onChange={(event) => setShowStatusHeader(event.target.checked)}
             />
           </label>
         </div>

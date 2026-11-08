@@ -148,9 +148,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     expect(created.ok(), await created.text()).toBeTruthy();
     const character = (await created.json()) as { id: string };
     await page.goto('/settings');
-    await page.getByRole('checkbox', { name: 'Show posture in Current Status' }).check();
-    await page.getByRole('checkbox', { name: 'Show maneuver in Current Status' }).check();
-    await page.getByRole('checkbox', { name: 'Show conditions in Current Status' }).check();
+    await page.getByRole('checkbox', { name: 'Show status header' }).check();
     await page.goto(`/characters/${character.id}`);
     const bar = page.getByRole('complementary', { name: 'Current Status' });
     await expect(bar).toBeVisible();
@@ -169,9 +167,14 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
         { name: 'maneuver', title: 'Maneuver', action: 'Move' },
         { name: 'conditions', title: 'Conditions', action: 'Mortally wounded' },
       ]) {
-        const trigger = bar.getByRole('button', { name: new RegExp(`^Change ${choice.name},`) });
+        const trigger = page
+          .locator('header')
+          .first()
+          .getByRole('button', { name: new RegExp(`^Change ${choice.name},`) });
         await trigger.tap();
-        const panel = bar
+        const panel = page
+          .locator('header')
+          .first()
           .getByRole('heading', { name: choice.title, exact: true })
           .locator('xpath=..');
         await expect(panel).toBeVisible();
@@ -192,13 +195,23 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     }
 
     // A selected maneuver exposes one of the longest supported rules blurbs.
-    await bar.getByRole('button', { name: /^Change maneuver,/ }).tap();
-    const maneuverPanel = bar
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: /^Change maneuver,/ })
+      .tap();
+    const maneuverPanel = page
+      .locator('header')
+      .first()
       .getByRole('heading', { name: 'Maneuver', exact: true })
       .locator('xpath=..');
     await expect(maneuverPanel).toBeVisible();
     await maneuverPanel.getByRole('button', { name: 'All-Out Attack', exact: true }).tap();
-    await bar.getByRole('button', { name: /^Change maneuver,/ }).tap();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: /^Change maneuver,/ })
+      .tap();
     await expect(maneuverPanel).toBeVisible();
     await expect(maneuverPanel.getByText(/\+4 melee\/\+1 ranged to hit/)).toBeVisible();
     await page.keyboard.press('Escape');
@@ -208,7 +221,11 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
     await settle(page);
     await page.keyboard.press('Escape');
-    await bar.getByRole('button', { name: /^Change maneuver,/ }).tap();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: /^Change maneuver,/ })
+      .tap();
     await expect(maneuverPanel).toBeVisible();
     const finalManeuver = maneuverPanel.getByRole('button', { name: 'Wait', exact: true });
     await finalManeuver.scrollIntoViewIfNeeded();
@@ -216,7 +233,11 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     await expect(maneuverPanel).toHaveCount(0);
 
     // Restore the long representative blurb for geometry and readable-text checks.
-    await bar.getByRole('button', { name: /^Change maneuver,/ }).tap();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: /^Change maneuver,/ })
+      .tap();
     await expect(maneuverPanel).toBeVisible();
     const longManeuver = maneuverPanel.getByRole('button', { name: 'All-Out Attack', exact: true });
     await longManeuver.scrollIntoViewIfNeeded();
@@ -231,7 +252,11 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
       await page.setViewportSize({ width: viewportSize.width, height: viewportSize.height });
       await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
       await settle(page);
-      await bar.getByRole('button', { name: /^Change maneuver,/ }).tap();
+      await page
+        .locator('header')
+        .first()
+        .getByRole('button', { name: /^Change maneuver,/ })
+        .tap();
       await expect(maneuverPanel).toBeVisible();
       for (const scale of viewportSize.scales) {
         await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: scale });

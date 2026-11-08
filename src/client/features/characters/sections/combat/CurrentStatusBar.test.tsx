@@ -68,11 +68,7 @@ function setup(
   fp = 10,
   max = 12,
   maneuver: string | null = null,
-  preferences: StatusBarPreferences = {
-    showPosture: true,
-    showManeuver: true,
-    showConditions: true,
-  },
+  preferences: StatusBarPreferences = { showStatusHeader: true },
 ) {
   const character = {
     id: 'character-1',
@@ -125,12 +121,8 @@ function setup(
 }
 
 describe('Current Status', () => {
-  it('shows HP and FP by default while independently hiding optional controls', () => {
-    setup(10, 10, 12, 'Attack', {
-      showPosture: false,
-      showManeuver: false,
-      showConditions: false,
-    });
+  it('shows HP and FP by default while hiding the status header controls', () => {
+    setup(10, 10, 12, 'Attack', { showStatusHeader: false });
 
     expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
@@ -145,6 +137,40 @@ describe('Current Status', () => {
     expect(screen.getByRole('button', { name: 'Change posture, current Standing' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Change maneuver, current Attack' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Change conditions, current None' })).toBeVisible();
+  });
+
+  it('closes an open choice panel when the status header is turned off', () => {
+    const { rerender, container } = setup(10, 10, 12, 'Attack');
+    fireEvent.click(screen.getByRole('button', { name: 'Change maneuver, current Attack' }));
+    expect(screen.getByRole('heading', { name: 'Maneuver' })).toBeVisible();
+    const props = {
+      character: {
+        id: 'character-1',
+        derived: { effectiveHt: 10 },
+        combat: { conditions: [], posture: 'standing', maneuver: 'Attack' },
+      } as unknown as CharacterDetail,
+      bumpers: {
+        hp: 10,
+        fp: 10,
+        hpMax: 12,
+        fpMax: 12,
+        bumpHp: vi.fn(),
+        bumpFp: vi.fn(),
+        setHp: vi.fn(),
+        setFp: vi.fn(),
+        commitHpDeltas: vi.fn(),
+        commitFpDeltas: vi.fn(),
+        resetHp: vi.fn(),
+        resetFp: vi.fn(),
+        flashHp: false,
+      } as PoolBumpers,
+      patchCombat: vi.fn(),
+      openRoll: vi.fn(),
+    };
+    rerender(<CurrentStatusBar {...props} canWrite preferences={{ showStatusHeader: false }} />);
+    expect(screen.queryByRole('heading', { name: 'Maneuver' })).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label^="Change maneuver"]')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
   });
 
   it('anchors visible uneven-threshold labels at their corresponding range values', () => {

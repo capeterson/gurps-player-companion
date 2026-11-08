@@ -84,6 +84,12 @@ expectations come from observed regressions and explicit user preferences.
   character name already shown as the page heading. The light/dark control lives
   inside the header menus (this hamburger and the desktop account menu), never as
   a bar button.
+- On character pages from 1280px the header is one 60px row (brand, nav, HP, FP,
+  sync, bell, account). Keep controls in that row at or below 36px tall and never
+  move the brand mark: the Sunbolt sun glow is anchored at 42/30px and breaks if
+  the mark shifts. Posture/Maneuver/Conditions (one **Show status header**
+  preference) sit inline when the measured row has room, otherwise in a strip below.
+  The row must never wrap (the character name truncates first).
 - Extend the existing interaction for a utility. Follow AGENTS.md's rule against
   duplicate sorting, coverage, movement or other controls.
 - When editing skill points, preview the net skill value and its actual

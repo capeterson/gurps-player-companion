@@ -1,18 +1,13 @@
 import { useCallback, useSyncExternalStore } from 'react';
 
 export interface StatusBarPreferences {
-  showPosture: boolean;
-  showManeuver: boolean;
-  showConditions: boolean;
+  /** Shows the Posture, Maneuver and Conditions triggers beside HP and FP. */
+  showStatusHeader: boolean;
 }
 
 const PREFIX = 'gpc:status-bar-preferences:';
 const CHANGE_EVENT = 'gpc:status-bar-preferences-change';
-const DEFAULTS: StatusBarPreferences = {
-  showPosture: false,
-  showManeuver: false,
-  showConditions: false,
-};
+const DEFAULTS: StatusBarPreferences = { showStatusHeader: false };
 
 function keyFor(userId: string): string {
   return `${PREFIX}${userId}`;
@@ -30,11 +25,14 @@ function readRaw(userId: string | undefined): string | null {
 function parsePreferences(raw: string | null): StatusBarPreferences {
   if (!raw) return DEFAULTS;
   try {
-    const value = JSON.parse(raw) as Partial<StatusBarPreferences>;
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    // Older builds stored three separate toggles; any of them on keeps the header on.
     return {
-      showPosture: value.showPosture === true,
-      showManeuver: value.showManeuver === true,
-      showConditions: value.showConditions === true,
+      showStatusHeader:
+        value.showStatusHeader === true ||
+        value.showPosture === true ||
+        value.showManeuver === true ||
+        value.showConditions === true,
     };
   } catch {
     return DEFAULTS;

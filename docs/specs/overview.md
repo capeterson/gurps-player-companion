@@ -354,8 +354,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Move) with their effective values and per-stat ✦ temp-modifier
   popovers; amber values, deltas and ✦ buttons appear only for an active temporary boost, never for permanent purchases. The **Status** card shows derived combat values not displayed
   elsewhere — Dodge, Basic Lift, and Thr / Sw. Current HP/FP live in the
-  persistent **Current Status** controls; user preferences can also show posture,
-  maneuver, and conditions there. The sheet's top row no longer duplicates the six secondary
+  persistent **Current Status** controls; the **Show status header** preference can
+  also show posture, maneuver, and conditions there. The sheet's top row no longer duplicates the six secondary
   numbers. Temporary ST/HT boosts
   affect their normal derived values but not maximum HP/FP; only the
   dedicated temporary HP/FP modifiers change those maxima (M37). Basic
@@ -744,8 +744,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   settings, campaign pages and library authoring omit obvious click/save/close
   instructions and filler introductions. Labels and controls carry routine
   context; actionable errors, permission warnings, rule limits and non-obvious
-  consequences remain. Settings labels the optional header switches as
-  **Current Status controls**.
+  consequences remain. Settings has one **Show status header**
+  switch in its **Character sheet header** card.
 - **Current Status and Combat tab (live-gameplay surfaces)**. Combat follows
   Overview in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
@@ -754,7 +754,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   player taps between live combat and the editable sheet without a route
   hop. **Current Status** is persistent on every full character section (the
   privacy-preserving minimal view does not receive it). It always holds HP and FP.
-  Posture, maneuver, and conditions are independent, off-by-default user display preferences in Settings;
+  Posture, maneuver, and conditions share one off-by-default **Show status header**
+  display preference in Settings (older per-control values migrate: any one on turns it on);
   they do not change the saved combat state or its effects on the rules. Settings
   are saved per signed-in user on this device. The status controls are portaled
   into the sticky global header. Below 1280px, the brand mark, HP, FP, sync status,
@@ -763,8 +764,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   second row. The mobile pool targets
   show current/max values above warning text in a flat, divided toolbar. The menu
   retains character, campaign, account, light/dark, and
-  other navigation actions. On desktop the ordinary navigation row stays above
-  the status controls, with less status padding when all optional controls are off.
+  other navigation actions. From 1280px the status controls share the navigation row
+  (see below).
   The measured complete header height supplies section scroll offsets, including
   when desktop navigation wraps. Attacks, the combined
   defense/armor workspace, the Solo tracker, and roll history use the Combat tab's
@@ -774,13 +775,18 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   - **Current Status** — compact HP/FP controls show their current/max values and
     important warnings. Opening a pool reveals ±1 and ±5 controls, reset, a range
     control, threshold/recovery guidance, death-check actions, and the FP-floor
-    warning. Enabled posture and maneuver close after a preset selection; enabled
+    warning. Posture and maneuver (when the status header is shown) close after a preset selection;
     conditions stay open for multi-selection until **Done**. The maneuver editor retains the active
     preset's rules guidance and supports a custom free-text fallback. The collapsed condition summary shows
     the first active condition plus `+N`. All common-condition chips normalize
     legacy Capitalized entries so old data still lights the right chip. Below 1280px,
-    HP and FP share the first row with navigation and sync actions; enabled posture,
-    maneuver, and conditions appear directly below them. The
+    HP and FP share the first row with navigation and sync actions; posture,
+    maneuver, and conditions appear directly below them when the status header is shown.
+    From 1280px the header is one 60px row on every character page: brand, nav, then
+    HP, FP, sync, bell and the account menu (36px pool buttons keep the brand mark's
+    sun anchor fixed). The status header's three triggers form a strip below that row
+    and join the row itself when it has measured room for them; there is no strip when the
+    preference is off. The
     condition editor suggests Reeling below one-third HP but never applies it.
     Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,
@@ -1336,7 +1342,7 @@ settings sections; switching sections retains drafts.
   integrity check and real-service-worker browser acceptance. See
   [architecture.md](architecture.md#pwa-installation-package).
 - **Settings** page: theme palettes (synced), account-scoped device-local
-  Current Status display switches, notification controls, profile, password, passkeys, API keys. Long credential and
+  **Show status header** switch, notification controls, profile, password, passkeys, API keys. Long credential and
   connected-app names wrap inside their cards, with destructive actions stacked
   below them on narrow screens rather than overlapping the metadata.
 
@@ -1506,7 +1512,7 @@ src/
                   (CombatStatusProvider/CurrentStatusBar + CombatTab with
                    Defenses/Attacks/DrSummary cards, ArmorLocationMap +
                    IncomingDamageDialog)
-    lib/statusBarPreferences.ts  Per-user, device-local Current Status display switches
+    lib/statusBarPreferences.ts  Per-user, device-local Show status header switch
     lib/connectionState.ts, lib/networkErrors.ts  Device offline choice,
                  shared reachability and expected fetch-failure classification
     lib/theme.ts, lib/themeSync.ts  Dark/light mode (device-local) + synced
