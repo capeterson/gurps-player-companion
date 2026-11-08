@@ -139,6 +139,40 @@ describe('Current Status', () => {
     expect(screen.getByRole('button', { name: 'Change conditions, current None' })).toBeVisible();
   });
 
+  it('closes an open choice panel when the status header is turned off', () => {
+    const { rerender, container } = setup(10, 10, 12, 'Attack');
+    fireEvent.click(screen.getByRole('button', { name: 'Change maneuver, current Attack' }));
+    expect(screen.getByRole('heading', { name: 'Maneuver' })).toBeVisible();
+    const props = {
+      character: {
+        id: 'character-1',
+        derived: { effectiveHt: 10 },
+        combat: { conditions: [], posture: 'standing', maneuver: 'Attack' },
+      } as unknown as CharacterDetail,
+      bumpers: {
+        hp: 10,
+        fp: 10,
+        hpMax: 12,
+        fpMax: 12,
+        bumpHp: vi.fn(),
+        bumpFp: vi.fn(),
+        setHp: vi.fn(),
+        setFp: vi.fn(),
+        commitHpDeltas: vi.fn(),
+        commitFpDeltas: vi.fn(),
+        resetHp: vi.fn(),
+        resetFp: vi.fn(),
+        flashHp: false,
+      } as PoolBumpers,
+      patchCombat: vi.fn(),
+      openRoll: vi.fn(),
+    };
+    rerender(<CurrentStatusBar {...props} canWrite preferences={{ showStatusHeader: false }} />);
+    expect(screen.queryByRole('heading', { name: 'Maneuver' })).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label^="Change maneuver"]')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
+  });
+
   it('anchors visible uneven-threshold labels at their corresponding range values', () => {
     // Exhaust every positive maximum the character schema can produce:
     // base ST/HT (99) + permanent modifier (50) + temporary pool modifier (50).

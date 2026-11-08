@@ -744,8 +744,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   settings, campaign pages and library authoring omit obvious click/save/close
   instructions and filler introductions. Labels and controls carry routine
   context; actionable errors, permission warnings, rule limits and non-obvious
-  consequences remain. Settings labels the optional header switches as
-  **Current Status controls**.
+  consequences remain. Settings has one **Show status header**
+  switch in its **Character sheet header** card.
 - **Current Status and Combat tab (live-gameplay surfaces)**. Combat follows
   Overview in the navigation
   (`src/client/features/characters/sections/combat/CombatTab.tsx`),
@@ -764,8 +764,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   second row. The mobile pool targets
   show current/max values above warning text in a flat, divided toolbar. The menu
   retains character, campaign, account, light/dark, and
-  other navigation actions. On desktop the ordinary navigation row stays above
-  the status controls, with less status padding when all optional controls are off.
+  other navigation actions. From 1280px the status controls share the navigation row
+  (see below).
   The measured complete header height supplies section scroll offsets, including
   when desktop navigation wraps. Attacks, the combined
   defense/armor workspace, the Solo tracker, and roll history use the Combat tab's
@@ -785,7 +785,8 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
     From 1280px the header is one 60px row on every character page: brand, nav, then
     HP, FP, sync, bell and the account menu (36px pool buttons keep the brand mark's
     sun anchor fixed). The status header's three triggers form a strip below that row
-    and join the row itself from 1792px; there is no strip when the preference is off. The
+    and join the row itself when it has measured room for them; there is no strip when the
+    preference is off. The
     condition editor suggests Reeling below one-third HP but never applies it.
     Each FP lost below zero also costs
     one HP, including a decrement crossing zero (B426); FP stops at −FP,

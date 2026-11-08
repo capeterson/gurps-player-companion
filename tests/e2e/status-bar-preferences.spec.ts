@@ -66,11 +66,14 @@ test('user preferences control the Current Status height and visible controls at
     await page.setViewportSize({ width, height });
     await expect(bar.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
     await expect(bar.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();
-    await expect(bar.getByRole('button', { name: /^Change posture,/ })).toHaveCount(0);
-    await expect(bar.getByRole('button', { name: /^Change maneuver,/ })).toHaveCount(0);
-    await expect(bar.getByRole('button', { name: /^Change conditions,/ })).toHaveCount(0);
-    // The landmark has no box from 1280px; the header holds the controls.
-    const box = (await bar.boundingBox()) ?? (await header.boundingBox());
+    await expect(header.getByRole('button', { name: /^Change posture,/ })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: /^Change maneuver,/ })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: /^Change conditions,/ })).toHaveCount(0);
+    // The landmark has no box from 1280px; the HP control is the visible bar.
+    const box =
+      width < 1280
+        ? await bar.boundingBox()
+        : await bar.getByRole('button', { name: /^Adjust HP,/ }).boundingBox();
     expect(box).not.toBeNull();
     offHeights.set(width, (await header.boundingBox())?.height ?? 0);
     if (width < 1280) {
@@ -313,7 +316,7 @@ test('user preferences control the Current Status height and visible controls at
       ['Change maneuver,', 'Maneuver'],
       ['Change conditions,', 'Conditions'],
     ] as const) {
-      const control = bar.getByRole('button', { name: new RegExp(`^${name}`) });
+      const control = header.getByRole('button', { name: new RegExp(`^${name}`) });
       await expect(control).toBeVisible();
       const box = await control.boundingBox();
       expect(box).not.toBeNull();
@@ -326,7 +329,7 @@ test('user preferences control the Current Status height and visible controls at
         }
       }
       await control.click();
-      const panel = bar.getByRole('heading', { name: title, exact: true }).locator('xpath=..');
+      const panel = header.getByRole('heading', { name: title, exact: true }).locator('xpath=..');
       await expect(panel).toBeVisible();
       const panelBox = await panel.boundingBox();
       expect(panelBox).not.toBeNull();
@@ -349,7 +352,7 @@ test('user preferences control the Current Status height and visible controls at
   await page.goto('/settings');
   await statusHeader.uncheck();
   await page.goto(`/characters/${characterId}`);
-  await expect(bar.getByRole('button', { name: /^Change posture,/ })).toHaveCount(0);
-  await expect(bar.getByRole('button', { name: /^Change maneuver,/ })).toHaveCount(0);
-  await expect(bar.getByRole('button', { name: /^Change conditions,/ })).toHaveCount(0);
+  await expect(header.getByRole('button', { name: /^Change posture,/ })).toHaveCount(0);
+  await expect(header.getByRole('button', { name: /^Change maneuver,/ })).toHaveCount(0);
+  await expect(header.getByRole('button', { name: /^Change conditions,/ })).toHaveCount(0);
 });

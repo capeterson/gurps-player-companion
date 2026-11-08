@@ -88,7 +88,8 @@ expectations come from observed regressions and explicit user preferences.
   sync, bell, account). Keep controls in that row at or below 36px tall and never
   move the brand mark: the Sunbolt sun glow is anchored at 42/30px and breaks if
   the mark shifts. Posture/Maneuver/Conditions (one **Show status header**
-  preference) go in a strip below, or inline from 1792px.
+  preference) sit inline when the measured row has room, otherwise in a strip below.
+  The row must never wrap (the character name truncates first).
 - Extend the existing interaction for a utility. Follow AGENTS.md's rule against
   duplicate sorting, coverage, movement or other controls.
 - When editing skill points, preview the net skill value and its actual

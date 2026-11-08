@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { COMMON_CONDITIONS, MANEUVERS, POSTURES } from '../../../../../shared/constants/combat.ts';
 import { conditionLabel, conditionsInclude } from '../../../../../shared/domain/conditions.ts';
 import type { CharacterDetail } from '../../../../../shared/schemas/character.ts';
@@ -355,7 +356,9 @@ function StateTrigger({
     >
       <span className="min-w-0 min-[1280px]:flex min-[1280px]:items-baseline min-[1280px]:gap-2">
         <span className="label-eyebrow block text-[10px] min-[1280px]:shrink-0">{label}</span>
-        <span className="block truncate text-xs font-semibold">{summary}</span>
+        <span className="block truncate text-xs font-semibold" title={summary}>
+          {summary}
+        </span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-[10px] text-base-content/50">
         {open ? '▴' : '▾'}
@@ -401,6 +404,51 @@ function ChoicePanel({
       <div className="mt-3">{children}</div>
     </section>
   );
+}
+
+/** 3 inline triggers (w-44) + 2 gaps (gap-2) + the header's column gap. */
+const INLINE_STRIP_WIDTH = 3 * 176 + 2 * 8 + 12;
+const INLINE_HYSTERESIS = 16;
+
+function px(value: string): number {
+  return Number.parseFloat(value) || 0;
+}
+
+/**
+ * Posture/Maneuver/Conditions join the header row only when the row has room
+ * left for them beside its natural content (the character name truncates
+ * first, so its untruncated width counts). Otherwise they keep their own strip.
+ * The result does not depend on the current mode, so a small hysteresis band
+ * keeps the layout from flickering at the boundary.
+ */
+function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
+  const style = getComputedStyle(header);
+  const available = header.clientWidth - px(style.paddingLeft) - px(style.paddingRight);
+  const rowGap = px(style.columnGap);
+  const items = [...header.querySelectorAll<HTMLElement>('[data-header-row-item]')];
+  const name = header.querySelector<HTMLElement>('[data-header-name]');
+  const truncated = name ? Math.max(0, name.scrollWidth - name.clientWidth) : 0;
+  let used = rowGap * Math.max(0, items.length - 1) + truncated;
+  for (const item of items) {
+    if (!item.hasAttribute('data-header-left')) {
+      used += item.offsetWidth;
+      continue;
+    }
+    // The left group grows to fill the row, so add up its natural pieces.
+    const nav = item.querySelector('nav');
+    const pieces = [...item.children];
+    used += px(getComputedStyle(item).columnGap) * Math.max(0, pieces.length - 1);
+    for (const piece of pieces) {
+      if (piece !== nav) {
+        used += (piece as HTMLElement).offsetWidth;
+        continue;
+      }
+      const groups = [...piece.children] as HTMLElement[];
+      used += px(getComputedStyle(piece).columnGap) * Math.max(0, groups.length - 1);
+      for (const group of groups) used += group.offsetWidth;
+    }
+  }
+  return available - used >= INLINE_STRIP_WIDTH + (wasInline ? 0 : INLINE_HYSTERESIS);
 }
 
 export function CurrentStatusBar({
@@ -541,6 +589,36 @@ export function CurrentStatusBar({
   }, [commitPendingCustomManeuver, openPanel]);
 
   const showStatusHeader = preferences.showStatusHeader;
+  // compact: below 1280px (the strip lives in the mobile grid); strip: its own
+  // header line after the right-hand controls; inline: inside the header row.
+  const [mode, setMode] = useState<'compact' | 'strip' | 'inline'>('compact');
+  const inline = mode === 'inline';
+  useLayoutEffect(() => {
+    const header = barRef.current?.closest('header');
+    if (!embedded || !showStatusHeader || !header) {
+      setMode('compact');
+      return;
+    }
+    const wide = window.matchMedia('(min-width: 1280px)');
+    const measure = () =>
+      setMode((was) => {
+        if (!wide.matches) return 'compact';
+        return shouldInlineStatusStrip(header, was === 'inline') ? 'inline' : 'strip';
+      });
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    for (const item of header.querySelectorAll('[data-header-row-item], [data-header-name]')) {
+      observer.observe(item);
+    }
+    wide.addEventListener('change', measure);
+    void document.fonts?.ready.then(measure);
+    return () => {
+      observer.disconnect();
+      wide.removeEventListener('change', measure);
+    };
+  }, [embedded, showStatusHeader]);
   useEffect(() => {
     if (showStatusHeader) return;
     if (openPanel === 'maneuver') commitPendingCustomManeuver();
@@ -561,10 +639,175 @@ export function CurrentStatusBar({
   // the fractional bottom directly can round the panel upward by one device
   // pixel and leave it overlapping the bar at zoomed/boundary widths.
   const panelTop = Math.ceil(barRef.current?.getBoundingClientRect().bottom ?? top + 120);
-  // Desktop strip cells share the row; at 1792px the strip joins the header row.
+  // In strip mode the strip is portaled after the header's right-hand controls so
+  // keyboard order follows the visual order (row 1 first, then the strip).
+  const stripHost =
+    mode === 'strip' ? document.getElementById('character-status-header-strip-slot') : null;
+  // Strip cells share their own line; inline cells have a fixed width that
+  // INLINE_STRIP_WIDTH accounts for.
   const stateCell = embedded
-    ? 'min-[1280px]:min-w-36 min-[1280px]:flex-[0_1_16rem] min-[1792px]:w-44 min-[1792px]:flex-none'
+    ? inline
+      ? 'min-[1280px]:w-44 min-[1280px]:flex-none'
+      : 'min-[1280px]:min-w-36 min-[1280px]:flex-[0_1_16rem]'
     : 'min-[1280px]:flex-1';
+
+  const statusStrip = showStatusHeader && (
+    <fieldset
+      aria-label="Status header"
+      className={
+        embedded
+          ? `m-0 min-w-0 border-0 p-0 order-last col-span-4 grid grid-cols-3 gap-0 border-t border-base-300/60 min-[1280px]:flex min-[1280px]:gap-2 ${
+              inline
+                ? 'min-[1280px]:order-2 min-[1280px]:shrink-0 min-[1280px]:border-t-0'
+                : 'min-[1280px]:order-6 min-[1280px]:mt-2 min-[1280px]:w-full min-[1280px]:pt-2'
+            }`
+          : 'm-0 min-w-0 border-0 p-0 col-span-2 grid grid-cols-3 gap-0 min-[1280px]:contents'
+      }
+    >
+      <div
+        className={`dropdown min-w-0 ${stateCell} ${openPanel === 'posture' ? 'dropdown-open' : ''}`}
+      >
+        <StateTrigger
+          label="Posture"
+          summary={postureSummary}
+          open={openPanel === 'posture'}
+          panelId={panelId}
+          onToggle={(trigger) => togglePanel('posture', trigger)}
+          flat={embedded}
+        />
+        {openPanel === 'posture' && (
+          <ChoicePanel id={panelId} panelTop={panelTop} title="Posture" embedded={embedded}>
+            <div className="flex flex-wrap gap-2">
+              {POSTURES.map((entry) => (
+                <ConditionChip
+                  key={entry}
+                  label={entry}
+                  active={posture === entry}
+                  className="capitalize"
+                  onClick={() => {
+                    void patchCombat('posture', entry);
+                    closeAndFocus();
+                  }}
+                  disabled={!canWrite}
+                />
+              ))}
+            </div>
+          </ChoicePanel>
+        )}
+      </div>
+      <div
+        className={`dropdown min-w-0 ${stateCell} ${openPanel === 'maneuver' ? 'dropdown-open' : ''}`}
+      >
+        <StateTrigger
+          label="Maneuver"
+          summary={storedManeuver ?? 'None'}
+          open={openPanel === 'maneuver'}
+          panelId={panelId}
+          onToggle={(trigger) => togglePanel('maneuver', trigger)}
+          flat={embedded}
+        />
+        {openPanel === 'maneuver' && (
+          <ChoicePanel id={panelId} panelTop={panelTop} title="Maneuver" embedded={embedded}>
+            <div className="mb-3 flex gap-2">
+              <button
+                type="button"
+                className={`btn btn-xs ${customManeuver ? '' : 'btn-primary'}`}
+                onClick={() => setCustomManeuver(false)}
+              >
+                Presets
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${customManeuver ? 'btn-primary' : ''}`}
+                onClick={() => setCustomManeuver(true)}
+              >
+                Custom
+              </button>
+            </div>
+            {customManeuver ? (
+              <input
+                aria-label="Custom maneuver"
+                className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
+                placeholder="e.g. Ready — draw sword"
+                disabled={!canWrite}
+                {...maneuverField.inputProps}
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {MANEUVERS.map((entry) => (
+                  <ConditionChip
+                    key={entry.id}
+                    label={entry.label}
+                    active={activeManeuver?.id === entry.id}
+                    onClick={() => {
+                      void patchCombat(
+                        'maneuver',
+                        activeManeuver?.id === entry.id ? null : entry.label,
+                      );
+                      closeAndFocus();
+                    }}
+                    disabled={!canWrite}
+                  />
+                ))}
+              </div>
+            )}
+            {activeManeuver && (
+              <p className="mt-3 text-xs text-base-content/70">{activeManeuver.blurb}</p>
+            )}
+          </ChoicePanel>
+        )}
+      </div>
+      <div
+        className={`dropdown dropdown-end min-w-0 ${stateCell} ${openPanel === 'conditions' ? 'dropdown-open' : ''}`}
+      >
+        <StateTrigger
+          label="Conditions"
+          summary={conditionSummary}
+          open={openPanel === 'conditions'}
+          panelId={panelId}
+          onToggle={(trigger) => togglePanel('conditions', trigger)}
+          flat={embedded}
+        />
+        {openPanel === 'conditions' && (
+          <ChoicePanel
+            id={panelId}
+            panelTop={panelTop}
+            title="Conditions"
+            alignEnd
+            embedded={embedded}
+          >
+            <div className="flex flex-wrap gap-2">
+              {COMMON_CONDITIONS.map((entry) => (
+                <ConditionChip
+                  key={entry}
+                  label={conditionLabel(entry)}
+                  active={conditions.some(
+                    (condition) => condition.trim().toLowerCase() === entry.toLowerCase(),
+                  )}
+                  onClick={() => toggleCondition(entry)}
+                  disabled={!canWrite}
+                />
+              ))}
+            </div>
+            {reelingSuggested && (
+              <p className="mt-3 text-xs text-warning">
+                <InfoTooltip
+                  content={`HP (${bumpers.hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; Reeling is a manual reminder and adds no extra penalty.`}
+                >
+                  Reeling suggested
+                </InfoTooltip>
+              </p>
+            )}
+            <div className="mt-4 flex justify-end">
+              <button type="button" className="btn btn-primary btn-sm" onClick={closeAndFocus}>
+                Done
+              </button>
+            </div>
+          </ChoicePanel>
+        )}
+      </div>
+    </fieldset>
+  );
 
   return (
     <aside
@@ -586,8 +829,10 @@ export function CurrentStatusBar({
             <span className="label-eyebrow">Current Status</span>
           </div>
         )}
+        {inline && statusStrip}
         <div
-          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${embedded ? `min-[1280px]:order-3 min-[1280px]:ml-auto ${showStatusHeader ? 'min-[1792px]:ml-0' : ''}` : ''} ${openPanel === 'HP' ? 'dropdown-open' : ''}`}
+          data-header-row-item
+          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${embedded ? 'min-[1280px]:order-3 min-[1280px]:shrink-0' : ''} ${openPanel === 'HP' ? 'dropdown-open' : ''}`}
           style={{ color: hpColor }}
         >
           <PoolTrigger
@@ -614,7 +859,8 @@ export function CurrentStatusBar({
           )}
         </div>
         <div
-          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${embedded ? 'min-[1280px]:order-4' : ''} ${openPanel === 'FP' ? 'dropdown-open' : ''}`}
+          data-header-row-item
+          className={`dropdown dropdown-start relative min-w-0 before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] min-[1280px]:before:hidden ${embedded ? 'min-[1280px]:order-4 min-[1280px]:shrink-0' : ''} ${openPanel === 'FP' ? 'dropdown-open' : ''}`}
           style={{ color: fpColor }}
         >
           <PoolTrigger
@@ -641,162 +887,9 @@ export function CurrentStatusBar({
           )}
         </div>
         {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.actions}</div>}
-        {showStatusHeader && (
-          <div
-            className={
-              embedded
-                ? 'col-span-4 grid grid-cols-3 gap-0 border-t border-base-300/60 min-[1280px]:order-6 min-[1280px]:mt-2 min-[1280px]:flex min-[1280px]:w-full min-[1280px]:gap-2 min-[1280px]:pt-2 min-[1792px]:order-2 min-[1792px]:ml-auto min-[1792px]:mt-0 min-[1792px]:w-auto min-[1792px]:border-t-0 min-[1792px]:pt-0'
-                : 'col-span-2 grid grid-cols-3 gap-0 min-[1280px]:contents'
-            }
-          >
-            <div
-              className={`dropdown min-w-0 ${stateCell} ${openPanel === 'posture' ? 'dropdown-open' : ''}`}
-            >
-              <StateTrigger
-                label="Posture"
-                summary={postureSummary}
-                open={openPanel === 'posture'}
-                panelId={panelId}
-                onToggle={(trigger) => togglePanel('posture', trigger)}
-                flat={embedded}
-              />
-              {openPanel === 'posture' && (
-                <ChoicePanel id={panelId} panelTop={panelTop} title="Posture" embedded={embedded}>
-                  <div className="flex flex-wrap gap-2">
-                    {POSTURES.map((entry) => (
-                      <ConditionChip
-                        key={entry}
-                        label={entry}
-                        active={posture === entry}
-                        className="capitalize"
-                        onClick={() => {
-                          void patchCombat('posture', entry);
-                          closeAndFocus();
-                        }}
-                        disabled={!canWrite}
-                      />
-                    ))}
-                  </div>
-                </ChoicePanel>
-              )}
-            </div>
-            <div
-              className={`dropdown min-w-0 ${stateCell} ${openPanel === 'maneuver' ? 'dropdown-open' : ''}`}
-            >
-              <StateTrigger
-                label="Maneuver"
-                summary={storedManeuver ?? 'None'}
-                open={openPanel === 'maneuver'}
-                panelId={panelId}
-                onToggle={(trigger) => togglePanel('maneuver', trigger)}
-                flat={embedded}
-              />
-              {openPanel === 'maneuver' && (
-                <ChoicePanel id={panelId} panelTop={panelTop} title="Maneuver" embedded={embedded}>
-                  <div className="mb-3 flex gap-2">
-                    <button
-                      type="button"
-                      className={`btn btn-xs ${customManeuver ? '' : 'btn-primary'}`}
-                      onClick={() => setCustomManeuver(false)}
-                    >
-                      Presets
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-xs ${customManeuver ? 'btn-primary' : ''}`}
-                      onClick={() => setCustomManeuver(true)}
-                    >
-                      Custom
-                    </button>
-                  </div>
-                  {customManeuver ? (
-                    <input
-                      aria-label="Custom maneuver"
-                      className={`${DRAFT_FIELD_CLASS} input input-bordered input-sm w-full`}
-                      placeholder="e.g. Ready — draw sword"
-                      disabled={!canWrite}
-                      {...maneuverField.inputProps}
-                    />
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {MANEUVERS.map((entry) => (
-                        <ConditionChip
-                          key={entry.id}
-                          label={entry.label}
-                          active={activeManeuver?.id === entry.id}
-                          onClick={() => {
-                            void patchCombat(
-                              'maneuver',
-                              activeManeuver?.id === entry.id ? null : entry.label,
-                            );
-                            closeAndFocus();
-                          }}
-                          disabled={!canWrite}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {activeManeuver && (
-                    <p className="mt-3 text-xs text-base-content/70">{activeManeuver.blurb}</p>
-                  )}
-                </ChoicePanel>
-              )}
-            </div>
-            <div
-              className={`dropdown dropdown-end min-w-0 ${stateCell} ${openPanel === 'conditions' ? 'dropdown-open' : ''}`}
-            >
-              <StateTrigger
-                label="Conditions"
-                summary={conditionSummary}
-                open={openPanel === 'conditions'}
-                panelId={panelId}
-                onToggle={(trigger) => togglePanel('conditions', trigger)}
-                flat={embedded}
-              />
-              {openPanel === 'conditions' && (
-                <ChoicePanel
-                  id={panelId}
-                  panelTop={panelTop}
-                  title="Conditions"
-                  alignEnd
-                  embedded={embedded}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {COMMON_CONDITIONS.map((entry) => (
-                      <ConditionChip
-                        key={entry}
-                        label={conditionLabel(entry)}
-                        active={conditions.some(
-                          (condition) => condition.trim().toLowerCase() === entry.toLowerCase(),
-                        )}
-                        onClick={() => toggleCondition(entry)}
-                        disabled={!canWrite}
-                      />
-                    ))}
-                  </div>
-                  {reelingSuggested && (
-                    <p className="mt-3 text-xs text-warning">
-                      <InfoTooltip
-                        content={`HP (${bumpers.hp}) is below one-third of maximum (B419). Move and Dodge are already halved numerically; Reeling is a manual reminder and adds no extra penalty.`}
-                      >
-                        Reeling suggested
-                      </InfoTooltip>
-                    </p>
-                  )}
-                  <div className="mt-4 flex justify-end">
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={closeAndFocus}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </ChoicePanel>
-              )}
-            </div>
-          </div>
-        )}
+        {mode === 'compact' && statusStrip}
+        {mode === 'strip' && !stripHost && statusStrip}
+        {mode === 'strip' && stripHost && createPortal(statusStrip, stripHost)}
       </div>
     </aside>
   );

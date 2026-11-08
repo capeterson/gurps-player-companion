@@ -81,9 +81,12 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
 
   const bar = page.getByRole('complementary', { name: 'Current Status' });
   await expect(bar).toBeVisible();
-  // From 1280px the status controls sit directly in the header row, so the
-  // landmark itself has no box; the header is the visible bar.
-  const barBox = (await bar.boundingBox()) ?? (await page.locator('header').first().boundingBox());
+  // From 1280px the controls sit directly in the header row, so the landmark
+  // has no box of its own; assert the HP control instead.
+  const barBox =
+    width < 1280
+      ? await bar.boundingBox()
+      : await bar.getByRole('button', { name: /^Adjust HP,/ }).boundingBox();
   expect(barBox).not.toBeNull();
 
   for (const pool of ['HP', 'FP'] as const) {
@@ -339,22 +342,49 @@ test('Current Status stays available and combat stays compact across mobile and 
     await expect(page.getByRole('combobox', { name: 'Defense order' })).toHaveCount(0);
     await expect(page.getByText('All locations and DR types', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Custom effect', exact: true })).toHaveCount(0);
-    await status.getByRole('button', { name: 'Change maneuver, current None' }).click();
-    await status.getByRole('button', { name: 'Attack', exact: true }).click();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: 'Change maneuver, current None' })
+      .click();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: 'Attack', exact: true })
+      .click();
     await expect(
-      status.getByRole('button', { name: 'Change maneuver, current Attack' }),
+      page
+        .locator('header')
+        .first()
+        .getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
-    await status.getByRole('button', { name: 'Change conditions, current None' }).click();
-    await status.getByRole('button', { name: 'Stunned', exact: true }).click();
-    await status.getByRole('button', { name: 'Done', exact: true }).click();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: 'Change conditions, current None' })
+      .click();
+    await page
+      .locator('header')
+      .first()
+      .getByRole('button', { name: 'Stunned', exact: true })
+      .click();
+    await page.locator('header').first().getByRole('button', { name: 'Done', exact: true }).click();
     await expect(
-      status.getByRole('button', { name: 'Change conditions, current Stunned' }),
+      page
+        .locator('header')
+        .first()
+        .getByRole('button', { name: 'Change conditions, current Stunned' }),
     ).toBeVisible();
-    await expect(status.getByRole('button', { name: 'Sleeping', exact: true })).toHaveCount(0);
+    await expect(
+      page.locator('header').first().getByRole('button', { name: 'Sleeping', exact: true }),
+    ).toHaveCount(0);
     await page.reload();
     await expect(status).toBeVisible();
     await expect(
-      status.getByRole('button', { name: 'Change maneuver, current Attack' }),
+      page
+        .locator('header')
+        .first()
+        .getByRole('button', { name: 'Change maneuver, current Attack' }),
     ).toBeVisible();
     await selectCharacterSection(page, 'Combat');
     await expect(incomingAttack).toBeVisible();
@@ -372,10 +402,7 @@ test('Current Status stays available and combat stays compact across mobile and 
       await bar.getByRole('button', { name: /^Adjust HP,/ }).click();
       const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
       await expect(hpPanel).toBeVisible();
-      const [barBox, hpPanelBox] = await Promise.all([
-        bar.boundingBox().then((value) => value ?? page.locator('header').first().boundingBox()),
-        hpPanel.boundingBox(),
-      ]);
+      const [barBox, hpPanelBox] = await Promise.all([bar.boundingBox(), hpPanel.boundingBox()]);
       expect(barBox).not.toBeNull();
       expect(hpPanelBox).not.toBeNull();
       if (barBox && hpPanelBox) {

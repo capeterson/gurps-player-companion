@@ -259,10 +259,12 @@ export function App() {
     >
       <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
         <header
-          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 px-3 py-2 sm:gap-6 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 bg-base-100 max-[1280px]:px-2! max-[1280px]:py-1! sm:gap-y-0 min-[1280px]:justify-start min-[1280px]:gap-x-3' : 'bg-base-100/95 backdrop-blur'}`}
+          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 px-3 py-2 sm:gap-6 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 bg-base-100 max-[1280px]:px-2! max-[1280px]:py-1! sm:gap-y-0 min-[1280px]:gap-x-3' : 'bg-base-100/95 backdrop-blur'}`}
         >
           <div
-            className={`app-header-normal flex min-w-0 items-center gap-3 sm:gap-6 ${characterDetail ? 'min-[1280px]:order-1' : ''}`}
+            data-header-row-item
+            data-header-left
+            className={`app-header-normal flex min-w-0 items-center gap-3 sm:gap-6 ${characterDetail ? 'min-[1280px]:order-1 min-[1280px]:min-w-[28rem] min-[1280px]:flex-1 min-[1280px]:basis-0' : ''}`}
           >
             <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
               <BrandMark />
@@ -279,7 +281,7 @@ export function App() {
               >
                 <Link
                   to="/characters"
-                  className={`rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  className={`shrink-0 whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
                     characterActive
                       ? 'text-base-content'
                       : 'text-muted hover:bg-base-200 hover:text-base-content'
@@ -298,6 +300,7 @@ export function App() {
                       ›
                     </span>
                     <Link
+                      data-header-name
                       to={`/characters/${entityBreadcrumb.id}`}
                       className="max-w-28 truncate rounded-field px-2 py-2 text-sm font-medium text-base-content transition hover:bg-base-300 sm:max-w-48 lg:max-w-80"
                       title={entityBreadcrumb.name}
@@ -309,12 +312,12 @@ export function App() {
               </div>
               <div
                 className={`flex min-w-0 items-center rounded-field transition ${
-                  campaignActive ? 'bg-base-200' : ''
-                }`}
+                  characterDetail ? 'min-[1280px]:shrink-0' : ''
+                } ${campaignActive ? 'bg-base-200' : ''}`}
               >
                 <Link
                   to={CAMPAIGN_ROOT}
-                  className={`rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  className={`shrink-0 whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
                     campaignActive
                       ? 'text-base-content'
                       : 'text-muted hover:bg-base-200 hover:text-base-content'
@@ -358,6 +361,11 @@ export function App() {
             </nav>
           </div>
           <div
+            id="character-status-header-slot"
+            className={characterDetail ? 'empty:hidden w-full min-[1280px]:contents' : 'hidden'}
+          />
+          <div
+            data-header-row-item
             className={`app-header-normal flex shrink-0 items-center gap-1 sm:gap-3 ${characterDetail ? 'min-[1280px]:order-5 min-[1280px]:border-l min-[1280px]:border-base-300 min-[1280px]:pl-3' : ''}`}
           >
             <SyncStatusIndicator />
@@ -431,10 +439,9 @@ export function App() {
               </ul>
             </details>
           </div>
-          <div
-            id="character-status-header-slot"
-            className={characterDetail ? 'empty:hidden w-full min-[1280px]:contents' : 'hidden'}
-          />
+          {characterDetail && (
+            <div id="character-status-header-strip-slot" className="hidden min-[1280px]:contents" />
+          )}
         </header>
         <main className="relative z-0 mx-auto w-full max-w-[80rem] p-4 sm:p-7">
           {guest && (

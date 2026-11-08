@@ -5,6 +5,8 @@ import { captureReviewScreenshot } from './review-artifacts';
 // theme.css), so the single-row desktop header must keep the mark's centre fixed.
 const MARK_CENTRE = { x: 42, y: 30 };
 const ROW_HEIGHT = 60;
+const WIDTHS = [1280, 1281, 1440, 1535, 1536, 1791, 1792, 1920];
+const LONG_NAME = 'Seraphina Alcántara-Whitlock the Unbowed of the Ninth Marches';
 
 async function box(locator: Locator) {
   const value = await locator.boundingBox();
@@ -19,26 +21,42 @@ async function settle(page: Page) {
   );
 }
 
-test('desktop character header keeps HP and FP on one row without moving the brand mark', async ({
+test('desktop character header keeps one row, the brand mark and keyboard order at any content width', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/login');
   await page.getByLabel(/email/i).fill('rowan@example.invalid');
   await page.getByLabel(/^password\b/i).fill('change-me-please-this-is-a-seed-account');
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
-  const characterId = await page.evaluate(async () => {
+  const auth = await page.evaluate(() => {
     const raw = localStorage.getItem('gpc.tokenPair.v1');
-    const accessToken = raw ? (JSON.parse(raw) as { accessToken?: string }).accessToken : null;
-    const response = await fetch('/api/v1/characters', {
-      headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {},
-    });
-    const characters = (await response.json()) as Array<{ id: string; name: string }>;
-    return characters.find((character) => character.name === 'Kestrel Vale')?.id;
+    return raw ? ((JSON.parse(raw) as { accessToken?: string }).accessToken ?? '') : '';
   });
-  expect(characterId).toBeTruthy();
+  const headers = { Authorization: `Bearer ${auth}` };
+  const characters = (await (
+    await page.request.get('/api/v1/characters', { headers })
+  ).json()) as Array<{
+    id: string;
+    name: string;
+  }>;
+  const kestrelId = characters.find((character) => character.name === 'Kestrel Vale')?.id;
+  expect(kestrelId).toBeTruthy();
+  // Worst-case content: a name past the link's 320px cap and both pools at
+  // their lowest supported values ("Death checks" / "Exhausted" warnings).
+  const created = await page.request.post('/api/v1/characters', {
+    headers,
+    data: { name: LONG_NAME, st: 15, dx: 15, iq: 15, ht: 15 },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const stressId = ((await created.json()) as { id: string }).id;
+  const patched = await page.request.patch(`/api/v1/characters/${stressId}/combat`, {
+    headers,
+    data: { currentHp: -1000, currentFp: -1000 },
+  });
+  expect(patched.ok(), await patched.text()).toBeTruthy();
 
   const header = page.locator('header').first();
   const mark = header.locator('.brand-mark:visible').first();
@@ -48,92 +66,180 @@ test('desktop character header keeps HP and FP on one row without moving the bra
   const posture = header.getByRole('button', { name: /^Change posture,/ });
   const maneuver = header.getByRole('button', { name: /^Change maneuver,/ });
   const conditions = header.getByRole('button', { name: /^Change conditions,/ });
+  const nameLink = header.locator('[data-header-name]');
 
-  async function checkRow(width: number, stripVisible: boolean) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await settle(page);
-    const label = `${width}px`;
-    const markBox = await box(mark);
-    expect(markBox.x + markBox.width / 2, `${label} mark x`).toBeCloseTo(MARK_CENTRE.x, 0);
-    expect(markBox.y + markBox.height / 2, `${label} mark y`).toBeCloseTo(MARK_CENTRE.y, 0);
-
-    const [hpBox, fpBox, accountBox, headerBox] = await Promise.all([
+  /** Row-1 controls in visual order, with their geometry. */
+  async function rowBoxes() {
+    const [markBox, nameBox, hpBox, fpBox, accountBox] = await Promise.all([
+      box(mark),
+      box(nameLink),
       box(hp),
       box(fp),
       box(account),
-      box(header),
     ]);
-    for (const control of [hpBox, fpBox]) {
-      expect(control.height, `${label} pool height`).toBeCloseTo(36, 0);
-      expect(control.y + control.height, `${label} pool is on the first row`).toBeLessThanOrEqual(
-        ROW_HEIGHT,
-      );
+    return { markBox, nameBox, hpBox, fpBox, accountBox };
+  }
+
+  async function checkRow(width: number, statusHeader: boolean, tag: string) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await settle(page);
+    const label = `${tag} ${width}px`;
+    const { markBox, nameBox, hpBox, fpBox, accountBox } = await rowBoxes();
+    expect(markBox.x + markBox.width / 2, `${label} mark x`).toBeCloseTo(MARK_CENTRE.x, 0);
+    expect(markBox.y + markBox.height / 2, `${label} mark y`).toBeCloseTo(MARK_CENTRE.y, 0);
+
+    // Nothing wraps: every row-1 control ends inside the 60px row.
+    for (const control of [nameBox, hpBox, fpBox, accountBox]) {
+      expect(control.y + control.height, `${label} stays on row 1`).toBeLessThanOrEqual(ROW_HEIGHT);
     }
+    expect(hpBox.height, `${label} pool height`).toBeCloseTo(36, 0);
+    expect(fpBox.height, `${label} pool height`).toBeCloseTo(36, 0);
+    // No overlap, left to right: name, HP, FP, account inside the viewport.
+    expect(nameBox.x + nameBox.width, `${label} name before HP`).toBeLessThanOrEqual(hpBox.x);
     expect(hpBox.x + hpBox.width, `${label} HP before FP`).toBeLessThanOrEqual(fpBox.x);
     expect(fpBox.x + fpBox.width, `${label} FP before account`).toBeLessThanOrEqual(accountBox.x);
-    expect(accountBox.x + accountBox.width).toBeLessThanOrEqual(width);
+    expect(accountBox.x + accountBox.width, `${label} account in viewport`).toBeLessThanOrEqual(
+      width,
+    );
     await expect(header.getByText('Current Status', { exact: true })).toHaveCount(0);
+    const headerBox = await box(header);
 
-    if (!stripVisible) {
+    if (!statusHeader) {
       expect(headerBox.height, `${label} one-row header`).toBeLessThanOrEqual(ROW_HEIGHT + 2);
       await expect(posture).toHaveCount(0);
-      return;
+      return 'off' as const;
     }
-    for (const trigger of [posture, maneuver, conditions]) {
-      await expect(trigger).toBeVisible();
-      const triggerBox = await box(trigger);
-      expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(width);
-      if (width >= 1792) {
-        expect(triggerBox.y + triggerBox.height, `${label} inline`).toBeLessThanOrEqual(ROW_HEIGHT);
-      } else {
-        expect(triggerBox.y, `${label} strip below the row`).toBeGreaterThanOrEqual(ROW_HEIGHT - 1);
-      }
+    const triggers = await Promise.all([posture, maneuver, conditions].map(box));
+    const inline = triggers.every((trigger) => trigger.y + trigger.height <= ROW_HEIGHT);
+    const stripped = triggers.every((trigger) => trigger.y >= ROW_HEIGHT - 1);
+    expect(inline || stripped, `${label} triggers are all inline or all in the strip`).toBe(true);
+    for (const trigger of triggers) {
+      expect(trigger.x).toBeGreaterThanOrEqual(0);
+      expect(trigger.x + trigger.width).toBeLessThanOrEqual(width);
     }
-    if (width >= 1792) {
-      expect(headerBox.height).toBeLessThanOrEqual(ROW_HEIGHT + 2);
-      const [postureBox, conditionsBox] = await Promise.all([box(posture), box(conditions)]);
+    if (inline) {
+      expect(headerBox.height, `${label} inline header`).toBeLessThanOrEqual(ROW_HEIGHT + 2);
+      const [first, , last] = triggers;
+      expect((last?.x ?? 0) + (last?.width ?? 0), `${label} inline before HP`).toBeLessThanOrEqual(
+        hpBox.x,
+      );
+      expect(first?.x ?? 0).toBeGreaterThan(nameBox.x + nameBox.width);
+    }
+    return inline ? ('inline' as const) : ('strip' as const);
+  }
+
+  /** Tab through row 1 from the Campaign link; focus must advance left to right. */
+  async function expectFocusFollowsVisualOrder(tag: string, strip: boolean) {
+    await header.getByRole('link', { name: 'Campaign', exact: true }).focus();
+    const stops: Array<{ x: number; y: number; name: string }> = [];
+    for (let index = 0; index < 14; index += 1) {
+      await page.keyboard.press('Tab');
+      const stop = await page.evaluate(() => {
+        const element = document.activeElement as HTMLElement | null;
+        const rect = element?.getBoundingClientRect();
+        return {
+          x: rect?.x ?? 0,
+          y: rect?.y ?? 0,
+          name: element?.getAttribute('aria-label') ?? element?.textContent?.trim() ?? '',
+        };
+      });
+      if (stop.y > ROW_HEIGHT) break;
+      stops.push(stop);
+      if (/user menu/i.test(stop.name)) break;
+    }
+    // A strip below the row is reached after the account menu, never before it.
+    if (strip) {
+      await page.keyboard.press('Tab');
       expect(
-        conditionsBox.x + conditionsBox.width,
-        `${label} inline before HP`,
-      ).toBeLessThanOrEqual(hpBox.x);
-      expect(postureBox.x).toBeGreaterThan(MARK_CENTRE.x);
+        await page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? ''),
+        `${tag} the strip follows the account menu`,
+      ).toMatch(/^Change posture,/);
+    }
+    expect(stops.map((stop) => stop.name).join(' | '), `${tag} reaches the account menu`).toMatch(
+      /user menu/i,
+    );
+    for (let index = 1; index < stops.length; index += 1) {
+      expect(
+        stops[index]?.x ?? 0,
+        `${tag}: "${stops[index]?.name}" must be right of "${stops[index - 1]?.name}"`,
+      ).toBeGreaterThan(stops[index - 1]?.x ?? 0);
     }
   }
 
   await page.goto('/settings');
   const statusHeader = page.getByRole('checkbox', { name: 'Show status header' });
   await expect(statusHeader).not.toBeChecked();
-  await page.goto(`/characters/${characterId}`);
-  await expect(hp).toBeVisible();
-  const widths = [1280, 1281, 1440, 1791, 1792, 1920];
-  for (const width of widths) await checkRow(width, false);
-  await captureReviewScreenshot(page, { path: 'test-results/desktop-header-off-1920.png' });
+
+  for (const [id, tag] of [
+    [kestrelId as string, 'ordinary'],
+    [stressId, 'worst-case'],
+  ] as const) {
+    await page.goto(`/characters/${id}`);
+    await expect(hp).toBeVisible();
+    for (const width of WIDTHS) await checkRow(width, false, tag);
+  }
+  await captureReviewScreenshot(page, { path: 'test-results/desktop-header-off-worst-1920.png' });
 
   await page.goto('/settings');
   await statusHeader.check();
-  await page.goto(`/characters/${characterId}`);
-  await expect(posture).toBeVisible();
-  for (const width of widths) {
-    await checkRow(width, true);
-    await captureReviewScreenshot(page, { path: `test-results/desktop-header-on-${width}.png` });
+  const modes = new Map<string, string>();
+  for (const [id, tag] of [
+    [kestrelId as string, 'ordinary'],
+    [stressId, 'worst-case'],
+  ] as const) {
+    await page.goto(`/characters/${id}`);
+    await expect(posture).toBeVisible();
+    for (const width of WIDTHS) {
+      const mode = await checkRow(width, true, tag);
+      modes.set(`${tag}-${width}`, mode);
+      await expectFocusFollowsVisualOrder(`${tag} ${width}px ${mode}`, mode === 'strip');
+      await captureReviewScreenshot(page, {
+        path: `test-results/desktop-header-on-${tag}-${width}.png`,
+      });
+    }
   }
+  // The measured switch: ordinary content has room inline at 1920px, the
+  // worst case does not at 1280px, and narrower never beats wider.
+  expect(modes.get('ordinary-1920')).toBe('inline');
+  expect(modes.get('worst-case-1280')).toBe('strip');
+  expect(modes.get('worst-case-1920')).toBeDefined();
 
-  // The HP popover opens under the single row and stays inside the viewport.
-  for (const width of [1280, 1440, 1920]) {
+  // Overlays: HP, and the choice panels in whichever mode applies, stay inside
+  // the viewport and open at the single row's bottom edge.
+  await page.goto(`/characters/${kestrelId}`);
+  for (const width of [1280, 1440, 1792, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
-    await hp.click();
-    const panel = header.getByRole('group', { name: 'HP adjustment' });
-    await expect(panel).toBeVisible();
-    const [panelBox, headerBox, hpBox] = await Promise.all([box(panel), box(header), box(hp)]);
-    expect(panelBox.x).toBeGreaterThanOrEqual(0);
-    expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
-    expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(900);
-    expect(panelBox.y).toBeGreaterThanOrEqual(hpBox.y + hpBox.height);
-    expect(panelBox.y).toBeLessThanOrEqual(headerBox.y + headerBox.height + 2);
-    await page.keyboard.press('Escape');
-    await expect(panel).toHaveCount(0);
+    for (const [trigger, name] of [
+      [hp, 'HP adjustment'],
+      [posture, 'Posture'],
+      [maneuver, 'Maneuver'],
+      [conditions, 'Conditions'],
+    ] as const) {
+      await trigger.click();
+      const panel =
+        name === 'HP adjustment'
+          ? header.getByRole('group', { name })
+          : header.getByRole('heading', { name, exact: true }).locator('xpath=..');
+      await expect(panel).toBeVisible();
+      const [panelBox, headerBox, triggerBox] = await Promise.all([
+        box(panel),
+        box(header),
+        box(trigger),
+      ]);
+      expect(panelBox.x, `${name} ${width}px left`).toBeGreaterThanOrEqual(0);
+      expect(panelBox.x + panelBox.width, `${name} ${width}px right`).toBeLessThanOrEqual(width);
+      expect(panelBox.y + panelBox.height, `${name} ${width}px bottom`).toBeLessThanOrEqual(900);
+      expect(panelBox.y, `${name} ${width}px below its trigger`).toBeGreaterThanOrEqual(
+        triggerBox.y + triggerBox.height,
+      );
+      expect(panelBox.y, `${name} ${width}px near the header edge`).toBeLessThanOrEqual(
+        Math.max(headerBox.y + headerBox.height, triggerBox.y + triggerBox.height + 14) + 2,
+      );
+      await page.keyboard.press('Escape');
+      await expect(panel).toHaveCount(0);
+    }
   }
 
   // Below 1280px the compact bar is unchanged and its sun anchor is 30/26.
@@ -142,7 +248,4 @@ test('desktop character header keeps HP and FP on one row without moving the bra
   const compactMark = await box(mark);
   expect(compactMark.x + compactMark.width / 2).toBeCloseTo(30, 0);
   expect(compactMark.y + compactMark.height / 2).toBeCloseTo(26, 0);
-
-  await page.goto('/settings');
-  await statusHeader.uncheck();
 });
