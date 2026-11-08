@@ -251,6 +251,33 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
     }
   }
 
+  // Stepping HP up and down (as a player does) must never move the strip between
+  // the row and its own line: the layout depends on content, not on current HP.
+  await page.goto(`/characters/${shortId}`);
+  await expect(posture).toBeVisible();
+  for (let width = 1280; width <= 2000; width += 32) {
+    await page.setViewportSize({ width, height: 900 });
+    await settle(page);
+    await hp.click();
+    const panel = header.getByRole('group', { name: 'HP adjustment' });
+    await expect(panel).toBeVisible();
+    const modeNow = async () =>
+      (await box(posture)).y + (await box(posture)).height <= ROW_HEIGHT ? 'inline' : 'strip';
+    const first = await modeNow();
+    for (const [name, steps] of [
+      ['−5 HP', 8],
+      ['+5 HP', 8],
+    ] as const) {
+      for (let step = 0; step < steps; step += 1) {
+        await panel.getByRole('button', { name }).click();
+        await settle(page);
+        expect(await modeNow(), `HP step at ${width}px keeps the ${first} layout`).toBe(first);
+      }
+    }
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+  }
+
   // Overlays: HP, and the choice panels in whichever mode applies, stay inside
   // the viewport and open at the single row's bottom edge.
   await page.goto(`/characters/${kestrelId}`);

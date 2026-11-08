@@ -331,6 +331,30 @@ function nullableTextParser(value: string): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * Invisible stand-in for a pool button at its widest state (longest warning at
+ * the lowest value). The header layout is measured against this, so stepping
+ * HP or FP never changes whether the status strip sits inline.
+ */
+function PoolWidthProbe({ label, warning, max }: { label: string; warning: string; max: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-pool-probe
+      className="btn btn-sm btn-ghost pointer-events-none invisible absolute top-0 left-0 hidden h-9 min-h-9 items-center gap-1 whitespace-nowrap px-2.5 min-[1280px]:inline-flex"
+    >
+      <span className="flex items-center gap-0.5 text-[10px] leading-none">
+        <span className="font-semibold">{label}</span>
+        <span className="font-semibold">{warning}</span>
+      </span>
+      <span className="num whitespace-nowrap text-base font-semibold">
+        {-max} / {max}
+      </span>
+      <span className="text-[10px]">▾</span>
+    </span>
+  );
+}
+
 function StateTrigger({
   label,
   summary,
@@ -452,7 +476,13 @@ function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
     : 0;
   let used = rowGap * Math.max(0, items.length - 1) + truncated;
   for (const item of items) {
-    used += item.hasAttribute('data-header-left') ? leftGroupWidth(item) : item.offsetWidth;
+    if (item.hasAttribute('data-header-left')) {
+      used += leftGroupWidth(item);
+      continue;
+    }
+    // Pools count at their widest state so HP/FP changes cannot flip the layout.
+    const probe = item.querySelector<HTMLElement>('[data-pool-probe]');
+    used += Math.max(item.offsetWidth, probe?.offsetWidth ?? 0);
   }
   const rootFont = px(getComputedStyle(document.documentElement).fontSize) || 16;
   const needed = rootFont * INLINE_STRIP_REM + rowGap + (wasInline ? 0 : INLINE_HYSTERESIS);
@@ -863,6 +893,7 @@ export function CurrentStatusBar({
             onToggle={(trigger) => togglePanel('HP', trigger)}
             compact={embedded}
           />
+          {embedded && <PoolWidthProbe label="HP" warning="Death checks" max={bumpers.hpMax} />}
           {activePool?.label === 'HP' && (
             <PoolAdjustmentPanel
               key={activePool.label}
@@ -891,6 +922,7 @@ export function CurrentStatusBar({
             onToggle={(trigger) => togglePanel('FP', trigger)}
             compact={embedded}
           />
+          {embedded && <PoolWidthProbe label="FP" warning="Exhausted" max={bumpers.fpMax} />}
           {activePool?.label === 'FP' && (
             <PoolAdjustmentPanel
               key={activePool.label}

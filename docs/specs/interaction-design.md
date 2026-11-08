@@ -436,6 +436,9 @@ row's natural content holds all three (3 × 11rem + 2 × 0.5rem + the header gap
 a 16px hysteresis), they sit inline in the row; otherwise they form a strip below it.
 Natural content means the left group floored at its 28rem minimum and the character
 name's untruncated width up to its `max-w-80` cap.
+HP and FP count at their widest state (an invisible probe with the longest warning at
+the lowest value), so stepping HP or FP never moves the strip between the row and
+its own line.
 Keyboard order follows the visual order (the portal slot sits between the left and
 right header groups; an inline strip is rendered before HP, and a strip on its own
 line is portaled into a second slot after the right-hand group);
