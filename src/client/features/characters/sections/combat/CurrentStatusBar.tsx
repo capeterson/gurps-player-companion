@@ -585,7 +585,7 @@ export function CurrentStatusBar({
       aria-label="Current Status"
     >
       <div
-        className={`mx-auto grid max-w-[80rem] min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_8.25rem] gap-0 px-0 py-0 min-[480px]:gap-x-1 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(5rem,max-content)_minmax(5rem,max-content)_8.25rem] min-[1280px]:px-4' : 'grid-cols-2 gap-1 px-2 py-1 min-[1280px]:px-7'} ${optionalCount > 0 ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}
+        className={`mx-auto grid max-w-[80rem] min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_8.25rem] gap-0 px-0 py-0 min-[1280px]:px-4' : 'grid-cols-2 gap-1 px-2 py-1 min-[1280px]:px-7'} ${optionalCount > 0 ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}
       >
         {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.menu}</div>}
         <div className="hidden min-[1280px]:block min-[1280px]:min-w-28">

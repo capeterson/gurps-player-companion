@@ -6,6 +6,7 @@ import {
   openAddItem,
   selectCharacterSection,
 } from './character-navigation';
+import { switchThemeFromMenu } from './header-theme';
 import { captureReviewScreenshot } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -90,7 +91,7 @@ unauthenticatedTest(
     for (const viewport of viewportCases) {
       await page.setViewportSize(viewport);
       if (viewport.width >= 1024 && !darkTheme) {
-        await page.getByRole('button', { name: 'Switch to Dark mode' }).click();
+        await switchThemeFromMenu(page, 'Dark');
         darkTheme = true;
       }
 
@@ -195,9 +196,6 @@ unauthenticatedTest(
           .locator('header.app-header summary[aria-label^="Notifications"]')
           .filter({ visible: true })
           .first(),
-        page
-          .locator('header.app-header button[aria-label^="Switch to "]')
-          .filter({ visible: true }),
         page.locator('header.app-header summary[aria-label="Open user menu"]'),
       ];
       for (const control of headerControls) {
@@ -240,6 +238,10 @@ unauthenticatedTest(
         const link = accountMenu.getByRole('link', { name: label, exact: true });
         await link.click({ trial: true });
       }
+      const themeItem = accountMenu.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ });
+      await expect(themeItem).toBeVisible();
+      await expect(themeItem).toContainText(/^(Dark|Light) mode$/);
+      await themeItem.click({ trial: true });
       await accountMenu.getByRole('button', { name: 'Logout', exact: true }).click({ trial: true });
       if ([667, 1025, 1920].includes(viewport.width)) {
         await captureReviewScreenshot(page, {

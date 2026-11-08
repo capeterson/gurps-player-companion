@@ -1,4 +1,5 @@
 import { type Page, expect, test } from '@playwright/test';
+import { ensureThemeMode } from './header-theme';
 import { captureReviewScreenshot } from './review-artifacts';
 
 async function readStore(page: Page, store: string) {
@@ -44,9 +45,7 @@ test('intentional offline mode stays quiet, preserves edits and resumes after Go
     page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Sync log' }) });
   await expect(saved()).toBeVisible({ timeout: 15_000 });
   await page.setViewportSize({ width: 575, height: 900 });
-  if ((await page.locator('html').getAttribute('data-theme')) !== 'sunbolt') {
-    await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
-  }
+  await ensureThemeMode(page, 'Light');
   await saved().click();
   await captureReviewScreenshot(page, {
     path: testInfo.outputPath('online-dialog-light-575.png'),
@@ -96,17 +95,7 @@ test('intentional offline mode stays quiet, preserves edits and resumes after Go
 
   // One account/page covers both palettes and footer breakpoint boundaries.
   for (const mode of ['light', 'dark']) {
-    const switchMode = page
-      .getByRole('button', {
-        name: `Switch to ${mode === 'light' ? 'Light' : 'Dark'} mode`,
-        exact: true,
-      })
-      .filter({ visible: true });
-    if (await switchMode.isVisible()) await switchMode.click();
-    await expect(page.locator('html')).toHaveAttribute(
-      'data-theme',
-      mode === 'light' ? 'sunbolt' : 'gilded-tome',
-    );
+    await ensureThemeMode(page, mode === 'light' ? 'Light' : 'Dark');
     for (const viewport of [
       { width: 375, height: 812 },
       { width: 575, height: 900 },

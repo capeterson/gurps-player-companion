@@ -409,10 +409,20 @@ when the text contains no spaces.
 Long account names remain width-bounded in the shared header at all breakpoints;
 opening the account menu must not horizontally scroll the page. The home welcome
 heading wraps unbroken account names within its card.
-The compact character navigation menu starts with the signed-in user's name and
-email, followed by destinations and Logout. It does not repeat the character name
-from the header breadcrumb. The dark/light toggle is a 44px icon button at the
-upper right, beside sync and notifications, rather than a navigation menu item.
+The brand mark (a link home, "Sunbolt home" in the compact bar) is shown at the
+left of the header on every page and at every width, because the Sunbolt sun
+glow is anchored on it. `--sun-x`/`--sun-y` in `theme.css` are set per header
+state: 26/26px for the normal header below 640px, 42/30px from 640px, and
+30/26px for the compact character bar below 1280px (matched with the
+`:has(#character-status-header-slot > aside)` condition).
+The compact character bar is, left to right: the brand mark, HP, FP, sync, the
+bell (not for guests) and an icon-only hamburger at the far right ("Open
+navigation for <character>"), each 44px. Its panel opens right-aligned and
+viewport-bounded. It starts with the signed-in user's name and email, followed
+by destinations, Settings, the light/dark item and Logout, and does not repeat
+the character name. The light/dark control is never a header button: it is a
+menu item in that panel and in the desktop account menu (labelled for the mode
+it switches to, e.g. "Dark mode").
 Large current/maximum HP and FP values may wrap between the two numbers, and
 warnings wrap within their pool button so the adjacent header controls stay clear.
 

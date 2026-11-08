@@ -757,11 +757,12 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Posture, maneuver, and conditions are independent, off-by-default user display preferences in Settings;
   they do not change the saved combat state or its effects on the rules. Settings
   are saved per signed-in user on this device. The status controls are portaled
-  into the sticky global header. Below 1280px, a compact character/navigation menu,
-  HP, FP, sync status, and notifications occupy separate, nonoverlapping tracks
-  in one row; enabled optional controls form a second row. The mobile pool targets
+  into the sticky global header. Below 1280px, the brand mark, HP, FP, sync status,
+  notifications and an icon-only right-aligned navigation hamburger occupy
+  separate, nonoverlapping tracks in one row; enabled optional controls form a
+  second row. The mobile pool targets
   show current/max values above warning text in a flat, divided toolbar. The menu
-  retains character, campaign, account, theme, and
+  retains character, campaign, account, light/dark, and
   other navigation actions. On desktop the ordinary navigation row stays above
   the status controls, with less status padding when all optional controls are off.
   The measured complete header height supplies section scroll offsets, including
@@ -1228,8 +1229,9 @@ settings sections; switching sections retains drafts.
   trigger fits alongside the other header controls; the menu retains the account
   email within viewport bounds.
   The compact character menu starts with the signed-in user's name and email,
-  omits the repeated character name, and keeps the dark/light toggle in the
-  upper-right header beside sync and notifications.
+  omits the repeated character name, and holds the dark/light item next to
+  Settings; the hamburger sits at the right of the compact bar and the brand mark
+  at the left. The desktop account menu holds the same item.
 - **Logged-in home**: a compact welcome and the four most recently updated
   characters. The welcome heading wraps long unspaced account names within its
   card. Global Character, Campaign, Log, and Library destinations stay in the
@@ -1315,8 +1317,9 @@ settings sections; switching sections retains drafts.
   page offers home/reload actions and shows a unique error reference, server
   request ID when available, current-user ID when available, route, and time for
   support correlation without exposing raw error details.
-- **Themes**: the header toggles dark/light mode per device (defaulting to the
-  OS preference). Settings → **Appearance** picks the palette for each mode —
+- **Themes**: a dark/light item in the header menus (the account menu, or the
+  compact character hamburger) switches mode per device (defaulting to the
+  OS preference). The brand mark is always visible at the header's left. Settings → **Appearance** picks the palette for each mode —
   dark: **Gilded Tome** (default), **Midnight Gilt**, **Verdigris & Brass**, or classic **Arcane Purple**; light: **Sunbolt**
   (default), **Heraldic Vellum**, or classic **Arcane Purple**. The palette choices are saved
   to the account (`GET`/`PATCH /auth/preferences`, `users.dark_theme` /

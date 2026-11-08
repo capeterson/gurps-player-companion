@@ -76,9 +76,14 @@ expectations come from observed regressions and explicit user preferences.
 - App updates never reload the page automatically, even when the server refuses
   an old sync protocol. Use the existing persistent `SwUpdatePrompt` toast with
   its Reload button; preserve drafts and queued edits until the user acts.
-- Keep destination menus for navigation. The compact character menu starts
-  with account name/email and omits the character name already in the breadcrumb.
-  Put the light/dark control in the upper-right header, outside that menu.
+- Keep destination menus for navigation. The brand mark is always shown at the
+  header's left on every page and width; the Sunbolt sun glow is anchored on it
+  (`--sun-x`/`--sun-y`, re-measure when header padding changes). The compact
+  character hamburger is icon-only and right-aligned in the header's far right,
+  after sync and the bell; its menu starts with account name/email and omits the
+  character name already shown as the page heading. The light/dark control lives
+  inside the header menus (this hamburger and the desktop account menu), never as
+  a bar button.
 - Extend the existing interaction for a utility. Follow AGENTS.md's rule against
   duplicate sorting, coverage, movement or other controls.
 - When editing skill points, preview the net skill value and its actual

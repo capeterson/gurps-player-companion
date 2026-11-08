@@ -60,6 +60,7 @@ test('a guest reads the Lantern Coast party without any way to change it', async
   await expect(page.getByRole('button', { name: /notifications/i })).toHaveCount(0);
   await page.getByLabel('Open user menu').click();
   await expect(page.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exit preview' }).first()).toBeVisible();
   await page.keyboard.press('Escape');
 

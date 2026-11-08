@@ -27,7 +27,7 @@ The feature is opt-in per instance with `PREVIEW_MODE_ENABLED=true` (default
   menu offers About and **Exit preview** instead of Logout.
 - Leaving (either button) wipes the device's preview data with the same purge
   as sign-out. **Create your account** then opens registration.
-- The light/dark switch works but stays on the device; guests have no account
+- The light/dark menu item works but stays on the device; guests have no account
   preferences to sync.
 
 ## Server
