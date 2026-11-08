@@ -23,10 +23,13 @@ async function settle(page: Page) {
 
 const created: { headers: Record<string, string>; ids: string[] } = { headers: {}, ids: [] };
 
-// Characters made for this spec are removed so reruns don't pile up in the seed account.
+// Characters made for this spec go to the recycle bin afterwards.
 test.afterEach(async ({ page }) => {
   for (const id of created.ids.splice(0)) {
-    await page.request.delete(`/api/v1/characters/${id}`, { headers: created.headers });
+    const removed = await page.request.delete(`/api/v1/characters/${id}`, {
+      headers: created.headers,
+    });
+    expect(removed.ok(), await removed.text()).toBeTruthy();
   }
 });
 
@@ -272,6 +275,16 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
         await panel.getByRole('button', { name }).click();
         await settle(page);
         expect(await modeNow(), `HP step at ${width}px keeps the ${first} layout`).toBe(first);
+        // The layout budgets HP at its probe, so the real button is never wider.
+        const widths = await page.evaluate(() => {
+          const probe = document.querySelector<HTMLElement>('[data-pool-probe]');
+          const button = probe?.parentElement?.querySelector<HTMLElement>('button');
+          return { probe: probe?.offsetWidth ?? 0, button: button?.offsetWidth ?? 0 };
+        });
+        expect(widths.button, 'HP button is measured').toBeGreaterThan(0);
+        expect(widths.probe, `HP probe covers the button at ${width}px`).toBeGreaterThanOrEqual(
+          widths.button,
+        );
       }
     }
     await page.keyboard.press('Escape');

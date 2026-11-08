@@ -332,11 +332,21 @@ function nullableTextParser(value: string): string | null {
 }
 
 /**
- * Invisible stand-in for a pool button at its widest state (longest warning at
- * the lowest value). The header layout is measured against this, so stepping
+ * Invisible stand-in for a pool button at its widest reachable state: HP's
+ * longest warning ("Stay conscious") at the −5×max floor, FP's at −max. The header layout is measured against this, so stepping
  * HP or FP never changes whether the status strip sits inline.
  */
-function PoolWidthProbe({ label, warning, max }: { label: string; warning: string; max: number }) {
+function PoolWidthProbe({
+  label,
+  warning,
+  floor,
+  max,
+}: {
+  label: string;
+  warning: string;
+  floor: number;
+  max: number;
+}) {
   return (
     <span
       aria-hidden="true"
@@ -348,7 +358,7 @@ function PoolWidthProbe({ label, warning, max }: { label: string; warning: strin
         <span className="font-semibold">{warning}</span>
       </span>
       <span className="num whitespace-nowrap text-base font-semibold">
-        {-max} / {max}
+        {floor} / {max}
       </span>
       <span className="text-[10px]">▾</span>
     </span>
@@ -491,9 +501,14 @@ function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
  * The trigger of the open panel. A layout-mode change re-parents the strip and
  * detaches the stored trigger, so fall back to whichever trigger is expanded.
  */
-function currentTrigger(ref: RefObject<HTMLButtonElement | null>): HTMLButtonElement | null {
+function currentTrigger(
+  ref: RefObject<HTMLButtonElement | null>,
+  panelId: string,
+): HTMLButtonElement | null {
   if (ref.current?.isConnected) return ref.current;
-  return document.querySelector<HTMLButtonElement>('button[aria-expanded="true"][aria-controls]');
+  return document.querySelector<HTMLButtonElement>(
+    `button[aria-expanded="true"][aria-controls="${CSS.escape(panelId)}"]`,
+  );
 }
 
 export function CurrentStatusBar({
@@ -613,7 +628,7 @@ export function CurrentStatusBar({
   useEffect(() => {
     if (openPanel === null) return;
     const dismissOutside = (event: PointerEvent) => {
-      const activeDropdown = currentTrigger(lastTrigger)?.closest('.dropdown');
+      const activeDropdown = currentTrigger(lastTrigger, panelId)?.closest('.dropdown');
       if (!activeDropdown?.contains(event.target as Node)) {
         commitPendingCustomManeuver();
         setOpenPanel(null);
@@ -623,7 +638,7 @@ export function CurrentStatusBar({
       if (event.key !== 'Escape') return;
       commitPendingCustomManeuver();
       setOpenPanel(null);
-      requestAnimationFrame(() => currentTrigger(lastTrigger)?.focus());
+      requestAnimationFrame(() => currentTrigger(lastTrigger, panelId)?.focus());
     };
     document.addEventListener('pointerdown', dismissOutside);
     document.addEventListener('keydown', dismissWithEscape);
@@ -631,7 +646,7 @@ export function CurrentStatusBar({
       document.removeEventListener('pointerdown', dismissOutside);
       document.removeEventListener('keydown', dismissWithEscape);
     };
-  }, [commitPendingCustomManeuver, openPanel]);
+  }, [commitPendingCustomManeuver, openPanel, panelId]);
 
   const showStatusHeader = preferences.showStatusHeader;
   // compact: below 1280px (the strip lives in the mobile grid); strip: its own
@@ -654,7 +669,7 @@ export function CurrentStatusBar({
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(header);
-    for (const item of header.querySelectorAll('[data-header-row-item], [data-header-name]')) {
+    for (const item of header.querySelectorAll('[data-header-row-item], [data-header-name], [data-pool-probe]')) {
       observer.observe(item);
     }
     wide.addEventListener('change', measure);
@@ -674,7 +689,7 @@ export function CurrentStatusBar({
 
   const closeAndFocus = () => {
     setOpenPanel(null);
-    requestAnimationFrame(() => currentTrigger(lastTrigger)?.focus());
+    requestAnimationFrame(() => currentTrigger(lastTrigger, panelId)?.focus());
   };
   const togglePanel = (panel: StatusPanel, trigger: HTMLButtonElement) => {
     lastTrigger.current = trigger;
@@ -689,7 +704,7 @@ export function CurrentStatusBar({
   const stripHost =
     mode === 'strip' ? document.getElementById('character-status-header-strip-slot') : null;
   // Strip cells share their own line; inline cells have a fixed width that
-  // INLINE_STRIP_WIDTH accounts for.
+  // INLINE_STRIP_REM accounts for.
   const stateCell = embedded
     ? inline
       ? 'min-[1280px]:w-44 min-[1280px]:flex-none'
@@ -891,7 +906,14 @@ export function CurrentStatusBar({
             onToggle={(trigger) => togglePanel('HP', trigger)}
             compact={embedded}
           />
-          {embedded && <PoolWidthProbe label="HP" warning="Death checks" max={bumpers.hpMax} />}
+          {embedded && (
+            <PoolWidthProbe
+              label="HP"
+              warning="Stay conscious"
+              floor={-5 * bumpers.hpMax}
+              max={bumpers.hpMax}
+            />
+          )}
           {activePool?.label === 'HP' && (
             <PoolAdjustmentPanel
               key={activePool.label}
@@ -920,7 +942,14 @@ export function CurrentStatusBar({
             onToggle={(trigger) => togglePanel('FP', trigger)}
             compact={embedded}
           />
-          {embedded && <PoolWidthProbe label="FP" warning="Exhausted" max={bumpers.fpMax} />}
+          {embedded && (
+            <PoolWidthProbe
+              label="FP"
+              warning="Exhausted"
+              floor={-bumpers.fpMax}
+              max={bumpers.fpMax}
+            />
+          )}
           {activePool?.label === 'FP' && (
             <PoolAdjustmentPanel
               key={activePool.label}

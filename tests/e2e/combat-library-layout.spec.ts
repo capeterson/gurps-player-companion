@@ -149,17 +149,18 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
   }
 }
 
-test('Current Status stays available and combat stays compact across mobile and desktop', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  await register(page);
-  await page.goto('/settings');
-  const statusHeaderPreference = page.getByRole('checkbox', { name: 'Show status header' });
-  await expect(statusHeaderPreference).not.toBeChecked();
-  await statusHeaderPreference.check();
+// One test per width keeps each run well inside the default budget.
+for (const width of [320, 1280]) {
+  test(`Current Status stays available and combat stays compact at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await register(page);
+    await page.goto('/settings');
+    const statusHeaderPreference = page.getByRole('checkbox', { name: 'Show status header' });
+    await expect(statusHeaderPreference).not.toBeChecked();
+    await statusHeaderPreference.check();
 
-  for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     const character = await api(page, '/characters', {
       name: `Compact hero ${width}`,
@@ -462,8 +463,8 @@ test('Current Status stays available and combat stays compact across mobile and 
         await expectCurrentStatusPoolPanelAt(page, breakpointWidth);
       }
     }
-  }
-});
+  });
+}
 
 test('library search and markdown toolbar retain drafts and render formatted descriptions', async ({
   page,

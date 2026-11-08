@@ -1026,7 +1026,7 @@ describe('delegated operation behavioral parity', () => {
     expect([...exercised].sort()).toEqual(
       TOOLS.map((tool) => (tool.action ? `${tool.tool}#${tool.action}` : tool.tool)).sort(),
     );
-  });
+  }, 30_000); // Exercises every tool through the SDK; ~9s on a busy dev host.
 
   it('enforces the declared OAuth scope before dispatch for every tool', async () => {
     for (const tool of TOOLS) {
