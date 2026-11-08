@@ -432,8 +432,10 @@ links, so the row height and therefore the brand mark's centre (42/30px) never
 change; do not raise them without re-measuring `--sun-y`. The **Show status
 header** preference adds Posture, Maneuver and Conditions as one-line 36px
 triggers. `CurrentStatusBar` measures the row: when the free width beside the
-row's natural content (the untruncated name counts) holds all three (556px, with a
-16px hysteresis), they sit inline in the row; otherwise they form a strip below it.
+row's natural content holds all three (3 × 11rem + 2 × 0.5rem + the header gap, with
+a 16px hysteresis), they sit inline in the row; otherwise they form a strip below it.
+Natural content means the left group floored at its 28rem minimum and the character
+name's untruncated width up to its `max-w-80` cap.
 Keyboard order follows the visual order (the portal slot sits between the left and
 right header groups; an inline strip is rendered before HP, and a strip on its own
 line is portaled into a second slot after the right-hand group);

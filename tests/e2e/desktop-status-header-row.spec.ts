@@ -21,6 +21,15 @@ async function settle(page: Page) {
   );
 }
 
+const created: { headers: Record<string, string>; ids: string[] } = { headers: {}, ids: [] };
+
+// Characters made for this spec are removed so reruns don't pile up in the seed account.
+test.afterEach(async ({ page }) => {
+  for (const id of created.ids.splice(0)) {
+    await page.request.delete(`/api/v1/characters/${id}`, { headers: created.headers });
+  }
+});
+
 test('desktop character header keeps one row, the brand mark and keyboard order at any content width', async ({
   page,
 }) => {
@@ -36,6 +45,7 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
     return raw ? ((JSON.parse(raw) as { accessToken?: string }).accessToken ?? '') : '';
   });
   const headers = { Authorization: `Bearer ${auth}` };
+  created.headers = headers;
   const characters = (await (
     await page.request.get('/api/v1/characters', { headers })
   ).json()) as Array<{
@@ -46,12 +56,18 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
   expect(kestrelId).toBeTruthy();
   // Worst-case content: a name past the link's 320px cap and both pools at
   // their lowest supported values ("Death checks" / "Exhausted" warnings).
-  const created = await page.request.post('/api/v1/characters', {
-    headers,
-    data: { name: LONG_NAME, st: 15, dx: 15, iq: 15, ht: 15 },
-  });
-  expect(created.ok(), await created.text()).toBeTruthy();
-  const stressId = ((await created.json()) as { id: string }).id;
+  async function createCharacter(name: string) {
+    const response = await page.request.post('/api/v1/characters', {
+      headers,
+      data: { name, st: 15, dx: 15, iq: 15, ht: 15 },
+    });
+    expect(response.ok(), await response.text()).toBeTruthy();
+    const id = ((await response.json()) as { id: string }).id;
+    created.ids.push(id);
+    return id;
+  }
+  const stressId = await createCharacter(LONG_NAME);
+  const shortId = await createCharacter('Ann');
   const patched = await page.request.patch(`/api/v1/characters/${stressId}/combat`, {
     headers,
     data: { currentHp: -1000, currentFp: -1000 },
@@ -203,7 +219,37 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
   // worst case does not at 1280px, and narrower never beats wider.
   expect(modes.get('ordinary-1920')).toBe('inline');
   expect(modes.get('worst-case-1280')).toBe('strip');
-  expect(modes.get('worst-case-1920')).toBeDefined();
+  // Narrower never beats wider: once a width is inline every wider width is too.
+  for (const tag of ['ordinary', 'worst-case']) {
+    const sequence = WIDTHS.map((width) => modes.get(`${tag}-${width}`));
+    const firstInline = sequence.indexOf('inline');
+    if (firstInline >= 0) {
+      expect(sequence.slice(firstInline), `${tag} stays inline once wide enough`).not.toContain(
+        'strip',
+      );
+    }
+  }
+
+  // A very short name leaves the left group at its 28rem minimum; sweeping the
+  // boundary must never put an inline strip on a wrapped (taller) row.
+  await page.goto(`/characters/${shortId}`);
+  await expect(posture).toBeVisible();
+  for (let width = 1280; width <= 2000; width += 16) {
+    await page.setViewportSize({ width, height: 900 });
+    await settle(page);
+    const { hpBox, fpBox, accountBox } = await rowBoxes();
+    for (const control of [hpBox, fpBox, accountBox]) {
+      expect(control.y + control.height, `Ann ${width}px stays on row 1`).toBeLessThanOrEqual(
+        ROW_HEIGHT,
+      );
+    }
+    const triggers = await Promise.all([posture, maneuver, conditions].map(box));
+    if (triggers.every((trigger) => trigger.y + trigger.height <= ROW_HEIGHT)) {
+      expect((await box(header)).height, `Ann ${width}px inline header height`).toBeLessThanOrEqual(
+        ROW_HEIGHT + 2,
+      );
+    }
+  }
 
   // Overlays: HP, and the choice panels in whichever mode applies, stay inside
   // the viewport and open at the single row's bottom edge.

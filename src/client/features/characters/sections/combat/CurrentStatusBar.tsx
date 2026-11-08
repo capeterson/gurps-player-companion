@@ -1,6 +1,7 @@
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useId,
@@ -406,20 +407,38 @@ function ChoicePanel({
   );
 }
 
-/** 3 inline triggers (w-44) + 2 gaps (gap-2) + the header's column gap. */
-const INLINE_STRIP_WIDTH = 3 * 176 + 2 * 8 + 12;
+/** Inline trigger cells are w-44 (11rem) with gap-2 (0.5rem) between the three. */
+const INLINE_STRIP_REM = 3 * 11 + 2 * 0.5;
 const INLINE_HYSTERESIS = 16;
 
 function px(value: string): number {
   return Number.parseFloat(value) || 0;
 }
 
+/** Natural width of the growing left group (brand + nav), floored at its min-width. */
+function leftGroupWidth(left: HTMLElement): number {
+  const nav = left.querySelector('nav');
+  const pieces = [...left.children] as HTMLElement[];
+  let natural = px(getComputedStyle(left).columnGap) * Math.max(0, pieces.length - 1);
+  for (const piece of pieces) {
+    if (piece !== nav) {
+      natural += piece.offsetWidth;
+      continue;
+    }
+    const groups = [...piece.children] as HTMLElement[];
+    natural += px(getComputedStyle(piece).columnGap) * Math.max(0, groups.length - 1);
+    for (const group of groups) natural += group.offsetWidth;
+  }
+  return Math.max(natural, px(getComputedStyle(left).minWidth));
+}
+
 /**
  * Posture/Maneuver/Conditions join the header row only when the row has room
  * left for them beside its natural content (the character name truncates
- * first, so its untruncated width counts). Otherwise they keep their own strip.
- * The result does not depend on the current mode, so a small hysteresis band
- * keeps the layout from flickering at the boundary.
+ * first, so its untruncated width, up to the link's max-width, counts).
+ * Otherwise they keep their own strip. The result does not depend on the
+ * current mode, so a small hysteresis band keeps the layout from flickering
+ * at the boundary.
  */
 function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
   const style = getComputedStyle(header);
@@ -427,28 +446,26 @@ function shouldInlineStatusStrip(header: Element, wasInline: boolean): boolean {
   const rowGap = px(style.columnGap);
   const items = [...header.querySelectorAll<HTMLElement>('[data-header-row-item]')];
   const name = header.querySelector<HTMLElement>('[data-header-name]');
-  const truncated = name ? Math.max(0, name.scrollWidth - name.clientWidth) : 0;
+  const nameMax = name ? px(getComputedStyle(name).maxWidth) || Number.POSITIVE_INFINITY : 0;
+  const truncated = name
+    ? Math.max(0, Math.min(name.scrollWidth, nameMax) - name.clientWidth)
+    : 0;
   let used = rowGap * Math.max(0, items.length - 1) + truncated;
   for (const item of items) {
-    if (!item.hasAttribute('data-header-left')) {
-      used += item.offsetWidth;
-      continue;
-    }
-    // The left group grows to fill the row, so add up its natural pieces.
-    const nav = item.querySelector('nav');
-    const pieces = [...item.children];
-    used += px(getComputedStyle(item).columnGap) * Math.max(0, pieces.length - 1);
-    for (const piece of pieces) {
-      if (piece !== nav) {
-        used += (piece as HTMLElement).offsetWidth;
-        continue;
-      }
-      const groups = [...piece.children] as HTMLElement[];
-      used += px(getComputedStyle(piece).columnGap) * Math.max(0, groups.length - 1);
-      for (const group of groups) used += group.offsetWidth;
-    }
+    used += item.hasAttribute('data-header-left') ? leftGroupWidth(item) : item.offsetWidth;
   }
-  return available - used >= INLINE_STRIP_WIDTH + (wasInline ? 0 : INLINE_HYSTERESIS);
+  const rootFont = px(getComputedStyle(document.documentElement).fontSize) || 16;
+  const needed = rootFont * INLINE_STRIP_REM + rowGap + (wasInline ? 0 : INLINE_HYSTERESIS);
+  return available - used >= needed;
+}
+
+/**
+ * The trigger of the open panel. A layout-mode change re-parents the strip and
+ * detaches the stored trigger, so fall back to whichever trigger is expanded.
+ */
+function currentTrigger(ref: RefObject<HTMLButtonElement | null>): HTMLButtonElement | null {
+  if (ref.current?.isConnected) return ref.current;
+  return document.querySelector<HTMLButtonElement>('button[aria-expanded="true"][aria-controls]');
 }
 
 export function CurrentStatusBar({
@@ -568,7 +585,7 @@ export function CurrentStatusBar({
   useEffect(() => {
     if (openPanel === null) return;
     const dismissOutside = (event: PointerEvent) => {
-      const activeDropdown = lastTrigger.current?.closest('.dropdown');
+      const activeDropdown = currentTrigger(lastTrigger)?.closest('.dropdown');
       if (!activeDropdown?.contains(event.target as Node)) {
         commitPendingCustomManeuver();
         setOpenPanel(null);
@@ -578,7 +595,7 @@ export function CurrentStatusBar({
       if (event.key !== 'Escape') return;
       commitPendingCustomManeuver();
       setOpenPanel(null);
-      requestAnimationFrame(() => lastTrigger.current?.focus());
+      requestAnimationFrame(() => currentTrigger(lastTrigger)?.focus());
     };
     document.addEventListener('pointerdown', dismissOutside);
     document.addEventListener('keydown', dismissWithEscape);
@@ -629,7 +646,7 @@ export function CurrentStatusBar({
 
   const closeAndFocus = () => {
     setOpenPanel(null);
-    requestAnimationFrame(() => lastTrigger.current?.focus());
+    requestAnimationFrame(() => currentTrigger(lastTrigger)?.focus());
   };
   const togglePanel = (panel: StatusPanel, trigger: HTMLButtonElement) => {
     lastTrigger.current = trigger;
