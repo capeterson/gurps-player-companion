@@ -423,6 +423,16 @@ by destinations, Settings, the light/dark item and Logout, and does not repeat
 the character name. The light/dark control is never a header button: it is a
 menu item in that panel and in the desktop account menu (labelled for the mode
 it switches to, e.g. "Dark mode").
+From 1280px a character page's header is a single 60px row: brand mark, Character
+and Campaign navigation, then HP, FP, a divider, sync, the bell and the account menu
+("Signed in as" shows from 1536px; the character name truncates before anything
+else gives way). The HP/FP buttons are 36px tall, the height of the navigation
+links, so the row height and therefore the brand mark's centre (42/30px) never
+change; do not raise them without re-measuring `--sun-y`. The **Show status
+header** preference adds Posture, Maneuver and Conditions as one-line 36px
+triggers: a strip below the row up to 1791px, inline in the row from 1792px. With
+the preference off there is no strip. HP/FP and choice popovers open 13px below
+their trigger, at the header's bottom edge, and may cover the strip.
 Large current/maximum HP and FP values may wrap between the two numbers, and
 warnings wrap within their pool button so the adjacent header controls stay clear.
 

@@ -259,16 +259,18 @@ export function App() {
     >
       <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
         <header
-          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 px-3 py-2 sm:gap-6 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 bg-base-100 max-[1280px]:px-2! max-[1280px]:py-1! sm:gap-y-0' : 'bg-base-100/95 backdrop-blur'}`}
+          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 px-3 py-2 sm:gap-6 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 bg-base-100 max-[1280px]:px-2! max-[1280px]:py-1! sm:gap-y-0 min-[1280px]:justify-start min-[1280px]:gap-x-3' : 'bg-base-100/95 backdrop-blur'}`}
         >
-          <div className="app-header-normal flex min-w-0 items-center gap-3 sm:gap-6">
+          <div
+            className={`app-header-normal flex min-w-0 items-center gap-3 sm:gap-6 ${characterDetail ? 'min-[1280px]:order-1' : ''}`}
+          >
             <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
               <BrandMark />
               <span className="hidden font-display text-base font-semibold sm:inline">Sunbolt</span>
             </Link>
             <nav
               aria-label="Primary navigation"
-              className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
+              className={`flex min-w-0 flex-1 flex-wrap items-center gap-1 ${characterDetail ? 'min-[1280px]:flex-nowrap' : ''}`}
             >
               <div
                 className={`flex min-w-0 items-center rounded-field transition ${
@@ -355,7 +357,9 @@ export function App() {
               </div>
             </nav>
           </div>
-          <div className="app-header-normal flex shrink-0 items-center gap-1 sm:gap-3">
+          <div
+            className={`app-header-normal flex shrink-0 items-center gap-1 sm:gap-3 ${characterDetail ? 'min-[1280px]:order-5 min-[1280px]:border-l min-[1280px]:border-base-300 min-[1280px]:pl-3' : ''}`}
+          >
             <SyncStatusIndicator />
             {!guest && <NotificationsBell />}
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
@@ -364,7 +368,11 @@ export function App() {
                   <span>Guest</span>
                 ) : (
                   <>
-                    <span className="hidden sm:inline text-muted">Signed in as</span>
+                    <span
+                      className={`hidden text-muted ${characterDetail ? 'min-[1536px]:inline' : 'sm:inline'}`}
+                    >
+                      Signed in as
+                    </span>
                     <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
                       {me.data?.displayName ?? 'Account'}
                     </span>
@@ -425,7 +433,7 @@ export function App() {
           </div>
           <div
             id="character-status-header-slot"
-            className={characterDetail ? 'empty:hidden w-full' : 'hidden'}
+            className={characterDetail ? 'empty:hidden w-full min-[1280px]:contents' : 'hidden'}
           />
         </header>
         <main className="relative z-0 mx-auto w-full max-w-[80rem] p-4 sm:p-7">

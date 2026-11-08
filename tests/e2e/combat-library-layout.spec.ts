@@ -81,7 +81,9 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
 
   const bar = page.getByRole('complementary', { name: 'Current Status' });
   await expect(bar).toBeVisible();
-  const barBox = await bar.boundingBox();
+  // From 1280px the status controls sit directly in the header row, so the
+  // landmark itself has no box; the header is the visible bar.
+  const barBox = (await bar.boundingBox()) ?? (await page.locator('header').first().boundingBox());
   expect(barBox).not.toBeNull();
 
   for (const pool of ['HP', 'FP'] as const) {
@@ -117,7 +119,10 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
     if (barBox && triggerBox && panelBox && decreaseBox && increaseBox) {
       expect(panelBox.x).toBeGreaterThanOrEqual(0);
       expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(width);
-      expect(panelBox.y).toBeGreaterThanOrEqual(barBox.y + barBox.height);
+      // From 1280px the pool opens under its trigger at the single header
+      // row's bottom edge; it may cover the status strip below the row.
+      const panelFloor = width < 1280 ? barBox.y + barBox.height : triggerBox.y + triggerBox.height;
+      expect(panelBox.y).toBeGreaterThanOrEqual(panelFloor);
       expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(568);
       if (width < 1280) {
         expect(Math.abs(panelBox.x + panelBox.width / 2 - width / 2)).toBeLessThanOrEqual(1);
@@ -128,7 +133,8 @@ async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
         expect(Math.abs(panelBox.x - expectedX)).toBeLessThanOrEqual(1);
         const triggerGap = panelBox.y - (triggerBox.y + triggerBox.height);
         expect(triggerGap).toBeGreaterThanOrEqual(0);
-        expect(triggerGap).toBeLessThanOrEqual(12);
+        // 13px reaches the single-row header's bottom edge (mt-[13px]).
+        expect(triggerGap).toBeLessThanOrEqual(13);
       }
       for (const buttonBox of [decreaseBox, increaseBox]) {
         expect(buttonBox.width).toBeGreaterThanOrEqual(44);
@@ -146,21 +152,9 @@ test('Current Status stays available and combat stays compact across mobile and 
   await page.setViewportSize({ width: 1280, height: 900 });
   await register(page);
   await page.goto('/settings');
-  const posturePreference = page.getByRole('checkbox', {
-    name: 'Show posture in Current Status',
-  });
-  const maneuverPreference = page.getByRole('checkbox', {
-    name: 'Show maneuver in Current Status',
-  });
-  const conditionsPreference = page.getByRole('checkbox', {
-    name: 'Show conditions in Current Status',
-  });
-  await expect(posturePreference).not.toBeChecked();
-  await expect(maneuverPreference).not.toBeChecked();
-  await expect(conditionsPreference).not.toBeChecked();
-  await posturePreference.check();
-  await maneuverPreference.check();
-  await conditionsPreference.check();
+  const statusHeaderPreference = page.getByRole('checkbox', { name: 'Show status header' });
+  await expect(statusHeaderPreference).not.toBeChecked();
+  await statusHeaderPreference.check();
 
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
@@ -378,7 +372,10 @@ test('Current Status stays available and combat stays compact across mobile and 
       await bar.getByRole('button', { name: /^Adjust HP,/ }).click();
       const hpPanel = page.getByRole('group', { name: 'HP adjustment' });
       await expect(hpPanel).toBeVisible();
-      const [barBox, hpPanelBox] = await Promise.all([bar.boundingBox(), hpPanel.boundingBox()]);
+      const [barBox, hpPanelBox] = await Promise.all([
+        bar.boundingBox().then((value) => value ?? page.locator('header').first().boundingBox()),
+        hpPanel.boundingBox(),
+      ]);
       expect(barBox).not.toBeNull();
       expect(hpPanelBox).not.toBeNull();
       if (barBox && hpPanelBox) {

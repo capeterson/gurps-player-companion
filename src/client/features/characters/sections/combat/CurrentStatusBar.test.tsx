@@ -68,11 +68,7 @@ function setup(
   fp = 10,
   max = 12,
   maneuver: string | null = null,
-  preferences: StatusBarPreferences = {
-    showPosture: true,
-    showManeuver: true,
-    showConditions: true,
-  },
+  preferences: StatusBarPreferences = { showStatusHeader: true },
 ) {
   const character = {
     id: 'character-1',
@@ -125,12 +121,8 @@ function setup(
 }
 
 describe('Current Status', () => {
-  it('shows HP and FP by default while independently hiding optional controls', () => {
-    setup(10, 10, 12, 'Attack', {
-      showPosture: false,
-      showManeuver: false,
-      showConditions: false,
-    });
+  it('shows HP and FP by default while hiding the status header controls', () => {
+    setup(10, 10, 12, 'Attack', { showStatusHeader: false });
 
     expect(screen.getByRole('button', { name: /^Adjust HP,/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Adjust FP,/ })).toBeVisible();

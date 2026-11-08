@@ -148,9 +148,7 @@ test('Current Status choice panels and temporary modifiers remain usable in touc
     expect(created.ok(), await created.text()).toBeTruthy();
     const character = (await created.json()) as { id: string };
     await page.goto('/settings');
-    await page.getByRole('checkbox', { name: 'Show posture in Current Status' }).check();
-    await page.getByRole('checkbox', { name: 'Show maneuver in Current Status' }).check();
-    await page.getByRole('checkbox', { name: 'Show conditions in Current Status' }).check();
+    await page.getByRole('checkbox', { name: 'Show status header' }).check();
     await page.goto(`/characters/${character.id}`);
     const bar = page.getByRole('complementary', { name: 'Current Status' });
     await expect(bar).toBeVisible();
