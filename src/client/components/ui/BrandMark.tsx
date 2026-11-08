@@ -12,7 +12,7 @@ export function BrandMark({ className = 'h-7 w-7' }: BrandMarkProps) {
       width="256"
       height="256"
       draggable={false}
-      className={`shrink-0 rounded-[8px] object-cover ${className}`}
+      className={`brand-mark shrink-0 rounded-[8px] object-cover ${className}`}
     />
   );
 }

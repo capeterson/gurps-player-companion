@@ -516,10 +516,10 @@
   width: min(44rem, calc(100% - 2rem));
   height: 5rem;
   padding: 0.5rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--dock-border, var(--border-strong));
   border-radius: var(--radius-box);
-  background: var(--color-base-100);
-  box-shadow: var(--shadow-2);
+  background: var(--dock-bg, var(--color-base-100));
+  box-shadow: var(--dock-shadow, var(--shadow-2));
 }
 .sheet-dock > button {
   margin: 0;
@@ -530,12 +530,13 @@
 }
 .sheet-dock > button:hover,
 .sheet-dock > button:focus-visible {
-  background: var(--color-base-200);
+  background: var(--dock-hover-bg, var(--color-base-200));
   color: var(--color-base-content);
 }
 .sheet-dock > .dock-active {
-  color: var(--color-primary);
-  background: var(--accent-soft);
+  color: var(--dock-active-ink, var(--color-primary));
+  background: var(--dock-active-bg, var(--accent-soft));
+  box-shadow: var(--dock-active-shadow, none);
 }
 .sheet-dock .dock-label {
   font-size: 0.75rem;
@@ -568,9 +569,9 @@
   height: 3.5rem;
   position: relative;
   transform: none;
-  background: var(--color-base-100);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
+  background: var(--dock-bg, var(--color-base-100));
+  color: var(--dock-active-ink, var(--color-primary));
+  border: 1px solid var(--dock-border, var(--color-primary));
   box-shadow: var(--shadow-glow), var(--shadow-2);
 }
 .sheet-nav-cue {
