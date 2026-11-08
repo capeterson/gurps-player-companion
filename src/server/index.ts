@@ -11,6 +11,7 @@ import {
 } from './services/notificationMaintenance.ts';
 import { startPreviewProvisioning, stopPreviewProvisioning } from './services/preview/provision.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
+import { startTelemetry, stopTelemetry } from './telemetry.ts';
 
 /** Server-process work only; each starter is idempotent and skips the test environment. */
 export function startBackgroundMaintenance(config: AppConfig): void {
@@ -89,6 +90,7 @@ export async function shutdownServer(
 
 if (import.meta.main) {
   const config = loadConfig();
+  startTelemetry();
   const server = startServer(config);
   console.log(
     `gurps-player-companion server listening on http://${server.hostname}:${server.port}`,
@@ -105,7 +107,8 @@ if (import.meta.main) {
       `received ${signal}; draining for up to ${config.shutdownGraceSeconds}s (${server.pendingRequests} in-flight requests)`,
     );
     void shutdownServer(server, config.shutdownGraceSeconds * 1000).then(
-      (result) => {
+      async (result) => {
+        await stopTelemetry().catch(() => undefined);
         console.log(
           result === 'drained'
             ? 'shutdown complete'

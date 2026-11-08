@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { type OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
+import { SpanKind, SpanStatusCode, context, propagation } from '@opentelemetry/api';
 import { bodyLimit } from 'hono/body-limit';
 import { upgradeWebSocket } from 'hono/bun';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
+import { matchedRoutes } from 'hono/route';
 import { oauthAuthorizationQuery } from '../shared/schemas/oauth.ts';
 import { requireActiveUser } from './auth/middleware.ts';
 import type { AppConfig } from './config.ts';
@@ -41,6 +43,7 @@ import { mediaConfig } from './services/media/config.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
 import { GuestWriteForbiddenError, guestGate } from './services/preview/guestAccess.ts';
 import { attachStaticHandler } from './static.ts';
+import { logTelemetryError, requestDuration, tracer } from './telemetry.ts';
 
 function acceptsGzip(value: string): boolean {
   const qualities = new Map<string, number>();
@@ -64,6 +67,47 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   if (mediaConfig().backend === 'local' && config.environment === 'production')
     throw new Error('Local media storage is forbidden in production');
   const app = createOpenApiApp();
+
+  app.use('*', async (c, next) => {
+    const start = performance.now();
+    const parent = propagation.extract(context.active(), {
+      traceparent: c.req.header('traceparent'),
+      tracestate: c.req.header('tracestate'),
+    });
+    await tracer.startActiveSpan(
+      'http.server.request',
+      { kind: SpanKind.SERVER },
+      parent,
+      async (span) => {
+        try {
+          await next();
+        } finally {
+          const route = matchedRoutes(c)
+            .filter((item) => item.method !== 'ALL' && !item.path.includes('*'))
+            .at(-1)?.path;
+          const attributes = {
+            'http.request.method': [
+              'GET',
+              'POST',
+              'PUT',
+              'PATCH',
+              'DELETE',
+              'OPTIONS',
+              'HEAD',
+            ].includes(c.req.method)
+              ? c.req.method
+              : '_OTHER',
+            'http.response.status_code': c.res.status,
+            ...(route && !route.includes('*') ? { 'http.route': route } : {}),
+          };
+          requestDuration.record((performance.now() - start) / 1000, attributes);
+          span.setAttributes(attributes);
+          if (c.res.status >= 500) span.setStatus({ code: SpanStatusCode.ERROR });
+          span.end();
+        }
+      },
+    );
+  });
 
   // Generate correlation IDs at the trusted server boundary. Never accept a
   // caller-supplied ID: the response header can be shown to a user safely and
@@ -291,31 +335,13 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     if (isPreviewReadOnlyViolation(err)) return c.json({ error: 'preview_read_only' }, 403);
     if (err instanceof HTTPException) {
       if (err.status >= 500) {
-        console.error(
-          'server request failed',
-          {
-            requestId,
-            userId: c.get('user')?.id,
-            method: c.req.method,
-            path: c.req.path.startsWith('/media/')
-              ? '/media/[redacted]'
-              : new URL(c.req.url).pathname,
-          },
-          err,
-        );
+        logTelemetryError('http.request.failed', { requestId, status: err.status });
+        console.error('server request failure details', err);
       }
       return c.json({ error: err.message || 'http_error' }, err.status);
     }
-    console.error(
-      'unhandled server error',
-      {
-        requestId,
-        userId: c.get('user')?.id,
-        method: c.req.method,
-        path: c.req.path.startsWith('/media/') ? '/media/[redacted]' : new URL(c.req.url).pathname,
-      },
-      err,
-    );
+    logTelemetryError('http.request.unhandled', { requestId, status: 500 });
+    console.error('unhandled server error details', err);
     return c.json({ error: 'internal_error' }, 500);
   });
 

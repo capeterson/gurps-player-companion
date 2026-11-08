@@ -637,3 +637,7 @@ not add an application service or put blobs in PostgreSQL. See
 ## Racial templates
 
 Racial templates live in `campaign_library_races` (migration 0067), while `characters.race` stores one authoritative owned purchase. The shared race schema/domain and character detail builder drive both server and local calculations; no live library query is required to calculate an owned race. See [races.md](races.md).
+
+## Observability
+
+The production server optionally exports OpenTelemetry metrics, server request spans and selected structured error logs via OTLP. The SDK starts only when `SUNBOLT_OTEL_ENABLED=true` and flushes on graceful shutdown. Instrumentation avoids request URLs, bodies and identifiers in metric labels. Scope and Alloy configuration are documented in [observability.md](../observability.md).

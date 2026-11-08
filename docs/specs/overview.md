@@ -22,6 +22,8 @@ in production and HTTP with `PORT` in development/test for all public app URLs.
 Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
+Optional server OpenTelemetry export sends request, sync, database pool, WebSocket and nightly sweep signals to an OTLP collector; see [the operator guide](../observability.md). Client-side outbox visibility is not included.
+
 The production image ships only production dependencies. The HTTP app denies
 framing, caches content-hashed assets immutably, and keeps HTML and service-worker
 entrypoints uncached so releases remain discoverable (see
@@ -1400,6 +1402,7 @@ src/
   build/pwaAssets.ts  Deterministic adaptive/Apple/favicon artwork and content-hashed installation URLs
   server/        Bun process — Hono routes, auth/OAuth, MCP, Drizzle, OpenAPI, WS
     index.ts     Bun.serve entrypoint; SIGTERM/SIGINT graceful drain (`shutdownServer`)
+    telemetry.ts Optional OTLP SDK lifecycle and shared server instruments
     lifecycle.ts Draining flag (readiness 503, `Connection: close`) during shutdown
     https.ts     Production HTTPS redirects and HSTS
     routes/health.ts  Liveness, database/migration readiness and release probes

@@ -1,3 +1,4 @@
+import { websocketConnections, websocketDeliveryFailures } from '../telemetry.ts';
 /**
  * In-process pub/sub for WebSocket fan-out.
  *
@@ -36,11 +37,13 @@ export function subscribe(userId: string, ws: WsLike): () => void {
     bucket = new Set();
     subscribers.set(userId, bucket);
   }
+  const isNew = !bucket.has(ws);
   bucket.add(ws);
+  if (isNew) websocketConnections.add(1);
   return () => {
     const b = subscribers.get(userId);
     if (!b) return;
-    b.delete(ws);
+    if (b.delete(ws)) websocketConnections.add(-1);
     if (b.size === 0) subscribers.delete(userId);
   };
 }
@@ -58,7 +61,8 @@ function deliver(userId: string, message: WsBroadcast): void {
     try {
       ws.send(text);
     } catch {
-      // Drop silently — a closed socket will be cleaned up on its
+      websocketDeliveryFailures.add(1);
+      // A closed socket will be cleaned up on its
       // own close handler.
     }
   }
@@ -81,6 +85,8 @@ export function closeAll(code = 1012, reason = 'server restarting'): number {
       }
     }
   }
+  const active = [...subscribers.values()].reduce((sum, bucket) => sum + bucket.size, 0);
+  websocketConnections.add(-active);
   subscribers.clear();
   return closed;
 }
@@ -92,6 +98,8 @@ export function subscriberCount(userId: string): number {
 
 /** Test helper: clear all subscriptions (e.g. between integration tests). */
 export function _resetForTests(): void {
+  const active = [...subscribers.values()].reduce((sum, bucket) => sum + bucket.size, 0);
+  websocketConnections.add(-active);
   subscribers.clear();
 }
 import { afterDbCommit } from '../db/client.ts';
