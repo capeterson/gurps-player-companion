@@ -335,12 +335,14 @@
   prefersdark: false;
   color-scheme: light;
 
-  /* base = sunlit vellum: a touch brighter and yellower than the retired
-     Illuminated Manuscript palette, chroma still kept <= 0.03 on reading surfaces. Sun-amber
-     gold dark enough for light text on fills and gold text on paper;
-     lapis-sky secondary as the cool counterpoint. */
-  --color-base-100: oklch(0.99 0.014 95); /* surface (cards, panels) */
-  --color-base-200: oklch(0.962 0.026 90); /* page bg (canvas) */
+  /* "Sun at the mark": base-100 is pure white so cards read as lit paper;
+     base-200 is the flat warm paper the page gradient fades to (hovers,
+     stripes). The sun itself is painted by the fixed .arcane-edge layer and
+     the header (see the [data-theme="sunbolt"] block below). Sun-amber gold
+     is dark enough for gold text on white and light text on fills;
+     lapis-sky secondary is the cool counterpoint. */
+  --color-base-100: oklch(1 0 0); /* surface (cards, panels) */
+  --color-base-200: oklch(0.972 0.028 93); /* flat paper (hovers, stripes) */
   --color-base-300: oklch(0.855 0.045 85); /* default border */
   --color-base-content: oklch(0.255 0.03 62);
 
@@ -539,21 +541,88 @@
   --hp-crit: oklch(0.5 0.18 25);
   --hp-out: oklch(0.4 0.1 320);
 
-  /* Light magic via the shared vignette: a sun-glow pooling in the top
-     right (brighter than the canvas, so it reads as light, not stain) and
-     a clear-sky wash in the bottom left. */
-  --arcane-edge-warm: oklch(0.975 0.075 95 / 0.9);
-  --arcane-edge-violet: oklch(0.93 0.04 235 / 0.45);
+  /* Sun at the mark. A white-hot point sits behind the brand mark in the
+     header's upper-left, with a sun-yellow halo fading into pale warm paper.
+     --sun-x/--sun-y are the mark's centre in viewport pixels (header padding
+     differs below/above the sm breakpoint); the fixed .arcane-edge layer and
+     the sticky .app-header both paint --sun-layers, the header with
+     background-attachment: fixed, so the two line up seamlessly. */
+  --sun-x: 26px;
+  --sun-y: 26px;
+  --sun-core: radial-gradient(
+    circle 44px at var(--sun-x) var(--sun-y),
+    oklch(1 0 0),
+    oklch(1 0 0 / 0)
+  );
+  --sun-halo: radial-gradient(
+    circle 260px at var(--sun-x) var(--sun-y),
+    oklch(0.93 0.12 94 / 0.9) 0%,
+    oklch(0.96 0.07 95 / 0.55) 38%,
+    transparent 78%
+  );
+  --sun-paper: linear-gradient(160deg, oklch(0.992 0.01 95), oklch(0.965 0.035 92));
+  --sun-layers: var(--sun-core), var(--sun-halo);
+  --sun-mark-halo: 0 0 0 3px oklch(1 0 0 / 0.85), 0 0 18px 5px oklch(0.9 0.14 92 / 0.8);
 
-  /* Sunlit top edge on every card; gilt etch a shade stronger than IM. */
-  --card-sheen: oklch(1 0.025 95 / 0.75);
-  --card-etch: color-mix(in oklch, var(--gild) 14%, transparent);
+  /* White cards with a soft warm lift; no white/gold sheen needed on top. */
+  --card-sheen: oklch(1 0 0);
+  --card-etch: oklch(0.88 0.06 90 / 0.55);
 
-  --shadow-1: 0 1px 2px oklch(0.45 0.06 70 / 0.1), 0 0 0 1px var(--color-base-300);
+  /* Soft tonal yellow for the character dock and solid primary buttons. */
+  --dock-bg: oklch(0.955 0.065 94);
+  --dock-border: oklch(0.88 0.08 91);
+  --dock-shadow: 0 14px 34px -16px oklch(0.6 0.13 85 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.8);
+  --dock-hover-bg: oklch(1 0 0 / 0.6);
+  --dock-active-bg: oklch(1 0 0);
+  --dock-active-ink: oklch(0.4 0.1 68);
+  --dock-active-shadow: 0 1px 3px oklch(0.55 0.08 78 / 0.25);
+  --btn-tonal-bg: oklch(0.92 0.11 95);
+  --btn-tonal-ink: oklch(0.38 0.1 68);
+  --btn-tonal-border: oklch(0.84 0.11 90);
+
+  --shadow-1: 0 1px 2px oklch(0.55 0.07 78 / 0.1), 0 14px 30px -24px oklch(0.6 0.12 85 / 0.6), 0 0 0
+    1px oklch(0.92 0.03 90);
   --shadow-2: 0 12px 40px -14px oklch(0.5 0.1 75 / 0.28), 0 0 0 1px var(--color-base-300), inset 0
     1px 0 oklch(1 0 0 / 0.7);
   /* Radiant halo: bolt-gold light rather than a primary-coloured smudge. */
   --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 28px -2px oklch(0.85 0.16 90 / 0.85);
+}
+
+/* Sunbolt: the sun layers. The page layer replaces the shared two-corner
+   vignette; the header repeats the radial layers (fixed to the viewport, like
+   the page layer) over its own base colour so the sun shows behind the mark.
+   The mark centre is measured at the sm breakpoint (header px-3/py-2 below,
+   px-7/py-3 at 640px and up). */
+@media (min-width: 640px) {
+  [data-theme="sunbolt"] {
+    --sun-x: 42px;
+    --sun-y: 30px;
+  }
+}
+[data-theme="sunbolt"] .arcane-edge::before {
+  background: var(--sun-layers), var(--sun-paper);
+}
+[data-theme="sunbolt"] .app-header {
+  background-image: var(--sun-layers);
+  background-attachment: fixed;
+}
+/* The portaled character status row sits inside the header; let the header's
+   sun show through it instead of cutting the halo with a white box. */
+[data-theme="sunbolt"] .app-header #character-status-header-slot > aside {
+  background-color: transparent;
+}
+[data-theme="sunbolt"] .brand-mark {
+  box-shadow: var(--sun-mark-halo);
+}
+
+/* Sunbolt: solid primary buttons are tonal yellow with dark gold text. The
+   primary colour itself stays burnished gold for text, links and drop caps;
+   outline, ghost, soft, dash and link variants are untouched. */
+[data-theme="sunbolt"] .btn-primary:not(.btn-outline, .btn-ghost, .btn-soft, .btn-dash, .btn-link) {
+  --btn-color: var(--btn-tonal-bg);
+  --btn-fg: var(--btn-tonal-ink);
+  --btn-border: var(--btn-tonal-border);
+  outline-color: var(--color-primary);
 }
 
 [data-theme="heraldic-vellum"] {
