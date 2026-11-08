@@ -1,5 +1,5 @@
 import { type Locator, type Page, expect, test } from '@playwright/test';
-import { selectCharacterSection } from './character-navigation';
+import { expectCharacterNavigationReady, selectCharacterSection } from './character-navigation';
 
 async function register(page: Page) {
   await page.goto('/register');
@@ -23,55 +23,95 @@ async function api(page: Page, path: string, data: object) {
   return response.json();
 }
 
+type Rect = { x: number; y: number; width: number; height: number };
+
+// One browser round trip reads every rect; the math is asserted in Node.
 async function expectVisibleRangeLabelsAligned(panel: Locator, slider: Locator) {
+  await expect(slider).toBeVisible();
+  // Real Playwright box kept as a cross-check against the in-page rects.
   const sliderBox = await slider.boundingBox();
   expect(sliderBox).not.toBeNull();
   if (!sliderBox) return;
 
-  const minimum = Number(await slider.getAttribute('min'));
-  const maximum = Number(await slider.getAttribute('max'));
-  const thumbRadius = sliderBox.height / 2;
-  const usableWidth = sliderBox.width - 2 * thumbRadius;
-  const labels = panel.locator('[data-range-label]');
-  const labelBoxes = [];
+  await expect(async () => {
+    const snapshot = await panel.evaluate(
+      (root, sliderEl) => {
+        const toRect = (r: DOMRect): Rect => ({
+          x: r.x,
+          y: r.y,
+          width: r.width,
+          height: r.height,
+        });
+        const visible = (el: Element) =>
+          el.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+        const input = sliderEl as HTMLInputElement;
+        const labels = [...root.querySelectorAll('[data-range-label]')].map((label) => {
+          const value = label.getAttribute('data-range-label');
+          const markers = root.querySelectorAll(`[data-range-point="${value}"]`);
+          return {
+            value: Number(value),
+            anchor: label.getAttribute('data-range-anchor'),
+            visible: visible(label),
+            rect: toRect(label.getBoundingClientRect()),
+            markerCount: markers.length,
+            markerVisible: markers.length === 1 && visible(markers[0]),
+            markerRect: markers.length === 1 ? toRect(markers[0].getBoundingClientRect()) : null,
+          };
+        });
+        return {
+          min: Number(input.getAttribute('min')),
+          max: Number(input.getAttribute('max')),
+          sliderRect: toRect(input.getBoundingClientRect()),
+          labels,
+        };
+      },
+      await slider.elementHandle(),
+    );
 
-  for (let index = 0; index < (await labels.count()); index += 1) {
-    const label = labels.nth(index);
-    const value = Number(await label.getAttribute('data-range-label'));
-    const percent = (value - minimum) / (maximum - minimum);
-    const expectedX = sliderBox.x + thumbRadius + percent * usableWidth;
-    const marker = panel.locator(`[data-range-point="${value}"]`);
-    const [labelBox, markerBox, anchor] = await Promise.all([
-      label.boundingBox(),
-      marker.boundingBox(),
-      label.getAttribute('data-range-anchor'),
-    ]);
-    expect(labelBox).not.toBeNull();
-    expect(markerBox).not.toBeNull();
-    expect(anchor).not.toBeNull();
-    if (!labelBox || !markerBox || !anchor) continue;
+    expect(Number.isFinite(snapshot.min) && Number.isFinite(snapshot.max)).toBe(true);
+    expect(snapshot.max).toBeGreaterThan(snapshot.min);
+    expect(snapshot.labels.length).toBeGreaterThan(0);
+    expect(Math.abs(snapshot.sliderRect.x - sliderBox.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(snapshot.sliderRect.width - sliderBox.width)).toBeLessThanOrEqual(1);
 
-    const markerCenter = markerBox.x + markerBox.width / 2;
-    const labelAnchor =
-      anchor === 'start'
-        ? labelBox.x
-        : anchor === 'end'
-          ? labelBox.x + labelBox.width
-          : labelBox.x + labelBox.width / 2;
-    expect(Math.abs(markerCenter - expectedX)).toBeLessThanOrEqual(1);
-    expect(Math.abs(labelAnchor - expectedX)).toBeLessThanOrEqual(1);
-    labelBoxes.push(labelBox);
-  }
+    const thumbRadius = snapshot.sliderRect.height / 2;
+    const usableWidth = snapshot.sliderRect.width - 2 * thumbRadius;
+    for (const label of snapshot.labels) {
+      expect(Number.isFinite(label.value)).toBe(true);
+      expect(label.visible).toBe(true);
+      expect(label.rect.width).toBeGreaterThan(0);
+      expect(label.rect.height).toBeGreaterThan(0);
+      expect(label.markerCount).toBe(1);
+      expect(label.markerVisible).toBe(true);
+      expect(label.anchor).not.toBeNull();
+      if (!label.markerRect) continue;
 
-  for (let first = 0; first < labelBoxes.length; first += 1) {
-    for (let second = first + 1; second < labelBoxes.length; second += 1) {
-      const a = labelBoxes[first];
-      const b = labelBoxes[second];
-      const overlap =
-        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-      expect(overlap).toBe(false);
+      const percent = (label.value - snapshot.min) / (snapshot.max - snapshot.min);
+      const expectedX = snapshot.sliderRect.x + thumbRadius + percent * usableWidth;
+      const markerCenter = label.markerRect.x + label.markerRect.width / 2;
+      const labelAnchor =
+        label.anchor === 'start'
+          ? label.rect.x
+          : label.anchor === 'end'
+            ? label.rect.x + label.rect.width
+            : label.rect.x + label.rect.width / 2;
+      expect(Math.abs(markerCenter - expectedX)).toBeLessThanOrEqual(1);
+      expect(Math.abs(labelAnchor - expectedX)).toBeLessThanOrEqual(1);
     }
-  }
+
+    for (let first = 0; first < snapshot.labels.length; first += 1) {
+      for (let second = first + 1; second < snapshot.labels.length; second += 1) {
+        const a = snapshot.labels[first].rect;
+        const b = snapshot.labels[second].rect;
+        const overlap =
+          a.x < b.x + b.width &&
+          b.x < a.x + a.width &&
+          a.y < b.y + b.height &&
+          b.y < a.y + a.height;
+        expect(overlap).toBe(false);
+      }
+    }
+  }).toPass({ timeout: 2000 });
 }
 
 async function expectCurrentStatusPoolPanelAt(page: Page, width: number) {
@@ -182,9 +222,10 @@ for (const width of [320, 1280]) {
     });
     await page.goto(`/characters/${character.id}`);
     const attributes = page.getByRole('heading', { name: 'Attributes', exact: true });
-    await expect(attributes).toHaveCount(0);
-    await selectCharacterSection(page, 'Overview');
+    // The sheet opens on Overview; wait for it to render before asserting.
+    await expectCharacterNavigationReady(page);
     await expect(attributes).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Incoming attack' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Sheet overview/ })).toHaveCount(0);
     const attributesBox = await attributes.boundingBox();
     const identity = page.getByRole('heading', { name: 'Identity', exact: true });
