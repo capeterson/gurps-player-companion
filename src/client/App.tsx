@@ -149,25 +149,40 @@ export function App() {
 
   useEntityDocumentTitle(entityBreadcrumb?.name);
 
+  const nextModeLabel = `${modeLabel(oppositeMode(mode))} mode`;
+  const themeMenuItem = (
+    <li>
+      <button type="button" onClick={toggleTheme} aria-label={`Switch to ${nextModeLabel}`}>
+        <AppIcon name={mode === 'dark' ? 'sun' : 'moon'} size={16} />
+        {nextModeLabel}
+      </button>
+    </li>
+  );
+
   const characterName = entityBreadcrumb?.kind === 'character' ? entityBreadcrumb.name : null;
+  const compactBrand = (
+    <Link
+      to="/"
+      aria-label="Sunbolt home"
+      className="flex h-11 w-11 items-center justify-center no-cap"
+    >
+      <BrandMark />
+    </Link>
+  );
   const mobileCharacterMenu = (
-    <nav aria-label="Character and app navigation" className="min-w-0 overflow-visible">
-      <details ref={mobileCharacterMenuRef} className="dropdown relative w-full min-w-0">
+    <nav aria-label="Character and app navigation" className="shrink-0 overflow-visible">
+      <details ref={mobileCharacterMenuRef} className="dropdown dropdown-end relative">
         <summary
-          className="btn btn-ghost btn-sm min-h-11! w-full min-w-0 max-w-full justify-center gap-1 overflow-hidden rounded-none px-0 min-[480px]:justify-start min-[480px]:px-2"
+          className="btn btn-ghost btn-sm min-h-11! h-11! w-11! shrink-0 justify-center rounded-none border-0 p-0 shadow-none"
           aria-label={`Open navigation for ${characterName ?? 'character'}`}
           title={characterName ?? 'Character navigation'}
         >
           <AppIcon name="menu" size={20} />
-          <span className="hidden min-w-0 flex-1 truncate text-left text-xs font-medium min-[480px]:block">
-            {characterName ?? 'Character'}
-          </span>
-          <AppIcon name="chevronDown" size={12} className="hidden min-[480px]:block" />
         </summary>
         <ul
           ref={mobileCharacterMenuPanelRef}
           style={{
-            marginLeft: 'var(--viewport-overlay-shift-x, 0px)',
+            marginRight: 'calc(0px - var(--viewport-overlay-shift-x, 0px))',
             maxHeight:
               'min(calc(100dvh - 1rem), var(--viewport-overlay-available-height, calc(100dvh - 5rem)))',
           }}
@@ -196,6 +211,7 @@ export function App() {
               <Link to="/settings">Settings</Link>
             </li>
           )}
+          {themeMenuItem}
           <li>
             <Link to="/about">About</Link>
           </li>
@@ -229,22 +245,14 @@ export function App() {
   return (
     <CharacterHeaderChromeContext.Provider
       value={{
-        menu: mobileCharacterMenu,
+        menu: compactBrand,
         actions: (
           <div className="relative flex w-full shrink-0 items-center justify-end before:absolute before:inset-y-2 before:left-0 before:w-px before:bg-base-300/70 before:content-[''] [&>details]:shrink-0 [&>span]:shrink-0">
             <SyncStatusIndicator triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
             {!guest && (
               <NotificationsBell triggerClassName="min-h-11! h-11! w-11! shrink-0! rounded-none! border-0! shadow-none!" />
             )}
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm min-h-11 h-11 w-11 shrink-0 rounded-none border-0 shadow-none"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
-              title={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
-            >
-              <AppIcon name={mode === 'dark' ? 'sun' : 'moon'} size={20} />
-            </button>
+            {mobileCharacterMenu}
           </div>
         ),
       }}
@@ -350,16 +358,6 @@ export function App() {
           <div className="app-header-normal flex shrink-0 items-center gap-1 sm:gap-3">
             <SyncStatusIndicator />
             {!guest && <NotificationsBell />}
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm gap-2 px-2 sm:px-3"
-              onClick={toggleTheme}
-              aria-label={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
-              title={`Switch to ${modeLabel(oppositeMode(mode))} mode`}
-            >
-              <AppIcon name={mode === 'dark' ? 'sun' : 'moon'} size={20} />
-              <span className="hidden sm:inline">{modeLabel(mode)} mode</span>
-            </button>
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
               <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
                 {guest ? (
@@ -399,6 +397,7 @@ export function App() {
                     </Link>
                   </li>
                 )}
+                {themeMenuItem}
                 {me.data?.isSuperuser && (
                   /* Hard-anchor: admin lives in a separate Vite entry
                     (see src/client/admin/main.tsx) so SPA Link won't

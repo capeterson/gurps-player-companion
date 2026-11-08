@@ -117,6 +117,7 @@ test('account and compact character menus remain touch reachable through resize 
   const cdp = await page.context().newCDPSession(page);
   const compactViewports = [
     { width: 320, height: 568 },
+    { width: 375, height: 812 },
     { width: 390, height: 844 },
     { width: 479, height: 800 },
     { width: 480, height: 800 },
@@ -138,9 +139,37 @@ test('account and compact character menus remain touch reachable through resize 
     await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
     await settleViewport(page);
 
+    const brandLink = page
+      .locator('header.app-header a[aria-label="Sunbolt home"], header.app-header a[href="/"]')
+      .filter({ visible: true })
+      .first();
+    const hpTrigger = page.getByRole('button', { name: /^Adjust HP,/ });
+    await expect(brandLink).toBeVisible();
+    const brandBounds = await brandLink.boundingBox();
+    const hpBounds = await hpTrigger.boundingBox();
+    expect(brandBounds).not.toBeNull();
+    expect(hpBounds).not.toBeNull();
+    expect((brandBounds?.x ?? 0) + (brandBounds?.width ?? 0)).toBeLessThanOrEqual(hpBounds?.x ?? 0);
+
     if (viewport.width >= 1280) {
       await expect(compactNav).toHaveCount(0);
       await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
+      await expect(
+        page
+          .locator('header.app-header button[aria-label^="Switch to "]')
+          .filter({ visible: true }),
+      ).toHaveCount(0);
+      const desktopTrigger = page.locator('header.app-header summary[aria-label="Open user menu"]');
+      await desktopTrigger.tap();
+      const desktopMenu = page.locator(
+        'details.dropdown[open]:has(> summary[aria-label="Open user menu"]) ul.dropdown-content',
+      );
+      await expect(desktopMenu).toContainText(email);
+      await expect(
+        desktopMenu.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ }),
+      ).toBeVisible();
+      await expectOverlayInsideVisualViewport(page, desktopMenu);
+      await desktopTrigger.tap();
       continue;
     }
 
@@ -151,21 +180,25 @@ test('account and compact character menus remain touch reachable through resize 
     await expect(identity).toContainText(displayName);
     await expect(identity).toContainText(email);
     await expect(menu).not.toContainText(characterName);
-    await expect(menu.getByRole('button', { name: /^Switch to / })).toHaveCount(0);
+    await expect(menu.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ })).toBeVisible();
     await expectOverlayInsideVisualViewport(page, menu);
+    const menuBounds = await menu.boundingBox();
+    const triggerBounds = await trigger.boundingBox();
+    // Right-aligned panel: it ends at the hamburger's right edge, give or take
+    // the viewport-collision gutter.
+    expect((menuBounds?.x ?? 0) + (menuBounds?.width ?? 0)).toBeGreaterThanOrEqual(
+      (triggerBounds?.x ?? 0) + (triggerBounds?.width ?? 0) - 8,
+    );
     const logout = menu.getByRole('button', { name: 'Logout', exact: true });
     await expectReachableAfterScroll(page, logout);
     await trigger.tap();
 
-    const themeToggle = page
-      .locator('header.app-header button[aria-label^="Switch to "]')
-      .filter({ visible: true });
-    await expect(themeToggle).toHaveCount(1);
-    await expectReachableAfterScroll(page, themeToggle);
-    const themeBounds = await themeToggle.boundingBox();
-    expect(themeBounds?.width).toBeGreaterThanOrEqual(44);
-    expect(themeBounds?.height).toBeGreaterThanOrEqual(44);
-    expect((themeBounds?.x ?? 0) + (themeBounds?.width ?? 0)).toBeGreaterThanOrEqual(
+    await expect(trigger).toHaveText('');
+    const triggerBox = await trigger.boundingBox();
+    expect(triggerBox?.width).toBeGreaterThanOrEqual(44);
+    expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
+    // The hamburger takes the far right, after sync and the bell.
+    expect((triggerBox?.x ?? 0) + (triggerBox?.width ?? 0)).toBeGreaterThanOrEqual(
       viewport.width - 9,
     );
     const notifications = page
@@ -173,8 +206,12 @@ test('account and compact character menus remain touch reachable through resize 
       .filter({ visible: true });
     const notificationBounds = await notifications.boundingBox();
     expect((notificationBounds?.x ?? 0) + (notificationBounds?.width ?? 0)).toBeLessThanOrEqual(
-      themeBounds?.x ?? 0,
+      triggerBox?.x ?? 0,
     );
+    await expect(
+      page.locator('header.app-header button[aria-label^="Switch to "]').filter({ visible: true }),
+    ).toHaveCount(0);
+    await expectReachableAfterScroll(page, trigger);
     await trigger.tap();
 
     if (
@@ -255,20 +292,20 @@ test('account and compact character menus remain touch reachable through resize 
   const openCompactMenu = compactNav.locator('ul.dropdown-content');
   await expectOverlayInsideVisualViewport(page, openCompactMenu);
 
-  await compactTrigger.tap();
-  const switchToDark = page
-    .getByRole('button', { name: 'Switch to Dark mode', exact: true })
-    .filter({ visible: true });
-  await expect(switchToDark).toBeVisible();
+  const switchToDark = openCompactMenu.getByRole('button', {
+    name: 'Switch to Dark mode',
+    exact: true,
+  });
+  await expect(switchToDark).toContainText('Dark mode');
   await switchToDark.tap();
   await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_DARK_THEME);
-  const switchToLight = page
-    .getByRole('button', { name: 'Switch to Light mode', exact: true })
-    .filter({ visible: true });
-  await expect(switchToLight).toBeVisible();
+  const switchToLight = openCompactMenu.getByRole('button', {
+    name: 'Switch to Light mode',
+    exact: true,
+  });
+  await expect(switchToLight).toContainText('Light mode');
   await switchToLight.tap();
   await expect(page.locator('html')).toHaveAttribute('data-theme', DEFAULT_LIGHT_THEME);
-  await compactTrigger.tap();
 
   const about = openCompactMenu.getByRole('link', { name: 'About', exact: true });
   await expectReachableAfterScroll(page, about);

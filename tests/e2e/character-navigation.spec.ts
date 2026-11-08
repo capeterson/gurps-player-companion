@@ -4,6 +4,7 @@ import {
   expectCharacterNavigationReady,
   selectCharacterSection,
 } from './character-navigation';
+import { switchThemeFromMenu } from './header-theme';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
 
@@ -190,8 +191,8 @@ test('character navigation adapts across mobile and desktop widths', async ({ pa
   }
 
   // The accessible navigation remains usable with either application theme.
-  await page.getByRole('button', { name: /switch to (dark|light) mode/i }).click();
+  await switchThemeFromMenu(page);
   await expectCharacterNavigationReady(page);
-  await page.getByRole('button', { name: /switch to (dark|light) mode/i }).click();
+  await switchThemeFromMenu(page);
   await expectCharacterNavigationReady(page);
 });

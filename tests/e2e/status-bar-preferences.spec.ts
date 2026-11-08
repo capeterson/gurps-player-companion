@@ -84,7 +84,9 @@ test('user preferences control the Current Status height and visible controls at
           name: /All changes saved|Syncing changes|Some changes failed to sync|Offline/,
         }),
       ).toBeVisible();
+      const brandLink = header.getByRole('link', { name: 'Sunbolt home' });
       const mobileControls = [
+        brandLink,
         navigation.getByLabel('Open navigation for Kestrel Vale'),
         bar.getByRole('button', { name: /^Adjust HP,/ }),
         bar.getByRole('button', { name: /^Adjust FP,/ }),
@@ -92,8 +94,10 @@ test('user preferences control the Current Status height and visible controls at
           name: /All changes saved|Syncing changes|Some changes failed to sync|Offline/,
         }),
         bar.getByLabel(/Notifications/),
-        bar.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ }),
       ];
+      await expect(
+        header.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ }),
+      ).toHaveCount(0);
       for (const control of mobileControls) {
         const controlBox = await control.boundingBox();
         expect(controlBox).not.toBeNull();
@@ -108,12 +112,25 @@ test('user preferences control the Current Status height and visible controls at
       const hpBox = await bar.getByRole('button', { name: /^Adjust HP,/ }).boundingBox();
       const fpBox = await bar.getByRole('button', { name: /^Adjust FP,/ }).boundingBox();
       const triggerBox = await menuTrigger.boundingBox();
+      const brandBox = await brandLink.boundingBox();
+      const syncBox = await header
+        .getByRole('button', {
+          name: /All changes saved|Syncing changes|Some changes failed to sync|Offline/,
+        })
+        .boundingBox();
+      const bellBox = await bar.getByLabel(/Notifications/).boundingBox();
       expect(hpBox).not.toBeNull();
       expect(fpBox).not.toBeNull();
       expect(triggerBox).not.toBeNull();
-      if (triggerBox && hpBox && fpBox) {
-        expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(hpBox.x);
+      expect(brandBox).not.toBeNull();
+      if (triggerBox && hpBox && fpBox && brandBox && syncBox && bellBox) {
+        // Brand mark leads the bar; the hamburger is the rightmost control.
+        expect(brandBox.x + brandBox.width).toBeLessThanOrEqual(hpBox.x);
         expect(hpBox.x + hpBox.width).toBeLessThanOrEqual(fpBox.x);
+        expect(fpBox.x + fpBox.width).toBeLessThanOrEqual(syncBox.x);
+        expect(syncBox.x + syncBox.width).toBeLessThanOrEqual(bellBox.x);
+        expect(bellBox.x + bellBox.width).toBeLessThanOrEqual(triggerBox.x);
+        expect(triggerBox.x + triggerBox.width).toBeGreaterThanOrEqual(width - 9);
       }
       expect((await header.boundingBox())?.height).toBeLessThanOrEqual(64);
       await navigation.getByLabel('Open navigation for Kestrel Vale').click();
@@ -121,7 +138,9 @@ test('user preferences control the Current Status height and visible controls at
       const identity = menu.locator(':scope > li').first();
       await expect(identity).toContainText('rowan@example.invalid');
       await expect(menu.getByText('Kestrel Vale', { exact: true })).toHaveCount(0);
-      await expect(menu.getByRole('button', { name: /^Switch to / })).toHaveCount(0);
+      await expect(
+        menu.getByRole('button', { name: /^Switch to (Dark|Light) mode$/ }),
+      ).toBeVisible();
       await expect(menu.getByRole('link', { name: 'Campaigns' })).toBeVisible();
       await expect(menu.getByRole('link', { name: 'Settings' })).toBeVisible();
       const menuBox = await menu.boundingBox();

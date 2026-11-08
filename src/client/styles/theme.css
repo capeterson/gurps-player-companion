@@ -599,6 +599,14 @@
     --sun-y: 30px;
   }
 }
+/* Character pages below 1280px swap the normal header rows for the compact
+   status row, whose first column holds the mark in a 44px square. */
+@media (max-width: 1279px) {
+  [data-theme="sunbolt"]:has(#character-status-header-slot > aside) {
+    --sun-x: 30px;
+    --sun-y: 26px;
+  }
+}
 [data-theme="sunbolt"] .arcane-edge::before {
   background: var(--sun-layers), var(--sun-paper);
 }
