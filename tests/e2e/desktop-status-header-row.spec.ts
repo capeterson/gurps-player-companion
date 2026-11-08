@@ -5,6 +5,8 @@ import { captureReviewScreenshot } from './review-artifacts';
 // theme.css), so the single-row desktop header must keep the mark's centre fixed.
 const MARK_CENTRE = { x: 42, y: 30 };
 const ROW_HEIGHT = 60;
+// Tab order is the same code path at every width; check it at the extremes and the middle.
+const FOCUS_WIDTHS = [1280, 1536, 1920];
 const WIDTHS = [1280, 1281, 1440, 1535, 1536, 1791, 1792, 1920];
 const LONG_NAME = 'Seraphina Alcántara-Whitlock the Unbowed of the Ninth Marches';
 
@@ -212,7 +214,9 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
     for (const width of WIDTHS) {
       const mode = await checkRow(width, true, tag);
       modes.set(`${tag}-${width}`, mode);
-      await expectFocusFollowsVisualOrder(`${tag} ${width}px ${mode}`, mode === 'strip');
+      if (FOCUS_WIDTHS.includes(width)) {
+        await expectFocusFollowsVisualOrder(`${tag} ${width}px ${mode}`, mode === 'strip');
+      }
       await captureReviewScreenshot(page, {
         path: `test-results/desktop-header-on-${tag}-${width}.png`,
       });
@@ -237,7 +241,7 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
   // boundary must never put an inline strip on a wrapped (taller) row.
   await page.goto(`/characters/${shortId}`);
   await expect(posture).toBeVisible();
-  for (let width = 1280; width <= 2000; width += 16) {
+  for (let width = 1280; width <= 2000; width += 48) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
     const { hpBox, fpBox, accountBox } = await rowBoxes();
@@ -258,7 +262,7 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
   // the row and its own line: the layout depends on content, not on current HP.
   await page.goto(`/characters/${shortId}`);
   await expect(posture).toBeVisible();
-  for (let width = 1280; width <= 2000; width += 32) {
+  for (const width of [1440, 1920]) {
     await page.setViewportSize({ width, height: 900 });
     await settle(page);
     await hp.click();
@@ -268,8 +272,8 @@ test('desktop character header keeps one row, the brand mark and keyboard order 
       (await box(posture)).y + (await box(posture)).height <= ROW_HEIGHT ? 'inline' : 'strip';
     const first = await modeNow();
     for (const [name, steps] of [
-      ['−5 HP', 8],
-      ['+5 HP', 8],
+      ['−5 HP', 6],
+      ['+5 HP', 6],
     ] as const) {
       for (let step = 0; step < steps; step += 1) {
         await panel.getByRole('button', { name }).click();

@@ -669,7 +669,9 @@ export function CurrentStatusBar({
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(measure);
     observer.observe(header);
-    for (const item of header.querySelectorAll('[data-header-row-item], [data-header-name], [data-pool-probe]')) {
+    for (const item of header.querySelectorAll(
+      '[data-header-row-item], [data-header-name], [data-pool-probe]',
+    )) {
       observer.observe(item);
     }
     wide.addEventListener('change', measure);
