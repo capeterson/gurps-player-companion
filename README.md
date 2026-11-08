@@ -219,3 +219,7 @@ automatically use ignored local storage when S3 is unconfigured; production
 rejects that backend. Public immutable URLs
 use native browser caching and bounded service-worker caches for offline viewing.
 Queued sources can be exported from the sync log before clearing local data.
+
+### Observability
+
+Server owners can enable optional OpenTelemetry export to Grafana Alloy. See the [observability guide](docs/observability.md) for configuration, available signals, and privacy details.

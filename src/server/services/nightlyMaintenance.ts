@@ -1,4 +1,5 @@
 import { isDraining } from '../lifecycle.ts';
+import { logTelemetryError, workerDuration, workerRuns } from '../telemetry.ts';
 import { sweepRecycleBin } from './recycleBin.ts';
 import { sweepUserPurges } from './userPurge.ts';
 
@@ -23,10 +24,16 @@ const NIGHTLY_SWEEPS: ReadonlyArray<{ name: string; run: () => Promise<unknown> 
 export async function runNightlySweeps(): Promise<void> {
   for (const sweep of NIGHTLY_SWEEPS) {
     if (isDraining()) return;
+    const start = performance.now();
+    let outcome = 'success';
     try {
       await sweep.run();
     } catch {
-      console.error(`${sweep.name} sweep failed; will retry next night`);
+      outcome = 'failure';
+      logTelemetryError('worker.sweep.failed', { worker: sweep.name });
+    } finally {
+      workerRuns.add(1, { worker: sweep.name, outcome });
+      workerDuration.record((performance.now() - start) / 1000, { worker: sweep.name, outcome });
     }
   }
 }

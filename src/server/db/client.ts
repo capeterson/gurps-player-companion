@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { metrics } from '@opentelemetry/api';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { loadConfig } from '../config.ts';
@@ -12,6 +13,20 @@ interface TransactionContext {
   tx: Transaction;
   afterCommit: Array<() => void | Promise<void>>;
 }
+let poolMetricsRegistered = false;
+function registerPoolMetrics(): void {
+  if (poolMetricsRegistered || process.env.SUNBOLT_OTEL_ENABLED !== 'true') return;
+  poolMetricsRegistered = true;
+  metrics
+    .getMeter('sunbolt')
+    .createObservableGauge('sunbolt.db.pool.connections', { unit: '{connection}' })
+    .addCallback((result) => {
+      if (!pool) return;
+      result.observe(pool.totalCount - pool.idleCount, { state: 'active' });
+      result.observe(pool.idleCount, { state: 'idle' });
+      result.observe(pool.waitingCount, { state: 'waiting' });
+    });
+}
 const ambientTransaction = new AsyncLocalStorage<TransactionContext>();
 
 export function getDb() {
@@ -19,6 +34,7 @@ export function getDb() {
   if (current) return current.tx as unknown as RootDb;
   if (dbInstance) return dbInstance;
   const config = loadConfig();
+  registerPoolMetrics();
   pool = new Pool({ connectionString: config.databaseUrl, connectionTimeoutMillis: 5_000 });
   pool.on('error', () => console.error('idle database connection failed'));
   dbInstance = drizzle(pool, { schema });

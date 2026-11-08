@@ -56,6 +56,7 @@ import {
   dispatchOperation,
   publishBatchInvalidations,
 } from '../services/syncDispatch.ts';
+import { syncBatchSize, syncCursorRows, syncOutcomes } from '../telemetry.ts';
 import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
@@ -114,6 +115,7 @@ router.openapi(
     const user = c.get('user');
     const { operations } = c.req.valid('json');
     const outcomes = [];
+    syncBatchSize.record(operations.length);
     // Apply ops in array order so e.g. (create trait X, patch trait X)
     // works.  Each op runs in dispatchOperation's own try/catch so a
     // failure on op N does not roll back ops 1..N-1.
@@ -142,6 +144,11 @@ router.openapi(
       );
       chains.record(op, outcome);
       outcomes.push(outcome);
+      syncOutcomes.add(1, {
+        entity_class: op.entityClass,
+        operation: op.command,
+        outcome: outcome.status,
+      });
     }
     await publishBatchInvalidations(user.id, batch);
     return c.json({ outcomes }, 200);
@@ -212,6 +219,7 @@ router.openapi(
     // in monotonic order (avoids "tombstone before its create" anomalies
     // when a row was created and then deleted within one batch window).
     changes.sort((a, b) => a.revision - b.revision);
+    syncCursorRows.record(changes.length);
 
     return c.json(
       {
