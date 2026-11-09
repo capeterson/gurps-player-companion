@@ -41,7 +41,7 @@ import {
   parseSyncProtocol,
 } from '../../shared/syncProtocol.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
-import { getDb } from '../db/client.ts';
+import { getDb, runReadSnapshotWorkers } from '../db/client.ts';
 import {
   type DbCharacter,
   campaignMemberships,
@@ -105,6 +105,7 @@ export function syncOutcomeReason(outcome: OperationOutcome): string {
 
 const DEFAULT_CURSOR_PAGE_SIZE = 200;
 const MAX_CURSOR_PAGE_SIZE = 500;
+const CURSOR_UPSERT_WORKERS = 4;
 
 router.openapi(
   createRoute({
@@ -313,18 +314,38 @@ async function pullCursor(
   const hasMore: Partial<Record<EntityClass, boolean>> = {};
   const nextCursor: Partial<Record<EntityClass, number>> = {};
 
+  const pending = cursors.entries();
+  const upsertsByCursor = new Map<number, SyncCursorChange[]>();
+  async function readUpserts(reader: CursorDb) {
+    // Advance the shared iterator synchronously before awaiting each query.
+    // Each worker gets a distinct cursor, even for repeated entity classes.
+    for (const [index, cursor] of pending) {
+      upsertsByCursor.set(
+        index,
+        await fetchClassUpserts(reader, {
+          ...cursor,
+          limit,
+          userId,
+          accessibleCharacterIds,
+          fullAccessCharacterIds,
+          characterAccess,
+          accessibleCampaignIds,
+        }),
+      );
+    }
+  }
+  if (
+    cursors.length > CURSOR_UPSERT_WORKERS &&
+    (accessibleCampaignIds.length || fullAccessCharacterIds.length)
+  ) {
+    await runReadSnapshotWorkers(db, CURSOR_UPSERT_WORKERS, readUpserts);
+  } else {
+    await readUpserts(db);
+  }
+
   for (const [index, cursor] of cursors.entries()) {
-    const upserts = await fetchClassUpserts(db, {
-      ...cursor,
-      limit,
-      userId,
-      accessibleCharacterIds,
-      fullAccessCharacterIds,
-      characterAccess,
-      accessibleCampaignIds,
-    });
     const slice = mergeClassChanges(
-      upserts,
+      upsertsByCursor.get(index) ?? [],
       tombstones.get(index + 1) ?? [],
       limit,
       cursor.sinceRevision,

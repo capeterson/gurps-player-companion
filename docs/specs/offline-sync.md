@@ -326,7 +326,11 @@ works offline.**
    batches tombstones in one query across the requested cursors, capped per
    cursor and scoped to the viewer as owner or through a currently accessible
    campaign. Upserts and tombstones share a database snapshot and merge in
-   revision order before the per-class page limit is applied. The orchestrator
+   revision order before the per-class page limit is applied. Multi-class pulls
+   with campaign or full character access can read upserts on up to four pooled
+   connections using the same PostgreSQL snapshot when the rest of the pool is
+   idle. Concurrent traffic uses serial reads. Pages are assembled in request order.
+   The orchestrator
    merges rows into Dexie, where it **never overwrites a field with a
    pending/in-flight outbox op** and **never writes a row while
    a pending/in-flight/transient-retry whole-entity delete for that same class
