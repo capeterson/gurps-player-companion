@@ -12,6 +12,20 @@ import { inProcessSeedRequest, lanternArtworkUploader } from './seedTransport.ts
 export { LANTERN_CAMPAIGN_NAME } from './lanternCoastContent.ts';
 export { inProcessSeedRequest, lanternArtworkUploader } from './seedTransport.ts';
 
+// Building the app registers every route, the OpenAPI document and the MCP
+// catalog (~2 s). A process seeds with one configuration, so build it once per
+// distinct config instead of once per seed.
+const seedApps = new Map<string, ReturnType<typeof createApp>>();
+export function seedApp(config: ReturnType<typeof loadConfig>) {
+  const key = JSON.stringify(config);
+  let app = seedApps.get(key);
+  if (!app) {
+    app = createApp(config);
+    seedApps.set(key, app);
+  }
+  return app;
+}
+
 /**
  * A single atomic, insert-once fixture. Normal routes validate all campaign and
  * character writes, capture owned library mechanics, and record audit/revisions.
@@ -31,7 +45,7 @@ export async function seedLanternCoast(ownerId: string, libraryText?: string) {
     if (existing) return { campaignId: existing.id, created: false };
 
     const yaml = libraryText ?? (await readLanternCoastYaml());
-    const app = createApp(loadConfig());
+    const app = seedApp(loadConfig());
     const [owner] = await db.select().from(users).where(eq(users.id, ownerId));
     if (!owner) throw new Error('Seed owner does not exist');
     const ownerToken = (await signAccessToken(owner.id, owner.authVersion)).token;
