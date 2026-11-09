@@ -18,7 +18,7 @@ import { campaignLibraryActiveEffects } from '../db/schema.ts';
  */
 
 import { createRoute } from '@hono/zod-openapi';
-import { and, asc, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import { campaignHouseRules } from '../../shared/schemas/campaign.ts';
 import {
   type EntityClass,
@@ -26,6 +26,8 @@ import {
   type OperationEnvelope,
   type OperationOutcome,
   type SyncCursorChange,
+  type SyncCursorRequest,
+  type SyncCursorResponse,
   syncCursorRequest,
   syncCursorResponse,
   syncOperationsRequest,
@@ -39,7 +41,7 @@ import {
   parseSyncProtocol,
 } from '../../shared/syncProtocol.ts';
 import { requireActiveUser } from '../auth/middleware.ts';
-import { getDb } from '../db/client.ts';
+import { getDb, runReadSnapshotWorkers } from '../db/client.ts';
 import {
   type DbCharacter,
   campaignMemberships,
@@ -103,6 +105,7 @@ export function syncOutcomeReason(outcome: OperationOutcome): string {
 
 const DEFAULT_CURSOR_PAGE_SIZE = 200;
 const MAX_CURSOR_PAGE_SIZE = 500;
+const CURSOR_UPSERT_WORKERS = 4;
 
 router.openapi(
   createRoute({
@@ -208,63 +211,14 @@ router.openapi(
     const { cursors, pageSize } = c.req.valid('json');
     const limit = Math.min(pageSize ?? DEFAULT_CURSOR_PAGE_SIZE, MAX_CURSOR_PAGE_SIZE);
 
-    const accessibleCampaignIds: string[] = await listAccessibleCampaignIds(user.id);
-    const characterAccess = await loadCharacterAccess(user.id, accessibleCampaignIds);
-    // Every character the viewer can see at all (full or minimal). Used
-    // for the `character` upsert query — minimal rows are projected to
-    // public-only columns before being emitted (see `projectCharacterRow`).
-    const accessibleCharacterIds: string[] = [...characterAccess.keys()];
-    // Subset that the viewer is allowed to see in detail. Child entity
-    // classes (traits / skills / inventory / combat) are scoped to this
-    // list so a non-GM member of a campaign with shareCharacterSheets=false
-    // doesn't pull other players' private rows down to IndexedDB.
-    const fullAccessCharacterIds: string[] = [...characterAccess.entries()]
-      .filter(([, mode]) => mode === 'full')
-      .map(([id]) => id);
-
-    const changes: SyncCursorChange[] = [];
-    const hasMore: Partial<Record<EntityClass, boolean>> = {};
-    const nextCursor: Partial<Record<EntityClass, number>> = {};
-
-    for (const cursor of cursors) {
-      const slice = await fetchClassChanges({
-        entityClass: cursor.entityClass,
-        sinceRevision: cursor.sinceRevision,
-        limit,
-        userId: user.id,
-        accessibleCharacterIds,
-        fullAccessCharacterIds,
-        characterAccess,
-        accessibleCampaignIds,
-      });
-      for (const change of slice.changes) changes.push(change);
-      hasMore[cursor.entityClass] = slice.hasMore;
-      nextCursor[cursor.entityClass] = slice.nextRevision;
-    }
-
-    // Sort across classes by revision so the client can apply changes
-    // in monotonic order (avoids "tombstone before its create" anomalies
-    // when a row was created and then deleted within one batch window).
-    changes.sort((a, b) => a.revision - b.revision);
-    syncCursorRows.record(changes.length);
-
-    return c.json(
-      {
-        changes,
-        hasMore: hasMore as Record<EntityClass, boolean>,
-        nextCursor: nextCursor as Record<EntityClass, number>,
-        // Authoritative access sets — already computed above for this
-        // same request, zero extra queries. Lets the client prune local
-        // rows that fell out of access (tombstones alone can't reach
-        // ex-members: they're scoped to campaigns the viewer *currently*
-        // belongs to).
-        accessible: {
-          characterIds: accessibleCharacterIds,
-          campaignIds: accessibleCampaignIds,
-        },
-      },
-      200,
-    );
+    // Read tombstones and upserts from one snapshot. A newer upsert must
+    // not advance a cursor past a tombstone committed after the batch read.
+    const response = await getDb().transaction((tx) => pullCursor(tx, user.id, cursors, limit), {
+      isolationLevel: 'repeatable read',
+      accessMode: 'read only',
+    });
+    syncCursorRows.record(response.changes.length);
+    return c.json(response, 200);
   },
 );
 
@@ -338,8 +292,81 @@ export function createBatchRevisionChains() {
   };
 }
 
-async function listAccessibleCampaignIds(userId: string): Promise<string[]> {
-  const db = getDb();
+type CursorDb = Parameters<Parameters<ReturnType<typeof getDb>['transaction']>[0]>[0];
+
+async function pullCursor(
+  db: CursorDb,
+  userId: string,
+  cursors: SyncCursorRequest['cursors'],
+  limit: number,
+): Promise<SyncCursorResponse> {
+  const accessibleCampaignIds = await listAccessibleCampaignIds(db, userId);
+  const characterAccess = await loadCharacterAccess(db, userId, accessibleCampaignIds);
+  // The character class includes minimal rows projected to public identity.
+  // Private child rows are scoped to characters with full access.
+  const accessibleCharacterIds = [...characterAccess.keys()];
+  const fullAccessCharacterIds = [...characterAccess.entries()]
+    .filter(([, mode]) => mode === 'full')
+    .map(([id]) => id);
+
+  const tombstones = await fetchTombstones(db, cursors, limit, userId, accessibleCampaignIds);
+  const changes: SyncCursorChange[] = [];
+  const hasMore: Partial<Record<EntityClass, boolean>> = {};
+  const nextCursor: Partial<Record<EntityClass, number>> = {};
+
+  const pending = cursors.entries();
+  const upsertsByCursor = new Map<number, SyncCursorChange[]>();
+  async function readUpserts(reader: CursorDb) {
+    // Advance the shared iterator synchronously before awaiting each query.
+    // Each worker gets a distinct cursor, even for repeated entity classes.
+    for (const [index, cursor] of pending) {
+      upsertsByCursor.set(
+        index,
+        await fetchClassUpserts(reader, {
+          ...cursor,
+          limit,
+          userId,
+          accessibleCharacterIds,
+          fullAccessCharacterIds,
+          characterAccess,
+          accessibleCampaignIds,
+        }),
+      );
+    }
+  }
+  if (
+    cursors.length > CURSOR_UPSERT_WORKERS &&
+    (accessibleCampaignIds.length || fullAccessCharacterIds.length)
+  ) {
+    await runReadSnapshotWorkers(db, CURSOR_UPSERT_WORKERS, readUpserts);
+  } else {
+    await readUpserts(db);
+  }
+
+  for (const [index, cursor] of cursors.entries()) {
+    const slice = mergeClassChanges(
+      upsertsByCursor.get(index) ?? [],
+      tombstones.get(index + 1) ?? [],
+      limit,
+      cursor.sinceRevision,
+    );
+    for (const change of slice.changes) changes.push(change);
+    hasMore[cursor.entityClass] = slice.hasMore;
+    nextCursor[cursor.entityClass] = slice.nextRevision;
+  }
+
+  // Clients apply changes in revision order across all classes.
+  changes.sort((a, b) => a.revision - b.revision);
+  return {
+    changes,
+    hasMore: hasMore as Record<EntityClass, boolean>,
+    nextCursor: nextCursor as Record<EntityClass, number>,
+    // Ex-members use these access sets to prune locally cached rows.
+    accessible: { characterIds: accessibleCharacterIds, campaignIds: accessibleCampaignIds },
+  };
+}
+
+async function listAccessibleCampaignIds(db: CursorDb, userId: string): Promise<string[]> {
   const rows = await db
     .selectDistinct({ id: campaigns.id })
     .from(campaigns)
@@ -420,10 +447,10 @@ export function decideCharacterAccess(args: {
 }
 
 async function loadCharacterAccess(
+  db: CursorDb,
   userId: string,
   campaignIds: string[],
 ): Promise<Map<string, CharacterAccessMode>> {
-  const db = getDb();
   // Recycle-binned characters are absent from the access set, so every device
   // prunes them locally; restoring one re-enters the set and backfills.
   const where = and(
@@ -471,85 +498,70 @@ async function loadCharacterAccess(
   });
 }
 
-interface FetchArgs {
-  readonly entityClass: EntityClass;
-  readonly sinceRevision: number;
-  readonly limit: number;
-  readonly userId: string;
-  /** Every character the viewer can see (full + minimal). */
-  readonly accessibleCharacterIds: string[];
-  /** Subset where the viewer can see private child rows. */
-  readonly fullAccessCharacterIds: string[];
-  readonly characterAccess: Map<string, CharacterAccessMode>;
-  readonly accessibleCampaignIds: string[];
+async function fetchTombstones(
+  db: CursorDb,
+  cursors: SyncCursorRequest['cursors'],
+  limit: number,
+  userId: string,
+  accessibleCampaignIds: string[],
+): Promise<Map<number, SyncCursorChange[]>> {
+  const byCursor = new Map<number, SyncCursorChange[]>();
+  if (cursors.length === 0) return byCursor;
+
+  const classes = cursors.map(({ entityClass }) => entityClass);
+  const revisions = cursors.map(({ sinceRevision }) => sinceRevision);
+  // Give the scope indexes a constant revision bound as well as the
+  // exact per-cursor bound in the join.
+  const minRevision = revisions.reduce((min, revision) => Math.min(min, revision));
+  const ownerScope = sql`t.owner_user_id = ${userId}`;
+  const scope = accessibleCampaignIds.length
+    ? sql`(${ownerScope} or t.campaign_id = any(${sql.param(accessibleCampaignIds)}::uuid[]))`
+    : ownerScope;
+
+  // Partition by input position so repeated classes with different cursor
+  // revisions keep their individual page limits.
+  const { rows } = await db.execute<{
+    cursor_position: number;
+    entity_class: EntityClass;
+    entity_id: string;
+    revision: string;
+    deleted_at: string;
+  }>(sql`
+    select cursor_position, entity_class, entity_id, revision, deleted_at
+    from (
+      select c.position::int as cursor_position, t.entity_class, t.entity_id, t.revision, t.deleted_at,
+        row_number() over (partition by c.position order by t.revision) as rank
+      from ${entityTombstones} t
+      join unnest(${sql.param(classes)}::text[], ${sql.param(revisions)}::bigint[])
+        with ordinality as c(entity_class, since_revision, position)
+        on t.entity_class = c.entity_class and t.revision > c.since_revision
+      where t.revision > ${minRevision} and ${scope}
+    ) ranked
+    where rank <= ${limit}
+  `);
+
+  for (const row of rows) {
+    const change: SyncCursorChange = {
+      entityClass: row.entity_class,
+      entityId: row.entity_id,
+      command: 'delete',
+      revision: Number(row.revision),
+      deletedAt: new Date(row.deleted_at).toISOString(),
+    };
+    const slice = byCursor.get(row.cursor_position);
+    if (slice) slice.push(change);
+    else byCursor.set(row.cursor_position, [change]);
+  }
+  return byCursor;
 }
 
-interface FetchResult {
-  readonly changes: SyncCursorChange[];
-  readonly hasMore: boolean;
-  readonly nextRevision: number;
-}
-
-async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
-  const {
-    entityClass,
-    sinceRevision,
-    limit,
-    userId,
-    accessibleCharacterIds,
-    fullAccessCharacterIds,
-    characterAccess,
-  } = args;
-  const db = getDb();
-
-  // Always pull tombstones for this class first so the merged result
-  // includes deletes interleaved with upserts in revision order.
-  // Tombstones are scoped by owner_user_id (denormalized at trigger
-  // time); campaign-scoped entities also surface to campaign members
-  // via the campaign_id column.
-  const tombstoneWhere =
-    args.accessibleCampaignIds.length > 0
-      ? and(
-          eq(entityTombstones.entityClass, entityClass),
-          gt(entityTombstones.revision, sinceRevision),
-          or(
-            eq(entityTombstones.ownerUserId, userId),
-            inArray(entityTombstones.campaignId, [...args.accessibleCampaignIds]),
-          ),
-        )
-      : and(
-          eq(entityTombstones.entityClass, entityClass),
-          gt(entityTombstones.revision, sinceRevision),
-          eq(entityTombstones.ownerUserId, userId),
-        );
-  const tombstoneRows = await db
-    .select()
-    .from(entityTombstones)
-    .where(tombstoneWhere)
-    .orderBy(asc(entityTombstones.revision))
-    .limit(limit);
-
-  const upserts = await fetchClassUpserts({
-    entityClass,
-    sinceRevision,
-    limit,
-    userId,
-    accessibleCharacterIds,
-    fullAccessCharacterIds,
-    characterAccess,
-    accessibleCampaignIds: args.accessibleCampaignIds,
-  });
-
-  const merged: SyncCursorChange[] = [
-    ...upserts,
-    ...tombstoneRows.map<SyncCursorChange>((t) => ({
-      entityClass,
-      entityId: t.entityId,
-      command: 'delete' as const,
-      revision: Number(t.revision),
-      deletedAt: t.deletedAt.toISOString(),
-    })),
-  ];
+function mergeClassChanges(
+  upserts: SyncCursorChange[],
+  tombstones: SyncCursorChange[],
+  limit: number,
+  sinceRevision: number,
+) {
+  const merged = [...upserts, ...tombstones];
   merged.sort((a, b) => a.revision - b.revision);
   // Apply the per-class limit AFTER merging so we don't lose tombstones
   // sitting just past the upsert cap (or vice versa).
@@ -559,23 +571,26 @@ async function fetchClassChanges(args: FetchArgs): Promise<FetchResult> {
   // may be rows past its own SQL LIMIT even though the merged list
   // fits.  Reporting hasMore=false in that case stalls the client's
   // backfill mid-stream until some unrelated change bumps a revision.
-  const hasMore = merged.length > limit || tombstoneRows.length >= limit || upserts.length >= limit;
+  const hasMore = merged.length > limit || tombstones.length >= limit || upserts.length >= limit;
   const last = limited[limited.length - 1];
   const nextRevision = last ? last.revision : sinceRevision;
 
   return { changes: limited, hasMore, nextRevision };
 }
 
-async function fetchClassUpserts(args: {
-  entityClass: EntityClass;
-  sinceRevision: number;
-  limit: number;
-  userId: string;
-  accessibleCharacterIds: string[];
-  fullAccessCharacterIds: string[];
-  characterAccess: Map<string, CharacterAccessMode>;
-  accessibleCampaignIds: string[];
-}): Promise<SyncCursorChange[]> {
+async function fetchClassUpserts(
+  db: CursorDb,
+  args: {
+    entityClass: EntityClass;
+    sinceRevision: number;
+    limit: number;
+    userId: string;
+    accessibleCharacterIds: string[];
+    fullAccessCharacterIds: string[];
+    characterAccess: Map<string, CharacterAccessMode>;
+    accessibleCampaignIds: string[];
+  },
+): Promise<SyncCursorChange[]> {
   const {
     entityClass,
     sinceRevision,
@@ -586,8 +601,6 @@ async function fetchClassUpserts(args: {
     characterAccess,
     accessibleCampaignIds,
   } = args;
-  const db = getDb();
-
   switch (entityClass) {
     case 'character': {
       const rows = await db
@@ -632,7 +645,7 @@ async function fetchClassUpserts(args: {
     case 'character_inventory':
     case 'character_loadout': {
       const table = CHARACTER_CHILD_TABLES[entityClass];
-      const changes = await fetchChildClass({
+      const changes = await fetchChildClass(db, {
         entityClass,
         table,
         idCol: table.id,
@@ -654,7 +667,7 @@ async function fetchClassUpserts(args: {
       // apply upserts and tombstones with a single lookup.  Tombstone
       // emission for combat also uses characterId (see migration
       // 0005); the two halves stay in sync.
-      return await fetchChildClass({
+      return await fetchChildClass(db, {
         entityClass,
         table: combatStates,
         idCol: combatStates.id,
@@ -734,6 +747,7 @@ async function fetchClassUpserts(args: {
     case 'campaign_library_source':
     case 'campaign_library_modifier':
       return await fetchLibraryClass(
+        db,
         entityClass,
         sinceRevision,
         limit,
@@ -755,6 +769,7 @@ async function fetchClassUpserts(args: {
  * `revision`, the same shape the client stores and compares on stale_base.
  */
 async function fetchLibraryClass(
+  db: CursorDb,
   entityClass: LibraryEntityClass,
   sinceRevision: number,
   limit: number,
@@ -765,7 +780,7 @@ async function fetchLibraryClass(
   const cfg = libraryEntityConfig(entityClass);
   // biome-ignore lint/suspicious/noExplicitAny: generic library table runtime object
   const table = cfg.table as any;
-  const rows = (await getDb()
+  const rows = (await db
     .select({ row: table, ownerId: campaigns.ownerId })
     .from(table)
     .innerJoin(campaigns, eq(cfg.table.campaignId, campaigns.id)) // recycle-bin: access sets are already filtered; this reads rows of those sets
@@ -816,8 +831,7 @@ interface ChildFetchArgs {
   limit: number;
 }
 
-async function fetchChildClass(args: ChildFetchArgs): Promise<SyncCursorChange[]> {
-  const db = getDb();
+async function fetchChildClass(db: CursorDb, args: ChildFetchArgs): Promise<SyncCursorChange[]> {
   if (args.accessibleCharacterIds.length === 0) return [];
   const rows = (await db
     .select()

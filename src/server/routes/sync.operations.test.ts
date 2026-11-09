@@ -13,8 +13,16 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { sql } from 'drizzle-orm';
+import type {
+  SyncCursorChange,
+  SyncCursorRequest,
+  SyncCursorResponse,
+} from '../../shared/schemas/sync.ts';
 import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
+import { getDb } from '../db/client.ts';
+import { entityTombstones } from '../db/schema.ts';
 import { subscribe } from '../services/wsBus.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 import { createTestActor } from '../testFixtures.ts';
@@ -97,6 +105,150 @@ async function postOperations(accessToken: string, operations: unknown[]) {
     }>;
   };
 }
+
+describe('POST /api/v1/sync/cursor tombstone pagination', () => {
+  it('preserves per-class pages and campaign access across a paged walk', async () => {
+    const gm = await registerUser('cursor-gm');
+    const member = await registerUser('cursor-member');
+    const campaignRes = await app.request('/api/v1/campaigns', {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ name: 'Cursor campaign' }),
+    });
+    expect(campaignRes.status).toBe(201);
+    const { id: campaignId } = (await campaignRes.json()) as { id: string };
+    const memberRes = await app.request(`/api/v1/campaigns/${campaignId}/members`, {
+      method: 'POST',
+      headers: jsonHeaders(gm.accessToken),
+      body: JSON.stringify({ email: member.email }),
+    });
+    expect(memberRes.status).toBe(200);
+
+    // Seed the cursor's input directly. Existing delete tests exercise the
+    // triggers that populate this table.
+    async function tombstone(ownerUserId: string, campaignId: string | null) {
+      const [row] = await getDb()
+        .insert(entityTombstones)
+        .values({
+          entityClass: 'character_language',
+          entityId: crypto.randomUUID(),
+          ownerUserId,
+          campaignId,
+          revision: sql`next_sync_revision()`,
+        })
+        .returning();
+      if (!row) throw new Error('Missing test tombstone');
+      return {
+        entityClass: 'character_language',
+        entityId: row.entityId,
+        command: 'delete',
+        revision: row.revision,
+        deletedAt: row.deletedAt.toISOString(),
+      } satisfies SyncCursorChange;
+    }
+
+    const owned = await tombstone(member.userId, null);
+    const character = await createCharacter(member.accessToken);
+    const shared = await tombstone(gm.userId, campaignId);
+    const ownedAndShared = await tombstone(member.userId, campaignId);
+    const hidden = await tombstone(gm.userId, null);
+    const last = await tombstone(gm.userId, campaignId);
+    const characterChange = {
+      entityClass: 'character',
+      entityId: character.id,
+      command: 'patch',
+      revision: character.revision,
+      data: expect.objectContaining({ id: character.id, revision: character.revision }),
+    } satisfies SyncCursorChange;
+    const initialCursors: SyncCursorRequest['cursors'] = [
+      { entityClass: 'character_language', sinceRevision: 0 },
+      { entityClass: 'character', sinceRevision: owned.revision },
+      { entityClass: 'character_skill', sinceRevision: hidden.revision },
+    ];
+
+    async function pull(cursors: SyncCursorRequest['cursors']) {
+      const res = await app.request('/api/v1/sync/cursor', {
+        method: 'POST',
+        headers: jsonHeaders(member.accessToken),
+        body: JSON.stringify({ cursors, pageSize: 2 } satisfies SyncCursorRequest),
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as SyncCursorResponse;
+    }
+
+    function advance(page: SyncCursorResponse) {
+      return initialCursors.map(({ entityClass }) => {
+        const sinceRevision = page.nextCursor[entityClass];
+        if (sinceRevision === undefined) throw new Error(`Missing cursor for ${entityClass}`);
+        return { entityClass, sinceRevision };
+      });
+    }
+
+    const accessible = { characterIds: [character.id], campaignIds: [campaignId] };
+    const page1 = await pull(initialCursors);
+    expect(page1).toEqual({
+      changes: [owned, characterChange, shared],
+      hasMore: { character_language: true, character: false, character_skill: false },
+      nextCursor: {
+        character_language: shared.revision,
+        character: character.revision,
+        character_skill: hidden.revision,
+      },
+      accessible,
+    });
+    const page2 = await pull(advance(page1));
+    expect(page2).toEqual({
+      changes: [ownedAndShared, last],
+      hasMore: { ...page1.hasMore },
+      nextCursor: { ...page1.nextCursor, character_language: last.revision },
+      accessible,
+    });
+    expect(await pull(advance(page2))).toEqual({
+      changes: [],
+      hasMore: { ...page2.hasMore, character_language: false },
+      nextCursor: page2.nextCursor,
+      accessible,
+    });
+
+    // Repeated classes are valid inputs and each cursor retains its own cap.
+    expect(
+      await pull([
+        { entityClass: 'character_language', sinceRevision: 0 },
+        { entityClass: 'character_language', sinceRevision: shared.revision },
+      ]),
+    ).toEqual({
+      changes: [owned, shared, ownedAndShared, last],
+      hasMore: { character_language: true },
+      nextCursor: { character_language: last.revision },
+      accessible,
+    });
+
+    const removal = await app.request(`/api/v1/campaigns/${campaignId}/members/${member.userId}`, {
+      method: 'DELETE',
+      headers: bearer(gm.accessToken),
+    });
+    expect(removal.status).toBe(204);
+    const exMemberPage = await pull(initialCursors);
+    expect(exMemberPage).toEqual({
+      changes: [owned, characterChange, ownedAndShared],
+      hasMore: { ...page1.hasMore },
+      nextCursor: { ...page1.nextCursor, character_language: ownedAndShared.revision },
+      accessible: { ...accessible, campaignIds: [] },
+    });
+    expect(await pull(advance(exMemberPage))).toEqual({
+      changes: [],
+      hasMore: { ...exMemberPage.hasMore, character_language: false },
+      nextCursor: exMemberPage.nextCursor,
+      accessible: exMemberPage.accessible,
+    });
+    expect(await pull([])).toEqual({
+      changes: [],
+      hasMore: {},
+      nextCursor: {},
+      accessible: exMemberPage.accessible,
+    });
+  });
+});
 
 describe('POST /api/v1/sync/operations -- batch-local revision fast-forward', () => {
   it('lets only one concurrent patch apply for the same base revision', async () => {
