@@ -26,6 +26,7 @@ import { campaignsRouter } from './routes/campaigns.ts';
 import { characterLoadoutsRouter } from './routes/characterLoadouts.ts';
 import { characterSubResourcesRouter } from './routes/characterSubResources.ts';
 import { charactersRouter } from './routes/characters.ts';
+import { createEmailWebhookRouter } from './routes/emailWebhook.ts';
 import { encounterRouter } from './routes/encounters.ts';
 import { healthRouter } from './routes/health.ts';
 import { historyRouter } from './routes/history.ts';
@@ -43,7 +44,15 @@ import { mediaConfig } from './services/media/config.ts';
 import { mutationInvalidation } from './services/mutationInvalidation.ts';
 import { GuestWriteForbiddenError, guestGate } from './services/preview/guestAccess.ts';
 import { attachStaticHandler } from './static.ts';
-import { logTelemetryError, requestDuration, tracer } from './telemetry.ts';
+import {
+  isUserActivityRequest,
+  logTelemetryError,
+  logTelemetryEvent,
+  logUserActivity,
+  observedOperation,
+  requestDuration,
+  tracer,
+} from './telemetry.ts';
 
 function acceptsGzip(value: string): boolean {
   const qualities = new Map<string, number>();
@@ -100,6 +109,56 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
             'http.response.status_code': c.res.status,
             ...(route && !route.includes('*') ? { 'http.route': route } : {}),
           };
+          const user = c.get('user');
+          const path = c.req.path;
+          if (
+            user &&
+            user.authMethod !== 'guest' &&
+            !user.suspendedAt &&
+            isUserActivityRequest(path, c.res.status)
+          ) {
+            logUserActivity(user.id, user.authMethod === 'api_key' ? 'api' : 'web');
+          }
+          if (
+            (path === '/api/v1/auth/login' || path === '/api/v1/auth/passkeys/login') &&
+            c.res.status >= 400 &&
+            c.res.status < 500
+          ) {
+            logTelemetryEvent(
+              'auth.login.failed',
+              {
+                method: path.endsWith('/passkeys/login') ? 'passkey' : 'password',
+                reason:
+                  c.res.status === 429
+                    ? 'rate_limited'
+                    : c.res.status === 422
+                      ? 'invalid_request'
+                      : 'invalid_credentials',
+                request_id: c.get('requestId'),
+              },
+              'WARN',
+            );
+          }
+          const operation = observedOperation(c.req.method, path);
+          if (operation) {
+            logTelemetryEvent(
+              'operation.completed',
+              {
+                operation,
+                status: c.res.status,
+                request_id: c.get('requestId'),
+                ...(user && user.authMethod !== 'guest' ? { user_id: user.id } : {}),
+              },
+              c.res.status >= 500 ? 'ERROR' : c.res.status >= 400 ? 'WARN' : 'INFO',
+            );
+          }
+          if (path.startsWith('/api/v1/sync/') && (c.res.status === 426 || c.res.status === 503)) {
+            logTelemetryEvent(
+              'sync.protocol_or_service_unavailable',
+              { status: c.res.status, request_id: c.get('requestId') },
+              'WARN',
+            );
+          }
           requestDuration.record((performance.now() - start) / 1000, attributes);
           span.setAttributes(attributes);
           if (c.res.status >= 500) span.setStatus({ code: SpanStatusCode.ERROR });
@@ -133,6 +192,8 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
   // router, transport and middleware below, so new routes are blocked by default.
   app.use('*', guestGate);
 
+  app.use('/api/v1/webhooks/resend', bodyLimit({ maxSize: 65536 }));
+  app.route('/', createEmailWebhookRouter(config));
   app.use('/api/v1/media/*', requireActiveUser);
   app.use('/api/v1/media/*', mediaAdmission);
   app.use('/api/v1/media/*', bodyLimit({ maxSize: 14 * 1024 * 1024 }));
@@ -336,12 +397,10 @@ export function createApp(config: AppConfig): OpenAPIHono<AppEnv> {
     if (err instanceof HTTPException) {
       if (err.status >= 500) {
         logTelemetryError('http.request.failed', { requestId, status: err.status });
-        console.error('server request failure details', err);
       }
       return c.json({ error: err.message || 'http_error' }, err.status);
     }
     logTelemetryError('http.request.unhandled', { requestId, status: 500 });
-    console.error('unhandled server error details', err);
     return c.json({ error: 'internal_error' }, 500);
   });
 

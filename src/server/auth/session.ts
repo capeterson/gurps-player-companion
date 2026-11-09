@@ -9,6 +9,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import { loadConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
 import { apiKeys, refreshTokens, users } from '../db/schema.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 import { hashApiKey, looksLikeApiKey } from './apiKey.ts';
 import {
   claimsGuestToken,
@@ -132,7 +133,7 @@ async function resolveApiKeyToken(token: string): Promise<AuthenticatedUser> {
     db.update(apiKeys)
       .set({ lastUsedAt: now })
       .where(eq(apiKeys.id, row.apiKey.id))
-      .catch((e) => console.error('lastUsedAt update failed', e));
+      .catch(() => logTelemetryEvent('auth.api_key.last_used_update_failed', {}, 'WARN'));
   }
 
   return {
@@ -274,6 +275,7 @@ export async function rotateRefreshToken(
   });
 
   if (result.kind === 'replay') {
+    logTelemetryEvent('auth.refresh.replay', {}, 'WARN');
     throw new AuthError('invalid_token', 'refresh token replayed; session family revoked');
   }
   if (result.kind === 'invalid') {

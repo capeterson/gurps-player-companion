@@ -640,4 +640,4 @@ Racial templates live in `campaign_library_races` (migration 0067), while `chara
 
 ## Observability
 
-The production server optionally exports OpenTelemetry metrics, server request spans and selected structured error logs via OTLP. The SDK starts only when `SUNBOLT_OTEL_ENABLED=true` and flushes on graceful shutdown. Instrumentation avoids request URLs, bodies and identifiers in metric labels. Scope and Alloy configuration are documented in [observability.md](../observability.md).
+The production server optionally exports OpenTelemetry metrics, server request spans and structured application, authentication, email and activity events via OTLP. The SDK starts only when `SUNBOLT_OTEL_ENABLED=true` and flushes on graceful shutdown. Instrumentation avoids request URLs, bodies and identifiers in metric labels. Scope and Alloy configuration are documented in [observability.md](../observability.md).

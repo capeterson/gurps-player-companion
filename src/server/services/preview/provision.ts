@@ -1,3 +1,4 @@
+import { logTelemetryEvent } from '../../telemetry.ts';
 /**
  * Builds the read-only preview campaign from the Lantern Coast seed recipe.
  *
@@ -215,10 +216,10 @@ export function startPreviewProvisioning(config: AppConfig): void {
     retryTimer = undefined;
     running = provisionPreviewCampaign()
       .then((result) => {
-        if (result.rebuilt) console.log(`guest preview provisioned: ${result.campaignId}`);
+        if (result.rebuilt) logTelemetryEvent('worker.preview.provisioned', {});
       })
-      .catch((error) => {
-        console.error('guest preview provisioning failed; retrying in 5 minutes', error);
+      .catch(() => {
+        logTelemetryEvent('worker.preview.failed', {}, 'ERROR');
         if (!stopped) retryTimer = setTimeout(attempt, RETRY_DELAY_MS);
       })
       .finally(() => {

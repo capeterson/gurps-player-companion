@@ -22,7 +22,7 @@ in production and HTTP with `PORT` in development/test for all public app URLs.
 Screenshot provenance and refresh notes live in
 [screenshots/README.md](../screenshots/README.md).
 
-Optional server OpenTelemetry export sends request, sync, database pool, WebSocket and nightly sweep signals to an OTLP collector; see [the operator guide](../observability.md). Client-side outbox visibility is not included.
+Optional server OpenTelemetry export sends request, sync, database pool, WebSocket, worker, authentication, email and observed user activity signals to an OTLP collector; see [the operator guide](../observability.md). Client-side outbox visibility is not included.
 
 The production image ships only production dependencies. The HTTP app denies
 framing, caches content-hashed assets immutably, and keeps HTML and service-worker

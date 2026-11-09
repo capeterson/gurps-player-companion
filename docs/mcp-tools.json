@@ -143,6 +143,12 @@
     },
     {
       "kind": "excluded",
+      "method": "POST",
+      "path": "/api/v1/webhooks/resend",
+      "reason": "Signed email provider webhook infrastructure"
+    },
+    {
+      "kind": "excluded",
       "method": "GET",
       "path": "/api/v1/healthz",
       "reason": "service infrastructure"

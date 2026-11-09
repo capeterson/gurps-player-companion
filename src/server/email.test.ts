@@ -52,3 +52,16 @@ describe('HTML email interpolation', () => {
     expect(message?.html).not.toContain('<b>');
   });
 });
+
+it('treats provider errors for password reset mail as failures', async () => {
+  const resend = {
+    emails: { send: async () => ({ error: { message: 'rejected' } }) },
+  } as unknown as import('resend').Resend;
+  await expect(
+    sendPasswordResetEmail(resend, 'sender@example.test', {
+      to: 'recipient@example.test',
+      displayName: 'Test',
+      resetUrl: 'https://example.test/reset?token=secret',
+    }),
+  ).rejects.toThrow('Email delivery failed');
+});

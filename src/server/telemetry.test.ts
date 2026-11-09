@@ -11,14 +11,18 @@ it('exports bounded request, sync and error telemetry to an OTLP HTTP receiver',
   });
   try {
     const script = `
-      import { startTelemetry, stopTelemetry, syncOutcomes, logTelemetryError } from './src/server/telemetry.ts';
+      import { startTelemetry, stopTelemetry, syncOutcomes, logTelemetryError, logTelemetryEvent, logUserActivity } from './src/server/telemetry.ts';
       import { createApp } from './src/server/app.ts';
       import { loadConfig } from './src/server/config.ts';
       startTelemetry();
       const app = createApp(loadConfig());
       await app.request('/api/v1/healthz?token=private-token', { headers: { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01' } });
+      await app.request('/api/v1/auth/reset-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'test-secret-token' }) });
       syncOutcomes.add(1, { entity_class: 'character', operation: 'patch', outcome: 'rejected' });
       logTelemetryError('test.failure', { status: 500 });
+      logUserActivity('synthetic-user', 'mcp');
+      logTelemetryEvent('email.accepted', { kind: 'password_reset' });
+      logTelemetryEvent('auth.login.failed', { method: 'password', reason: 'invalid_credentials' }, 'WARN');
       await stopTelemetry();
     `;
     const child = Bun.spawn(['bun', '-e', script], {
@@ -41,6 +45,17 @@ it('exports bounded request, sync and error telemetry to an OTLP HTTP receiver',
     const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
     expect({ code, stderr }).toEqual({ code: 0, stderr: expect.any(String) });
     const all = JSON.stringify(received);
+    const exportedLogs = received
+      .filter((record) => record.path === '/v1/logs')
+      .map((record) => record.body)
+      .join('');
+    expect(exportedLogs).toContain('user.activity');
+    expect(exportedLogs).toContain('operation.completed');
+    expect(exportedLogs).toContain('password_reset.complete');
+    expect(exportedLogs).not.toContain('test-secret-token');
+    expect(exportedLogs).toContain('auth.login.failed');
+    expect(exportedLogs).toContain('email.accepted');
+    expect(exportedLogs).not.toContain('private-token');
     expect(received.map((record) => record.path)).toEqual(
       expect.arrayContaining(['/v1/metrics', '/v1/traces', '/v1/logs']),
     );
@@ -50,6 +65,10 @@ it('exports bounded request, sync and error telemetry to an OTLP HTTP receiver',
     expect(all).toContain('sunbolt.sync.operations');
     expect(all).toContain('rejected');
     expect(all).toContain('test.failure');
+    expect(all).toContain('user.activity');
+    expect(all).toContain('synthetic-user');
+    expect(all).toContain('email.accepted');
+    expect(all).toContain('auth.login.failed');
     expect(all).not.toContain('private-token');
   } finally {
     collector.stop(true);

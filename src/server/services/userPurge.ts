@@ -12,6 +12,7 @@ import {
   users,
 } from '../db/schema.ts';
 import { isDraining } from '../lifecycle.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 import { resolveLogAwards } from './adventureLogAwards.ts';
 import { advanceCampaignProjectionRevision } from './libraryInvalidation.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
@@ -24,7 +25,10 @@ export async function sweepExpiredRefreshTokens(now = new Date()): Promise<numbe
 }
 
 /** Nightly expiry cleanup plus atomic account deletion; failed accounts stay queued. */
-export async function sweepUserPurges(now = new Date()): Promise<number> {
+export async function sweepUserPurges(
+  now = new Date(),
+  processed: (count?: number) => void = () => {},
+): Promise<number> {
   const db = getDb();
   // Keep the sweep lock on its own connection. Each account commits separately
   // so a large nightly queue does not hold the sync revision fence all night.
@@ -34,7 +38,7 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
     );
     if (!lock.rows[0]?.acquired) return 0;
     // Expiry cleanup runs even when no accounts are scheduled for deletion.
-    await sweepExpiredRefreshTokens(now);
+    processed(await sweepExpiredRefreshTokens(now));
     const due = await db
       .select({ id: users.id })
       .from(users)
@@ -186,12 +190,14 @@ export async function sweepUserPurges(now = new Date()): Promise<number> {
           }
           return true;
         });
-        if (deleted) purged++;
+        if (deleted) {
+          purged++;
+          processed();
+        }
       } catch {
-        console.error('user purge failed; queued for next night', { userId: candidate.id });
+        logTelemetryEvent('worker.user_purge.item_failed', {}, 'ERROR');
       }
     }
-    if (purged) console.info('user purge completed', { users: purged });
     return purged;
   });
 }

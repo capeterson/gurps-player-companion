@@ -1,11 +1,12 @@
 import { eq, sql } from 'drizzle-orm';
 import { getDb } from '../../db/client.ts';
 import { mediaAssets } from '../../db/schema.ts';
+import { logTelemetryEvent, observeSweep } from '../../telemetry.ts';
 import { mediaConfig } from './config.ts';
 import { mediaStorage } from './storage.ts';
 
 /** Database lease makes this safe to schedule in every app replica. */
-export async function sweepMedia(): Promise<void> {
+export async function sweepMedia(processed: (count?: number) => void = () => {}): Promise<void> {
   if (!mediaConfig().configured) return;
   // This transaction lock also protects backup-pause installation. A backup
   // waits for the entire active sweep (including object deletes) to finish.
@@ -52,11 +53,11 @@ export async function sweepMedia(): Promise<void> {
         cursor = page.cursor;
       } while (cursor);
       await db.delete(mediaAssets).where(eq(mediaAssets.id, asset.id));
+      processed();
     }
     await db.execute(
       sql`delete from media_counters where expires_at<now()-interval '1 day' and key not in ('maintenance','backup-pause')`,
     );
-    if (victims.length) console.info('media cleanup completed', { assets: victims.length });
   });
   // The lease expires naturally; never release a successor's lease.
 }
@@ -67,8 +68,8 @@ export function startMediaMaintenance() {
   if (timer || !mediaConfig().configured || process.env.ENVIRONMENT === 'test') return;
   const tick = () => {
     if (activeSweep) return;
-    activeSweep = sweepMedia()
-      .catch(() => console.error('media cleanup failed; will retry'))
+    activeSweep = observeSweep('media cleanup', sweepMedia)
+      .catch(() => logTelemetryEvent('worker.media_cleanup.failed', {}, 'ERROR'))
       .finally(() => {
         activeSweep = undefined;
       });

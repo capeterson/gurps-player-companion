@@ -3,6 +3,7 @@ import { metrics } from '@opentelemetry/api';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { loadConfig } from '../config.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 import * as schema from './schema.ts';
 
 let pool: Pool | undefined;
@@ -36,7 +37,7 @@ export function getDb() {
   const config = loadConfig();
   registerPoolMetrics();
   pool = new Pool({ connectionString: config.databaseUrl, connectionTimeoutMillis: 5_000 });
-  pool.on('error', () => console.error('idle database connection failed'));
+  pool.on('error', () => logTelemetryEvent('db.pool.connection_failed', {}, 'ERROR'));
   dbInstance = drizzle(pool, { schema });
   return dbInstance;
 }

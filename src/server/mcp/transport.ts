@@ -17,6 +17,7 @@ import {
   resolveOAuthAccessToken,
 } from '../oauth/service.ts';
 import type { AppEnv } from '../openapi/app.ts';
+import { logTelemetryEvent, logUserActivity } from '../telemetry.ts';
 import {
   type RuntimeTool,
   buildToolCatalog,
@@ -384,9 +385,17 @@ export function createMcpHandler(
     });
     server.setRequestHandler(CallToolRequestSchema, async (toolCall) => {
       const tool = byName.get(toolCall.params.name);
-      if (!tool) return toolError('unknown_tool', 'Unknown tool');
+      if (!tool) {
+        logTelemetryEvent('mcp.tool.failed', { reason: 'unknown_tool' }, 'WARN');
+        return toolError('unknown_tool', 'Unknown tool');
+      }
       const input = (toolCall.params.arguments ?? {}) as OperationInput;
       if (!tool.validateInput(input)) {
+        logTelemetryEvent(
+          'mcp.tool.failed',
+          { reason: 'invalid_input', tool: tool.policy.tool },
+          'WARN',
+        );
         return toolError(
           'validation_error',
           `Invalid tool input: ${JSON.stringify(tool.validateInput.errors)}`,
@@ -417,12 +426,25 @@ export function createMcpHandler(
         const body: unknown =
           text.length === 0 ? null : contentType.includes('json') ? JSON.parse(text) : text;
         const violation = await runtime.validateResponse(response.status, contentType, body);
-        if (violation)
+        if (violation) {
+          logTelemetryEvent(
+            'mcp.tool.failed',
+            { reason: 'response_contract', tool: tool.policy.tool },
+            'ERROR',
+          );
           return toolError(
             'response_contract_error',
             'The operation returned an invalid response',
             500,
           );
+        }
+        if (!response.ok)
+          logTelemetryEvent(
+            'mcp.tool.failed',
+            { reason: 'operation_response', tool: tool.policy.tool, status: response.status },
+            response.status >= 500 ? 'ERROR' : 'WARN',
+          );
+        if (response.ok) logUserActivity(principal.user.id, 'mcp');
         const mutationBody =
           response.ok && runtime.policy.method !== 'GET'
             ? mutationAcknowledgement(body, input, runtime.policy)
@@ -442,6 +464,11 @@ export function createMcpHandler(
           ...(response.ok ? {} : { isError: true }),
         };
       } catch {
+        logTelemetryEvent(
+          'mcp.tool.failed',
+          { reason: 'operation_exception', tool: tool.policy.tool },
+          'ERROR',
+        );
         return toolError(
           'operation_failed',
           'The operation could not be completed. Reuse the same idempotency key to check a mutation outcome; otherwise refresh the affected data before trying again.',

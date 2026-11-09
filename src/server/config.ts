@@ -43,6 +43,7 @@ const envSchema = z.object({
   API_KEY_PEPPER: z.string().min(16).optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
   APP_HOSTNAME: appHostname.optional(),
   OAUTH_CLIENTS: z
     .string()
@@ -134,6 +135,7 @@ export type AppConfig = {
   corsOrigins: string[];
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
+  resendWebhookSecret?: string | undefined;
   appHostname: string;
   oauthClients: OAuthClientConfig[];
   trustProxy: boolean;
@@ -175,6 +177,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     CORS_ORIGINS: env.CORS_ORIGINS,
     RESEND_API_KEY: env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: env.RESEND_FROM_EMAIL,
+    RESEND_WEBHOOK_SECRET: env.RESEND_WEBHOOK_SECRET,
     APP_HOSTNAME: env.APP_HOSTNAME,
     OAUTH_CLIENTS: env.OAUTH_CLIENTS,
     TRUST_PROXY: env.TRUST_PROXY,
@@ -203,6 +206,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     corsOrigins: parsed.CORS_ORIGINS,
     resendApiKey: parsed.RESEND_API_KEY,
     resendFromEmail: parsed.RESEND_FROM_EMAIL,
+    resendWebhookSecret: parsed.RESEND_WEBHOOK_SECRET,
     appHostname: parsed.APP_HOSTNAME ?? 'localhost',
     oauthClients: parsed.OAUTH_CLIENTS,
     trustProxy: parsed.TRUST_PROXY ?? parsed.ENVIRONMENT === 'production',
