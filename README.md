@@ -168,6 +168,7 @@ The supplied Compose files set container variables explicitly: `.env` supplies `
 | `CORS_ORIGINS` | `[]` | JSON array of allowed origins. Empty means same-origin only; both Compose files set `[]`. |
 | `RESEND_API_KEY` | Unset | Enables Resend delivery for password resets and campaign invitations. |
 | `RESEND_FROM_EMAIL` | Unset | Sender email for Resend; configure alongside the API key. |
+| `RESEND_WEBHOOK_SECRET` | Unset | Signing secret for Resend delivery event callbacks; see [observability](docs/observability.md). |
 | `OAUTH_CLIENTS` | `[]` | Optional JSON array of operator-defined public OAuth clients. Supported clients can register/discover themselves without an entry. See `.env.example` for the shape. |
 | `TRUST_PROXY` | `true` in production, `false` otherwise | Trust the final forwarded IP/protocol hop behind a trusted edge. Explicitly disable for direct hosting. |
 | `AUTH_RATE_LIMIT_WINDOW_SECONDS` | `600` | Shared public-auth rate-limit window in seconds, from 1 to 86,400. |

@@ -49,6 +49,7 @@ import {
 import { getResend, sendPasswordResetEmail } from '../email.ts';
 import { createOpenApiApp, errorResponse } from '../openapi/app.ts';
 import { isReservedPreviewEmail } from '../services/preview/provision.ts';
+import { logTelemetryEvent, logUserActivity } from '../telemetry.ts';
 
 const router = createOpenApiApp();
 
@@ -154,6 +155,11 @@ router.openapi(
     }
     if (!created) throw new HTTPException(500, { message: 'insert failed' });
     const tokens = await issueTokenPair(created.id);
+    logTelemetryEvent('auth.registration.succeeded', {
+      user_id: created.id,
+      request_id: c.get('requestId'),
+    });
+    logUserActivity(created.id, 'web');
     return c.json(tokens, 201);
   },
 );
@@ -193,6 +199,12 @@ router.openapi(
       throw new HTTPException(401, { message: 'invalid credentials' });
     }
     const tokens = await issueTokenPair(user.id);
+    logTelemetryEvent('auth.login.succeeded', {
+      method: 'password',
+      user_id: user.id,
+      request_id: c.get('requestId'),
+    });
+    logUserActivity(user.id, 'web');
     return c.json(tokens, 200);
   },
 );
@@ -497,6 +509,12 @@ router.openapi(
       .returning({ id: passkeyCredentials.id });
     if (!updated[0]) throw new HTTPException(401, { message: 'invalid passkey' });
     const tokens = await issueTokenPair(credential.userId);
+    logTelemetryEvent('auth.login.succeeded', {
+      method: 'passkey',
+      user_id: credential.userId,
+      request_id: c.get('requestId'),
+    });
+    logUserActivity(credential.userId, 'web');
     return c.json(tokens, 200);
   },
 );
@@ -827,11 +845,28 @@ router.openapi(
         const baseUrl = appUrl(config);
         const resetUrl = `${baseUrl}/reset-password?token=${rawToken}`;
 
+        logTelemetryEvent('email.attempted', {
+          kind: 'password_reset',
+          request_id: c.get('requestId'),
+        });
         sendPasswordResetEmail(resend, config.resendFromEmail, {
           to: user.email,
           displayName: user.displayName,
           resetUrl,
-        }).catch(() => {});
+        }).then(
+          (providerId) =>
+            logTelemetryEvent('email.accepted', {
+              ...(providerId ? { provider_email_id: providerId } : {}),
+              kind: 'password_reset',
+              request_id: c.get('requestId'),
+            }),
+          () =>
+            logTelemetryEvent(
+              'email.failed',
+              { kind: 'password_reset', request_id: c.get('requestId') },
+              'ERROR',
+            ),
+        );
       }
     }
 

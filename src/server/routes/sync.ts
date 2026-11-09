@@ -56,7 +56,7 @@ import {
   dispatchOperation,
   publishBatchInvalidations,
 } from '../services/syncDispatch.ts';
-import { syncBatchSize, syncCursorRows, syncOutcomes } from '../telemetry.ts';
+import { logTelemetryEvent, syncBatchSize, syncCursorRows, syncOutcomes } from '../telemetry.ts';
 import { libraryEntityConfig, libraryRowOut } from './campaignLibraryEntities.ts';
 
 const router = createOpenApiApp();
@@ -86,6 +86,20 @@ router.use('/sync/*', async (c, next) => {
   await next();
 });
 router.use('/sync/*', requireActiveUser);
+
+/** Coarse categories only: the underlying reason can contain user data. */
+export function syncOutcomeReason(outcome: OperationOutcome): string {
+  if (outcome.status === 'unauthorized') return 'access_denied';
+  if (outcome.status === 'stale_base') return 'revision_mismatch';
+  if (outcome.status === 'conflict') return 'conflict';
+  if (outcome.status === 'transient') return 'retryable_failure';
+  if (outcome.status !== 'rejected') return 'applied';
+  const reason = outcome.reason ?? '';
+  if (/parent|belongs to|not found/i.test(reason)) return 'missing_or_invalid_reference';
+  if (/read.only|not writable|not allowed|forbidden/i.test(reason)) return 'write_restricted';
+  if (/invalid|required|must|expected|validation/i.test(reason)) return 'invalid_input';
+  return 'other_rejection';
+}
 
 const DEFAULT_CURSOR_PAGE_SIZE = 200;
 const MAX_CURSOR_PAGE_SIZE = 500;
@@ -144,6 +158,19 @@ router.openapi(
       );
       chains.record(op, outcome);
       outcomes.push(outcome);
+      if (outcome.status !== 'applied') {
+        logTelemetryEvent(
+          'sync.operation.not_applied',
+          {
+            entity_class: op.entityClass,
+            operation: op.command,
+            outcome: outcome.status,
+            reason: syncOutcomeReason(outcome),
+            request_id: c.get('requestId'),
+          },
+          'WARN',
+        );
+      }
       syncOutcomes.add(1, {
         entity_class: op.entityClass,
         operation: op.command,

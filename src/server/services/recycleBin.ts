@@ -1,3 +1,10 @@
+import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { HTTPException } from 'hono/http-exception';
+import { canWriteCharacter, lookupCampaignRole } from '../auth/permissions.ts';
+import { type AuditTx, withAudit } from '../db/auditContext.ts';
+import { getDb } from '../db/client.ts';
+import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
+import { isDraining } from '../lifecycle.ts';
 /**
  * Recycle bin: deleting a character or campaign marks it (`deleted_at`) and
  * hides it from every read path; it is restorable for 30 days, after which the
@@ -8,13 +15,7 @@
  * (`deleted_at <= now() - 30 days`), so an item is never purged early. It may
  * outlive the cutoff by up to one sweep interval.
  */
-import { and, asc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
-import { HTTPException } from 'hono/http-exception';
-import { canWriteCharacter, lookupCampaignRole } from '../auth/permissions.ts';
-import { type AuditTx, withAudit } from '../db/auditContext.ts';
-import { getDb } from '../db/client.ts';
-import { campaignMemberships, campaigns, characters } from '../db/schema.ts';
-import { isDraining } from '../lifecycle.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 import { detachLibraryReferencesForTransfer } from './ownedLibraryMechanics.ts';
 
 export const RECYCLE_BIN_RETENTION_DAYS = 30;
@@ -272,7 +273,9 @@ export async function listRecycleBin(
  * own audited transaction, and a concurrent restore wins via the row re-check.
  * Campaigns go first so their released characters are judged on their own clock.
  */
-export async function sweepRecycleBin(): Promise<number> {
+export async function sweepRecycleBin(
+  processed: (count?: number) => void = () => {},
+): Promise<number> {
   const db = getDb();
   return db.transaction(async (lockTx) => {
     const lock = await lockTx.execute<{ acquired: boolean }>(
@@ -303,11 +306,12 @@ export async function sweepRecycleBin(): Promise<number> {
             .for('update', { skipLocked: true });
           return target ? purgeCampaign(tx, target.id) : false;
         });
-        if (removed) purged++;
+        if (removed) {
+          purged++;
+          processed();
+        }
       } catch {
-        console.error('recycle bin campaign purge failed; will retry', {
-          campaignId: candidate.id,
-        });
+        logTelemetryEvent('worker.recycle_bin.item_failed', { kind: 'campaign' }, 'ERROR');
       }
     }
     const dueCharacters = await db
@@ -332,14 +336,14 @@ export async function sweepRecycleBin(): Promise<number> {
             .for('update', { skipLocked: true });
           return target ? purgeCharacter(tx, target.id) : false;
         });
-        if (removed) purged++;
+        if (removed) {
+          purged++;
+          processed();
+        }
       } catch {
-        console.error('recycle bin character purge failed; will retry', {
-          characterId: candidate.id,
-        });
+        logTelemetryEvent('worker.recycle_bin.item_failed', { kind: 'character' }, 'ERROR');
       }
     }
-    if (purged) console.info('recycle bin purge completed', { items: purged });
     return purged;
   });
 }

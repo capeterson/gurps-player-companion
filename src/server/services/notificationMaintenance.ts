@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { loadConfig } from '../config.ts';
 import { isDraining } from '../lifecycle.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 import { nextNotificationEmailAttemptAt, processNotificationEmails } from './notificationEmails.ts';
 import { hasPendingNotificationEvents, processNotificationEvents } from './notificationEvents.ts';
 
@@ -104,7 +105,7 @@ export class NotificationMaintenance {
     this.client = undefined;
     this.close(client);
     if (this.running && !isDraining()) {
-      console.error('notification listener disconnected; will reconnect');
+      logTelemetryEvent('worker.notification.listener_disconnected', {}, 'ERROR');
       this.scheduleReconnect();
     }
   }
@@ -127,7 +128,7 @@ export class NotificationMaintenance {
     this.active = Promise.resolve()
       .then(() => this.drain())
       .catch(() => {
-        console.error('notification processing failed; will retry');
+        logTelemetryEvent('worker.notification.failed', {}, 'ERROR');
         this.requested = false;
         this.scheduleWork(Math.min(60_000, 1_000 * 2 ** Math.min(this.processingFailures++, 6)));
       })

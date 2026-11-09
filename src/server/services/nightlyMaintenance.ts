@@ -1,5 +1,5 @@
 import { isDraining } from '../lifecycle.ts';
-import { logTelemetryError, workerDuration, workerRuns } from '../telemetry.ts';
+import { logTelemetryError, observeSweep, workerDuration, workerRuns } from '../telemetry.ts';
 import { sweepRecycleBin } from './recycleBin.ts';
 import { sweepUserPurges } from './userPurge.ts';
 
@@ -16,9 +16,12 @@ export function nextNightlyAt(now: Date): Date {
  * isolated, so one failing sweep never blocks the others; failed items stay
  * queued for the next night.
  */
-const NIGHTLY_SWEEPS: ReadonlyArray<{ name: string; run: () => Promise<unknown> }> = [
-  { name: 'user purge', run: () => sweepUserPurges() },
-  { name: 'recycle bin', run: () => sweepRecycleBin() },
+const NIGHTLY_SWEEPS: ReadonlyArray<{
+  name: string;
+  run: (processed: (count?: number) => void) => Promise<unknown>;
+}> = [
+  { name: 'user purge', run: (processed) => sweepUserPurges(new Date(), processed) },
+  { name: 'recycle bin', run: (processed) => sweepRecycleBin(processed) },
 ];
 
 export async function runNightlySweeps(): Promise<void> {
@@ -27,7 +30,7 @@ export async function runNightlySweeps(): Promise<void> {
     const start = performance.now();
     let outcome = 'success';
     try {
-      await sweep.run();
+      await observeSweep(sweep.name, sweep.run);
     } catch {
       outcome = 'failure';
       logTelemetryError('worker.sweep.failed', { worker: sweep.name });

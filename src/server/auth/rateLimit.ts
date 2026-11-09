@@ -4,6 +4,7 @@ import type { Context } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppConfig } from '../config.ts';
 import { getDb } from '../db/client.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 
 export type AuthRateLimitScope = 'login' | 'register' | 'reset' | 'challenge' | 'oauth' | 'guest';
 
@@ -91,12 +92,12 @@ export async function enforceAuthRateLimit(
   const sourceRetryAfter = await consume(scope, `source:${digest(source)}`, config);
   // A blocked source must not allocate arbitrary new account rows or exhaust
   // another account's budget. Only admitted sources consume that dimension.
-  if (sourceRetryAfter > 0) reject(c, sourceRetryAfter);
+  if (sourceRetryAfter > 0) reject(c, sourceRetryAfter, scope, 'source');
   const accountRetryAfter =
     account && scope !== 'login' && scope !== 'register'
       ? await consume(scope, `account:${digest(normalizeRateLimitAccount(account))}`, config)
       : 0;
-  if (accountRetryAfter > 0) reject(c, accountRetryAfter);
+  if (accountRetryAfter > 0) reject(c, accountRetryAfter, scope, 'account');
 }
 
 /** Only failed password checks consume the cross-source account budget. */
@@ -110,10 +111,20 @@ export async function enforceFailedLoginRateLimit(
     `account:${digest(normalizeRateLimitAccount(account))}`,
     config,
   );
-  if (retryAfter > 0) reject(c, retryAfter);
+  if (retryAfter > 0) reject(c, retryAfter, 'login', 'account');
 }
 
-function reject(c: Context, retryAfter: number): never {
+function reject(
+  c: Context,
+  retryAfter: number,
+  scope: AuthRateLimitScope,
+  dimension: 'source' | 'account',
+): never {
+  logTelemetryEvent(
+    'auth.rate_limited',
+    { scope, dimension, retry_after_seconds: retryAfter },
+    'WARN',
+  );
   c.header('Retry-After', String(retryAfter));
   throw new HTTPException(429, {
     message: 'too many requests; please try again later',

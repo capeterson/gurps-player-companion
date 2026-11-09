@@ -10,9 +10,9 @@ export async function sendPasswordResetEmail(
   resend: Resend,
   from: string,
   opts: { to: string; displayName: string; resetUrl: string },
-): Promise<void> {
+): Promise<string | undefined> {
   const { to, displayName, resetUrl } = opts;
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from,
     to,
     subject: 'Reset your Sunbolt password',
@@ -32,6 +32,8 @@ export async function sendPasswordResetEmail(
 <p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>
     `.trim(),
   });
+  if (result.error) throw new Error('Email delivery failed');
+  return result.data?.id;
 }
 
 function escapeHtml(str: string): string {
@@ -46,7 +48,7 @@ export async function sendNotificationEmail(
   resend: Resend,
   from: string,
   opts: { to: string; subject: string; message: string; appUrl: string; idempotencyKey: string },
-): Promise<void> {
+): Promise<string | undefined> {
   const result = await resend.emails.send(
     {
       from,
@@ -58,4 +60,5 @@ export async function sendNotificationEmail(
     { idempotencyKey: opts.idempotencyKey },
   );
   if (result.error) throw new Error('Email delivery failed');
+  return result.data?.id;
 }

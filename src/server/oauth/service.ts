@@ -712,7 +712,7 @@ export async function resolveOAuthAccessToken(
   };
 }
 
-export async function revokeOAuthToken(rawToken: string, clientId: string): Promise<void> {
+export async function revokeOAuthToken(rawToken: string, clientId: string): Promise<boolean> {
   const db = getDb();
   const tokenHash = hash(rawToken);
   const accessRows = await db
@@ -731,9 +731,12 @@ export async function revokeOAuthToken(rawToken: string, clientId: string): Prom
     .filter((row) => row.clientId === clientId)
     .map((row) => row.grantId);
   if (grantIds.length > 0) {
-    await db
+    const updated = await db
       .update(oauthGrants)
       .set({ revokedAt: new Date() })
-      .where(inArray(oauthGrants.id, grantIds));
+      .where(and(inArray(oauthGrants.id, grantIds), isNull(oauthGrants.revokedAt)))
+      .returning({ id: oauthGrants.id });
+    return updated.length > 0;
   }
+  return false;
 }

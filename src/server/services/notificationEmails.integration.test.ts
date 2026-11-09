@@ -477,3 +477,27 @@ describe('notification email policy', () => {
     });
   });
 });
+
+describe('email queue telemetry trigger', () => {
+  it('installs an insert-only trigger with bounded fields and no client warning', async () => {
+    const { sql } = await import('drizzle-orm');
+    const result = await getDb().execute<{
+      trigger_definition: string;
+      function_definition: string;
+    }>(sql`
+      SELECT pg_get_triggerdef(t.oid) AS trigger_definition,
+             pg_get_functiondef(t.tgfoid) AS function_definition
+      FROM pg_trigger t
+      WHERE t.tgrelid = 'notification_email_queue'::regclass
+        AND t.tgname = 'log_email_queue_attempt_trg' AND NOT t.tgisinternal
+    `);
+    expect(result.rows).toHaveLength(1);
+    const row = result.rows[0];
+    expect(row?.trigger_definition).toContain('AFTER INSERT');
+    expect(row?.function_definition).toContain('email.queue.insert_attempt');
+    expect(row?.function_definition).toContain('client_min_messages');
+    expect(row?.function_definition).not.toContain('NEW.subject');
+    expect(row?.function_definition).not.toContain('NEW.message');
+    expect(row?.function_definition).not.toContain('NEW.user_id');
+  });
+});

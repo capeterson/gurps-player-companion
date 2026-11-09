@@ -116,6 +116,7 @@ export const OPERATION_POLICY: readonly OperationPolicy[] = [
   excluded('POST', '/oauth/register', 'OAuth client-registration infrastructure'),
   excluded('GET', '/oauth/authorize', 'OAuth consent infrastructure'),
   excluded('POST', '/mcp', 'MCP transport infrastructure'),
+  excluded('POST', '/api/v1/webhooks/resend', 'Signed email provider webhook infrastructure'),
   excluded('GET', '/api/v1/healthz', 'service infrastructure'),
   excluded('GET', '/api/v1/readyz', 'service infrastructure'),
   excluded('POST', '/api/v1/auth/register', 'account and credential infrastructure'),

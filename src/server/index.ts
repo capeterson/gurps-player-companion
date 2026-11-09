@@ -11,7 +11,7 @@ import {
 } from './services/notificationMaintenance.ts';
 import { startPreviewProvisioning, stopPreviewProvisioning } from './services/preview/provision.ts';
 import { closeAll as closeAllWebSockets } from './services/wsBus.ts';
-import { startTelemetry, stopTelemetry } from './telemetry.ts';
+import { logTelemetryEvent, startTelemetry, stopTelemetry } from './telemetry.ts';
 
 /** Server-process work only; each starter is idempotent and skips the test environment. */
 export function startBackgroundMaintenance(config: AppConfig): void {
@@ -92,32 +92,31 @@ if (import.meta.main) {
   const config = loadConfig();
   startTelemetry();
   const server = startServer(config);
-  console.log(
-    `gurps-player-companion server listening on http://${server.hostname}:${server.port}`,
-  );
+  logTelemetryEvent('server.started', {});
+  if (!config.resendApiKey || !config.resendFromEmail)
+    logTelemetryEvent('email.delivery_unconfigured', {}, 'WARN');
+  if (config.resendApiKey && !config.resendWebhookSecret)
+    logTelemetryEvent('email.webhook_unconfigured', {}, 'WARN');
   let shuttingDown = false;
   const onSignal = (signal: NodeJS.Signals) => {
     if (shuttingDown) {
       // A second signal means the operator does not want to wait.
-      console.warn(`received ${signal} again; exiting immediately`);
+      logTelemetryEvent('server.shutdown.interrupted', { signal }, 'WARN');
       process.exit(1);
     }
     shuttingDown = true;
-    console.log(
-      `received ${signal}; draining for up to ${config.shutdownGraceSeconds}s (${server.pendingRequests} in-flight requests)`,
-    );
+    logTelemetryEvent('server.shutdown.started', {
+      signal,
+      pending_requests: server.pendingRequests,
+    });
     void shutdownServer(server, config.shutdownGraceSeconds * 1000).then(
       async (result) => {
+        logTelemetryEvent('server.shutdown.finished', { outcome: result });
         await stopTelemetry().catch(() => undefined);
-        console.log(
-          result === 'drained'
-            ? 'shutdown complete'
-            : 'shutdown grace period elapsed; remaining connections closed',
-        );
         process.exit(0);
       },
-      (error) => {
-        console.error('shutdown failed', error);
+      () => {
+        logTelemetryEvent('server.shutdown.failed', {}, 'ERROR');
         process.exit(1);
       },
     );

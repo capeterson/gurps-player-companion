@@ -10667,6 +10667,68 @@
     "parameters": {}
   },
   "paths": {
+    "/api/v1/webhooks/resend": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Receive signed Resend delivery events",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Event accepted"
+          },
+          "400": {
+            "description": "Invalid signature or event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Webhook body too large"
+          },
+          "503": {
+            "description": "Webhook not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/.well-known/oauth-protected-resource/mcp": {
       "get": {
         "tags": [

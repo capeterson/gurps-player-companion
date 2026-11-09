@@ -153,3 +153,8 @@ clobber a different toggle.
 - `src/client/features/settings/NotificationsSection.tsx` — desktop, email and inbox controls.
 - `src/client/lib/desktopNotifications.ts` — explicit permission, device opt-in and delivery deduplication.
 - `src/client/components/NotificationsBell.tsx` — typed inbox rendering and invitation actions.
+
+
+Resend delivery callbacks can be enabled with `RESEND_WEBHOOK_SECRET` and a provider-configured webhook at `/api/v1/webhooks/resend`. The server verifies the raw payload signature before emitting an OTLP event; it does not persist callback content or change notification state. See [observability](../observability.md) for event correlation and delivery limitations.
+
+Email queue inserts also emit a PostgreSQL server log event containing only the queue UUID and kind. The event records an insert attempt and can survive transaction rollback; queue rows remain authoritative. PostgreSQL log collection is configured separately on the database host; see [observability](../observability.md).

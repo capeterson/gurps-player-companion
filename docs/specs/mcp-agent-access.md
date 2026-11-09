@@ -195,7 +195,7 @@ tools. The current covered surface is:
 | Login/register/recovery/refresh/logout, passwords, passkeys, API keys, OAuth consent/token management | Browser/security infrastructure excluded, except the safe current-user read above. |
 | Guest preview session (`GET`/`POST /auth/guest`) | Read-only preview session infrastructure; excluded. Guest tokens are refused at `/mcp` by the guest allow-list (see [preview-mode.md](preview-mode.md)). |
 | Theme and notification preferences (`GET`/`PATCH /auth/preferences`, `GET`/`PATCH /auth/notification-preferences`) | Browser display preference; excluded, and gated to interactive JWT sessions (`requireActiveJwt`). |
-| Admin, health, OpenAPI, static assets, MCP/OAuth discovery and transport | Infrastructure/admin excluded from player tools. |
+| Admin, health, OpenAPI, static assets, MCP/OAuth discovery and transport, signed Resend delivery webhook | Infrastructure/admin excluded from player tools. |
 
 Device-only roll history and solo encounter scratchpads are not raw API
 capabilities and cannot be read remotely. A future convenience tool requiring a

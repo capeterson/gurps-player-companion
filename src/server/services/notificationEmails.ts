@@ -1,16 +1,29 @@
 /** Only invitation, acceptance and unconditional security mail can enter this worker. */
-import { and, eq, isNull, lt, lte, min } from 'drizzle-orm';
+import { and, eq, isNull, lt, lte, min, sql } from 'drizzle-orm';
 import { notificationEmailPayload } from '../../shared/schemas/notification.ts';
 import { notificationPreferences } from '../../shared/schemas/notificationPreferences.ts';
 import { appUrl, loadConfig } from '../config.ts';
 import { getDb, runInDbTransaction } from '../db/client.ts';
 import { campaignInvitations, notificationEmailQueue, users } from '../db/schema.ts';
 import { getResend, sendNotificationEmail } from '../email.ts';
+import { logTelemetryEvent } from '../telemetry.ts';
 
 /** Schedule only known pending mail; unconfigured delivery must remain idle. */
 export async function nextNotificationEmailAttemptAt(): Promise<Date | null> {
   const config = loadConfig();
-  if (!getResend(config) || !config.resendFromEmail) return null;
+  const configured = Boolean(getResend(config) && config.resendFromEmail);
+  const [counts] = await getDb()
+    .select({
+      pending: sql<number>`count(*) filter (where ${notificationEmailQueue.sentAt} is null and ${notificationEmailQueue.attempts} < 8)::int`,
+      exhausted: sql<number>`count(*) filter (where ${notificationEmailQueue.sentAt} is null and ${notificationEmailQueue.attempts} >= 8)::int`,
+    })
+    .from(notificationEmailQueue);
+  logTelemetryEvent('email.queue.backlog', {
+    pending: counts?.pending ?? 0,
+    exhausted: counts?.exhausted ?? 0,
+    configured: configured ? 1 : 0,
+  });
+  if (!configured) return null;
   const [row] = await getDb()
     .select({ nextAttemptAt: min(notificationEmailQueue.nextAttemptAt) })
     .from(notificationEmailQueue)
@@ -19,7 +32,9 @@ export async function nextNotificationEmailAttemptAt(): Promise<Date | null> {
 }
 
 export async function processNotificationEmails(
-  sendEmail: typeof sendNotificationEmail = sendNotificationEmail,
+  sendEmail: (
+    ...args: Parameters<typeof sendNotificationEmail>
+  ) => Promise<string | undefined> | Promise<void> = sendNotificationEmail,
 ): Promise<number> {
   const config = loadConfig();
   const resend = getResend(config);
@@ -56,7 +71,10 @@ export async function processNotificationEmails(
           .where(eq(campaignInvitations.id, job.relatedId));
         skip ||= invitation?.status !== 'pending';
       }
+      if (job.attempts === 0)
+        logTelemetryEvent('email.queue_observed', { kind: job.kind, job_id: job.id });
       if (skip) {
+        logTelemetryEvent('email.skipped', { kind: job.kind, job_id: job.id });
         await db.delete(notificationEmailQueue).where(eq(notificationEmailQueue.id, job.id));
         continue;
       }
@@ -65,7 +83,12 @@ export async function processNotificationEmails(
           subject: job.subject,
           message: job.message,
         });
-        await sendEmail(resend, from, {
+        logTelemetryEvent('email.attempted', {
+          kind: job.kind,
+          job_id: job.id,
+          attempt: job.attempts + 1,
+        });
+        const providerId = await sendEmail(resend, from, {
           to: user.email,
           ...payload,
           appUrl: appUrl(config),
@@ -75,6 +98,12 @@ export async function processNotificationEmails(
           .update(notificationEmailQueue)
           .set({ sentAt: new Date(), lastError: null })
           .where(eq(notificationEmailQueue.id, job.id));
+        logTelemetryEvent('email.accepted', {
+          ...(providerId ? { provider_email_id: providerId } : {}),
+          kind: job.kind,
+          job_id: job.id,
+          attempt: job.attempts + 1,
+        });
       } catch {
         const attempts = job.attempts + 1;
         await db
@@ -85,7 +114,11 @@ export async function processNotificationEmails(
             nextAttemptAt: new Date(Date.now() + Math.min(3_600_000, 60_000 * 2 ** attempts)),
           })
           .where(eq(notificationEmailQueue.id, job.id));
-        console.error('notification email delivery failed', { jobId: job.id, attempts });
+        logTelemetryEvent(
+          attempts >= 8 ? 'email.exhausted' : 'email.retry_scheduled',
+          { kind: job.kind, job_id: job.id, attempt: attempts },
+          'ERROR',
+        );
       }
     }
     return jobs.length;
