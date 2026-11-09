@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import Ajv, { type ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
 import {
@@ -301,6 +302,43 @@ function compile(schema: JsonSchema): ValidateFunction {
   return validator;
 }
 
+// Response schemas for different operations share one large component graph
+// (character detail above all). Compiling a bundled copy per operation made each
+// tool pay a ~100 ms first-call compile; instead register the converted
+// components once and let every response validator `$ref` into them, so ajv
+// compiles each component a single time per document.
+const sharedDefinitionIds = new WeakMap<object, string>();
+function sharedDefinitions(definitions: Record<string, JsonSchema>): string {
+  let id = sharedDefinitionIds.get(definitions);
+  if (id) return id;
+  // Content-derived, so every app built from the same components in this
+  // process (tests build many) reuses the already compiled validators.
+  const $defs = toJsonSchema(definitions) as JsonSchema;
+  id = `urn:sunbolt:mcp-components:${createHash('sha256').update(JSON.stringify($defs)).digest('hex')}`;
+  if (!ajv.getSchema(id)) ajv.addSchema({ $id: id, $defs });
+  sharedDefinitionIds.set(definitions, id);
+  return id;
+}
+
+function sharedRefs(value: unknown, id: string): unknown {
+  if (Array.isArray(value)) return value.map((entry) => sharedRefs(entry, id));
+  if (!value || typeof value !== 'object') return value;
+  const converted: JsonSchema = {};
+  for (const [key, child] of Object.entries(value as JsonSchema)) {
+    converted[key] =
+      key === '$ref' && typeof child === 'string' && child.startsWith('#/$defs/')
+        ? `${id}${child}`
+        : sharedRefs(child, id);
+  }
+  return converted;
+}
+
+function responseSchema(schema: JsonSchema, definitions: Record<string, JsonSchema>): JsonSchema {
+  // bundled() still validates that every referenced component exists.
+  const { $defs: _bundledDefs, ...root } = bundled(schema, definitions);
+  return sharedRefs(root, sharedDefinitions(definitions)) as JsonSchema;
+}
+
 export function buildToolCatalog(
   rawDocument: unknown,
   registryDefinitions: readonly unknown[] = [],
@@ -333,7 +371,7 @@ export function buildToolCatalog(
         if (content.schema)
           responseValidators.set(
             `${status}:${type}`,
-            compile(bundled(content.schema, definitions)),
+            compile(responseSchema(content.schema, definitions)),
           );
       }
     }

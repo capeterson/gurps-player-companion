@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { fixedCalculation } from '../../shared/domain/calculation.ts';
@@ -378,8 +378,14 @@ describe('delegated operation behavioral parity', () => {
     closeDb();
   });
 
-  it('executes a successful behavioral fixture through the SDK and shared handler for every tool', async () => {
-    const suffix = randomUUID();
+  let suffix: string;
+  let clientId: string;
+  let owner: Actor;
+  let member: Actor;
+  let campaignId: string;
+
+  beforeAll(async () => {
+    suffix = randomUUID();
     const [client] = await getDb()
       .insert(oauthClients)
       .values({
@@ -390,9 +396,19 @@ describe('delegated operation behavioral parity', () => {
       })
       .returning({ id: oauthClients.id });
     if (!client) throw new Error('client insert failed');
-    const owner = await registerActor('owner', client.id);
-    const member = await registerActor('member', client.id);
+    clientId = client.id;
+    owner = await registerActor('owner', clientId);
+    member = await registerActor('member', clientId);
+    const campaign = (
+      await call<{ id: string }>(owner, 'campaign', {
+        action: 'create',
+        body: { name: `Matrix ${suffix}`, experimentalActiveEffects: true },
+      })
+    ).body;
+    campaignId = campaign.id as string;
+  }, 30_000);
 
+  it('executes campaign, invitation and notification tools', async () => {
     const mediaCapabilities = await call<{ enabled: boolean; maxInputBytes: number }>(
       owner,
       'media',
@@ -401,13 +417,6 @@ describe('delegated operation behavioral parity', () => {
     expect(mediaCapabilities.body.enabled).toBe(true);
     await call(owner, 'get_current_user');
     await call(owner, 'list_campaigns');
-    const campaign = (
-      await call<{ id: string }>(owner, 'campaign', {
-        action: 'create',
-        body: { name: `Matrix ${suffix}`, experimentalActiveEffects: true },
-      })
-    ).body;
-    const campaignId = campaign.id as string;
     const filteredCampaigns = await call<Array<{ id: string }>>(owner, 'list_campaigns', {
       query: { search: suffix, limit: 1, offset: 0 },
     });
@@ -521,6 +530,9 @@ describe('delegated operation behavioral parity', () => {
     await call(member, 'notification', { action: 'mark_read', path: { id: notification.id } });
     await call(member, 'notification', { action: 'mark_all_read' });
     await call(member, 'notification', { action: 'delete', path: { id: notification.id } });
+  });
+
+  it('executes character loadout tools', async () => {
     // Loadouts use the member's own budget: the owner's matrix already spends
     // most of the production per-client rate limit.
     const kitCharacter = (
@@ -571,7 +583,9 @@ describe('delegated operation behavioral parity', () => {
       activeLoadoutName: null,
     });
     await call(member, 'character_loadout', { action: 'delete', ...loadoutPath });
+  });
 
+  it('executes campaign library tools', async () => {
     await call(owner, 'get_campaign_library', path(campaignId));
     const libraryKinds = [
       ['trait', { name: `Trait ${suffix}`, kind: 'advantage' }],
@@ -664,7 +678,7 @@ describe('delegated operation behavioral parity', () => {
     }
     // This long parity matrix reaches the per-principal MCP request budget;
     // isolate three additional CRUD operations on their own test actor.
-    const raceOwner = await registerActor('race-crud', client.id);
+    const raceOwner = await registerActor('race-crud', clientId);
     const raceCampaign = (
       await call<{ id: string }>(raceOwner, 'campaign', {
         action: 'create',
@@ -702,7 +716,9 @@ describe('delegated operation behavioral parity', () => {
       ...path(campaignId),
       body: { yaml: exported.body, mode: 'merge' },
     });
+  });
 
+  it('executes adventure log and encounter tools', async () => {
     await call(owner, 'list_adventure_log', path(campaignId));
     const logEntry = (
       await call<{ id: string }>(owner, 'adventure_log_entry', {
@@ -811,7 +827,9 @@ describe('delegated operation behavioral parity', () => {
     });
     await call(owner, 'encounter_effect', { action: 'delete', ...effectPath });
     await call(owner, 'encounter_combatant', { action: 'delete', ...combatantPath });
+  });
 
+  it('executes character, media and history tools', async () => {
     await call(owner, 'list_characters');
     const character = (
       await call<{ id: string }>(owner, 'character', {
@@ -989,7 +1007,9 @@ describe('delegated operation behavioral parity', () => {
     await call(owner, 'get_character_history', path(characterId));
     await call(owner, 'get_campaign_history', path(campaignId));
     await call(owner, 'character', { action: 'delete', ...path(characterId) });
+  });
 
+  it('executes campaign deletion and recycle bin tools', async () => {
     const deleteCampaign = (
       await call<{ id: string }>(owner, 'campaign', {
         action: 'create',
@@ -1000,7 +1020,7 @@ describe('delegated operation behavioral parity', () => {
 
     // The owner principal is near the per-principal MCP rate budget, so the
     // recycle-bin round trip runs as its own principal.
-    const recycler = await registerActor('recycler', client.id);
+    const recycler = await registerActor('recycler', clientId);
     const binned = (
       await call<{ id: string }>(recycler, 'character', {
         action: 'create',
@@ -1022,11 +1042,13 @@ describe('delegated operation behavioral parity', () => {
     ).body;
     await call(recycler, 'campaign', { action: 'delete', ...path(binnedCampaign.id) });
     await call(recycler, 'campaign', { action: 'restore', ...path(binnedCampaign.id) });
+  });
 
+  it('exercises every tool in the matrix', () => {
     expect([...exercised].sort()).toEqual(
       TOOLS.map((tool) => (tool.action ? `${tool.tool}#${tool.action}` : tool.tool)).sort(),
     );
-  }, 30_000); // Exercises every tool through the SDK; ~9s on a busy dev host.
+  });
 
   it('enforces the declared OAuth scope before dispatch for every tool', async () => {
     for (const tool of TOOLS) {
