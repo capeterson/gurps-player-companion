@@ -343,7 +343,15 @@ works offline.**
    are monotonic. This prevents a cursor request that began before an upload from
    briefly restoring its captured pre-upload value after that upload settles.
    Periodic
-   pull runs every `PERIODIC_PULL_MS` (30s); WS nudges pull sooner.
+   pull runs every `PERIODIC_PULL_MS` (30s); WS nudges pull sooner. The drain
+   loop's own five-second safety wake pulls only when no pull has completed in
+   the last `IDLE_LOOP_PULL_MIN_INTERVAL_MS` (15s), so an idle tab pulls about
+   every 15s rather than every 5s. A reconnect or WS nudge keeps the five-second
+   loop pulls going for the next 15s (the first pull after reconnecting can
+   precede the data). The pull after each drain, "Sync now" and bootstrap are
+   unchanged. Because WS is
+   acceleration only (S8), a tab whose socket is down converges within the
+   interval bound.
 
 ## The protocol
 

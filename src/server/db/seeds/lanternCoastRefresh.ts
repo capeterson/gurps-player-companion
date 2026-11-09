@@ -39,7 +39,6 @@ import {
   sourceExportKeys,
   sourceImportIdentity,
 } from '../../../shared/yaml/sourceReferences.ts';
-import { createApp } from '../../app.ts';
 import { signAccessToken } from '../../auth/jwt.ts';
 import { loadConfig } from '../../config.ts';
 import { closeDb, getDb, runInDbSavepoint, runInDbTransaction } from '../client.ts';
@@ -53,7 +52,7 @@ import {
   users,
 } from '../schema.ts';
 import { ensureDemoUser } from './accounts.ts';
-import { seedLanternCoast } from './lanternCoast.ts';
+import { seedApp, seedLanternCoast } from './lanternCoast.ts';
 import { LANTERN_CAMPAIGN_NAME, type LanternRequest } from './lanternCoastContent.ts';
 import { refreshLanternCoastV4 } from './lanternCoastContentV4.ts';
 import { lanternCharacters, lanternSharedLogs } from './lanternCoastData.ts';
@@ -126,7 +125,7 @@ export async function refreshLanternCoast(
     );
     const [owner] = await db.select().from(users).where(eq(users.id, ownerId));
     if (!owner) throw new Error('Seed owner does not exist');
-    const app = createApp(loadConfig());
+    const app = seedApp(loadConfig());
     const ownerToken = (await signAccessToken(owner.id, owner.authVersion)).token;
     const request: LanternRequest = async (token, path, method = 'POST', body?: unknown) => {
       const response = await app.request(`/api/v1${path}`, {
