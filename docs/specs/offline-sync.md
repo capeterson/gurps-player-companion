@@ -322,9 +322,13 @@ works offline.**
    earlier failure still produces its persistent toast and flash; the local
    journal records an unchanged value when the newer intent is preserved.
 5. **Pull.** `POST /sync/cursor` returns rows + tombstones since each class's
-   cursor position, plus the authoritative `accessible` id sets. The
-   orchestrator merges rows into Dexie — but **never overwrites a field with a
-   pending/in-flight outbox op**, and it also **never writes a row at all while
+   cursor position, plus the authoritative `accessible` id sets. The server
+   batches tombstones in one query across the requested cursors, capped per
+   cursor and scoped to the viewer as owner or through a currently accessible
+   campaign. Upserts and tombstones share a database snapshot and merge in
+   revision order before the per-class page limit is applied. The orchestrator
+   merges rows into Dexie, where it **never overwrites a field with a
+   pending/in-flight outbox op** and **never writes a row while
    a pending/in-flight/transient-retry whole-entity delete for that same class
    and id is queued** (`applyServerRow`, `AGENTS.md` S4). This prevents a
    bootstrap/from-zero cursor pull from resurrecting a row the user deleted
