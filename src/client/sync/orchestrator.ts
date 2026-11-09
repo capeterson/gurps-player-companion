@@ -137,6 +137,11 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 const DRAIN_BATCH_SIZE = 50;
 const PERIODIC_PULL_MS = 30_000;
+// The idle drain loop wakes every five seconds. Its opportunistic cursor pull
+// is skipped when any pull completed this recently, except for this long after
+// a reconnect or WebSocket nudge (when it keeps its five-second cadence).
+// Post-drain, periodic, manual and bootstrap pulls are unaffected.
+const IDLE_LOOP_PULL_MIN_INTERVAL_MS = 15_000;
 const BOOTSTRAP_RETRY_MS = 5_000;
 // An explicit retry may skip the outbox's maximum five-minute backoff.
 const MANUAL_RETRY_WINDOW_MS = 5 * 60_000 + 1_000;
@@ -317,12 +322,18 @@ class SyncOrchestrator {
   private clientOutdated = false;
   /** Invalidates every response that originated before logout/account switch. */
   private sessionGeneration = 0;
+  private lastPullCompletedAt = 0;
+  // A reconnect or WS nudge keeps the loop's five-second pulls going until
+  // this time: the first pull after reconnecting can precede the server data.
+  private fastPullUntil = 0;
   private sessionAbort = new AbortController();
   private purging = false;
   private unsubscribeConnection: (() => void) | null = null;
 
   private invalidateSessionWork(): void {
     this.sessionGeneration += 1;
+    this.lastPullCompletedAt = 0;
+    this.fastPullUntil = 0;
     this.sessionAbort.abort();
     this.sessionAbort = new AbortController();
   }
@@ -380,6 +391,8 @@ class SyncOrchestrator {
 
   /** Force the drain loop to re-evaluate immediately. */
   triggerDrain(): void {
+    // A WS nudge means the server has news: the next idle pass must pull.
+    this.fastPullUntil = Date.now() + IDLE_LOOP_PULL_MIN_INTERVAL_MS;
     this.wake();
   }
 
@@ -570,6 +583,7 @@ class SyncOrchestrator {
       // A pull that completed is the one thing that clears an
       // outstanding failure.
       this.syncHealthy = true;
+      this.lastPullCompletedAt = Date.now();
       const pending = await countPending();
       this.refreshIndicator(pending);
       return true;
@@ -854,6 +868,8 @@ class SyncOrchestrator {
   }
 
   private onOnline = (): void => {
+    // Reconnecting must catch up now, not at the next throttle boundary.
+    this.fastPullUntil = Date.now() + IDLE_LOOP_PULL_MIN_INTERVAL_MS;
     this.wake();
   };
 
@@ -993,7 +1009,13 @@ class SyncOrchestrator {
         if (delayedBy !== undefined) return delayedBy;
         // Nothing to drain -- but if /sync/cursor hasn't run recently,
         // do that now to keep Dexie fresh.
-        if (!manual) await this.triggerCursorPull();
+        if (
+          !manual &&
+          (Date.now() < this.fastPullUntil ||
+            Date.now() - this.lastPullCompletedAt >= IDLE_LOOP_PULL_MIN_INTERVAL_MS)
+        ) {
+          await this.triggerCursorPull();
+        }
         return;
       }
       syncStateStore.set('syncing');
