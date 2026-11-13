@@ -11,16 +11,18 @@
  *   5. add + delete route through enqueueCreate / enqueueDelete
  *
  * The outbox module is mocked so these tests exercise the panel + draft
- * plumbing without standing up Dexie; the Dexie-level cursor-vs-pending
+ * plumbing; rollback cases seed the durable row read by the draft hook.
+ * The Dexie-level cursor-vs-pending
  * case (S11's fifth bullet) is covered in orchestrator/outbox tests.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { LanguageOut } from '../../../../shared/schemas/language.ts';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { flashBus } from '../../../sync/flashBus.ts';
 import { LanguagesPanel } from './LanguagesPanel.tsx';
@@ -144,6 +146,10 @@ beforeEach(() => {
   enqueueDelete.mockResolvedValue(undefined);
 });
 
+afterEach(async () => {
+  await getLocalDb().characterLanguages.delete(LANG_ID);
+});
+
 describe('LanguagesPanel rendering', () => {
   it('lists a language with its fluency labels and point total', () => {
     renderPanel(makeCharacter([makeLanguage({ points: 3 })]), false);
@@ -246,6 +252,7 @@ describe('LanguagesPanel fluency select', () => {
   });
 
   it('server rejection: rolls back to the server value, toasts, and flashes', async () => {
+    await getLocalDb().characterLanguages.put({ ...makeLanguage(), revision: 1 });
     enqueueFieldPatch.mockRejectedValue(new Error('unknown fluency level'));
     renderPanel(makeCharacter([makeLanguage()]));
     openLanguageEditor();
@@ -342,6 +349,7 @@ describe('LanguagesPanel points and name', () => {
   });
 
   it('rejects a non-integer points value locally with a toast and rollback', async () => {
+    await getLocalDb().characterLanguages.put({ ...makeLanguage(), revision: 1 });
     renderPanel(makeCharacter([makeLanguage()]));
     openLanguageEditor();
     const points = screen.getByLabelText('Latin points') as HTMLInputElement;
