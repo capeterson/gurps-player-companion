@@ -39,7 +39,7 @@ Each lettered row below is a separate execution session. The numbered groups org
 | 23 | **016** Whole-form snapshots and campaign-scoped log drafts. | Slow success, context changes and actual request targets; encounter extension is completed in 29. |
 | 24 | **017**, **015** Invitation guard and campaign settings. | 016 for invitation; 007 for settings. Use separate owners only for disjoint files; verify independent requests, role gates and validation. |
 | 25 | **018**, **019** Safe sign-in destinations and scoped history filters. | Independent surfaces; safe path validation and scope-specific filtering with browser coverage. |
-| 26 | **020** Recovery and credential-read errors. | 007; correct recovery errors, no account enumeration and retryable credential reads. Coordinate 34 and 36. |
+| 26 | **020** Recovery and credential-read errors. | 007; correct recovery errors, no account enumeration and retryable credential reads. Coordinate 34 and 35. |
 | 27 | **029** Recalculation from owned purchases. | 001/005/007/016; exact staged purchase, outbox result, downstream effects and dialog review. |
 | 28a | **033** Manual trait levels and effects. | 029; actual contributions, paid points and queue/rollback behavior. |
 | 28b | **032** Technique limits and notes. | 001/005/007/008/012/016; actual math, saved values and queue behavior. |

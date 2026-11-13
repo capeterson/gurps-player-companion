@@ -36,7 +36,7 @@ test('a sparse campaign default permits a linked skill and later rule changes af
   await page.goto(`/characters/${character.id}`);
   await selectCharacterSection(page, 'Skills');
   await page.getByRole('button', { name: '+ Add skill' }).click();
-  await page.getByRole('combobox', { name: 'Skill', exact: true }).fill('Acid-free study');
+  await page.getByRole('textbox', { name: 'Skill', exact: true }).fill('Acid-free study');
   await page.getByRole('option', { name: /Acid-free study/ }).click();
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect
