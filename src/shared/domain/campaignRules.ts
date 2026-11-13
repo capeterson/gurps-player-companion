@@ -49,6 +49,15 @@ export function convertsDamageAddsToDice(rules?: Partial<CampaignHouseRules> | n
   return rules?.convertDamageAddsToDice ?? rules?.ruleSet === 'j_talisar';
 }
 
+/** Effective values for rule expressions in a known campaign. Parsing supplies
+ * legacy defaults without expanding a named preset; the optional damage rule
+ * follows the same ruleset fallback as damage calculation. Invalid data throws.
+ */
+export function projectCampaignRulesForEvaluation(value: unknown): CampaignHouseRules {
+  const rules = campaignHouseRules.parse(value);
+  return { ...rules, convertDamageAddsToDice: convertsDamageAddsToDice(rules) };
+}
+
 export const HOUSE_RULE_DEFINITIONS: readonly HouseRuleDefinition[] = [
   {
     key: 'convertDamageAddsToDice',

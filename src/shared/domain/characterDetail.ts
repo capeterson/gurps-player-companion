@@ -3,6 +3,7 @@ import type { PricingResolution } from '../schemas/calculation.ts';
 import { type CharacterRace, HUMAN_RACE } from '../schemas/race.ts';
 import { resolveActiveEffects } from './activeEffects.ts';
 import { armorLayerStacks, armorLayering, describeArmorLayerStacks } from './armorDr.ts';
+import { projectCampaignRulesForEvaluation } from './campaignRules.ts';
 import { inventoryAvailability } from './inventoryAvailability.ts';
 import { racialProfile } from './race.ts';
 import { actionTarget, benefitUnlocked, evaluateModifiers } from './skillProcedures.ts';
@@ -535,6 +536,10 @@ export function buildCharacterDetail(
 ): CharacterDetail {
   const { character, traits, skills, spells, languages, techniques, inventory, combat, campaign } =
     input;
+  const evaluationRules =
+    campaign?.houseRules === undefined
+      ? undefined
+      : projectCampaignRulesForEvaluation(campaign.houseRules);
   const baseAttrs = characterAttrsFromRow(character);
 
   // Resolve trait/skill effects FIRST.  Each character trait/skill carries
@@ -728,9 +733,7 @@ export function buildCharacterDetail(
         : {}),
     };
   });
-  const defaultConditionContext = campaign?.houseRules
-    ? { campaignRules: campaign.houseRules }
-    : undefined;
+  const defaultConditionContext = evaluationRules ? { campaignRules: evaluationRules } : undefined;
   const skillLevels = resolveSkillLevels(defaultableSkills, derived, defaultConditionContext);
   let skillsOut = [...skills, ...virtualRacialSkills].map((s) => {
     const virtual = virtualRacialSkills.some((row) => row.id === s.id);
@@ -805,7 +808,7 @@ export function buildCharacterDetail(
         Per: derived.per,
       },
       techLevel: campaign?.techLevel ?? null,
-      ...(campaign?.houseRules ? { campaignRules: campaign.houseRules } : {}),
+      ...(evaluationRules ? { campaignRules: evaluationRules } : {}),
       ...(snapshot.success && snapshot.data.skillRules?.gmPermissions
         ? { gmPermissions: new Set(snapshot.data.skillRules.gmPermissions) }
         : {}),
@@ -857,7 +860,7 @@ export function buildCharacterDetail(
       'character:Per': derived.per,
     };
     if (campaign?.techLevel != null) context['tech_level:campaign'] = campaign.techLevel;
-    for (const [key, value] of Object.entries(campaign?.houseRules ?? {}))
+    for (const [key, value] of Object.entries(evaluationRules ?? {}))
       if (['string', 'boolean', 'number'].includes(typeof value))
         context[`campaign:${key}`] = value as string | number | boolean;
     for (const trait of [...traits, ...racial.traits])
@@ -951,7 +954,7 @@ export function buildCharacterDetail(
     ...s,
     procedureContext: {
       ...Object.fromEntries(
-        Object.entries(campaign?.houseRules ?? {})
+        Object.entries(evaluationRules ?? {})
           .filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v))
           .map(([k, v]) => [`campaign:${k}`, v as string | number | boolean]),
       ),

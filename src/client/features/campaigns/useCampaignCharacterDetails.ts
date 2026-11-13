@@ -60,7 +60,7 @@ export function useCampaignCharacterDetails(
                 disadvantageCap: campaign.disadvantageCap,
                 quirkCap: campaign.quirkCap,
                 manaLevel: campaign.manaLevel ?? 'normal',
-                ...(campaign.houseRules ? { houseRules: campaign.houseRules } : {}),
+                ...(campaign.houseRules === undefined ? {} : { houseRules: campaign.houseRules }),
                 techLevel: campaign.techLevel ?? null,
               }
             : null,

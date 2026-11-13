@@ -8,7 +8,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { useEffect } from 'react';
+import { Component, type ReactNode, useEffect } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { campaignHouseRules } from '../../../shared/schemas/campaign.ts';
@@ -1023,3 +1023,91 @@ it('shows draft net levels and links both attribute and skill contributors', asy
   expect(screen.getByText(/Enter whole points/)).toBeVisible();
   expect((await getLocalDb().characterSkills.get(SKILL))?.points).toBe(2);
 });
+
+it('uses sparse campaign defaults in conditional skill point previews', async () => {
+  await seed();
+  const db = getLocalDb();
+  await db.campaigns.put({
+    id: CAMPAIGN,
+    ownerId: 'owner',
+    name: 'Campaign',
+    pointTarget: null,
+    disadvantageCap: null,
+    quirkCap: null,
+    houseRules: { ruleSet: 'j_talisar' },
+    revision: 1,
+  } as never);
+  await db.characterSkills.update(SKILL, {
+    points: 0,
+    defaults: [
+      {
+        kind: 'attribute',
+        attribute: 'DX',
+        modifier: 0,
+        conditions: [
+          { kind: 'campaign_rule', rule: 'forbidAcidMagic', value: false },
+          { kind: 'campaign_rule', rule: 'convertDamageAddsToDice', value: true },
+        ],
+      },
+    ],
+  });
+  const player = renderHook(() =>
+    useCharacterDetail(CID, { skillPointPreview: { skillId: SKILL, points: 0 } }),
+  );
+  await waitFor(() =>
+    expect(player.result.current?.skillLevelBreakdowns?.get(SKILL)?.level).toBe(12),
+  );
+  await db.campaigns.update(CAMPAIGN, {
+    houseRules: campaignHouseRules.parse({ ruleSet: 'j_talisar', forbidAcidMagic: true }),
+  });
+  await waitFor(() =>
+    expect(player.result.current?.skillLevelBreakdowns?.get(SKILL)?.level).toBeNull(),
+  );
+});
+
+it.each(['character', 'campaign'] as const)(
+  'rejects explicitly null rules in local %s detail',
+  async (surface) => {
+    await seed();
+    const db = getLocalDb();
+    await db.campaigns.put({
+      id: CAMPAIGN,
+      ownerId: 'owner',
+      name: 'Campaign',
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      houseRules: null,
+      revision: 1,
+    } as never);
+    class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+      override state = { failed: false };
+      static getDerivedStateFromError() {
+        return { failed: true };
+      }
+      override render() {
+        return this.state.failed ? <span>Invalid rules</span> : this.props.children;
+      }
+    }
+    function CharacterReader() {
+      useCharacterDetail(CID);
+      return null;
+    }
+    function CampaignReader() {
+      useCampaignCharacterDetails(CAMPAIGN);
+      return null;
+    }
+    const Reader = surface === 'character' ? CharacterReader : CampaignReader;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <Boundary>
+          <Reader />
+        </Boundary>,
+      );
+      await screen.findByText('Invalid rules');
+    } finally {
+      error.mockRestore();
+    }
+  },
+);
