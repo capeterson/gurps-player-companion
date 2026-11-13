@@ -206,6 +206,10 @@ export interface ApiOptions {
   headers?: Record<string, string>;
   /** Default true.  Set false for /auth/login etc. */
   authenticated?: boolean;
+  /** Refuse dispatch if this intent belongs to a different login session. */
+  expectedSessionId?: string | null;
+  /** Refuse initial dispatch or retry after the originating intent is revoked. */
+  isDispatchActive?: () => boolean;
   /** Allows session teardown to cancel requests before they can mutate local state. */
   signal?: AbortSignal;
 }
@@ -239,8 +243,19 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
  * back and the original 401 would misdescribe what happened.
  */
 export async function apiFetch(path: string, options: ApiOptions = {}): Promise<Response> {
+  const assertActive = () => {
+    if (options.isDispatchActive && !options.isDispatchActive())
+      throw new ApiError(409, 'request intent was discarded');
+  };
+  assertActive();
   const method = options.method ?? 'GET';
   const tokens = tokenStore.read();
+  if (
+    options.expectedSessionId !== undefined &&
+    (tokens?.sessionId ?? null) !== options.expectedSessionId
+  ) {
+    throw new ApiError(401, 'session changed before request dispatch');
+  }
   if (
     tokens?.guest &&
     options.authenticated !== false &&
@@ -280,6 +295,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     // The request may have crossed a logout/login boundary while it was in
     // flight. Never refresh or retry an old account's request as the new one.
     if (!tokens || !tokenStore.isCurrent(tokens)) return res;
+    assertActive();
     const refreshed = await refreshTokens(tokens);
     if (!refreshed.ok && refreshed.kind === 'unavailable') {
       // Report the failure that actually blocked us. Returning the
@@ -304,6 +320,7 @@ export async function apiFetch(path: string, options: ApiOptions = {}): Promise<
     if (refreshed.ok) {
       const next = tokenStore.read();
       if (next?.sessionId === tokens.sessionId) {
+        assertActive();
         const retryInit: RequestInit = {
           method,
           headers: { ...headers, authorization: `Bearer ${next.accessToken}` },

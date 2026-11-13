@@ -11,7 +11,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { discardPendingToggles } from '../lib/pendingToggles.ts';
 import { ToastProvider } from '../lib/toast.tsx';
+import { tokenStore } from '../lib/tokenStore.ts';
 import { useDraftToggle } from './useDraftToggle.ts';
 
 function Wrap({ children }: { children: ReactNode }) {
@@ -194,4 +196,168 @@ describe('useDraftToggle', () => {
     expect(screen.getByText(/Couldn't save worn — flaky network/)).toBeInTheDocument();
     await waitFor(() => expect(cb.checked).toBe(false));
   });
+});
+
+describe('session ownership', () => {
+  const tokens = { accessToken: 'access-a', refreshToken: 'refresh-a', accessTokenExpiresIn: 900 };
+
+  for (const reject of [false, true]) {
+    it(`does not dispatch a queued edit after replacement when the first save ${reject ? 'fails' : 'succeeds'}`, async () => {
+      tokenStore.write(tokens);
+      let settle!: () => void;
+      const save = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve, rejectPromise) => {
+              settle = () => (reject ? rejectPromise(new Error('rejected')) : resolve());
+            }),
+        )
+        .mockResolvedValue(undefined);
+      const view = render(
+        <Wrap>
+          <Toggle name="session toggle" initial={false} onSave={save} />
+        </Wrap>,
+      );
+      const input = screen.getByLabelText('session toggle');
+      fireEvent.click(input);
+      fireEvent.click(input);
+      act(() => tokenStore.write({ ...tokens, accessToken: 'access-b' }));
+      await act(async () => settle());
+      expect(save).toHaveBeenCalledTimes(1);
+      expect((input as HTMLInputElement).checked).toBe(false);
+      view.unmount();
+      tokenStore.clear();
+    });
+  }
+
+  it('drains after navigation and same-session token rotation', async () => {
+    tokenStore.write(tokens);
+    const original = tokenStore.read();
+    if (!original) throw new Error('Expected an authenticated session');
+    let settle!: () => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const view = render(
+      <Wrap>
+        <Toggle name="navigation toggle" initial={false} onSave={save} />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('navigation toggle');
+    fireEvent.click(input);
+    fireEvent.click(input);
+    view.unmount();
+    tokenStore.replaceIfCurrent(original, { ...tokens, accessToken: 'rotated' });
+    await act(async () => settle());
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+    expect(save).toHaveBeenLastCalledWith(false);
+    tokenStore.clear();
+  });
+});
+
+it('does not dispatch queued work after logout, even after the same account signs in again', async () => {
+  const tokens = { accessToken: 'account', refreshToken: 'refresh', accessTokenExpiresIn: 900 };
+  tokenStore.write(tokens);
+  let settle!: () => void;
+  const save = vi.fn().mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        settle = resolve;
+      }),
+  );
+  const view = render(
+    <Wrap>
+      <Toggle name="logout toggle" initial={false} onSave={save} />
+    </Wrap>,
+  );
+  fireEvent.click(screen.getByLabelText('logout toggle'));
+  fireEvent.click(screen.getByLabelText('logout toggle'));
+  act(() => {
+    tokenStore.clear();
+    tokenStore.write(tokens);
+  });
+  await act(async () => settle());
+  expect(save).toHaveBeenCalledTimes(1);
+  view.unmount();
+  tokenStore.clear();
+});
+
+it('drains a queued follow-up after a failure and same-session rotation', async () => {
+  const tokens = { accessToken: 'account', refreshToken: 'refresh', accessTokenExpiresIn: 900 };
+  tokenStore.write(tokens);
+  const original = tokenStore.read();
+  if (!original) throw new Error('Expected an authenticated session');
+  let fail!: () => void;
+  const save = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((_, reject) => {
+          fail = () => reject(new Error('offline'));
+        }),
+    )
+    .mockResolvedValue(undefined);
+  const view = render(
+    <Wrap>
+      <Toggle name="rotation toggle" initial={false} onSave={save} />
+    </Wrap>,
+  );
+  fireEvent.click(screen.getByLabelText('rotation toggle'));
+  fireEvent.click(screen.getByLabelText('rotation toggle'));
+  act(() => {
+    tokenStore.replaceIfCurrent(original, { ...tokens, accessToken: 'rotated' });
+  });
+  await act(async () => fail());
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  view.unmount();
+  tokenStore.clear();
+});
+
+it('revokes an old queue and allows a fresh save after discard without old settlement affecting it', async () => {
+  const tokens = { accessToken: 'account', refreshToken: 'refresh', accessTokenExpiresIn: 900 };
+  tokenStore.write(tokens);
+  let settleOld!: () => void;
+  let settleNew!: () => void;
+  const save = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          settleOld = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          settleNew = resolve;
+        }),
+    );
+  const view = render(
+    <Wrap>
+      <Toggle name="discard toggle" initial={false} onSave={save} />
+    </Wrap>,
+  );
+  const input = screen.getByLabelText('discard toggle') as HTMLInputElement;
+  fireEvent.click(input);
+  fireEvent.click(input);
+  const session = tokenStore.read();
+  if (!session) throw new Error('Expected an authenticated session');
+  act(() => discardPendingToggles(session.sessionId));
+  expect(input.checked).toBe(false);
+  fireEvent.click(input);
+  expect(save).toHaveBeenCalledTimes(2);
+  await act(async () => settleOld());
+  expect(input.checked).toBe(true);
+  await act(async () => settleNew());
+  expect(input.checked).toBe(true);
+  expect(save).toHaveBeenCalledTimes(2);
+  view.unmount();
+  tokenStore.clear();
 });

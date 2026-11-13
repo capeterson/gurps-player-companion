@@ -12,6 +12,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../lib/toast.tsx';
+import { tokenStore } from '../lib/tokenStore.ts';
 import { flashBus } from '../sync/flashBus.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from './useDraftField.ts';
 
@@ -577,5 +578,369 @@ describe('useDraftField', () => {
 
     expect(inputA.value).toBe('15');
     expect(inputB.value).toBe('14');
+  });
+  it('retains a newer unblurred edit when an older save fails', async () => {
+    let reject!: (error: Error) => void;
+    const onSave = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_, fail) => {
+            reject = fail;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    render(
+      <Wrap>
+        <NumericField name="ST" initial={10} onSave={onSave} />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: '14' } });
+    await act(async () => reject(new Error('Rejected 12')));
+    expect(input).toHaveValue('14');
+    expect(input).toHaveAttribute('data-flashing', 'true');
+    expect(screen.getByText("Couldn't save ST — Rejected 12")).toBeVisible();
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave.mock.calls).toEqual([[12], [14]]));
+    expect(input).toHaveValue('14');
+  });
+
+  it('does not replace newer typing with an older queued value after failure', async () => {
+    let reject!: (error: Error) => void;
+    let finish!: () => void;
+    const onSave = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_, fail) => {
+            reject = fail;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    render(
+      <Wrap>
+        <NumericField name="ST" initial={10} onSave={onSave} />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST');
+    for (const value of ['12', '13']) {
+      fireEvent.change(input, { target: { value } });
+      fireEvent.blur(input);
+    }
+    fireEvent.change(input, { target: { value: '14' } });
+    await act(async () => reject(new Error('Rejected 12')));
+    await waitFor(() => expect(onSave.mock.calls).toEqual([[12], [13]]));
+    expect(input).toHaveValue('14');
+    await act(async () => finish());
+    expect(input).toHaveValue('14');
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave.mock.calls).toEqual([[12], [13], [14]]));
+  });
+
+  it('advances durable knowledge while retaining a dirty draft', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    function Field({ value }: { value: string }) {
+      const field = useDraftField({ name: 'Name', serverValue: value, onSave });
+      return <input aria-label="Name" {...field.inputProps} />;
+    }
+    const view = render(
+      <Wrap>
+        <Field value="A" />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('Name');
+    fireEvent.change(input, { target: { value: 'B' } });
+    view.rerender(
+      <Wrap>
+        <Field value="C" />
+      </Wrap>,
+    );
+    expect(input).toHaveValue('B');
+    fireEvent.change(input, { target: { value: 'A' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith('A'));
+    expect(input).toHaveValue('A');
+  });
+
+  it('refreshes the rejected baseline even while newer raw text is protected', async () => {
+    let stored = 'A';
+    const onSave = vi.fn(async (value: string) => {
+      stored = value;
+    });
+    function Field() {
+      const field = useDraftField({
+        name: 'Name',
+        serverValue: 'A',
+        onSave,
+        flashKey: 'character:test:name',
+        readRollbackValue: async () => stored,
+      });
+      return <input aria-label="Name" {...field.inputProps} />;
+    }
+    render(
+      <Wrap>
+        <Field />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('Name');
+    fireEvent.change(input, { target: { value: 'Rejected' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(stored).toBe('Rejected'));
+    fireEvent.change(input, { target: { value: 'Newer' } });
+    stored = 'A';
+    await act(async () => flashBus.emit({ key: 'character:test:name', reason: 'rejected' }));
+    expect(input).toHaveValue('Newer');
+    // Recommitting the same rejected value must not be mistaken for a no-op.
+    fireEvent.change(input, { target: { value: 'Rejected' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(onSave.mock.calls).toEqual([['Rejected'], ['Rejected']]));
+    expect(stored).toBe('Rejected');
+  });
+
+  it('retains retryable text when the rollback reader fails', async () => {
+    let failRead = false;
+    let stored = 10;
+    const read = vi.fn(async () => {
+      if (failRead) throw new Error('Storage unavailable');
+      return stored;
+    });
+    const save = vi.fn(async (value: number) => {
+      stored = value;
+    });
+    function Field() {
+      const field = useDraftField({
+        name: 'ST',
+        serverValue: 10,
+        parse: Number,
+        onSave: save,
+        persistOnCommit: true,
+        flashKey: 'character:test:st',
+        readRollbackValue: read,
+      });
+      return <input aria-label="ST" {...field.inputProps} />;
+    }
+    render(
+      <Wrap>
+        <Field />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST');
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    failRead = true;
+    stored = 10;
+    await act(async () => flashBus.emit({ key: 'character:test:st', reason: 'rejected' }));
+    expect(input).toHaveValue('12');
+    expect(screen.getByText("Couldn't refresh ST — Storage unavailable")).toBeVisible();
+    failRead = false;
+    fireEvent.blur(input);
+    await waitFor(() => expect(save.mock.calls).toEqual([[12], [12]]));
+    expect(stored).toBe(12);
+  });
+
+  it('does not apply a delayed read after the originating field changes', async () => {
+    let finish!: (value: string) => void;
+    const saveA = vi.fn().mockResolvedValue(undefined);
+    const saveB = vi.fn().mockResolvedValue(undefined);
+    function Field({ id }: { id: string }) {
+      const field = useDraftField({
+        name: 'Name',
+        serverValue: id,
+        onSave: id === 'A' ? saveA : saveB,
+        persistOnCommit: true,
+        flashKey: `character:${id}:name`,
+        readRollbackValue:
+          id === 'A'
+            ? () =>
+                new Promise<string>((resolve) => {
+                  finish = resolve;
+                })
+            : async () => 'B',
+      });
+      return <input aria-label="Name" {...field.inputProps} />;
+    }
+    const view = render(
+      <Wrap>
+        <Field id="A" />
+      </Wrap>,
+    );
+    view.rerender(
+      <Wrap>
+        <Field id="B" />
+      </Wrap>,
+    );
+    await act(async () => finish('Old A'));
+    const input = screen.getByLabelText('Name');
+    expect(input).toHaveValue('B');
+    fireEvent.change(input, { target: { value: 'New B' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(saveB).toHaveBeenCalledWith('New B'));
+    expect(saveA).not.toHaveBeenCalled();
+  });
+  it('reconciles a rejection that arrives before the local enqueue resolves', async () => {
+    let stored = 10;
+    let finish!: () => void;
+    function Field() {
+      const field = useDraftField({
+        name: 'ST',
+        serverValue: 10,
+        parse: Number,
+        flashKey: 'character:fast:st',
+        persistOnCommit: true,
+        readRollbackValue: async () => stored,
+        onSave: async (value) => {
+          stored = value;
+          await new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+        },
+      });
+      return <input aria-label="ST" {...field.inputProps} />;
+    }
+    render(
+      <Wrap>
+        <Field />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await act(async () => {
+      stored = 10;
+      flashBus.emit({ key: 'character:fast:st', reason: 'rejected' });
+      finish();
+    });
+    await waitFor(() => expect(input).toHaveValue('10'));
+    expect(input).toHaveAttribute('data-flashing', 'true');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    expect(stored).toBe(12);
+    await act(async () => finish());
+    await waitFor(() => expect(input).toHaveValue('12'));
+  });
+
+  it('drains a committed follow-up after unmount', async () => {
+    let finish!: () => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const view = render(
+      <Wrap>
+        <NumericField name="ST" initial={10} onSave={save} />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('ST');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: '14' } });
+    fireEvent.blur(input);
+    view.unmount();
+    await act(async () => finish());
+    await waitFor(() => expect(save.mock.calls).toEqual([[12], [14]]));
+  });
+
+  it('drains the original entity queue independently after a field switches', async () => {
+    let finish!: () => void;
+    const saveA = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    const saveB = vi.fn().mockResolvedValue(undefined);
+    function Field({ id }: { id: string }) {
+      const field = useDraftField({
+        name: 'Name',
+        serverValue: id,
+        flashKey: `character:${id}:name`,
+        onSave: id === 'A' ? saveA : saveB,
+      });
+      return <input aria-label="Name" {...field.inputProps} />;
+    }
+    const view = render(
+      <Wrap>
+        <Field id="A" />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('Name');
+    fireEvent.change(input, { target: { value: 'A1' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: 'A2' } });
+    fireEvent.blur(input);
+    view.rerender(
+      <Wrap>
+        <Field id="B" />
+      </Wrap>,
+    );
+    fireEvent.change(input, { target: { value: 'B1' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(saveB).toHaveBeenCalledWith('B1'));
+    await act(async () => finish());
+    await waitFor(() => expect(saveA.mock.calls).toEqual([['A1'], ['A2']]));
+    expect(saveB.mock.calls).toEqual([['B1']]);
+    expect(input).toHaveValue('B1');
+  });
+  it('accepts new edits after session replacement with unchanged field props', async () => {
+    const tokens = { accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresIn: 60 };
+    tokenStore.write(tokens);
+    let finish!: () => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue(undefined);
+    function Field() {
+      const field = useDraftField({
+        name: 'Name',
+        serverValue: 'A',
+        flashKey: 'character:test:name',
+        onSave: save,
+      });
+      return <input aria-label="Name" {...field.inputProps} />;
+    }
+    const view = render(
+      <Wrap>
+        <Field />
+      </Wrap>,
+    );
+    const input = screen.getByLabelText('Name');
+    fireEvent.change(input, { target: { value: 'old 1' } });
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: 'old 2' } });
+    fireEvent.blur(input);
+    act(() => tokenStore.write(tokens));
+    await waitFor(() => expect(input).toHaveValue('A'));
+    fireEvent.change(input, { target: { value: 'new' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(save.mock.calls).toEqual([['old 1'], ['new']]));
+    await act(async () => finish());
+    expect(save.mock.calls).toEqual([['old 1'], ['new']]);
+    expect(input).toHaveValue('new');
+    view.unmount();
+    tokenStore.clear();
   });
 });

@@ -33,13 +33,17 @@ export function disableDesktopNotifications(userId: string): void {
   writeEnabled(userId, false);
 }
 /** Called only from the explicit Settings enable gesture. */
-export async function enableDesktopNotifications(userId: string): Promise<void> {
+export async function enableDesktopNotifications(
+  userId: string,
+  isActive: () => boolean = () => true,
+): Promise<void> {
   if (!desktopNotificationsSupported())
     throw new Error('Desktop notifications are unavailable in this browser');
   if (Notification.permission === 'denied')
     throw new Error('Notifications are blocked. Allow them in your browser settings first');
   const permission =
     Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+  if (!isActive()) return;
   if (permission !== 'granted') throw new Error('Browser permission was not granted');
   writeEnabled(userId, true);
 }

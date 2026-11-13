@@ -350,6 +350,15 @@ a rejection stays visible after the add form closes. Sync rejection records
 persist across reloads. These guarantees belong to the shared hooks and
 outbox, rather than a second panel-specific save implementation.
 
+The field hook keeps raw edit generations separate from its current durable
+value. An older failure still toasts and flashes, but cannot replace newer
+typing or a queued commit. Scoped readers refresh rollback knowledge without
+letting a delayed read overwrite a later write; a failed read leaves text
+available for retry. Shared character and owned-row savers compare no-ops in
+the outbox transaction against current local intent. Committed queues retain
+their original field and login session through navigation or an entity switch;
+their old settlements cannot change the newly displayed field.
+
 Language creation keeps the fluency-based suggested points and explicit
 override. Technique creation keeps its library default skill, difficulty,
 default modifier, and optional level cap. Their controls clarify those values
@@ -744,6 +753,14 @@ and rollback feedback use the standard settings patterns. `useDraftToggle`
 retains rapid same-field changes and flashes the visible checkbox with a toast
 on failure. This online account preference is outside the local-first sheet
 and library outbox.
+
+Account-setting toggle queues belong to their initiating login session.
+Navigation and token rotation within that session preserve ordered follow-ups,
+including after a failed save. A replacement login suppresses the old queue and
+its response updates. Pending toggles join the existing sign-out/password-change
+discard guard; explicit discard revokes queued intent, while a request already
+sent may still finish on the server. A delayed desktop-permission result cannot
+enable a discarded or replaced session's preference.
 
 ## Racial templates
 

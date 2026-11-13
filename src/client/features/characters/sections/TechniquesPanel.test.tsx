@@ -8,9 +8,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { TechniqueOut } from '../../../../shared/schemas/technique.ts';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { flashBus } from '../../../sync/flashBus.ts';
 import { TechniquesPanel } from './TechniquesPanel.tsx';
@@ -151,6 +152,10 @@ beforeEach(() => {
   enqueueDelete.mockResolvedValue(undefined);
 });
 
+afterEach(async () => {
+  await getLocalDb().characterTechniques.delete(TECH_ID);
+});
+
 describe('TechniquesPanel rendering', () => {
   it('shows a resolved level as a tappable roll target', () => {
     renderPanel(makeCharacter([makeTechnique()]), false);
@@ -255,6 +260,7 @@ describe('TechniquesPanel row editing', () => {
   });
 
   it('rejects an empty default skill locally with a toast and rollback', async () => {
+    await getLocalDb().characterTechniques.put({ ...makeTechnique(), revision: 1 });
     renderPanel(makeCharacter([makeTechnique()]));
     openTechniqueEditor();
     const input = screen.getByLabelText('Feint default skill') as HTMLInputElement;
@@ -285,6 +291,7 @@ describe('TechniquesPanel row editing', () => {
   });
 
   it('server rejection on the difficulty select rolls back, toasts, and flashes', async () => {
+    await getLocalDb().characterTechniques.put({ ...makeTechnique(), revision: 1 });
     enqueueFieldPatch.mockRejectedValue(new Error('field not writable'));
     renderPanel(makeCharacter([makeTechnique()]));
     openTechniqueEditor();

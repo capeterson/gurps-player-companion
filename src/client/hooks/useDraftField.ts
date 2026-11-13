@@ -19,8 +19,9 @@
  * `format` converts V → string when syncing from the server.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useToasts } from '../lib/toast.tsx';
+import { tokenStore } from '../lib/tokenStore.ts';
 import { useFlashState } from './useFlashState.ts';
 
 export interface UseDraftFieldOptions<V> {
@@ -38,6 +39,9 @@ export interface UseDraftFieldOptions<V> {
   readonly validate?: ((v: V) => string | null) | undefined;
   /** Persist the value.  Resolve on success, reject on failure (rollback fires). */
   readonly onSave: (v: V) => Promise<unknown>;
+  /** Local writers compare with current storage inside their transaction.
+   * Never suppress a deliberate commit using a potentially delayed prop. */
+  readonly persistOnCommit?: boolean;
   /**
    * Local writers that already serialize in storage can enqueue at commit time.
    * Every settlement is still processed in order to retain rollback baselines.
@@ -110,347 +114,320 @@ function defaultOnError(err: unknown): string {
 }
 
 export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldReturn {
-  const {
-    name,
-    serverValue,
-    parse = (s) => s as unknown as V,
-    format = (v) => String(v),
-    equals = Object.is,
-    validate,
-    onSave,
-    onError = defaultOnError,
-    flashKey,
-    enqueueOnCommit,
-  } = opts;
-
+  const options = useRef(opts);
+  options.current = opts;
   const toasts = useToasts();
-  const [draft, setDraft] = useState(() => format(serverValue));
+  const [draft, setDraft] = useState(() => (opts.format ?? String)(opts.serverValue));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Refs mirror state so the long-lived performSave closure sees current values.
   const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const serverValueRef = useRef(serverValue);
-  serverValueRef.current = serverValue;
-  const dirtyRef = useRef(false);
-  // `null` here means "no save in flight / nothing queued".  We wrap the
-  // value in `{ value }` so the outer null check is unambiguous even
-  // when `V` itself includes null (e.g. a nullable text field whose
-  // empty draft saves as null).  Comparing the *reference* against
-  // null can never confuse `null` with a legitimate null payload.
-  const inflightRef = useRef<{ value: V } | null>(null);
-  const queuedRef = useRef<{ value: V } | null>(null);
-  type SaveOutcome = { ok: true } | { ok: false; error: unknown; committed?: { value: V } };
-  type PreparedSave = { outcome: Promise<SaveOutcome>; editVersion: number };
-  const localQueueRef = useRef<Array<{ value: V; prepared: PreparedSave }>>([]);
-  const editVersionRef = useRef(0);
-  const enqueueOnCommitRef = useRef(enqueueOnCommit);
-  enqueueOnCommitRef.current = enqueueOnCommit;
-  const readRollbackValueRef = useRef(opts.readRollbackValue);
-  readRollbackValueRef.current = opts.readRollbackValue;
-  const rollbackRequestRef = useRef<{ editVersion: number } | null>(null);
-  // The most recently CONFIRMED authoritative value, updated by either
-  // an incoming server prop change or the success branch of a save.
-  // We compare against this for the commit() no-op short-circuit
-  // instead of using the raw `serverValue` prop, because the prop can
-  // lag a successful save until the refetch lands — meanwhile the user
-  // might re-edit back to the prior value, and a stale comparison
-  // would skip the PATCH and drop the edit silently.
-  const lastCommittedRef = useRef<V>(serverValue);
-  const isMountedRef = useRef(true);
+  const dirty = useRef(false);
+  const editVersion = useRef(0);
+  // Knowledge advances independently of the text the user is still editing.
+  // Unknown is distinct from a legitimate null/undefined field value.
+  const committed = useRef<{ value: V } | null>({ value: opts.serverValue });
+  const knowledgeVersion = useRef(0);
+  const readVersion = useRef(0);
+  const mounted = useRef(true);
+  type Outcome = { ok: true } | { ok: false; error: unknown };
+  type Scope = {
+    key: string | undefined;
+    sessionId: string | undefined;
+    inflight: Attempt | null;
+    queued: Attempt | null;
+    localQueue: Attempt[];
+    rollbackPending: boolean;
+  };
+  type Attempt = {
+    value: V;
+    editVersion: number;
+    save: (value: V) => Promise<unknown>;
+    read: (() => Promise<V>) | undefined;
+    scope: Scope;
+    name: string;
+    onError: (error: unknown) => string;
+    storageMode: boolean;
+    outcome?: Promise<Outcome>;
+  };
+  const sessionId = useSyncExternalStore(
+    tokenStore.subscribe,
+    () => tokenStore.read()?.sessionId,
+    () => undefined,
+  );
+  const newScope = useCallback(
+    (key: string | undefined): Scope => ({
+      key,
+      sessionId: tokenStore.read()?.sessionId,
+      inflight: null,
+      queued: null,
+      localQueue: [],
+      rollbackPending: false,
+    }),
+    [],
+  );
+  const scope = useRef<Scope>(newScope(opts.flashKey));
+  const inScope = useCallback(
+    (origin: Scope) =>
+      mounted.current &&
+      scope.current === origin &&
+      options.current.flashKey === origin.key &&
+      tokenStore.read()?.sessionId === origin.sessionId,
+    [],
+  );
 
-  // Cache the option callbacks in refs so identity changes between renders
-  // don't accidentally restart in-flight saves or stale-close on closures.
-  const parseRef = useRef(parse);
-  parseRef.current = parse;
-  const formatRef = useRef(format);
-  formatRef.current = format;
-  const equalsRef = useRef(equals);
-  equalsRef.current = equals;
-  const validateRef = useRef(validate);
-  validateRef.current = validate;
-  const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
-  const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
-  const nameRef = useRef(name);
-  nameRef.current = name;
-
-  // Sync from the server ONLY when the field is clean and no save is in
-  // flight.  Per AGENTS.md, we never wholesale-sync over a user's local
-  // edit.
-  useEffect(() => {
-    if (dirtyRef.current) return;
-    if (inflightRef.current !== null) return;
-    // Server prop is now the authoritative committed value.  Future
-    // commit() short-circuits compare against this.
-    lastCommittedRef.current = serverValue;
-    const formatted = formatRef.current(serverValue);
-    setDraft(formatted);
+  const show = useCallback((value: V) => {
+    const formatted = (options.current.format ?? String)(value);
     draftRef.current = formatted;
-  }, [serverValue]);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
+    setDraft(formatted);
   }, []);
+  const reader = useCallback(
+    () => options.current.readRollbackValue ?? options.current.enqueueOnCommit?.readCommitted,
+    [],
+  );
+  const storageMode = Boolean(opts.persistOnCommit || opts.enqueueOnCommit);
 
-  const reconcileRollback = useCallback(async () => {
-    const request = rollbackRequestRef.current;
-    const read = readRollbackValueRef.current;
-    if (!request || !read || inflightRef.current !== null) return;
-    if (request.editVersion !== editVersionRef.current || dirtyRef.current) {
-      rollbackRequestRef.current = null;
-      return;
-    }
+  // Reads may complete after a newer prop, save, rejection, or context switch.
+  // Only the newest observation can establish knowledge; raw edits stay separate.
+  const refresh = async (read: () => Promise<V>, replace: boolean, origin = scope.current) => {
+    const request = ++readVersion.current;
+    const knowledge = knowledgeVersion.current;
+    const edit = editVersion.current;
     try {
       const value = await read();
       if (
-        !isMountedRef.current ||
-        rollbackRequestRef.current !== request ||
-        request.editVersion !== editVersionRef.current ||
-        dirtyRef.current ||
-        inflightRef.current !== null
+        !inScope(origin) ||
+        request !== readVersion.current ||
+        knowledge !== knowledgeVersion.current
       )
         return;
-      rollbackRequestRef.current = null;
-      lastCommittedRef.current = value;
-      const formatted = formatRef.current(value);
-      setDraft(formatted);
-      draftRef.current = formatted;
-    } catch (error) {
-      if (!isMountedRef.current || rollbackRequestRef.current !== request) return;
-      rollbackRequestRef.current = null;
-      toasts.push(`Couldn't refresh ${nameRef.current} — ${onErrorRef.current(error)}`, {
-        kind: 'error',
-      });
+      committed.current = { value };
+      knowledgeVersion.current++;
+      if (replace && edit === editVersion.current && !dirty.current && !scope.current.inflight)
+        show(value);
+    } catch (err) {
+      if (
+        !inScope(origin) ||
+        request !== readVersion.current ||
+        knowledge !== knowledgeVersion.current
+      )
+        return;
+      committed.current = null;
+      if (edit === editVersion.current && !scope.current.inflight) dirty.current = true;
+      // An unreadable store cannot prove the old text is already saved.
+      toasts.push(
+        `Couldn't refresh ${options.current.name} — ${(options.current.onError ?? defaultOnError)(err)}`,
+        {
+          kind: 'error',
+        },
+      );
     }
-  }, [toasts]);
+  };
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
-  // An exceptionally fast rejection may arrive before the local enqueue's
-  // promise settles. Reconcile after that save, without replacing newer edits.
   useEffect(() => {
-    if (!isSaving) void reconcileRollback();
-  }, [isSaving, reconcileRollback]);
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-  // Subscribe to async rollback events from the orchestrator.  When
-  // the server rejects an outbox op for THIS field, the orchestrator
-  // has already reverted the underlying Dexie row to the prior value;
-  // we just need to surface the visual rollback (revert the draft +
-  // flash).  The accompanying persistent toast comes from the
-  // orchestrator, so we don't push one here.  Flash state (parity,
-  // timer, flashBus subscription) is shared via useFlashState; only the
-  // draft-revert side effect is specific to this hook.
+  useEffect(() => {
+    if (scope.current.key !== opts.flashKey || scope.current.sessionId !== sessionId) {
+      scope.current = newScope(opts.flashKey);
+      dirty.current = false;
+      editVersion.current++;
+      committed.current = { value: opts.serverValue };
+      knowledgeVersion.current++;
+      show(opts.serverValue);
+      setIsSaving(false);
+      setError(null);
+    }
+    const read = reader();
+    if (storageMode && read) {
+      void refreshRef.current(read, true);
+    } else if (!scope.current.inflight) {
+      committed.current = { value: opts.serverValue };
+      knowledgeVersion.current++;
+      if (!dirty.current) show(opts.serverValue);
+    }
+  }, [opts.serverValue, opts.flashKey, storageMode, reader, show, sessionId, newScope]);
+
   const {
     flashing,
     flashProps,
     trigger: flashRollback,
-  } = useFlashState(flashKey, () => {
-    if (readRollbackValueRef.current) {
-      rollbackRequestRef.current = { editVersion: editVersionRef.current };
-      void reconcileRollback();
-      return;
+  } = useFlashState(opts.flashKey, () => {
+    committed.current = null;
+    knowledgeVersion.current++;
+    const read = reader();
+    if (read) {
+      // A real server rejection can beat the local enqueue's continuation.
+      // Do not let that continuation re-establish the rejected optimistic value.
+      scope.current.rollbackPending = true;
+      if (!scope.current.inflight) {
+        scope.current.rollbackPending = false;
+        void refreshRef.current(read, true);
+      }
+    } else if (!dirty.current && !scope.current.inflight) {
+      committed.current = { value: options.current.serverValue };
+      show(options.current.serverValue);
     }
-    const formatted = formatRef.current(lastCommittedRef.current);
-    setDraft(formatted);
-    draftRef.current = formatted;
-    dirtyRef.current = false;
   });
 
-  /**
-   * Used for parse / validate failures only — these never start an
-   * onSave call, so they don't interact with the inflight/queue state
-   * machine.  `performSave`'s server-rejection branch handles its own
-   * toast + flash + draft revert because it has to reason about the
-   * queue too.
-   *
-   * We revert to `lastCommittedRef`, not the `serverValue` prop: a
-   * recent successful save may have advanced the authoritative value
-   * past what the prop reflects (the refetch might still be in flight),
-   * and rolling back to the stale prop would erase that durable save.
-   */
   const rollback = useCallback(
     (msg: string) => {
-      const formatted = formatRef.current(lastCommittedRef.current);
-      setDraft(formatted);
-      draftRef.current = formatted;
-      dirtyRef.current = false;
       setError(msg);
       flashRollback();
-      toasts.push(`Couldn't save ${nameRef.current} — ${msg}`, { kind: 'error' });
+      toasts.push(`Couldn't save ${options.current.name} — ${msg}`, { kind: 'error' });
+      const read =
+        options.current.readRollbackValue ?? options.current.enqueueOnCommit?.readCommitted;
+      if (read) {
+        dirty.current = false;
+        void refreshRef.current(read, true);
+      } else if (committed.current) {
+        dirty.current = false;
+        const formatted = (options.current.format ?? String)(committed.current.value);
+        draftRef.current = formatted;
+        setDraft(formatted);
+      }
     },
     [flashRollback, toasts],
   );
 
   const performSave = useCallback(
-    async (value: V, prepared?: PreparedSave): Promise<void> => {
-      inflightRef.current = { value };
-      setIsSaving(true);
-      let succeeded = false;
-      try {
-        if (prepared) {
-          const outcome = await prepared.outcome;
-          if (!outcome.ok) {
-            if (outcome.committed) lastCommittedRef.current = outcome.committed.value;
-            throw outcome.error;
-          }
+    async (attempt: Attempt): Promise<void> => {
+      const owner = attempt.scope;
+      const sessionActive = () => tokenStore.read()?.sessionId === owner.sessionId;
+      const active = () => inScope(owner);
+      // Committed follow-ups belong to their original scope even if the
+      // component unmounts or starts showing another entity.
+      if (!sessionActive()) return;
+      owner.inflight = attempt;
+      if (active()) {
+        setIsSaving(true);
+        readVersion.current++;
+      }
+      let outcome: Outcome;
+      if (attempt.outcome) outcome = await attempt.outcome;
+      else {
+        try {
+          await attempt.save(attempt.value);
+          outcome = { ok: true };
+        } catch (error) {
+          outcome = { ok: false, error };
+        }
+      }
+      if (!sessionActive()) return;
+      if (active()) {
+        knowledgeVersion.current++;
+        if (outcome.ok) {
+          if (!attempt.storageMode && !owner.rollbackPending)
+            committed.current = { value: attempt.value };
         } else {
-          await onSaveRef.current(value);
+          const msg = attempt.onError(outcome.error);
+          if (attempt.editVersion === editVersion.current) setError(msg);
+          flashRollback();
         }
-        succeeded = true;
-      } catch (err) {
-        const msg = onErrorRef.current(err);
-        setError(msg);
-        flashRollback();
-        toasts.push(`Couldn't save ${nameRef.current} — ${msg}`, { kind: 'error' });
       }
-      inflightRef.current = null;
-
-      if (succeeded) {
-        // The server has just persisted `value`.  Treat it as the new
-        // authoritative committed value immediately — BEFORE draining
-        // the queue, not after.  If a queued follow-up fails, its
-        // rollback path needs to revert to THIS save's value, not the
-        // pre-save committed value (otherwise the durable save we just
-        // landed gets erased from the UI).  Also handles the
-        // "save 12, then edit back to 10" race where the no-op check
-        // would otherwise see a stale 10 prop while the refetch is in
-        // flight.
-        lastCommittedRef.current = value;
+      if (!outcome.ok) {
+        toasts.push(`Couldn't save ${attempt.name} — ${attempt.onError(outcome.error)}`, {
+          kind: 'error',
+        });
       }
-
-      // The queue holds the user's most recent commit on this field — they
-      // typed it AFTER `value`, so it's their freshest intent and per
-      // AGENTS.md ("fire when the in-flight save settles") it must run
-      // regardless of whether THIS save succeeded or failed.  Dropping the
-      // queue on failure would silently lose that newer edit.
-      const localQueued = localQueueRef.current.shift();
-      const queued = localQueued ?? queuedRef.current;
-      if (queued !== null) {
-        queuedRef.current = null;
-        if (!succeeded && !prepared) {
-          // The failed save left draft on the rejected value.  Move it
-          // to the queued value so the input shows the user's later
-          // edit while the replay save runs.  The flash already fired
-          // for the failure; we don't re-flash on the carry-over.
-          const formatted = formatRef.current(queued.value);
-          setDraft(formatted);
-          draftRef.current = formatted;
-        }
-        await performSave(queued.value, localQueued?.prepared);
+      // Drain with the original callbacks and scope, even after navigation.
+      const next = owner.localQueue.shift() ?? owner.queued;
+      owner.queued = null;
+      if (next) {
+        owner.inflight = null;
+        await performSave(next);
         return;
       }
-
-      if (succeeded) {
-        // No queue, save succeeded: if the live draft still matches the
-        // value we just saved, mark clean so future server syncs can
-        // update us.
-        try {
-          const parsedDraft = parseRef.current(draftRef.current);
-          if (equalsRef.current(parsedDraft, value)) {
-            dirtyRef.current = false;
-            setError(null);
-          }
-        } catch {
-          /* user is mid-edit with an unparsable draft — keep dirty */
+      owner.inflight = null;
+      if (!active()) return;
+      if (attempt.editVersion === editVersion.current) {
+        if (outcome.ok) {
+          dirty.current = false;
+          setError(null);
+        } else if (attempt.read) {
+          // A failed reader must retain the raw draft for retry.
+          // The refresh below clears it only if durable knowledge is available.
+          dirty.current = false;
+        } else if (committed.current) {
+          const formatted = (options.current.format ?? String)(committed.current.value);
+          draftRef.current = formatted;
+          setDraft(formatted);
+          dirty.current = false;
         }
-      } else if (!prepared || prepared.editVersion === editVersionRef.current) {
-        // No queue, save failed: revert draft to the last authoritative
-        // committed value.  Using the `serverValue` prop here would
-        // erase a prior successful save whose refetch hasn't landed yet
-        // (e.g. ST 10→12 succeeds, then 13 fails — we must roll back
-        // to 12, not the stale 10 prop).
-        const formatted = formatRef.current(lastCommittedRef.current);
-        setDraft(formatted);
-        draftRef.current = formatted;
-        dirtyRef.current = false;
       }
-
-      if (isMountedRef.current) setIsSaving(false);
+      const needsRead = attempt.storageMode || owner.rollbackPending || !outcome.ok;
+      owner.rollbackPending = false;
+      if (attempt.read && needsRead) await refreshRef.current(attempt.read, true, attempt.scope);
+      if (!active()) return;
+      // A new save may have started while the storage observation was pending.
+      if (!scope.current.inflight) setIsSaving(false);
     },
-    [flashRollback, toasts],
+    [flashRollback, toasts, inScope],
   );
 
   const setValue = useCallback((raw: string) => {
-    editVersionRef.current++;
-    setDraft(raw);
+    editVersion.current++;
     draftRef.current = raw;
-    dirtyRef.current = true;
+    setDraft(raw);
+    dirty.current = true;
     setError(null);
   }, []);
 
   const commit = useCallback(() => {
-    if (!dirtyRef.current) return;
-
-    let parsed: V;
+    if (!dirty.current) return;
+    const config = options.current;
+    let value: V;
     try {
-      parsed = parseRef.current(draftRef.current);
+      value = config.parse ? config.parse(draftRef.current) : (draftRef.current as unknown as V);
+      const message = config.validate?.(value);
+      if (message) throw new Error(message);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'invalid input';
-      rollback(msg);
+      rollback(err instanceof Error ? err.message : 'invalid input');
       return;
     }
-
-    if (validateRef.current) {
-      const verr = validateRef.current(parsed);
-      if (verr) {
-        rollback(verr);
-        return;
-      }
-    }
-
     if (
-      !enqueueOnCommitRef.current &&
-      equalsRef.current(parsed, lastCommittedRef.current) &&
-      inflightRef.current === null
+      !config.persistOnCommit &&
+      !config.enqueueOnCommit &&
+      !config.readRollbackValue &&
+      !scope.current.inflight &&
+      committed.current &&
+      (config.equals ?? Object.is)(value, committed.current.value)
     ) {
-      // No-op: the typed value already matches the last value we
-      // committed (either confirmed by a prior save or arrived via
-      // the server prop).  Comparing against the prop directly would
-      // miss recent same-tab saves that haven't been refetched yet.
-      dirtyRef.current = false;
+      dirty.current = false;
       setError(null);
       return;
     }
-
-    if (enqueueOnCommitRef.current) {
-      const readCommitted = enqueueOnCommitRef.current.readCommitted;
-      const failed = async (error: unknown): Promise<SaveOutcome> => {
-        try {
-          return { ok: false, error, committed: { value: await readCommitted() } };
-        } catch {
-          // If storage itself is unreadable, retain our last confirmed value.
-          return { ok: false, error };
-        }
-      };
-      let outcome: Promise<SaveOutcome>;
+    const attempt: Attempt = {
+      value,
+      editVersion: editVersion.current,
+      save: config.onSave,
+      read: config.readRollbackValue ?? config.enqueueOnCommit?.readCommitted,
+      scope: scope.current,
+      name: config.name,
+      onError: config.onError ?? defaultOnError,
+      storageMode: Boolean(config.persistOnCommit || config.enqueueOnCommit),
+    };
+    if (tokenStore.read()?.sessionId !== attempt.scope.sessionId) return;
+    if (config.enqueueOnCommit) {
+      // Start storage transactions synchronously with the gesture, preserving
+      // ordering with relative/pool updates from other hook instances.
       try {
-        // Start the local transaction now, before a subsequent bumper gesture.
-        // Convert rejection immediately so a queued promise cannot go unhandled.
-        outcome = Promise.resolve(onSaveRef.current(parsed)).then(
+        attempt.outcome = Promise.resolve(attempt.save(value)).then(
           () => ({ ok: true as const }),
-          failed,
+          (error: unknown) => ({ ok: false as const, error }),
         );
       } catch (error) {
-        outcome = failed(error);
+        attempt.outcome = Promise.resolve({ ok: false, error });
       }
-      const prepared = { outcome, editVersion: editVersionRef.current };
-      if (inflightRef.current !== null) localQueueRef.current.push({ value: parsed, prepared });
-      else void performSave(parsed, prepared);
-      return;
-    }
-    if (inflightRef.current !== null) {
-      // Queue the latest value for after the current save settles.
-      // Wrapping in `{ value }` keeps the null-vs-not-null check on
-      // queuedRef unambiguous when V itself includes null.
-      queuedRef.current = { value: parsed };
-      return;
-    }
-
-    void performSave(parsed);
+      if (scope.current.inflight) scope.current.localQueue.push(attempt);
+      else void performSave(attempt);
+    } else if (scope.current.inflight) scope.current.queued = attempt;
+    else void performSave(attempt);
   }, [performSave, rollback]);
 
   return {
@@ -462,7 +439,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     flashing,
     inputProps: {
       value: draft,
-      onChange: (e) => setValue(e.target.value),
+      onChange: (event) => setValue(event.target.value),
       onBlur: commit,
       ...flashProps,
     },
