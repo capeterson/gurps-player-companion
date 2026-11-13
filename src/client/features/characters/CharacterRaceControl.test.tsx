@@ -95,9 +95,11 @@ describe('Character race', () => {
     await waitFor(() =>
       expect(screen.getByText("Couldn't save race — Race unavailable")).toBeVisible(),
     );
-    expect(screen.getByRole('button', { name: 'Change race: Human' })).toHaveAttribute(
-      'data-flashing',
-      'true',
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Change race: Human' })).toHaveAttribute(
+        'data-flashing',
+        'true',
+      ),
     );
   });
   it('queues a second selection behind a slow first save', async () => {

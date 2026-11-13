@@ -21,13 +21,15 @@ import { type ChangeEvent, useCallback } from 'react';
 import type { EntityClass } from '../../../../shared/schemas/sync.ts';
 import { type UseDraftFieldReturn, useDraftField } from '../../../hooks/useDraftField.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
-import { useCharacterFieldSave } from './useCharacterPatch.ts';
+import { type FieldSaver, useCharacterFieldSave } from './useCharacterPatch.ts';
 
 export interface EntityRowPatch {
   /** Patch one field on this row's entity. Mirrors the old `patchX(field, value)` closures. */
   readonly patch: (field: string, value: unknown) => Promise<void>;
   /** The flash-bus key for a given field on this row's entity. */
   readonly flashKey: (field: string) => string;
+  /** Scoped storage reader and transaction-aware no-op handling for drafts. */
+  readonly draftOptions: <V>(field: string) => FieldSaver<V>;
 }
 
 /**
@@ -56,7 +58,13 @@ export function useEntityRowPatch(
     [entityClass, entityId],
   );
 
-  return { patch, flashKey };
+  const draftOptions = useCallback(
+    <V>(field: string) =>
+      fieldSave<V>(field, { entityClass, entityId, humanName: `${entityName} ${field}` }),
+    [fieldSave, entityClass, entityId, entityName],
+  );
+
+  return { patch, flashKey, draftOptions };
 }
 
 /**
@@ -79,8 +87,7 @@ export function useEntityTextField(
     serverValue,
     parse: (s) => s.trim(),
     validate,
-    onSave: (v) => row.patch(field, v),
-    flashKey: row.flashKey(field),
+    ...row.draftOptions<string>(field),
   });
 }
 
@@ -126,8 +133,7 @@ export function useEntityEnumField<V extends string>(
     serverValue,
     parse: (s) => s as V,
     validate: (v) => (allowed.includes(v) ? null : `unknown ${label}`),
-    onSave: (v) => row.patch(field, v),
-    flashKey: row.flashKey(field),
+    ...row.draftOptions<V>(field),
   });
   const { setValue, commit } = draft;
   const onChange = useCallback(
@@ -164,8 +170,7 @@ export function useEntityPointsField(
     name: `${entityName} points`,
     serverValue,
     parse,
-    onSave: (v) => row.patch('points', v),
-    flashKey: row.flashKey('points'),
+    ...row.draftOptions<number>('points'),
   });
 }
 
@@ -192,7 +197,6 @@ export function useEntityDefaultModifierField(
       }
       return n;
     },
-    onSave: (v) => row.patch('defaultModifier', v),
-    flashKey: row.flashKey('defaultModifier'),
+    ...row.draftOptions<number>('defaultModifier'),
   });
 }

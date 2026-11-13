@@ -223,7 +223,8 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, reg
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
 - **Unsaved changes at sign-out**: logout and password change check queued
-  edits, unsaved images, and pending theme preferences before ending the session.
+  edits, unsaved images, pending theme preferences, and queued account-setting
+  toggles before ending the session.
   A confirmation offers **Keep editing** or explicit discard; cancel preserves
   the signed-in session and local work. Confirmed sign-out still purges all
   account data from this device.
@@ -1036,7 +1037,9 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
-interaction rules.
+interaction rules. Older failures preserve newer raw text, durable-value readers
+are scoped, and shared saver no-op checks use the current outbox transaction.
+Committed queues retain their original field and session through navigation.
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/log`,
@@ -1558,6 +1561,7 @@ src/
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
+    lib/pendingToggles.ts  Session-scoped pending account-setting saves and explicit discard
     hooks/       useConnectionStatus (shared offline mode/reachability),
                  useDraftField (canonical draft-on-blur), useDraftToggle,
                  useUnsyncedChangesGuard (confirmed session cleanup),

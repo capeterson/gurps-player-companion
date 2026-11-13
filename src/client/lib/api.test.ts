@@ -209,7 +209,9 @@ describe('api refresh-on-401', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(api('/characters')).resolves.toEqual({ ok: true });
+    await expect(api('/characters', { isDispatchActive: () => true })).resolves.toEqual({
+      ok: true,
+    });
     expect(refreshed).toBe(true);
     expect(tokenStore.read()).toMatchObject({ accessToken: 'access-2' });
   });
@@ -363,4 +365,68 @@ describe('api refresh-on-401', () => {
       version: 1,
     });
   });
+});
+
+it('refuses a request owned by a replaced session before dispatch', async () => {
+  tokenStore.write({
+    accessToken: 'first',
+    refreshToken: 'refresh-first',
+    accessTokenExpiresIn: 900,
+  });
+  const session = tokenStore.read();
+  if (!session) throw new Error('Expected an authenticated session');
+  const sessionId = session.sessionId;
+  tokenStore.write({
+    accessToken: 'second',
+    refreshToken: 'refresh-second',
+    accessTokenExpiresIn: 900,
+  });
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  const count = fetchSpy.mock.calls.length;
+  await expect(
+    api('/auth/notification-preferences', {
+      method: 'PATCH',
+      body: { emailInvitations: false },
+      expectedSessionId: sessionId,
+    }),
+  ).rejects.toThrow('session changed before request dispatch');
+  expect(fetchSpy.mock.calls.length).toBe(count);
+  fetchSpy.mockRestore();
+});
+
+it('does not retry a discarded preference request after a held token refresh', async () => {
+  seedTokens();
+  const session = tokenStore.read();
+  if (!session) throw new Error('Expected an authenticated session');
+  let releaseRefresh!: (response: Response) => void;
+  const heldRefresh = new Promise<Response>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes('/auth/refresh')) return heldRefresh;
+    return jsonResponse(401, { error: 'token expired' });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  let active = true;
+  const request = api('/auth/notification-preferences', {
+    method: 'PATCH',
+    body: { emailInvitations: false },
+    expectedSessionId: session.sessionId,
+    isDispatchActive: () => active,
+  });
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  active = false;
+  releaseRefresh(
+    jsonResponse(200, {
+      accessToken: 'access-2',
+      refreshToken: 'refresh-2',
+      accessTokenExpiresIn: 3600,
+    }),
+  );
+  await expect(request).rejects.toThrow('request intent was discarded');
+  expect(
+    fetchMock.mock.calls.filter(([url]) => String(url).includes('/auth/notification-preferences')),
+  ).toHaveLength(1);
+  expect(tokenStore.read()?.sessionId).toBe(session.sessionId);
+  expect(tokenStore.read()?.accessToken).toBe('access-2');
 });

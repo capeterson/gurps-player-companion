@@ -22,12 +22,15 @@
 
 import { useCallback } from 'react';
 import type { EntityClass } from '../../../../shared/schemas/sync.ts';
+import { readSyncEntity } from '../../../db/syncEntityStore.ts';
 import { makeFlashKey } from '../../../sync/flashBus.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 
-export interface FieldSaver {
+export interface FieldSaver<V = unknown> {
   readonly onSave: (value: unknown) => Promise<void>;
   readonly flashKey: string;
+  readonly persistOnCommit: true;
+  readonly readRollbackValue: () => Promise<V>;
 }
 
 /**
@@ -38,14 +41,14 @@ export interface FieldSaver {
  */
 export function useCharacterFieldSave(characterId: string) {
   return useCallback(
-    (
+    <V = unknown>(
       field: string,
       opts?: {
         entityClass?: EntityClass | undefined;
         entityId?: string | undefined;
         humanName?: string | undefined;
       },
-    ): FieldSaver => {
+    ): FieldSaver<V> => {
       const entityClass: EntityClass = opts?.entityClass ?? 'character';
       const entityId = opts?.entityId ?? characterId;
       const flashKey = makeFlashKey(entityClass, entityId, field);
@@ -58,9 +61,15 @@ export function useCharacterFieldSave(characterId: string) {
           humanName: opts?.humanName ?? field,
           flashKey,
           characterId: entityClass === 'character' ? undefined : characterId,
+          skipIfUnchanged: true,
         });
       };
-      return { onSave, flashKey };
+      const readRollbackValue = async (): Promise<V> => {
+        const row = await readSyncEntity(entityClass, entityId);
+        if (!row) throw new Error('This entry is no longer available');
+        return row[field] as V;
+      };
+      return { onSave, flashKey, persistOnCommit: true, readRollbackValue };
     },
     [characterId],
   );

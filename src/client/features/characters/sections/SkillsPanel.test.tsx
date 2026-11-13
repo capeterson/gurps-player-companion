@@ -10,7 +10,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { skillCreate } from '../../../../shared/schemas/skill.ts';
@@ -88,6 +88,10 @@ beforeEach(() => {
   enqueueCreate.mockResolvedValue(undefined);
   enqueueFieldPatch.mockReset();
   enqueueFieldPatch.mockResolvedValue(undefined);
+});
+
+afterEach(async () => {
+  await getLocalDb().characterSkills.delete('skill-1');
 });
 
 function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
@@ -491,6 +495,13 @@ describe('SkillsPanel', () => {
   });
 
   it('saves an inline field and rolls it back with a toast and flash on failure', async () => {
+    const { libraryMechanics, defaults, ...skill } = makeSkill();
+    await getLocalDb().characterSkills.put({
+      ...skill,
+      ...(libraryMechanics === undefined ? {} : { libraryMechanics }),
+      ...(defaults === undefined ? {} : { defaults }),
+      revision: 1,
+    });
     enqueueFieldPatch.mockRejectedValueOnce(new Error('Disk full'));
     renderPanel(makeCharacter([makeSkill()]), true);
     openSkillEditor('Broadsword');
@@ -501,7 +512,7 @@ describe('SkillsPanel', () => {
     expect(
       await screen.findByText("Couldn't save Broadsword points — Disk full"),
     ).toBeInTheDocument();
-    expect(points).toHaveValue('8');
+    await waitFor(() => expect(points).toHaveValue('8'));
     expect(points).toHaveAttribute('data-flashing', 'true');
     expect(enqueueFieldPatch).toHaveBeenCalledWith(
       expect.objectContaining({ fieldPath: 'points', attemptedValue: 12 }),

@@ -17,6 +17,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS } from '../../../hooks/useDraftField.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import {
@@ -28,7 +29,16 @@ import {
 const enqueueFieldPatch = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../sync/outbox.ts', () => ({
-  enqueueFieldPatch,
+  enqueueFieldPatch: async (args: {
+    entityId: string;
+    fieldPath: string;
+    attemptedValue: unknown;
+  }) => {
+    await enqueueFieldPatch(args);
+    await getLocalDb().characterSkills.update(args.entityId, {
+      [args.fieldPath]: args.attemptedValue,
+    });
+  },
 }));
 
 const CHAR_ID = '0193b3c0-f1f0-7000-8000-00000000e001';
@@ -65,8 +75,23 @@ function renderRow(name = 'Broadsword', points = 8) {
 }
 
 describe('useEntityRowPatch', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     enqueueFieldPatch.mockReset();
+    await getLocalDb().characterSkills.put({
+      id: SKILL_ID,
+      characterId: CHAR_ID,
+      name: 'Broadsword',
+      points: 8,
+      attribute: 'DX',
+      difficulty: 'A',
+      techLevel: null,
+      specialization: null,
+      notes: null,
+      librarySkillId: null,
+      createdAt: '',
+      updatedAt: '',
+      revision: 1,
+    });
   });
 
   it('enqueues via enqueueFieldPatch with the same shape the old patchX closures used', async () => {

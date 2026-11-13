@@ -107,6 +107,58 @@ async function seedCharacter() {
 }
 
 describe('enqueueFieldPatch', () => {
+  it('compares deliberate draft commits with current intent in the enqueue transaction', async () => {
+    await seedCharacter();
+    const db = getLocalDb();
+    const patch = (attemptedValue: string) =>
+      enqueueFieldPatch({
+        entityClass: 'character',
+        entityId: CHAR_ID,
+        fieldPath: 'name',
+        attemptedValue,
+        skipIfUnchanged: true,
+      });
+    // The user typed and returned to the original value while another local
+    // writer changed it. An old React prop cannot establish a no-op here.
+    await db.characters.update(CHAR_ID, { name: 'Remote C' });
+    await patch('Test');
+    expect((await db.characters.get(CHAR_ID))?.name).toBe('Test');
+    expect(await db.outbox.toArray()).toMatchObject([
+      { attemptedValue: 'Test', prevValue: 'Remote C' },
+    ]);
+    const firstId = (await db.outbox.toArray())[0]?.clientOpId;
+    await patch('Test');
+    expect(await db.outbox.toArray()).toMatchObject([{ clientOpId: firstId }]);
+
+    // Delivery-uncertain B must settle ahead of a deliberate reset to A.
+    await db.outbox.clear();
+    await patch('Pending B');
+    const predecessor = (await db.outbox.toArray())[0];
+    if (!predecessor) throw new Error('Missing pending edit');
+    await db.outbox.update(predecessor.clientOpId, { status: 'in_flight' });
+    await patch('Test');
+    const ops = await db.outbox.toArray();
+    expect(ops).toHaveLength(2);
+    expect(ops.find((op) => op.status === 'pending')).toMatchObject({
+      attemptedValue: 'Test',
+      predecessorClientOpId: predecessor.clientOpId,
+    });
+    expect((await db.characters.get(CHAR_ID))?.name).toBe('Test');
+  });
+
+  it('does not manufacture a no-op when its scoped row is missing', async () => {
+    await expect(
+      enqueueFieldPatch({
+        entityClass: 'character',
+        entityId: CHAR_ID,
+        fieldPath: 'appearance',
+        attemptedValue: undefined,
+        skipIfUnchanged: true,
+      }),
+    ).rejects.toThrow('This entry is no longer available');
+    expect(await getLocalDb().outbox.count()).toBe(0);
+  });
+
   it('lets an explicit source choice replace and unblock a retained unmapped library edit', async () => {
     const db = getLocalDb();
     const traitId = '0193b3c0-f1f0-7000-8000-00000000e220';

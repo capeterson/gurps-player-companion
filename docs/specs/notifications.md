@@ -140,7 +140,11 @@ settings changes cannot overwrite one another. These exact operations have
 explicit MCP infrastructure exclusions. Inbox topic/email toggles reuse
 `useDraftToggle` to queue rapid same-field edits and show toast+flash on failure;
 client cache merges only the confirmed field so out-of-order responses cannot
-clobber a different toggle.
+clobber a different toggle. Queued writes and cache updates retain their
+originating login session across navigation and token rotation. Another tab's
+replacement login cannot send those writes as the new account. Pending toggles
+participate in the existing discard guard, and a delayed desktop-permission
+result cannot enable a discarded or replaced session's device preference.
 
 ## File map
 
@@ -152,6 +156,7 @@ clobber a different toggle.
 - `src/server/services/notificationMaintenance.ts` — same-process maintenance lifecycle.
 - `src/client/features/settings/NotificationsSection.tsx` — desktop, email and inbox controls.
 - `src/client/lib/desktopNotifications.ts` — explicit permission, device opt-in and delivery deduplication.
+- `src/client/lib/pendingToggles.ts` — session-scoped pending preference saves and explicit discard.
 - `src/client/components/NotificationsBell.tsx` — typed inbox rendering and invitation actions.
 
 

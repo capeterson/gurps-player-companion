@@ -50,7 +50,7 @@ export function CharacterRaceControl({
     format: JSON.stringify,
     parse: (raw) => characterRace.parse(JSON.parse(raw)),
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-    ...buildSave('race', { humanName: 'race' }),
+    ...buildSave<CharacterRace>('race', { humanName: 'race' }),
     readRollbackValue: async () =>
       (await getLocalDb().characters.get(character.id))?.race ?? HUMAN_RACE,
   });
