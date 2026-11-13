@@ -500,8 +500,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   later point changes and offline warnings remain stable. Campaigns either block learning
   and point increases or allow them with persistent sheet warnings; unrelated
   later edits never delete an existing skill. Prose remains beside the typed
-  rule for source fidelity. All rule data is captured in the owned library
-  snapshot so offline calculation and warnings match the server.
+  rule for source fidelity. Known campaign rule expressions use schema defaults;
+  unavailable campaigns and unknown rule keys remain unknown. All rule data is
+  captured in the owned library snapshot so offline calculation and warnings
+  match the server.
   Difficulty never decides whether a default exists, including Very Hard skills.
   Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
   the listed penalty (B173). Purchased levels and learned-skill defaults remain

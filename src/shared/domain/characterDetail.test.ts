@@ -820,3 +820,125 @@ describe('earned adventure points and character caps', () => {
     },
   );
 });
+
+it('uses known sparse campaign defaults in skill contexts and keeps unavailable campaigns unknown', () => {
+  const timestamp = '2026-10-03T00:00:00.000Z';
+  const sourceId = '00000000-0000-4000-8000-000000000001';
+  const campaignId = '00000000-0000-4000-8000-000000000002';
+  const input: CharacterDetailInput = {
+    character: {
+      ...characterCreate.parse({ name: 'Learner' }),
+      id: 'character',
+      ownerId: 'owner',
+      campaignId,
+      height: null,
+      weight: null,
+      age: null,
+      birthdate: null,
+      appearance: null,
+      dismissedWarnings: [],
+      revision: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    traits: [],
+    spells: [],
+    languages: [],
+    techniques: [],
+    inventory: [],
+    combat: null,
+    campaign: {
+      pointTarget: null,
+      disadvantageCap: null,
+      quirkCap: null,
+      houseRules: { ruleSet: 'j_talisar' } as CampaignHouseRules,
+    },
+    skills: [
+      {
+        id: 'skill',
+        characterId: 'character',
+        name: 'Study',
+        attribute: 'IQ',
+        difficulty: 'A',
+        points: 1,
+        techLevel: null,
+        specialization: null,
+        notes: null,
+        librarySkillId: sourceId,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        libraryMechanics: {
+          sourceId,
+          campaignId,
+          sourceRevision: 1,
+          effects: [],
+          skillRules: {
+            techLevelPolicy: { kind: 'not_applicable' },
+            prerequisites: {
+              kind: 'campaign_rule',
+              ruleKey: 'forbidAcidMagic',
+              expectedValue: false,
+            },
+            defaults: null,
+            groups: [],
+            tags: [],
+            gmPermissions: [],
+            gmPermissionSpecialization: null,
+            procedures: {
+              modifiers: [
+                {
+                  id: 'rule-bonus',
+                  label: 'Rule bonus',
+                  when: [
+                    {
+                      input: { domain: 'campaign', key: 'forbidAcidMagic', label: 'Acid rule' },
+                      operator: 'equals',
+                      value: false,
+                    },
+                  ],
+                  value: { kind: 'fixed', value: 2 },
+                  appliesTo: 'base_level',
+                  stacking: 'stack',
+                },
+              ],
+              actions: [],
+              benefits: [],
+            },
+          },
+        },
+      },
+    ],
+  };
+  const detail = buildCharacterDetail(input);
+  expect(detail.skills[0]?.prerequisiteStatus).toBe('met');
+  expect(detail.skills[0]?.effectiveLevel).toBe(11);
+  expect(detail.skills[0]?.procedureContext).toMatchObject({
+    'campaign:forbidAcidMagic': false,
+    'campaign:protectNaturalDr': true,
+    'campaign:ruleSet': 'j_talisar',
+    'campaign:convertDamageAddsToDice': true,
+  });
+  expect(detail.houseRules.convertDamageAddsToDice).toBeUndefined();
+  const missing = buildCharacterDetail({ ...input, campaign: null });
+  expect(missing.houseRulesKnown).toBe(false);
+  expect(missing.skills[0]?.prerequisiteStatus).toBe('unknown');
+  expect(missing.skills[0]?.effectiveLevel).toBe(9);
+  expect(missing.skills[0]?.procedureContext?.['campaign:forbidAcidMagic']).toBeUndefined();
+  const knownCampaign = input.campaign;
+  if (!knownCampaign) throw new Error('Expected the known-campaign fixture');
+  expect(() =>
+    buildCharacterDetail({
+      ...input,
+      campaign: {
+        ...knownCampaign,
+        houseRules: { forbidAcidMagic: 'false' } as unknown as CampaignHouseRules,
+      },
+    }),
+  ).toThrow();
+  expect(() =>
+    buildCharacterDetail({
+      ...input,
+      campaign: { ...knownCampaign, houseRules: null as unknown as CampaignHouseRules },
+    }),
+  ).toThrow();
+});

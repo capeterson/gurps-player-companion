@@ -341,3 +341,15 @@ later deletions on subsequent runs. See the [seed guide](../../bootstrap/README.
 ## Racial templates
 
 Races use printed package points rather than the pricing expression engine. Components retain their printed cost for inspection but are not billed independently. One owned resolved snapshot applies racial attribute deltas, traits/effects and training; complete variants/forms replace profiles and lenses add explicit deltas/replacements. Source changes do not reprice existing race purchases. See [races.md](races.md).
+
+## Campaign rule evaluation
+
+Campaign-rule prerequisites, conditional defaults and skill procedures use a
+shared schema-parsed projection of known campaign settings, both for locked
+server validation and character detail on the server and local client. Sparse
+legacy settings receive schema defaults without expanding the selected preset;
+an unavailable campaign and unrecognized rule lookup remain unknown. Invalid
+stored settings fail parsing rather than silently becoming defaults. The optional
+`convertDamageAddsToDice` override remains optional on campaign reads; rule
+expressions see its effective B269 value (the explicit override, otherwise true
+only for `j_talisar`), matching damage calculation. No stored row is rewritten.

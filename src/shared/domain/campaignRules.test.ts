@@ -8,7 +8,9 @@ import {
   customizeHouseRule,
   isNumberHouseRule,
   normalizeHouseRuleSettings,
+  projectCampaignRulesForEvaluation,
 } from './campaignRules.ts';
+import { evaluateSkillDefaultConditions, evaluateSkillPrerequisite } from './skillRules.ts';
 
 describe('campaign house-rule sets', () => {
   it('loads every J Talisar option without affecting the separate attribute-cap rule', () => {
@@ -91,5 +93,57 @@ describe('optional damage-adds policy', () => {
     expect(convertsDamageAddsToDice(customizeHouseRule(legacy, 'forbidAcidMagic', false))).toBe(
       true,
     );
+  });
+});
+
+describe('known campaign evaluation projection', () => {
+  it('parses sparse rules without expanding presets, preserving explicit values', () => {
+    expect(
+      projectCampaignRulesForEvaluation({ ruleSet: 'j_talisar', limitationCapPercent: 0 }),
+    ).toMatchObject({
+      ruleSet: 'j_talisar',
+      limitationCapPercent: 0,
+      forbidAcidMagic: false,
+      protectNaturalDr: true,
+      convertDamageAddsToDice: true,
+    });
+    expect(
+      projectCampaignRulesForEvaluation({
+        ruleSet: 'j_talisar',
+        convertDamageAddsToDice: false,
+        forbidAcidMagic: true,
+      }),
+    ).toMatchObject({
+      convertDamageAddsToDice: false,
+      forbidAcidMagic: true,
+    });
+    const sparse = projectCampaignRulesForEvaluation({});
+    expect(sparse).toMatchObject({
+      ruleSet: 'custom',
+      forbidAcidMagic: false,
+      protectNaturalDr: true,
+      convertDamageAddsToDice: false,
+    });
+    expect(
+      evaluateSkillPrerequisite(
+        { kind: 'campaign_rule', ruleKey: 'missing', expectedValue: false },
+        { skills: [], traits: [], attributes: {}, techLevel: null, campaignRules: sparse },
+      ).truth,
+    ).toBe('unknown');
+    expect(
+      evaluateSkillDefaultConditions(
+        [{ kind: 'campaign_rule', rule: 'forbidAcidMagic', value: false }],
+        { campaignRules: sparse },
+      )[0]?.truth,
+    ).toBe('met');
+    expect(
+      evaluateSkillDefaultConditions([{ kind: 'campaign_rule', rule: 'missing', value: false }], {
+        campaignRules: sparse,
+      })[0]?.truth,
+    ).toBe('unknown');
+    expect('unknownRule' in projectCampaignRulesForEvaluation({})).toBe(false);
+    expect(() => projectCampaignRulesForEvaluation({ forbidAcidMagic: 'false' })).toThrow();
+    expect(() => projectCampaignRulesForEvaluation({ unknownRule: true })).toThrow();
+    expect(() => projectCampaignRulesForEvaluation(null)).toThrow();
   });
 });
