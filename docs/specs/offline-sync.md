@@ -219,6 +219,12 @@ works offline.**
    value, including when a different value is already queued. Reads that fail
    leave the text retryable rather than proving a no-op. This includes
    same-field edits committed while an earlier save is still pending.
+   Bespoke trait/skill/spell fields use the shared scoped row saver too.
+   Active-effect note edits address one effect by identity, then read/modify/write
+   the current whole array within the existing transaction. Draft scope keys
+   distinguish nested item paths and effect entries even when rollback events
+   use one top-level field key. Readers never substitute render-time item or
+   loadout values when the corresponding stored row has disappeared.
    Bumpers use the latest local values, including another input’s edit before React
    renders it. Every floating HP/FP popover gesture writes the combat row and
    outbox immediately in that transaction; the panel renders only the resulting

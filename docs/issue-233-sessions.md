@@ -2,7 +2,7 @@
 
 [Issue 233](https://github.com/capeterson/gurps-player-companion/issues/233) and the [implementation packets and architecture reviews](https://gist.github.com/capeterson/8da70e3e76700e7c796a0b9816cd5aa5) are the source for packet details, evidence, exact copy, and acceptance. This is an execution plan, not evidence that those proposals have shipped or that their visual designs are approved. Recheck the current issue and linked material before each packet.
 
-Session 1 implements **PROP-043** in PR #242. The next combined change implements **session 2a (PROP-001 foundation)** and **session 33 (PROP-038)** in parallel, with one shared full validation run and PR. Session 2b remains planned; PROP-001 is not closed by the foundation alone. Other sessions are planned. Previous unfinished work remains preserved; inspect relevant changes and their provenance selectively, and reuse only independently reviewed work that meets the current packet's contract. Do not assume existing edits or prior tests establish completion.
+Session 1 implements **PROP-043** in PR #242. PR #243 implements **session 2a (PROP-001 foundation)** and **session 33 (PROP-038)** together. **Session 2b** in this change completes the remaining audited production draft-field integrations and the real character/owned-row browser acceptance for PROP-001. Other sessions are planned. Previous unfinished work remains preserved; inspect relevant changes and their provenance selectively, and reuse only independently reviewed work that meets the current packet's contract. Do not assume existing edits or prior tests establish completion.
 
 Each lettered row below is a separate execution session. The numbered groups organize related work; they are not a promise that the work fits a particular time or usage budget. Split further when necessary, preserving a reviewable checkpoint and the stated acceptance boundary. Dependencies refer to completed foundations, not merely started sessions.
 
@@ -10,7 +10,7 @@ Each lettered row below is a separate execution session. The numbered groups org
 | --- | --- | --- |
 | 1 | **043** Known campaign rule projection across reads and skill evaluation. | Implemented here. Exit requires sparse/defaulted and explicit values, unavailable context, authorization and REST/sync/MCP parity validation. |
 | 2a | **001** Shared draft knowledge, rollback baseline and transactional comparison. | Implemented in the combined 2a/33 change; verify local intent, ordered writes, rejection feedback, read failures and original scope across navigation. |
-| 2b | **001** Character and owned-row integration and browser races. | 2a; audit remaining bespoke wrappers and generic HTTP prop freshness, actual durable outcomes, toast and flash. Both parts required for closure. |
+| 2b | **001** Character and owned-row integration and browser races. | Implemented here: remaining wrappers, nested draft identities, invalid effect draft retention and real server rejection/cursor/queue/null browser outcomes. No production HTTP draft save consumers were found. |
 | 3 | **004** Stable domain identities and safe duplication. | Schema and reference integrity, reorder and reopen. |
 | 4 | **003** Domain-aware reference choices and repair. | 004 interfaces; valid choices, unresolved references and open picker geometry. |
 | 5 | **007** Actionable validation paths and host-specific bounds. | Named errors reveal and focus actual controls, including reordered and nested rows. |

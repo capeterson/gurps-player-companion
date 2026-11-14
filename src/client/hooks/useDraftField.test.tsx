@@ -759,7 +759,8 @@ describe('useDraftField', () => {
         serverValue: id,
         onSave: id === 'A' ? saveA : saveB,
         persistOnCommit: true,
-        flashKey: `character:${id}:name`,
+        flashKey: 'character:shared:activeEffects',
+        scopeKey: `character:shared:activeEffects:${id}:notes`,
         readRollbackValue:
           id === 'A'
             ? () =>
@@ -872,7 +873,8 @@ describe('useDraftField', () => {
       const field = useDraftField({
         name: 'Name',
         serverValue: id,
-        flashKey: `character:${id}:name`,
+        flashKey: 'character:shared:activeEffects',
+        scopeKey: `character:shared:activeEffects:${id}:notes`,
         onSave: id === 'A' ? saveA : saveB,
       });
       return <input aria-label="Name" {...field.inputProps} />;

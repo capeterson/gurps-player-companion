@@ -15,7 +15,7 @@ import { newClientId } from '../../../../sync/outbox.ts';
 import { ActiveEffectForm } from '../../../library/ActiveEffectForm.tsx';
 import { effectPreview } from '../../../library/EffectsEditor.tsx';
 import { ActiveConditionsPanel } from '../ActiveConditionsPanel.tsx';
-import { mutateActiveEffects } from '../activeEffectMutations.ts';
+import { mutateActiveEffects, readActiveEffectNotes } from '../activeEffectMutations.ts';
 import { useLibraryFetcher } from '../useLibraryFetcher.ts';
 
 function EffectNotes({ entry, characterId }: { entry: ActiveEffectInstance; characterId: string }) {
@@ -24,9 +24,15 @@ function EffectNotes({ entry, characterId }: { entry: ActiveEffectInstance; char
     name: `${entry.name} notes`,
     parse: (raw) => raw,
     onSave: (value) =>
-      mutateActiveEffects(characterId, `${entry.name} notes`, (entries) =>
-        entries.map((e) => (e.id === entry.id ? { ...e, notes: value } : e)),
-      ),
+      mutateActiveEffects(characterId, `${entry.name} notes`, (entries) => {
+        if (!entries.some((effect) => effect.id === entry.id))
+          throw new Error('This active effect no longer exists');
+        return entries.map((effect) =>
+          effect.id === entry.id ? { ...effect, notes: value } : effect,
+        );
+      }),
+    enqueueOnCommit: { readCommitted: () => readActiveEffectNotes(characterId, entry.id) },
+    scopeKey: `character:${characterId}:activeEffects:${entry.id}:notes`,
     flashKey: `character:${characterId}:activeEffects`,
   });
   return (

@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveRaceSelection } from '../../../shared/domain/race.ts';
 import type { CharacterDetail } from '../../../shared/schemas/character.ts';
 import { HUMAN_RACE, libraryRaceOut } from '../../../shared/schemas/race.ts';
+import { getLocalDb } from '../../db/dexie.ts';
 import { ToastProvider } from '../../lib/toast.tsx';
 import { CharacterRaceControl } from './CharacterRaceControl.tsx';
 
@@ -54,9 +55,13 @@ function select(id: string) {
 function apply() {
   fireEvent.click(screen.getByRole('button', { name: 'Apply race' }));
 }
-beforeEach(() => {
+beforeEach(async () => {
   mock.save.mockReset().mockResolvedValue(undefined);
   mock.races = [race, second];
+  await getLocalDb().characters.put({ ...character, revision: 1 } as never);
+});
+afterEach(async () => {
+  await getLocalDb().characters.delete(character.id);
 });
 describe('Character race', () => {
   it('defaults to Human and previews before explicitly applying the whole race', async () => {

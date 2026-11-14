@@ -5,6 +5,18 @@ import {
 import { getLocalDb } from '../../../db/dexie.ts';
 import { campaignTransferStores } from '../../../sync/localCampaignTransfer.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
+
+export async function readActiveEffectNotes(
+  characterId: string,
+  effectId: string,
+): Promise<string> {
+  const row = await getLocalDb().characters.get(characterId);
+  if (!row) throw new Error('Character no longer exists');
+  const entry = (row.activeEffects ?? []).find((effect) => effect.id === effectId);
+  if (!entry) throw new Error('This active effect no longer exists');
+  return entry.notes ?? '';
+}
+
 export async function mutateActiveEffects(
   characterId: string,
   label: string,

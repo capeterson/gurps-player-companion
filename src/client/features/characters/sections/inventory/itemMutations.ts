@@ -92,7 +92,9 @@ export function readPath(value: unknown, path: string): unknown {
 }
 
 export async function readItemPath(id: string, path: string): Promise<unknown> {
-  return readPath(await getLocalDb().characterInventory.get(id), path);
+  const row = await getLocalDb().characterInventory.get(id);
+  if (!row) throw new Error('This inventory item no longer exists');
+  return readPath(row, path);
 }
 
 export function writeItemPath(id: string, path: string, value: unknown, label: string) {

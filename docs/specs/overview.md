@@ -1040,6 +1040,12 @@ loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
 interaction rules. Older failures preserve newer raw text, durable-value readers
 are scoped, and shared saver no-op checks use the current outbox transaction.
 Committed queues retain their original field and session through navigation.
+All production `useDraftField` save consumers use local-first writers; there
+are no HTTP save consumers requiring a separate freshness protocol. Bespoke
+trait, skill and spell fields share scoped row readers; nested inventory and
+active-effect notes keep their individual draft identities while sharing the
+existing whole-field rollback feedback. Invalid newer owned-effect drafts
+survive older save/removal settlements.
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/log`,

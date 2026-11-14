@@ -71,7 +71,8 @@ export function ItemLocationField({ item, label }: { item: InventoryItemOut; lab
     enqueueOnCommit: {
       readCommitted: async () => {
         const row = await getLocalDb().characterInventory.get(item.id);
-        return locationValue(row ?? item);
+        if (!row) throw new Error('This inventory item no longer exists');
+        return locationValue(row);
       },
     },
     flashKey: makeFlashKey('character_inventory', item.id, 'worn'),

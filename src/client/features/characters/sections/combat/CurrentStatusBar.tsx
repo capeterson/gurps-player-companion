@@ -16,6 +16,7 @@ import type { CharacterDetail } from '../../../../../shared/schemas/character.ts
 import { useCharacterHeaderChrome } from '../../../../components/CharacterHeaderChromeContext.tsx';
 import { ConditionChip } from '../../../../components/ui/ConditionChip.tsx';
 import { InfoTooltip } from '../../../../components/ui/InfoTooltip.tsx';
+import { getLocalDb } from '../../../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../../../hooks/useDraftField.ts';
 import { useFlashState } from '../../../../hooks/useFlashState.ts';
 import { useViewportBoundedOverlay } from '../../../../hooks/useViewportBoundedOverlay.ts';
@@ -557,9 +558,20 @@ export function CurrentStatusBar({
 
   const maneuverField = useDraftField<string | null>({
     name: 'maneuver',
-    serverValue: storedManeuver ?? '',
+    serverValue: storedManeuver,
+    format: (value) => value ?? '',
     parse: nullableTextParser,
     onSave: (value) => patchCombat('maneuver', value),
+    enqueueOnCommit: {
+      readCommitted: async () => {
+        const db = getLocalDb();
+        return db.transaction('r', [db.characters, db.characterCombat], async () => {
+          const characterRow = await db.characters.get(character.id);
+          if (!characterRow) throw new Error('Character no longer exists');
+          return (await db.characterCombat.get(character.id))?.maneuver ?? null;
+        });
+      },
+    },
     flashKey: makeFlashKey('character_combat', character.id, 'maneuver'),
   });
   const commitManeuver = maneuverField.commit;

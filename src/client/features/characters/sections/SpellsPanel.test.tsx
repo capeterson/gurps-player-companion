@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSpellOut } from '../../../../shared/domain/characterDetail.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SpellOut } from '../../../../shared/schemas/spell.ts';
+import { getLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { enqueueCreate, enqueueDelete, enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { MagicSection } from './MagicSection.tsx';
@@ -120,6 +121,9 @@ beforeEach(() => {
   enqueueCreateMock.mockReset().mockResolvedValue(undefined);
   enqueueDeleteMock.mockReset().mockResolvedValue(undefined);
   enqueueFieldPatchMock.mockReset().mockResolvedValue(undefined);
+});
+afterEach(async () => {
+  await getLocalDb().characterSpells.delete(SPELL_ONE);
 });
 
 describe('SpellsPanel reading and table controls', () => {
@@ -318,6 +322,10 @@ describe('SpellsPanel row drafts', () => {
   });
 
   it('reports and flashes a rejected field save while restoring its previous value', async () => {
+    await getLocalDb().characterSpells.put({
+      ...makeSpell(SPELL_ONE, 'Fireball'),
+      revision: 1,
+    } as never);
     enqueueFieldPatchMock.mockRejectedValue(new Error('server rejected cost'));
     renderPanel(makeCharacter([makeSpell(SPELL_ONE, 'Fireball')]));
     editSpell();
@@ -333,6 +341,17 @@ describe('SpellsPanel row drafts', () => {
   });
 
   it('saves spell notes, retains them while filtered out, and flashes the summary with a visible rejection toast', async () => {
+    await getLocalDb().characterSpells.put({
+      ...makeSpell(SPELL_ONE, 'Fireball'),
+      revision: 1,
+    } as never);
+    enqueueFieldPatchMock.mockImplementation(
+      async (args: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+        await getLocalDb().characterSpells.update(args.entityId, {
+          [args.fieldPath]: args.attemptedValue,
+        });
+      },
+    );
     renderPanel(
       makeCharacter([makeSpell(SPELL_ONE, 'Fireball'), makeSpell(SPELL_TWO, 'Ice Shield')]),
     );
@@ -356,8 +375,10 @@ describe('SpellsPanel row drafts', () => {
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search spells' }), {
       target: { value: '' },
     });
-    expect(screen.getByRole('textbox', { name: 'Fireball notes' })).toHaveValue(
-      'Revised **description**',
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Fireball notes' })).toHaveValue(
+        'Revised **description**',
+      ),
     );
 
     enqueueFieldPatchMock.mockRejectedValueOnce(new Error('network unavailable'));
@@ -372,8 +393,10 @@ describe('SpellsPanel row drafts', () => {
     );
     expect(screen.getByText(/Couldn't save Fireball notes — network unavailable/)).toBeVisible();
     editSpell();
-    expect(screen.getByRole('textbox', { name: 'Fireball notes' })).toHaveValue(
-      'Revised **description**',
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Fireball notes' })).toHaveValue(
+        'Revised **description**',
+      ),
     );
   });
 
