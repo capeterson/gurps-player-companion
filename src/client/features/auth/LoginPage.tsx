@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, api } from '../../lib/api.ts';
 import { getPasskey, passkeysSupported } from '../../lib/passkeys.ts';
+import { safeReturnDestination } from '../../lib/returnDestination.ts';
 import { type Tokens, tokenStore } from '../../lib/tokenStore.ts';
 
 export function LoginPage({ defaultReturnTo = '/' }: { defaultReturnTo?: '/' | '/admin/users' }) {
@@ -13,14 +14,10 @@ export function LoginPage({ defaultReturnTo = '/' }: { defaultReturnTo?: '/' | '
   const location = useLocation();
   const loginState = location.state as { returnTo?: unknown; reason?: unknown } | null;
   const candidate = loginState?.returnTo;
-  const returnTo =
-    typeof candidate === 'string' &&
-    (candidate === '/oauth/consent' ||
-      candidate.startsWith('/oauth/consent?') ||
-      (defaultReturnTo === '/admin/users' &&
-        (candidate === '/admin' || candidate.startsWith('/admin/'))))
-      ? candidate
-      : defaultReturnTo;
+  const returnTo = safeReturnDestination(
+    candidate,
+    defaultReturnTo === '/admin/users' ? 'admin' : 'player',
+  );
   const isOAuthReauthentication =
     returnTo.startsWith('/oauth/consent') &&
     loginState?.reason === 'oauth-consent-reauthentication';

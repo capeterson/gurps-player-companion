@@ -191,7 +191,7 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
   - `useInfiniteQuery` → `GET /characters/:id/history`; runs `groupIntoBatches(summarizeEvent(...))`.
   - Renders a vertical list reusing the row styling from `sections/SkillsPanel.tsx` (grid rows, border-b). Each group is one summary row: timestamp (relative), summary, actor name. Summary text wraps long unspaced entity names within its column, so the full event remains readable at narrow widths. The timestamp carries a `title` tooltip with the full localized date/time down to the second (`HistoryGroupRow.tsx`'s `formatAbsolute`), for when the relative label ("3h ago") isn't precise enough.
   - **Foldable batches:** groups with >1 child render a disclosure arrow, reusing existing expand patterns already in this file — the `▸`/`▾` toggle in PointsPanel (CharacterSheetPage.tsx:1062) and the `<details>` pattern in WarningsPanel (~:1303); expanding fetches `?detail=1` for that `batchId` and shows each child's `old → new` per field.
-  - **Local filter & search:** a search box + filter chips (by entity type: Attributes/Skills/Spells/Inventory/Combat; by op: added/changed/removed; optional date range) that filter the already-loaded list **in memory** (no server round-trip), matching against the summary line and field names. "Load older" button triggers the next page.
+  - **Local filter & search:** a search box and category chips (Attributes, Traits, Skills, Magic, Inventory and Combat), plus operation chips (Added, Changed and Removed), filter the already-loaded list **in memory** without a server round-trip. Search matches the summary. "Load older" requests the next page.
 - `RollHistoryPanel` renders check and damage rolls newest first, including their
   local timestamps. `rollHistory.ts` persists them per character in `localStorage`
   and prunes the oldest entries whenever a new roll would exceed 250. It never
@@ -209,7 +209,11 @@ Diff helpers live alongside (`diffRows(old, new, ignoreKeys)` ignoring `revision
 The server-backed Change history and Campaign panels are read-only and share a
 `useHistoryQuery` hook plus `HistoryList`/`HistoryGroupRow` presentation in
 `src/client/features/history/`; the local Roll history panel deliberately does not
-use that data path.
+use that data path. Campaign history offers Campaign, Members and Library
+categories; the Library category covers all campaign-library entity classes.
+Switching between character and campaign scopes clears an incompatible category
+while retaining the operation and search filters. Details remain on-demand and
+subject to the existing authorization checks.
 
 ---
 

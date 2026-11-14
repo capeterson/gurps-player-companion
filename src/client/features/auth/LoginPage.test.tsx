@@ -19,6 +19,11 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
   return { ...orig, api: vi.fn() };
 });
 
+vi.mock('../../lib/passkeys.ts', () => ({
+  passkeysSupported: () => true,
+  getPasskey: vi.fn().mockResolvedValue({ id: 'synthetic' }),
+}));
+
 vi.mock('../../lib/tokenStore.ts', () => ({
   tokenStore: {
     read: vi.fn().mockReturnValue(null),
@@ -150,6 +155,24 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(expected, { replace: true }));
   });
+
+  it.each(['password', 'passkey'] as const)(
+    'returns to a sheet anchor after %s sign-in',
+    async (method) => {
+      vi.mocked(api).mockResolvedValue(fakeTokens);
+      const user = userEvent.setup();
+      const target = '/characters/abc?section=inventory#inventory-item-1';
+      renderLogin(target);
+      await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+      if (method === 'password') {
+        await user.type(screen.getByLabelText(/password/i), 'password123');
+        await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+      } else {
+        await user.click(screen.getByRole('button', { name: /use a passkey/i }));
+      }
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(target, { replace: true }));
+    },
+  );
 
   it('explains OAuth reauthentication before the consent screen is shown', () => {
     renderLogin('/oauth/consent?client_id=safe&state=abc', 'oauth-consent-reauthentication');

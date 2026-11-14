@@ -180,6 +180,8 @@ test('character and campaign history wrap long summaries and keep expanded detai
     await expect(page.getByRole('button', { name: 'Campaign changes' })).toBeVisible();
     const campaignSummary = page.getByText(`Added library source ${SOURCE_NAME}`, { exact: true });
     await expect(campaignSummary).toBeVisible({ timeout: 30_000 });
+    await page.getByRole('button', { name: 'Library', exact: true }).click();
+    await expect(campaignSummary).toBeVisible();
     const campaignSummaryRow = campaignSummary.locator('xpath=ancestor::summary[1]');
     const campaignEvent = campaignSummaryRow.locator('xpath=..');
     const campaignSummaryContent = campaignSummary.locator('xpath=..');

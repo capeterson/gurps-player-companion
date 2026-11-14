@@ -47,6 +47,7 @@ export function CampaignHistoryPanel({ campaignId, isOwner }: CampaignHistoryPan
         </div>
       )}
       <HistoryList
+        scope={scope}
         events={events}
         isLoading={isLoading}
         error={isError ? error : null}

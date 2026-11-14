@@ -3,9 +3,10 @@ import { parse, stringify } from 'yaml';
 import { normalizeWeaponData } from '../../../shared/domain/weaponModes.ts';
 import { type WeaponData, type WeaponMode, weaponData } from '../../../shared/schemas/inventory.ts';
 import { RangedRangeInputs } from '../characters/sections/inventory/RangedRangeField.tsx';
-import { StructuredFields } from './StructuredFields.tsx';
+import { RowIdentityDomain, StructuredFields } from './StructuredFields.tsx';
 import { newEditorId } from './editorId.ts';
 import { libraryFormError } from './libraryFormErrors.ts';
+import { unusedRowKey } from './rowIdentity.ts';
 
 function readDraft(text: string): unknown {
   try {
@@ -70,19 +71,21 @@ export function WeaponModesEditor({
         {advanced ? 'Visual modes' : 'All weapon fields'}
       </button>
       {advanced ? (
-        <StructuredFields
-          schema={weaponData.nullable()}
-          value={draft}
-          label="Weapon data"
-          path="weaponData"
-          onChange={(next) => {
-            setDraft(next);
-            const result = weaponData.nullable().safeParse(next);
-            setError(result.success ? '' : libraryFormError(result.error));
-            if (result.success) setData(normalizeWeaponData(result.data));
-            onChange(next == null ? '' : stringify(next));
-          }}
-        />
+        <RowIdentityDomain.Provider value="weapon">
+          <StructuredFields
+            schema={weaponData.nullable()}
+            value={draft}
+            label="Weapon data"
+            path="weaponData"
+            onChange={(next) => {
+              setDraft(next);
+              const result = weaponData.nullable().safeParse(next);
+              setError(result.success ? '' : libraryFormError(result.error));
+              if (result.success) setData(normalizeWeaponData(result.data));
+              onChange(next == null ? '' : stringify(next));
+            }}
+          />
+        </RowIdentityDomain.Provider>
       ) : (
         <>
           <label>
@@ -150,19 +153,43 @@ export function WeaponModesEditor({
                     className="fieldset min-w-0 border-t border-base-300 pt-3"
                   >
                     <legend className="fieldset-legend">Mode {index + 1}</legend>
+                    <div className="flex gap-1">
+                      {([-1, 1] as const).map((direction) => (
+                        <button
+                          key={direction}
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          aria-label={`Move attack ${mode.name} ${direction < 0 ? 'up' : 'down'}`}
+                          disabled={
+                            index + direction < 0 || index + direction >= (data.modes?.length ?? 0)
+                          }
+                          onClick={() => {
+                            const modes = [...(data.modes ?? [])];
+                            const other = index + direction;
+                            const item = modes[index];
+                            const neighbor = modes[other];
+                            if (!item || !neighbor) return;
+                            modes[index] = neighbor;
+                            modes[other] = item;
+                            update({ ...data, modes });
+                          }}
+                        >
+                          {direction < 0 ? '↑' : '↓'}
+                        </button>
+                      ))}
+                    </div>
                     <div className="grid min-w-0 gap-2 sm:grid-cols-2">
-                      {(['key', 'name', 'skill', 'damage', 'reach', 'parry'] as const).map(
-                        (field) => (
-                          <label key={field} className="min-w-0">
-                            {field === 'key' ? 'Stable mode key' : field}
-                            <input
-                              className="input input-sm w-full"
-                              value={mode[field] ?? ''}
-                              onChange={(e) => change({ [field]: e.target.value })}
-                            />
-                          </label>
-                        ),
-                      )}
+                      {(['name', 'skill', 'damage', 'reach', 'parry'] as const).map((field) => (
+                        <label key={field} className="min-w-0">
+                          {field === 'name' ? 'Attack name' : field}
+                          <input
+                            aria-label={`${field === 'name' ? 'Attack name' : field}, ${mode.name}`}
+                            className="input input-sm w-full"
+                            value={mode[field] ?? ''}
+                            onChange={(e) => change({ [field]: e.target.value })}
+                          />
+                        </label>
+                      ))}
                       <label>
                         Minimum ST
                         <input
@@ -270,6 +297,25 @@ export function WeaponModesEditor({
                     <button
                       type="button"
                       className="btn btn-sm w-fit"
+                      aria-label={`Duplicate attack ${mode.name}`}
+                      disabled={(data.modes?.length ?? 0) >= 20}
+                      onClick={() => {
+                        const name = `${mode.name.slice(0, 35)} copy`;
+                        const key = unusedRowKey(
+                          name,
+                          (data.modes ?? []).map((item) => item.key),
+                          40,
+                        );
+                        const modes = [...(data.modes ?? [])];
+                        modes.splice(index + 1, 0, { ...structuredClone(mode), name, key });
+                        update({ ...data, modes });
+                      }}
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm w-fit"
                       disabled={(data.modes?.length ?? 0) <= 1}
                       onClick={() =>
                         update({ ...data, modes: (data.modes ?? []).filter((_, i) => i !== index) })
@@ -287,7 +333,17 @@ export function WeaponModesEditor({
                 onClick={() =>
                   update({
                     ...data,
-                    modes: [...(data.modes ?? []), { key: newEditorId(), name: 'New mode' }],
+                    modes: [
+                      ...(data.modes ?? []),
+                      {
+                        key: unusedRowKey(
+                          'New attack',
+                          (data.modes ?? []).map((mode) => mode.key),
+                          40,
+                        ),
+                        name: 'New attack',
+                      },
+                    ],
                   })
                 }
               >

@@ -198,7 +198,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Password and passkey sign-in restore validated internal destinations, including their query and sheet anchor; OAuth reauthentication retains its request query. Admin destinations use their own allow-list. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -1183,6 +1183,8 @@ settings sections; switching sections retains drafts.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters. Audit
   summaries wrap long unspaced entity names within their rows without clipping.
+  Category filters follow the current scope: Campaign, Members and Library for
+  campaign events, and sheet categories for character events.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.

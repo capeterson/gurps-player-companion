@@ -1,7 +1,15 @@
-import { type ReactNode, useContext, useId, useRef, useState } from 'react';
+import { type ReactNode, createContext, useContext, useId, useRef, useState } from 'react';
 import { z } from 'zod';
 import { SourcebooksContext, sourcebookLabel } from './SourcebooksContext.tsx';
 import { newEditorId } from './editorId.ts';
+import { unusedRowKey } from './rowIdentity.ts';
+
+export const RowIdentityDomain = createContext<'weapon' | null>(null);
+
+function identityRow(domain: 'weapon' | null, path: string) {
+  if (domain === 'weapon' && path === 'weaponData.modes') return { name: 'Attack', max: 40 };
+  return null;
+}
 import {
   choiceTag,
   editorLabel,
@@ -18,15 +26,17 @@ export interface StructuredFieldProps {
   onChange: (value: unknown) => void;
   label: string;
   path?: string | undefined;
+  accessibleLabel?: string | undefined;
   /** Domain controls (references, effects, rich text) can replace one field. */
   renderField?: ((props: StructuredFieldProps) => ReactNode | undefined) | undefined;
 }
 
 /** Typed controls, never a JSON textarea. Invalid numeric/string drafts stay in the model. */
 export function StructuredFields(props: StructuredFieldProps) {
-  const { schema, value, onChange, label, path = '', renderField } = props;
+  const { schema, value, onChange, label, path = '', renderField, accessibleLabel } = props;
   const id = useId();
   const books = useContext(SourcebooksContext);
+  const identityDomain = useContext(RowIdentityDomain);
   const custom = renderField?.(props);
   if (custom !== undefined) return custom;
   const base = unwrapSchema(schema);
@@ -48,25 +58,31 @@ export function StructuredFields(props: StructuredFieldProps) {
   if (choices.length > 1) return <ChoiceField {...props} choices={choices} />;
   if (base instanceof z.ZodObject) {
     const row = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+    const rowDomain = identityRow(identityDomain, path.replace(/\.\d+$/, ''));
     return (
       <fieldset className="fieldset min-w-0 space-y-3 sm:col-span-2">
         <legend className="fieldset-legend break-words">{label}</legend>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-          {Object.entries(objectShape(base)).map(([key, child]) => (
-            <StructuredFields
-              key={key}
-              schema={child}
-              value={row[key]}
-              label={editorLabel(key)}
-              path={path ? `${path}.${key}` : key}
-              renderField={renderField}
-              onChange={(next) => {
-                const updated = { ...row, [key]: next };
-                if (next === undefined) delete updated[key];
-                onChange(updated);
-              }}
-            />
-          ))}
+          {Object.entries(objectShape(base))
+            .filter(([key]) => !(rowDomain && identityDomain === 'weapon' && key === 'key'))
+            .map(([key, child]) => (
+              <StructuredFields
+                key={key}
+                schema={child}
+                value={row[key]}
+                label={rowDomain && key === 'name' ? `${rowDomain.name} name` : editorLabel(key)}
+                accessibleLabel={
+                  rowDomain && key === 'name' ? `${rowDomain.name} name, ${label}` : undefined
+                }
+                path={path ? `${path}.${key}` : key}
+                renderField={renderField}
+                onChange={(next) => {
+                  const updated = { ...row, [key]: next };
+                  if (next === undefined) delete updated[key];
+                  onChange(updated);
+                }}
+              />
+            ))}
         </div>
       </fieldset>
     );
@@ -149,6 +165,7 @@ export function StructuredFields(props: StructuredFieldProps) {
       ) : (
         <input
           id={id}
+          aria-label={accessibleLabel}
           className="input input-sm min-w-0 w-full"
           data-field-path={path}
           type="text"
@@ -280,6 +297,23 @@ function ArrayField({
 }: StructuredFieldProps & { element: z.ZodTypeAny; maximum?: number | undefined }) {
   const { value, onChange, label, path = '', renderField } = props;
   const rows = Array.isArray(value) ? value : [];
+  const identityDomain = useContext(RowIdentityDomain);
+  const identity = identityRow(identityDomain, path);
+  const prepareIdentity = (row: unknown, duplicate: boolean) => {
+    if (!identity || !row || typeof row !== 'object' || Array.isArray(row)) return row;
+    const entry = row as Record<string, unknown>;
+    const original =
+      typeof entry.name === 'string' && entry.name.trim()
+        ? entry.name
+        : `New ${identity.name.toLowerCase()}`;
+    const name = duplicate
+      ? `${original.slice(0, identity.max - 5)} copy`
+      : original.slice(0, identity.max);
+    const keys = rows.flatMap((item) =>
+      item && typeof item === 'object' && typeof item.key === 'string' ? [item.key] : [],
+    );
+    return { ...entry, name, key: unusedRowKey(name, keys, identity.max) };
+  };
   const ids = useRef<string[]>([]);
   while (ids.current.length < rows.length) ids.current.push(newEditorId());
   const move = (index: number, direction: number) => {
@@ -330,11 +364,13 @@ function ArrayField({
             <button
               type="button"
               className="btn btn-ghost btn-xs"
+              aria-label={identity ? `Duplicate ${label} ${index + 1}` : undefined}
               disabled={maximum !== undefined && rows.length >= maximum}
               onClick={() => {
                 ids.current.splice(index + 1, 0, newEditorId());
-                const copy = structuredClone(row);
-                if (copy && typeof copy === 'object' && 'id' in copy)
+                let copy = structuredClone(row);
+                copy = prepareIdentity(copy, true);
+                if (!identity && copy && typeof copy === 'object' && 'id' in copy)
                   (copy as Record<string, unknown>).id = newEditorId();
                 onChange([...rows.slice(0, index + 1), copy, ...rows.slice(index + 1)]);
               }}
@@ -368,7 +404,7 @@ function ArrayField({
         className="btn btn-sm w-fit"
         disabled={maximum !== undefined && rows.length >= maximum}
         onClick={() => {
-          const next = seedSchema(element);
+          const next = prepareIdentity(seedSchema(element), false);
           if (next && typeof next === 'object' && 'id' in next)
             (next as Record<string, unknown>).id = newEditorId();
           ids.current[rows.length] = newEditorId();

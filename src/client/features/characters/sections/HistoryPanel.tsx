@@ -99,6 +99,7 @@ function ChangeHistory({ characterId }: HistoryPanelProps) {
   return (
     <div className="space-y-3">
       <HistoryList
+        scope="character"
         events={events}
         isLoading={isLoading}
         error={isError ? error : null}

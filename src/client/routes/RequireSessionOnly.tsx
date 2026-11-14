@@ -9,7 +9,7 @@ export function RequireSessionOnly() {
       <Navigate
         to="/login"
         replace
-        state={{ returnTo: `${location.pathname}${location.search}` }}
+        state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }}
       />
     );
   }

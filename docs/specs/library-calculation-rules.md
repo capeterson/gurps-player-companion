@@ -199,8 +199,10 @@ offered through **Review update**, which previews removed/added effect lines and
 never downgrades to an older library row.
 
 Weapon, armor, shield, container, powerstone, magic-item and enchantment facets
-coexist on one physical item. The library editor offers visual attack modes and a
-complete typed weapon/armor detail views, container fields, powerstone capacity
+coexist on one physical item. The library editor offers visual attack modes and
+complete typed weapon/armor detail views. New and duplicated library attack modes
+receive unused bounded keys; renaming or reordering preserves their existing keys.
+The editor also provides container fields, powerstone capacity
 and energy, every magic-item mode, and editable enchantment attachments.
 Linked enchantment mechanics remain authoritative until **Make independent**
 retains the snapshot and removes the link. Unrelated edits preserve dormant

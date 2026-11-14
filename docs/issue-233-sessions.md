@@ -2,7 +2,7 @@
 
 [Issue 233](https://github.com/capeterson/gurps-player-companion/issues/233) and the [implementation packets and architecture reviews](https://gist.github.com/capeterson/8da70e3e76700e7c796a0b9816cd5aa5) are the source for packet details, evidence, exact copy, and acceptance. This is an execution plan, not evidence that those proposals have shipped or that their visual designs are approved. Recheck the current issue and linked material before each packet.
 
-Session 1 implements **PROP-043** in PR #242. PR #243 implements **session 2a (PROP-001 foundation)** and **session 33 (PROP-038)** together. **Session 2b** in this change completes the remaining audited production draft-field integrations and the real character/owned-row browser acceptance for PROP-001. Other sessions are planned. Previous unfinished work remains preserved; inspect relevant changes and their provenance selectively, and reuse only independently reviewed work that meets the current packet's contract. Do not assume existing edits or prior tests establish completion.
+Session 1 implements **PROP-043** in PR #242. PR #243 implements **session 2a (PROP-001 foundation)** and **session 33 (PROP-038)** together. PR #244 completes **session 2b** for PROP-001. This change combines the bounded **session 3a** identity foundation with **session 25**. Other sessions are planned. Previous unfinished work remains preserved; inspect relevant changes and their provenance selectively, and reuse only independently reviewed work that meets the current packet's contract. Do not assume existing edits or prior tests establish completion.
 
 Each lettered row below is a separate execution session. The numbered groups organize related work; they are not a promise that the work fits a particular time or usage budget. Split further when necessary, preserving a reviewable checkpoint and the stated acceptance boundary. Dependencies refer to completed foundations, not merely started sessions.
 
@@ -11,7 +11,8 @@ Each lettered row below is a separate execution session. The numbered groups org
 | 1 | **043** Known campaign rule projection across reads and skill evaluation. | Implemented here. Exit requires sparse/defaulted and explicit values, unavailable context, authorization and REST/sync/MCP parity validation. |
 | 2a | **001** Shared draft knowledge, rollback baseline and transactional comparison. | Implemented in the combined 2a/33 change; verify local intent, ordered writes, rejection feedback, read failures and original scope across navigation. |
 | 2b | **001** Character and owned-row integration and browser races. | Implemented here: remaining wrappers, nested draft identities, invalid effect draft retention and real server rejection/cursor/queue/null browser outcomes. No production HTTP draft save consumers were found. |
-| 3 | **004** Stable domain identities and safe duplication. | Schema and reference integrity, reorder and reopen. |
+| 3a | **004** Stable identities for new and duplicated weapon modes. | Bounded foundation in this change; existing keys stay stable. |
+| 3b | **004** Race component/option identities, reference-aware repair and remaining acceptance. | 3a; account for collisions across race profiles and lenses, identify dependent lenses, selections and snapshots before repair, and complete weapon browser/reference acceptance. Do not claim all of 004 complete until this exits. |
 | 4 | **003** Domain-aware reference choices and repair. | 004 interfaces; valid choices, unresolved references and open picker geometry. |
 | 5 | **007** Actionable validation paths and host-specific bounds. | Named errors reveal and focus actual controls, including reordered and nested rows. |
 | 6 | **005** Numeric drafts and library/character consumers. | 007; raw invalid values retained, correct bounds and no invalid writes. Encounter consumers are completed with 29 and 30; do not close 005 early. |
@@ -38,7 +39,7 @@ Each lettered row below is a separate execution session. The numbered groups org
 | 22 | **024** Import confirmation and count grammar. | Destructive consequences remain visible; modal geometry and zero/one/many cases. |
 | 23 | **016** Whole-form snapshots and campaign-scoped log drafts. | Slow success, context changes and actual request targets; encounter extension is completed in 29. |
 | 24 | **017**, **015** Invitation guard and campaign settings. | 016 for invitation; 007 for settings. Use separate owners only for disjoint files; verify independent requests, role gates and validation. |
-| 25 | **018**, **019** Safe sign-in destinations and scoped history filters. | Independent surfaces; safe path validation and scope-specific filtering with browser coverage. |
+| 25 | **018**, **019** Safe sign-in destinations and scoped history filters. | Implemented here; safe path validation and scope-specific filtering with browser coverage. |
 | 26 | **020** Recovery and credential-read errors. | 007; correct recovery errors, no account enumeration and retryable credential reads. Coordinate 34 and 35. |
 | 27 | **029** Recalculation from owned purchases. | 001/005/007/016; exact staged purchase, outbox result, downstream effects and dialog review. |
 | 28a | **033** Manual trait levels and effects. | 029; actual contributions, paid points and queue/rollback behavior. |
