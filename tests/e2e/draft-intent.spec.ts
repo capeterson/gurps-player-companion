@@ -43,6 +43,9 @@ async function createCharacter(page: Page): Promise<Detail> {
 async function openName(page: Page, id: string): Promise<Locator> {
   await page.goto(`/characters/${id}`);
   await selectCharacterSection(page, 'Overview');
+  // Section navigation focuses the heading in a scheduled animation frame.
+  // Wait for it before typing so it cannot blur and commit the new draft.
+  await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeFocused();
   const input = page
     .getByRole('textbox', { name: 'character name' })
     .filter({ visible: true })
@@ -246,8 +249,23 @@ test('a deliberate return to A after remote C is written while B remains unblurr
 }) => {
   const character = await createCharacter(page);
   const input = await openName(page, character.id);
+  const sentDraft: Operation[] = [];
+  page.on('request', (request) => {
+    if (!request.url().endsWith('/api/v1/sync/operations')) return;
+    const body = request.postDataJSON() as { operations: Operation[] };
+    sentDraft.push(
+      ...body.operations.filter(
+        (op) =>
+          op.entityClass === 'character' &&
+          op.entityId === character.id &&
+          op.fieldPath === 'name' &&
+          op.attemptedValue === 'Unblurred B',
+      ),
+    );
+  });
   await expect(input).toHaveValue('Draft A');
   await input.fill('Unblurred B');
+  await expect(input).toBeFocused();
   const cursor = page.waitForResponse(
     async (response) => {
       if (!response.url().endsWith('/api/v1/sync/cursor') || !response.ok()) return false;
@@ -268,7 +286,9 @@ test('a deliberate return to A after remote C is written while B remains unblurr
   await expect
     .poll(() => localCharacterName(page, character.id), { timeout: 20_000 })
     .toBe('Remote C');
+  await expect(input).toBeFocused();
   await expect(input).toHaveValue('Unblurred B');
+  expect(sentDraft).toHaveLength(0);
   const applied = watchApplied(page, 'character', character.id, 'Draft A');
   await input.fill('Draft A');
   await input.press('Tab');
