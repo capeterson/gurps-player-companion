@@ -5,10 +5,20 @@ import {
   weaponData,
 } from '../../../../../shared/schemas/inventory.ts';
 import { getLocalDb } from '../../../../db/dexie.ts';
-import { addCategory, mutateItem, removeCategory, writeItemPath } from './itemMutations.ts';
+import {
+  addCategory,
+  mutateItem,
+  readItemPath,
+  removeCategory,
+  writeItemPath,
+} from './itemMutations.ts';
 
 const ID = '0193b3c0-f1f0-7000-8000-00000000a001';
 const CHARACTER = '0193b3c0-f1f0-7000-8000-00000000c001';
+it('does not treat a missing inventory row as a saved empty path', async () => {
+  await getLocalDb().characterInventory.delete(ID);
+  await expect(readItemPath(ID, 'name')).rejects.toThrow('This inventory item no longer exists');
+});
 async function seed() {
   const value = inventoryItemOut.parse({
     id: ID,

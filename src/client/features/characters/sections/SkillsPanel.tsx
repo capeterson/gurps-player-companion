@@ -521,16 +521,14 @@ function SkillRow({ characterId, skill, canWrite, mode, onMode, onRoll, effects 
     serverValue: skill.specialization,
     format: (value) => value ?? '',
     parse: (value) => value.trim() || null,
-    onSave: (value) => rowPatch.patch('specialization', value),
-    flashKey: rowPatch.flashKey('specialization'),
+    ...rowPatch.draftOptions<string | null>('specialization'),
   });
   const notesField = useDraftField<string | null>({
     name: `${displayName} description and notes`,
     serverValue: skill.notes,
     format: (value) => value ?? '',
     parse: (value) => value.trim() || null,
-    onSave: (value) => rowPatch.patch('notes', value),
-    flashKey: rowPatch.flashKey('notes'),
+    ...rowPatch.draftOptions<string | null>('notes'),
   });
   const techLevelField = useDraftField<number | null>({
     name: `${displayName} tech level`,
@@ -544,8 +542,7 @@ function SkillRow({ characterId, skill, canWrite, mode, onMode, onRoll, effects 
       }
       return parsed;
     },
-    onSave: (value) => rowPatch.patch('techLevel', value),
-    flashKey: rowPatch.flashKey('techLevel'),
+    ...rowPatch.draftOptions<number | null>('techLevel'),
   });
   const hasConfiguredRules = Boolean(skill.libraryMechanics || skill.procedures);
   const hasAdvancedDetails = hasConfiguredRules || skill.techLevel != null;

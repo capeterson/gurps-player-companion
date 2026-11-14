@@ -67,6 +67,8 @@ export interface UseDraftFieldOptions<V> {
    * the flash bus only handles the *visual* part of AGENTS.md rule 2.
    */
   readonly flashKey?: string;
+  /** Identity of this draft when several inputs share one rollback flash key. */
+  readonly scopeKey?: string;
   /** Read the reconciled local value after an outbox rejection. A live-query
    * prop can miss an optimistic write immediately followed by its rollback. */
   readonly readRollbackValue?: () => Promise<V>;
@@ -165,12 +167,13 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
     }),
     [],
   );
-  const scope = useRef<Scope>(newScope(opts.flashKey));
+  const draftScopeKey = opts.scopeKey ?? opts.flashKey;
+  const scope = useRef<Scope>(newScope(draftScopeKey));
   const inScope = useCallback(
     (origin: Scope) =>
       mounted.current &&
       scope.current === origin &&
-      options.current.flashKey === origin.key &&
+      (options.current.scopeKey ?? options.current.flashKey) === origin.key &&
       tokenStore.read()?.sessionId === origin.sessionId,
     [],
   );
@@ -233,8 +236,8 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
   }, []);
 
   useEffect(() => {
-    if (scope.current.key !== opts.flashKey || scope.current.sessionId !== sessionId) {
-      scope.current = newScope(opts.flashKey);
+    if (scope.current.key !== draftScopeKey || scope.current.sessionId !== sessionId) {
+      scope.current = newScope(draftScopeKey);
       dirty.current = false;
       editVersion.current++;
       committed.current = { value: opts.serverValue };
@@ -251,7 +254,7 @@ export function useDraftField<V>(opts: UseDraftFieldOptions<V>): UseDraftFieldRe
       knowledgeVersion.current++;
       if (!dirty.current) show(opts.serverValue);
     }
-  }, [opts.serverValue, opts.flashKey, storageMode, reader, show, sessionId, newScope]);
+  }, [opts.serverValue, draftScopeKey, storageMode, reader, show, sessionId, newScope]);
 
   const {
     flashing,

@@ -85,6 +85,7 @@ function ScalarItemField({
     },
     onSave: (value) => writeItemPath(item.id, spec.path, value, spec.label),
     enqueueOnCommit: { readCommitted: () => readItemPath(item.id, spec.path) },
+    scopeKey: `character_inventory:${item.id}:${spec.path}`,
     flashKey: makeFlashKey('character_inventory', item.id, spec.path.split('.')[0] as string),
   });
   const filled = hasFieldValue(spec.kind === 'boolean' ? draft.value === 'true' : draft.value);

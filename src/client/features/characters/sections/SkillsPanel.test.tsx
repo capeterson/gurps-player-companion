@@ -519,6 +519,46 @@ describe('SkillsPanel', () => {
     );
   });
 
+  it('saves a nullable specialization deliberately returned to its old value after a remote change', async () => {
+    const initial = makeSkill({ specialization: 'Old' });
+    const { libraryMechanics, defaults, ...stored } = initial;
+    await getLocalDb().characterSkills.put({
+      ...stored,
+      ...(libraryMechanics === undefined ? {} : { libraryMechanics }),
+      ...(defaults === undefined ? {} : { defaults }),
+      revision: 1,
+    });
+    enqueueFieldPatch.mockImplementation(
+      async (op: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+        await getLocalDb().characterSkills.update(op.entityId, {
+          [op.fieldPath]: op.attemptedValue,
+        });
+      },
+    );
+    const view = renderPanel(makeCharacter([initial]), true);
+    openSkillEditor('Broadsword/Old');
+    const input = screen.getByLabelText('Broadsword/Old specialization');
+    fireEvent.change(input, { target: { value: 'Draft' } });
+    await getLocalDb().characterSkills.update(initial.id, { specialization: 'Remote' });
+    view.rerender(
+      <SkillsPanel
+        character={makeCharacter([{ ...initial, specialization: 'Remote' }])}
+        canWrite
+      />,
+    );
+    expect(input).toHaveValue('Draft');
+    fireEvent.change(input, { target: { value: 'Old' } });
+    fireEvent.blur(input);
+    await waitFor(() =>
+      expect(enqueueFieldPatch).toHaveBeenCalledWith(
+        expect.objectContaining({ fieldPath: 'specialization', attemptedValue: 'Old' }),
+      ),
+    );
+    await waitFor(async () =>
+      expect((await getLocalDb().characterSkills.get(initial.id))?.specialization).toBe('Old'),
+    );
+  });
+
   it('queues a newer same-field edit and saves a different field in parallel', async () => {
     let finishFirst = () => {};
     enqueueFieldPatch.mockImplementationOnce(

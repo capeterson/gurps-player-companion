@@ -359,6 +359,18 @@ the outbox transaction against current local intent. Committed queues retain
 their original field and login session through navigation or an entity switch;
 their old settlements cannot change the newly displayed field.
 
+Trait effects/notes, skill specialization/notes/TL, spell cost/notes and combat
+maneuver drafts use the same durable-reader contract as the shared row fields.
+Nested inventory paths and active-effect notes have a draft identity separate
+from their shared whole-field rollback flash key. Active-effect notes update
+the current stored array transactionally; maneuver and nested inventory edits
+keep commit-time enqueueing. Missing item, loadout or effect rows leave rollback
+knowledge unresolved and preserve the retryable text.
+
+The owned trait-effects editor also counts invalid nested edits as newer intent.
+An older empty save or removal cannot close or rebuild that newer draft when
+it succeeds or fails. Explicit removal closes only its own settled draft.
+
 Language creation keeps the fluency-based suggested points and explicit
 override. Technique creation keeps its library default skill, difficulty,
 default modifier, and optional level cap. Their controls clarify those values
