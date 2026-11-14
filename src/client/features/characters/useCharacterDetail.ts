@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
  */
 
 import { useLiveQuery } from 'dexie-react-hooks';
+import { projectCampaignRulesForEvaluation } from '../../../shared/domain/campaignRules.ts';
 import { buildCharacterDetail } from '../../../shared/domain/characterDetail.ts';
 import {
   type SkillLevelBreakdown,
@@ -99,7 +100,7 @@ export function useCharacterDetail(
             disadvantageCap: campaign.disadvantageCap,
             quirkCap: campaign.quirkCap,
             manaLevel: campaign.manaLevel ?? 'normal',
-            ...(campaign.houseRules ? { houseRules: campaign.houseRules } : {}),
+            ...(campaign.houseRules === undefined ? {} : { houseRules: campaign.houseRules }),
             techLevel: campaign.techLevel ?? null,
           }
         : null,
@@ -126,7 +127,9 @@ export function useCharacterDetail(
                   : {}),
               })),
               detail.derived,
-              campaign?.houseRules ? { campaignRules: campaign.houseRules } : undefined,
+              campaign?.houseRules === undefined
+                ? undefined
+                : { campaignRules: projectCampaignRulesForEvaluation(campaign.houseRules) },
             ),
           }
         : {}),

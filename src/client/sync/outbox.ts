@@ -86,6 +86,8 @@ function wasGeneratedByBrokenUuidFallback(value: string | undefined): value is s
 }
 
 export interface EnqueueFieldPatchArgs {
+  /** Draft saves compare inside the write transaction, including pending intent. */
+  readonly skipIfUnchanged?: boolean;
   readonly localMediaUploadId?: string;
   /** Internal retry metadata; never part of the wire value. */
   readonly localCampaignTransferUndo?: OutboxEntry['localCampaignTransferUndo'];
@@ -159,6 +161,11 @@ async function enqueueFieldPatchInTransaction(input: EnqueueFieldPatchArgs): Pro
   const db = getLocalDb();
   if (args.entityClass === 'campaign' && args.fieldPath !== 'coverAssetId')
     throw new Error('Only campaign cover images use the outbox');
+  if (args.skipIfUnchanged) {
+    const row = await readFieldPatchRow(args);
+    if (!row) throw new Error('This entry is no longer available');
+    if (JSON.stringify(row[args.fieldPath]) === JSON.stringify(args.attemptedValue)) return;
+  }
   const ckey = coalesceKey(args.entityId, args.fieldPath);
   const now = await afterEquipmentSwitches(
     args.entityClass === 'character_inventory' ? args.characterId : undefined,

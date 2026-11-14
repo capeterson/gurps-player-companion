@@ -7,6 +7,7 @@ import {
   type NotificationPreferences,
 } from '../../../shared/schemas/notificationPreferences.ts';
 import { ToastProvider } from '../../lib/toast.tsx';
+import { tokenStore } from '../../lib/tokenStore.ts';
 import { NotificationsSection } from './NotificationsSection.tsx';
 
 const mocks = vi.hoisted(() => ({ api: vi.fn() }));
@@ -60,6 +61,7 @@ function mockPreferencesApi() {
 
 beforeEach(() => {
   localStorage.clear();
+  tokenStore.write({ accessToken: 'access', refreshToken: 'refresh', accessTokenExpiresIn: 900 });
   FakeNotification.permission = 'default';
   FakeNotification.requestPermission.mockReset().mockResolvedValue('granted');
   installNotificationApi();
@@ -138,9 +140,13 @@ describe('NotificationsSection', () => {
 
     const invitations = await screen.findByRole('checkbox', { name: 'Invitations' });
     await user.click(invitations);
+    const session = tokenStore.read();
+    if (!session) throw new Error('Expected an authenticated session');
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith('/auth/notification-preferences', {
         method: 'PATCH',
+        expectedSessionId: session.sessionId,
+        isDispatchActive: expect.any(Function),
         body: { invitations: false },
       }),
     );
@@ -164,6 +170,8 @@ describe('NotificationsSection', () => {
   it('serializes same-topic toggles while saving another topic independently', async () => {
     const requests: Array<{
       body: Partial<NotificationPreferences>;
+      sessionId: string | null | undefined;
+      isActive: (() => boolean) | undefined;
       resolve: (value: NotificationPreferences) => void;
     }> = [];
     vi.mocked(api).mockImplementation((_path, options) => {
@@ -172,6 +180,8 @@ describe('NotificationsSection', () => {
       return new Promise((resolve) => {
         requests.push({
           body: options.body as Partial<NotificationPreferences>,
+          sessionId: options.expectedSessionId,
+          isActive: options.isDispatchActive,
           resolve: (value) => resolve(value as never),
         });
       });
@@ -188,6 +198,14 @@ describe('NotificationsSection', () => {
     await user.click(points);
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(requests.map(({ body }) => body)).toEqual([{ invitations: false }, { points: false }]);
+    const session = tokenStore.read();
+    if (!session) throw new Error('Expected an authenticated session');
+    expect(requests.map(({ sessionId }) => sessionId)).toEqual([
+      session.sessionId,
+      session.sessionId,
+    ]);
+    expect(requests[0]?.isActive?.()).toBe(true);
+    expect(requests[1]?.isActive?.()).toBe(true);
 
     await act(async () => {
       requests[0]?.resolve({ ...DEFAULT_NOTIFICATION_PREFERENCES, invitations: false });
@@ -195,10 +213,14 @@ describe('NotificationsSection', () => {
     });
     await waitFor(() => expect(requests).toHaveLength(3));
     expect(requests[2]?.body).toEqual({ invitations: true });
+    expect(requests[2]?.sessionId).toBe(session.sessionId);
+    expect(requests[2]?.isActive?.()).toBe(true);
+    expect(requests[1]?.isActive?.()).toBe(false);
     await act(async () => {
       requests[2]?.resolve(DEFAULT_NOTIFICATION_PREFERENCES);
     });
     await waitFor(() => expect(invitations).toBeChecked());
     await waitFor(() => expect(points).not.toBeChecked());
+    expect(requests[2]?.isActive?.()).toBe(false);
   });
 });

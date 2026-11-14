@@ -151,6 +151,7 @@ export function RangedRangeField({
       readCommitted: async () =>
         ((await readItemPath(item.id, path)) as RangedRange | null) ?? null,
     },
+    scopeKey: `character_inventory:${item.id}:${path}`,
     flashKey: makeFlashKey('character_inventory', item.id, 'weaponData'),
   });
   let value: RangedRange | null = null;

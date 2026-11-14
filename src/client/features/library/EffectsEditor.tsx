@@ -143,6 +143,8 @@ interface Props<T extends TraitEffect> {
   /** Library authors may maintain archived conditions while activation is disabled. */
   authoring?: boolean;
   onChange: (effects: T[]) => void;
+  /** A user changed the nested draft, including an invalid intermediate value. */
+  onDraftChange?: () => void;
   onValidityChange?: (valid: boolean) => void;
 }
 
@@ -156,6 +158,7 @@ export function EffectsEditor<T extends TraitEffect>({
   portable = true,
   authoring = portable,
   onChange,
+  onDraftChange,
   onValidityChange,
 }: Props<T>) {
   const activeEffectsEnabled = useExperimentalActiveEffects(campaignId);
@@ -185,6 +188,7 @@ export function EffectsEditor<T extends TraitEffect>({
   }, [effects, externalKey, onValidityChange]);
 
   function publish(next: EffectDraft[]) {
+    onDraftChange?.();
     setDrafts(next);
     const schema = portable ? libraryTraitEffect : traitEffect;
     const parsed = next.map((draft) => schema.safeParse(candidateFromDraft(draft)));

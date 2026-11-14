@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLocalDb } from '../db/dexie.ts';
 import { api } from '../lib/api.ts';
+import { beginPendingToggle } from '../lib/pendingToggles.ts';
 import { clearPendingThemePreferences, getThemeState, setThemePreference } from '../lib/theme.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -285,4 +286,20 @@ describe('useUnsyncedChangesGuard', () => {
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
     expect(await getLocalDb().outbox.count()).toBe(1);
   });
+});
+
+it('prompts for pending account toggles and revokes them on confirmed discard', async () => {
+  const session = tokenStore.read();
+  if (!session) throw new Error('Expected an authenticated session');
+  const pending = beginPendingToggle(session.sessionId);
+  const { onSignOut } = mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+  const dialog = await screen.findByRole('dialog', {
+    name: 'Discard unsaved changes and sign out?',
+  });
+  expect(dialog).toBeVisible();
+  expect(onSignOut).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Discard and sign out' }));
+  await waitFor(() => expect(onSignOut).toHaveBeenCalled());
+  expect(pending.isActive()).toBe(false);
 });

@@ -33,7 +33,6 @@ import { InfoTooltip } from '../../components/ui/InfoTooltip.tsx';
 import { Stat, StatCard } from '../../components/ui/StatCard.tsx';
 import { TempBoostPopover } from '../../components/ui/TempBoostPopover.tsx';
 import { WarningBanner } from '../../components/ui/WarningBanner.tsx';
-import { getLocalDb } from '../../db/dexie.ts';
 import { DRAFT_FIELD_CLASS, useDraftField } from '../../hooks/useDraftField.ts';
 import { useFieldFlash } from '../../hooks/useFieldFlash.ts';
 import { api } from '../../lib/api.ts';
@@ -127,7 +126,7 @@ function AttrInput({
   // its own key.  Without `flashKey` an async server rejection would
   // toast but never visually flash this input.
   const buildSave = useCharacterFieldSave(characterId);
-  const fieldSave = buildSave(field, { humanName: label });
+  const fieldSave = buildSave<number>(field, { humanName: label });
   const draft = useDraftField<number>({
     name: label,
     serverValue: value,
@@ -550,41 +549,42 @@ function IdentityPanel({
     serverValue: character.name,
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    ...buildSave('name', { humanName: 'name' }),
+    ...buildSave<string>('name', { humanName: 'name' }),
   });
   const heightField = useDraftField<string | null>({
     name: 'height',
-    serverValue: character.height ?? '',
+    serverValue: character.height ?? null,
+    format: (value) => value ?? '',
     parse: nullableTextParser,
-    ...buildSave('height', { humanName: 'height' }),
+    ...buildSave<string | null>('height', { humanName: 'height' }),
   });
   const weightField = useDraftField<string | null>({
     name: 'weight',
-    serverValue: character.weight ?? '',
+    serverValue: character.weight ?? null,
+    format: (value) => value ?? '',
     parse: nullableTextParser,
-    ...buildSave('weight', { humanName: 'weight' }),
+    ...buildSave<string | null>('weight', { humanName: 'weight' }),
   });
   const birthdateField = useDraftField<string | null>({
     name: 'birthdate',
-    serverValue: character.birthdate ?? '',
+    serverValue: character.birthdate ?? null,
+    format: (value) => value ?? '',
     parse: nullableTextParser,
-    ...buildSave('birthdate', { humanName: 'birthdate' }),
+    ...buildSave<string | null>('birthdate', { humanName: 'birthdate' }),
   });
   const ageField = useDraftField<number | null>({
     name: 'age',
     serverValue: character.age ?? null,
     format: (v) => (v === null ? '' : String(v)),
     parse: nullableIntParser(0, 10000),
-    ...buildSave('age', { humanName: 'age' }),
+    ...buildSave<number | null>('age', { humanName: 'age' }),
   });
   const appearanceField = useDraftField<string | null>({
     name: 'description',
     serverValue: character.appearance ?? null,
     format: (value) => value ?? '',
     parse: nullableTextParser,
-    ...buildSave('appearance', { humanName: 'description' }),
-    readRollbackValue: async () =>
-      (await getLocalDb().characters.get(character.id))?.appearance ?? null,
+    ...buildSave<string | null>('appearance', { humanName: 'description' }),
   });
   // Lazily create the editor, then retain it across view/edit switches so its
   // source mode and unsaved draft survive. The shared hook owns all saves.
@@ -1317,7 +1317,7 @@ function IdentityHero({
     serverValue: character.name,
     parse: (s) => s.trim(),
     validate: (v) => (v.length > 0 ? null : 'name cannot be empty'),
-    ...buildSave('name', { humanName: 'name' }),
+    ...buildSave<string>('name', { humanName: 'name' }),
   });
 
   const chips: Array<[string, string]> = [

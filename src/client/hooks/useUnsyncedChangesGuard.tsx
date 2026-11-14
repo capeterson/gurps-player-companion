@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.tsx';
 import { getLocalDb } from '../db/dexie.ts';
+import { discardPendingToggles, hasPendingToggles } from '../lib/pendingToggles.ts';
 import { getThemeState } from '../lib/theme.ts';
 import { useToasts } from '../lib/toast.tsx';
 import { tokenStore } from '../lib/tokenStore.ts';
@@ -29,6 +30,7 @@ export function useUnsyncedChangesGuard() {
       if (tokenStore.read()?.sessionId !== next.sessionId) {
         throw new Error('Your sign-in session changed. Please try again.');
       }
+      discardPendingToggles(next.sessionId);
       await next.action();
     } catch (error) {
       toasts.push(error instanceof Error ? error.message : 'Could not finish this action', {
@@ -53,7 +55,7 @@ export function useUnsyncedChangesGuard() {
         [db.outbox, db.mediaUploads],
         async () => (await db.outbox.count()) > 0 || (await db.mediaUploads.count()) > 0,
       );
-      if (hasUnsyncedChanges || getThemeState().pending) {
+      if (hasUnsyncedChanges || getThemeState().pending || hasPendingToggles(next.sessionId)) {
         setRequest(next);
       } else {
         await execute(next);

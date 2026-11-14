@@ -560,17 +560,15 @@ function CharacterEffectsEditor({
     setValid(true);
     setEditorVersion((version) => version + 1);
   }, []);
+  const effectsSaver = rowPatch.draftOptions<TraitEffect[] | undefined>('customEffects');
   const effectsField = useDraftField<TraitEffect[]>({
     name: `${trait.name} effects`,
     serverValue: trait.customEffects ?? [],
     format: JSON.stringify,
     parse: (raw) => characterEffectsSchema.parse(JSON.parse(raw) as unknown),
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-    onSave: async (effects) => {
-      await rowPatch.patch('customEffects', effects);
-      if (effects.length === 0) hideEffects();
-    },
-    flashKey: rowPatch.flashKey('customEffects'),
+    ...effectsSaver,
+    readRollbackValue: async () => (await effectsSaver.readRollbackValue()) ?? [],
   });
   const effects = characterEffectsSchema.parse(JSON.parse(effectsField.value) as unknown);
   useEffect(() => {
@@ -620,6 +618,10 @@ function CharacterEffectsEditor({
           effects={effects}
           inventoryItems={inventory}
           portable={false}
+          onDraftChange={() => {
+            setRemoveRequested(false);
+            effectsField.setValue(effectsField.value);
+          }}
           onChange={(next) => effectsField.setValue(JSON.stringify(next))}
           onValidityChange={setValid}
         />
@@ -764,10 +766,10 @@ function TraitRow({
   );
   const notesField = useDraftField<string | null>({
     name: `${trait.name} notes`,
-    serverValue: trait.notes ?? '',
+    serverValue: trait.notes ?? null,
+    format: (value) => value ?? '',
     parse: (s) => (s.trim().length === 0 ? null : s),
-    onSave: (v) => rowPatch.patch('notes', v),
-    flashKey: rowPatch.flashKey('notes'),
+    ...rowPatch.draftOptions<string | null>('notes'),
   });
   const hasSourceRules = Boolean(trait.libraryMechanics || trait.modifiers.length > 0);
   const hasCustomEffects = (trait.customEffects ?? []).some(

@@ -42,8 +42,11 @@ export function LoadoutEditor({
           : null,
     onSave: (value) => renameLoadout(characterId, loadout.id, value),
     enqueueOnCommit: {
-      readCommitted: async () =>
-        (await getLocalDb().characterLoadouts.get(loadout.id))?.name ?? loadout.name,
+      readCommitted: async () => {
+        const row = await getLocalDb().characterLoadouts.get(loadout.id);
+        if (!row) throw new Error('This loadout no longer exists');
+        return row.name;
+      },
     },
     flashKey: makeFlashKey('character_loadout', loadout.id, 'name'),
   });

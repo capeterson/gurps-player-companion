@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { campaignHouseRules } from '../../../../shared/schemas/campaign.ts';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
+import { traitEffect } from '../../../../shared/schemas/effects.ts';
 import { type LocalCampaign, getLocalDb } from '../../../db/dexie.ts';
 import { ToastProvider } from '../../../lib/toast.tsx';
 import { TraitsPanel } from './TraitsPanel.tsx';
@@ -176,6 +177,33 @@ const ownedTrait = {
   updatedAt: new Date().toISOString(),
 } as const;
 
+afterEach(async () => {
+  await getLocalDb().characterTraits.delete(ownedTrait.id);
+  await getLocalDb().outbox.where('entityId').equals(ownedTrait.id).delete();
+});
+
+async function storeEffectsPatch(args: {
+  entityId: string;
+  fieldPath: string;
+  attemptedValue: unknown;
+}) {
+  if (args.fieldPath !== 'customEffects') throw new Error(`Unexpected field ${args.fieldPath}`);
+  await getLocalDb().characterTraits.update(args.entityId, {
+    customEffects: traitEffect.array().max(50).parse(args.attemptedValue),
+  });
+}
+
+async function seedOwnedTrait(
+  customEffects: Array<{ target: 'dx'; value: number; scaling: 'flat' }> = [],
+) {
+  await getLocalDb().characterTraits.put({
+    ...ownedTrait,
+    modifiers: [],
+    customEffects,
+    revision: 1,
+  });
+}
+
 function renderCharacterTraits(traits: readonly unknown[], canWrite = true) {
   const character = {
     id: ownedTrait.characterId,
@@ -264,17 +292,27 @@ it('saves character-owned effects through the trait outbox field', async () => {
   );
 });
 
-it('can remove an empty Effects section without writing a trait patch', () => {
+it('can remove an empty Effects section without writing a trait patch', async () => {
+  await seedOwnedTrait();
+  const actual =
+    await vi.importActual<typeof import('../../../sync/outbox.ts')>('../../../sync/outbox.ts');
+  enqueueFieldPatch.mockImplementation(actual.enqueueFieldPatch);
   renderOwnedTrait();
   openTraitEditor('Weapon Mastery');
   fireEvent.click(screen.getByRole('button', { name: '+ Add effects' }));
   fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
-  expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible();
+  await waitFor(() => expect(screen.getByRole('button', { name: '+ Add effects' })).toBeVisible());
   expect(screen.queryByText('Effects')).not.toBeInTheDocument();
-  expect(enqueueFieldPatch).not.toHaveBeenCalled();
+  expect(await getLocalDb().outbox.where('entityId').equals(ownedTrait.id).count()).toBe(0);
 });
 
 it('removes saved effects through the outbox and restores the compact add control', async () => {
+  await seedOwnedTrait([{ target: 'dx', value: 1, scaling: 'flat' }]);
+  enqueueFieldPatch.mockImplementation(
+    async (args: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+      await storeEffectsPatch(args);
+    },
+  );
   renderCharacterTraits([
     { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
   ]);
@@ -290,6 +328,7 @@ it('removes saved effects through the outbox and restores the compact add contro
 });
 
 it('keeps saved effects visible and flashes the editor if removal fails', async () => {
+  await seedOwnedTrait([{ target: 'dx', value: 1, scaling: 'flat' }]);
   enqueueFieldPatch.mockRejectedValueOnce(new Error('effect rejected'));
   renderCharacterTraits([
     { ...ownedTrait, customEffects: [{ target: 'dx', value: 1, scaling: 'flat' }] },
@@ -298,20 +337,67 @@ it('keeps saved effects visible and flashes the editor if removal fails', async 
   fireEvent.click(screen.getByText('Effects (1)'));
   fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
   await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/);
-  expect(screen.getByText('Effects (1)')).toBeVisible();
+  await waitFor(() => expect(screen.getByText('Effects (1)')).toBeVisible());
   expect(screen.getByText('Effects (1)').closest('details')).toHaveAttribute(
     'data-flashing',
     'true',
   );
 });
 
+it.each(['success', 'rejection'] as const)(
+  'retains a newer invalid effect draft when older removal settles with %s',
+  async (outcome) => {
+    const saved = [{ target: 'dx' as const, value: 1, scaling: 'flat' as const }];
+    await seedOwnedTrait(saved);
+    let settle!: () => void;
+    enqueueFieldPatch.mockImplementationOnce(
+      async (args: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+        await new Promise<void>((resolve, reject) => {
+          settle = () => (outcome === 'success' ? resolve() : reject(new Error('effect rejected')));
+        });
+        await storeEffectsPatch(args);
+      },
+    );
+    renderCharacterTraits([{ ...ownedTrait, customEffects: saved }]);
+    openTraitEditor();
+    fireEvent.click(screen.getByText('Effects (1)'));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove effects' }));
+    await waitFor(() => expect(enqueueFieldPatch).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: '+ Add effect' }));
+    const skill = screen.getByLabelText('Skill name');
+    fireEvent.change(skill, { target: { value: ' ' } });
+    await act(async () => settle());
+    expect(screen.getByLabelText('Skill name')).toHaveValue(' ');
+    expect(await screen.findByRole('button', { name: 'Save effects' })).toBeDisabled();
+    if (outcome === 'rejection') {
+      expect(
+        await screen.findByText(/Couldn't save Weapon Mastery effects — effect rejected/),
+      ).toBeVisible();
+      expect(screen.getByText('Effects').closest('details')).toHaveAttribute(
+        'data-flashing',
+        'true',
+      );
+    }
+    fireEvent.change(skill, { target: { value: 'Broadsword' } });
+    expect(screen.getByRole('button', { name: 'Save effects' })).toBeEnabled();
+  },
+);
+
 it('queues removal behind an in-flight effects save', async () => {
+  await seedOwnedTrait();
   let settleFirst: (() => void) | undefined;
   enqueueFieldPatch.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
+    async (args: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+      await new Promise<void>((resolve) => {
         settleFirst = resolve;
-      }),
+      });
+      await storeEffectsPatch(args);
+    },
+  );
+  enqueueFieldPatch.mockImplementation(
+    async (args: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+      await storeEffectsPatch(args);
+    },
   );
   renderOwnedTrait();
   addDxEffect();
@@ -334,6 +420,7 @@ it('queues removal behind an in-flight effects save', async () => {
 });
 
 it('retains a visible rollback event when an owned-effects save fails', async () => {
+  await seedOwnedTrait();
   enqueueFieldPatch.mockRejectedValueOnce(new Error('effect rejected'));
   renderOwnedTrait();
   addDxEffect();

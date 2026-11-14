@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { groupIntoBatches } from '../../../shared/history/summarize.ts';
 import type { HistoryEventOut } from '../../../shared/schemas/history.ts';
+import { isLibraryEntityClass } from '../../../shared/schemas/sync.ts';
 import { QueryReadError } from '../../components/ui/QueryReadError.tsx';
 import { HistoryGroupRow } from './HistoryGroupRow.tsx';
 
-const ENTITY_FILTERS = [
+const CHARACTER_FILTERS = [
   { label: 'Attributes', match: (e: HistoryEventOut) => e.entityClass === 'character' },
   {
     label: 'Traits',
@@ -29,6 +30,16 @@ const ENTITY_FILTERS = [
   },
 ] as const;
 
+const CAMPAIGN_FILTERS = [
+  {
+    label: 'Campaign',
+    match: (e: HistoryEventOut) =>
+      e.entityClass === 'campaign' || e.entityClass === 'adventure_log',
+  },
+  { label: 'Members', match: (e: HistoryEventOut) => e.entityClass === 'campaign_membership' },
+  { label: 'Library', match: (e: HistoryEventOut) => isLibraryEntityClass(e.entityClass) },
+] as const;
+
 // History rows store the DB-level op values (`insert` / `update` /
 // `delete`), so filters must match those — not the outbox command names
 // (`create` / `patch`). The labels are the user-facing verbs.
@@ -40,6 +51,7 @@ const OP_FILTERS = [
 type OpFilter = (typeof OP_FILTERS)[number]['op'];
 
 interface HistoryListProps {
+  scope: 'character' | 'campaign';
   events: HistoryEventOut[];
   isLoading: boolean;
   error?: unknown;
@@ -52,6 +64,7 @@ interface HistoryListProps {
 }
 
 export function HistoryList({
+  scope,
   events,
   isLoading,
   error,
@@ -63,13 +76,21 @@ export function HistoryList({
   loadDetails,
 }: HistoryListProps) {
   const [search, setSearch] = useState('');
-  const [entityFilter, setEntityFilter] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{
+    scope: 'character' | 'campaign';
+    label: string;
+  } | null>(null);
+  const entityFilter = selection?.scope === scope ? selection.label : null;
+  useEffect(() => {
+    setSelection((current) => (current && current.scope !== scope ? null : current));
+  }, [scope]);
+  const entityFilters = scope === 'campaign' ? CAMPAIGN_FILTERS : CHARACTER_FILTERS;
   const [opFilter, setOpFilter] = useState<OpFilter | null>(null);
 
   const filtered = useMemo(() => {
     let list = events;
     if (entityFilter) {
-      const def = ENTITY_FILTERS.find((f) => f.label === entityFilter);
+      const def = entityFilters.find((f) => f.label === entityFilter);
       if (def) list = list.filter(def.match);
     }
     if (opFilter) {
@@ -80,7 +101,7 @@ export function HistoryList({
       list = list.filter((e) => e.summary.toLowerCase().includes(q));
     }
     return list;
-  }, [events, entityFilter, opFilter, search]);
+  }, [events, entityFilter, entityFilters, opFilter, search]);
 
   const groups = useMemo(() => groupIntoBatches(filtered), [filtered]);
 
@@ -104,11 +125,13 @@ export function HistoryList({
           className="input input-sm input-bordered flex-1 min-w-40 max-w-xs"
         />
         <div className="flex gap-1 flex-wrap">
-          {ENTITY_FILTERS.map((f) => (
+          {entityFilters.map((f) => (
             <button
               key={f.label}
               type="button"
-              onClick={() => setEntityFilter(entityFilter === f.label ? null : f.label)}
+              onClick={() =>
+                setSelection(entityFilter === f.label ? null : { scope, label: f.label })
+              }
               aria-pressed={entityFilter === f.label}
               className={`chip text-xs ${entityFilter === f.label ? 'on' : ''}`}
             >

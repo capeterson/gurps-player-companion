@@ -213,8 +213,18 @@ works offline.**
    writes immediately, while the hook processes every result in order so a
    successful intermediate value remains the rollback baseline. On failure,
    the input reads its durable value to include successful edits from other controls.
-   This includes
+   Shared character/owned-row draft savers check unchanged values within the
+   same transaction as enqueueing, against the local row's current intent.
+   A stale displayed value cannot suppress a deliberate return to an older
+   value, including when a different value is already queued. Reads that fail
+   leave the text retryable rather than proving a no-op. This includes
    same-field edits committed while an earlier save is still pending.
+   Bespoke trait/skill/spell fields use the shared scoped row saver too.
+   Active-effect note edits address one effect by identity, then read/modify/write
+   the current whole array within the existing transaction. Draft scope keys
+   distinguish nested item paths and effect entries even when rollback events
+   use one top-level field key. Readers never substitute render-time item or
+   loadout values when the corresponding stored row has disappeared.
    Bumpers use the latest local values, including another input’s edit before React
    renders it. Every floating HP/FP popover gesture writes the combat row and
    outbox immediately in that transaction; the panel renders only the resulting
@@ -438,6 +448,13 @@ new shape; the reloaded build runs that upgrade before it sends anything.
 | HTTP 426 (outdated build) | Batch restored exactly as queued; sync pauses and a persistent toast offers Reload when the user is ready (see *Sync protocol version*). |
 
 ## The session must survive a server outage
+
+Online account-setting toggles remain outside the outbox. Their pending queues
+are scoped to a login session and counted by the existing discard guard.
+`apiFetch` accepts an internal expected-session fence for those writes: it
+refuses dispatch under a replacement login. Token rotation and ordinary
+navigation preserve the original session's queue; discarded or replaced
+sessions cannot apply a late response to the settings cache.
 
 Every stored token pair carries a cross-tab session id and rotation version.
 `refreshTokens()` captures that identity before sending and may replace or clear

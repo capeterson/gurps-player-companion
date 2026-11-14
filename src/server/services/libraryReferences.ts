@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
+import { projectCampaignRulesForEvaluation } from '../../shared/domain/campaignRules.ts';
 import { canAdoptLibraryEntry, modifierApplies } from '../../shared/domain/libraryIdentity.ts';
 import {
   definitionReference,
@@ -617,7 +618,7 @@ export async function prepareLibraryReference<T extends Record<string, unknown>>
             Per: detail.derived.per,
           },
           techLevel: campaign.techLevel,
-          campaignRules: campaign.houseRules,
+          campaignRules: projectCampaignRulesForEvaluation(campaign.houseRules),
           gmPermissions: granted,
           targetSpecialization: resolved.specialization,
         });

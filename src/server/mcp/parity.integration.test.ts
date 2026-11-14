@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash, randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { fixedCalculation } from '../../shared/domain/calculation.ts';
+import type { CampaignHouseRules } from '../../shared/schemas/campaign.ts';
 import type { LibraryTraitEffect, TraitEffect } from '../../shared/schemas/effects.ts';
 import type { HistoryEventOut } from '../../shared/schemas/history.ts';
 import type { OAuthScope } from '../../shared/schemas/oauth.ts';
@@ -9,7 +11,7 @@ import { parseLibraryYaml } from '../../shared/yaml/library.ts';
 import { createApp } from '../app.ts';
 import type { AppConfig } from '../config.ts';
 import { closeDb, getDb, runInDbTransaction } from '../db/client.ts';
-import { oauthClients, oauthGrants } from '../db/schema.ts';
+import { campaigns, oauthClients, oauthGrants } from '../db/schema.ts';
 import type { OAuthPrincipal } from '../oauth/service.ts';
 import type { MediaStorage } from '../services/media/storage.ts';
 import { setMediaStorageForTests } from '../services/media/storage.ts';
@@ -1376,6 +1378,37 @@ describe('delegated operation behavioral parity', () => {
 
     const unchanged = await call<{ dx: number }>(owner, 'get_character', path(character.id));
     expect(unchanged.body.dx).toBe(20);
+    const source = (
+      await call<{ id: string }>(owner, 'library_skill', {
+        action: 'create',
+        ...path(campaign.id),
+        body: {
+          name: 'Sparse rule study',
+          attribute: 'IQ',
+          difficulty: 'A',
+          prerequisiteRules: {
+            kind: 'campaign_rule',
+            ruleKey: 'forbidAcidMagic',
+            expectedValue: false,
+          },
+        },
+      })
+    ).body;
+    await getDb()
+      .update(campaigns)
+      .set({ houseRules: { ruleSet: 'custom' } as CampaignHouseRules })
+      .where(eq(campaigns.id, campaign.id));
+    const skill = await call<{ skill: { prerequisiteStatus: string } }>(owner, 'character_skill', {
+      action: 'create',
+      ...path(character.id),
+      body: {
+        name: 'Sparse rule study',
+        attribute: 'IQ',
+        difficulty: 'A',
+        librarySkillId: source.id,
+      },
+    });
+    expect(skill.body.skill.prerequisiteStatus).toBe('met');
   });
 
   // Manifest anchor: effects-authoring-parity.

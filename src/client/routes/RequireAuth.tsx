@@ -8,7 +8,7 @@ export function RequireAuth() {
   const location = useLocation();
   if (!tokenStore.hasToken()) {
     if (location.pathname === '/') return <LandingPage />;
-    const returnTo = `${location.pathname}${location.search}`;
+    const returnTo = `${location.pathname}${location.search}${location.hash}`;
     return <Navigate to="/login" replace state={{ returnTo }} />;
   }
   // Wrap the authenticated tree in SyncProvider (starts the

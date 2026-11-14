@@ -114,6 +114,23 @@ describe('desktop notification delivery', () => {
     expect(desktopNotificationsEnabled(userId)).toBe(true);
   });
 
+  it('does not write an account preference if delayed permission returns after revocation', async () => {
+    let grant!: (permission: NotificationPermission) => void;
+    FakeNotification.requestPermission.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          grant = resolve;
+        }),
+    );
+    let active = true;
+    const enabling = enableDesktopNotifications(userId, () => active);
+    active = false;
+    grant('granted');
+    await enabling;
+    expect(desktopNotificationsEnabled(userId)).toBe(false);
+    expect(localStorage.getItem(`gpc:desktop-notifications:${userId}`)).toBeNull();
+  });
+
   it('uses the first delivery fetch as a baseline and does not replay existing unread items', async () => {
     await enableDesktopNotifications(userId);
 

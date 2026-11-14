@@ -319,8 +319,7 @@ function SpellRow({
         throw new Error('must be an integer from 0 to 99');
       return value;
     },
-    onSave: (value) => rowPatch.patch('baseEnergyCost', value),
-    flashKey: rowPatch.flashKey('baseEnergyCost'),
+    ...rowPatch.draftOptions<number>('baseEnergyCost'),
   });
   const notesField = useDraftField<string | null>({
     name: `${spell.name} notes`,
@@ -329,8 +328,7 @@ function SpellRow({
     parse: (raw) => raw.trim() || null,
     validate: (value) =>
       (value?.length ?? 0) > 20000 ? 'notes must be at most 20000 characters' : null,
-    onSave: (value) => rowPatch.patch('notes', value),
-    flashKey: rowPatch.flashKey('notes'),
+    ...rowPatch.draftOptions<string | null>('notes'),
   });
   const summaryFlash = useFlashGroup([
     nameField.inputProps,

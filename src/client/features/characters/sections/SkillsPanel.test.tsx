@@ -10,7 +10,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CharacterDetail } from '../../../../shared/schemas/character.ts';
 import type { SkillOut } from '../../../../shared/schemas/skill.ts';
 import { skillCreate } from '../../../../shared/schemas/skill.ts';
@@ -88,6 +88,10 @@ beforeEach(() => {
   enqueueCreate.mockResolvedValue(undefined);
   enqueueFieldPatch.mockReset();
   enqueueFieldPatch.mockResolvedValue(undefined);
+});
+
+afterEach(async () => {
+  await getLocalDb().characterSkills.delete('skill-1');
 });
 
 function makeSkill(overrides: Partial<SkillOut> = {}): SkillOut {
@@ -491,6 +495,13 @@ describe('SkillsPanel', () => {
   });
 
   it('saves an inline field and rolls it back with a toast and flash on failure', async () => {
+    const { libraryMechanics, defaults, ...skill } = makeSkill();
+    await getLocalDb().characterSkills.put({
+      ...skill,
+      ...(libraryMechanics === undefined ? {} : { libraryMechanics }),
+      ...(defaults === undefined ? {} : { defaults }),
+      revision: 1,
+    });
     enqueueFieldPatch.mockRejectedValueOnce(new Error('Disk full'));
     renderPanel(makeCharacter([makeSkill()]), true);
     openSkillEditor('Broadsword');
@@ -501,10 +512,50 @@ describe('SkillsPanel', () => {
     expect(
       await screen.findByText("Couldn't save Broadsword points — Disk full"),
     ).toBeInTheDocument();
-    expect(points).toHaveValue('8');
+    await waitFor(() => expect(points).toHaveValue('8'));
     expect(points).toHaveAttribute('data-flashing', 'true');
     expect(enqueueFieldPatch).toHaveBeenCalledWith(
       expect.objectContaining({ fieldPath: 'points', attemptedValue: 12 }),
+    );
+  });
+
+  it('saves a nullable specialization deliberately returned to its old value after a remote change', async () => {
+    const initial = makeSkill({ specialization: 'Old' });
+    const { libraryMechanics, defaults, ...stored } = initial;
+    await getLocalDb().characterSkills.put({
+      ...stored,
+      ...(libraryMechanics === undefined ? {} : { libraryMechanics }),
+      ...(defaults === undefined ? {} : { defaults }),
+      revision: 1,
+    });
+    enqueueFieldPatch.mockImplementation(
+      async (op: { entityId: string; fieldPath: string; attemptedValue: unknown }) => {
+        await getLocalDb().characterSkills.update(op.entityId, {
+          [op.fieldPath]: op.attemptedValue,
+        });
+      },
+    );
+    const view = renderPanel(makeCharacter([initial]), true);
+    openSkillEditor('Broadsword/Old');
+    const input = screen.getByLabelText('Broadsword/Old specialization');
+    fireEvent.change(input, { target: { value: 'Draft' } });
+    await getLocalDb().characterSkills.update(initial.id, { specialization: 'Remote' });
+    view.rerender(
+      <SkillsPanel
+        character={makeCharacter([{ ...initial, specialization: 'Remote' }])}
+        canWrite
+      />,
+    );
+    expect(input).toHaveValue('Draft');
+    fireEvent.change(input, { target: { value: 'Old' } });
+    fireEvent.blur(input);
+    await waitFor(() =>
+      expect(enqueueFieldPatch).toHaveBeenCalledWith(
+        expect.objectContaining({ fieldPath: 'specialization', attemptedValue: 'Old' }),
+      ),
+    );
+    await waitFor(async () =>
+      expect((await getLocalDb().characterSkills.get(initial.id))?.specialization).toBe('Old'),
     );
   });
 

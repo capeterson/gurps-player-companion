@@ -11,7 +11,7 @@ import { flashBus } from '../../../sync/flashBus.ts';
 import { getSyncOrchestrator, resetSyncOrchestratorForTests } from '../../../sync/orchestrator.ts';
 import { enqueueFieldPatch } from '../../../sync/outbox.ts';
 import { useCharacterDetail } from '../useCharacterDetail.ts';
-import { mutateActiveEffects } from './activeEffectMutations.ts';
+import { mutateActiveEffects, readActiveEffectNotes } from './activeEffectMutations.ts';
 import { ActiveEffectsPanel } from './combat/ActiveEffectsPanel.tsx';
 import { SoloTrackerCard } from './combat/SoloTrackerCard.tsx';
 const id = '00000000-0000-4000-8000-000000000001';
@@ -93,6 +93,17 @@ it('composes rapid edits to the same and different instances, keeping other fiel
   expect(row?.activeEffects?.[0]).toMatchObject({ notes: 'Latest', state: 'inactive' });
   expect(row?.name).toBe('New hero');
   expect(await getLocalDb().outbox.count()).toBe(2);
+});
+it('reads current notes by effect identity and rejects a removed effect', async () => {
+  await seed();
+  await mutateActiveEffects(id, 'Notes', (entries) =>
+    entries.map((entry) => (entry.id === effect.id ? { ...entry, notes: 'Current' } : entry)),
+  );
+  expect(await readActiveEffectNotes(id, effect.id)).toBe('Current');
+  await mutateActiveEffects(id, 'Remove', () => []);
+  await expect(readActiveEffectNotes(id, effect.id)).rejects.toThrow(
+    'This active effect no longer exists',
+  );
 });
 it.each(['applied', 'rejected'] as const)(
   'settles %s with cursor protection, durable rollback notices and flashes',

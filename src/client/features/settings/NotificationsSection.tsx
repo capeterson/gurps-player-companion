@@ -22,7 +22,7 @@ function PreferenceToggle({
   label: string;
   description?: string;
   value: boolean;
-  onSave: (value: boolean) => Promise<unknown>;
+  onSave: (value: boolean, sessionId: string | null, isActive: () => boolean) => Promise<unknown>;
 }) {
   const draft = useDraftToggle({ name: label, serverValue: value, onSave });
   return (
@@ -36,6 +36,7 @@ function PreferenceToggle({
         className="toggle toggle-sm shrink-0 field-rollback-flash"
         aria-label={label}
         checked={draft.checked}
+        disabled={draft.sessionChanged}
         onChange={draft.toggle}
         {...draft.flashProps}
       />
@@ -48,8 +49,8 @@ function DesktopToggle({ userId }: { userId: string }) {
   const draft = useDraftToggle({
     name: 'Desktop notifications',
     serverValue: enabled,
-    onSave: async (value) => {
-      if (value) await enableDesktopNotifications(userId);
+    onSave: async (value, _sessionId, isActive) => {
+      if (value) await enableDesktopNotifications(userId, isActive);
       else disableDesktopNotifications(userId);
     },
   });
@@ -65,7 +66,7 @@ function DesktopToggle({ userId }: { userId: string }) {
           className="toggle toggle-sm shrink-0 field-rollback-flash"
           aria-label="Desktop notifications"
           checked={draft.checked}
-          disabled={!supported || draft.isSaving}
+          disabled={!supported || draft.isSaving || draft.sessionChanged}
           onChange={draft.toggle}
           {...draft.flashProps}
         />
@@ -89,11 +90,19 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
     queryFn: () => api<NotificationPreferences>('/auth/notification-preferences'),
     enabled: Boolean(userId),
   });
-  const save = async (key: keyof NotificationPreferences, value: boolean) => {
+  const save = async (
+    key: keyof NotificationPreferences,
+    value: boolean,
+    sessionId: string | null,
+    isActive: () => boolean,
+  ) => {
     await api<NotificationPreferences>('/auth/notification-preferences', {
       method: 'PATCH',
+      expectedSessionId: sessionId,
+      isDispatchActive: isActive,
       body: { [key]: value },
     });
+    if (!isActive()) return;
     // Merge only the confirmed field; responses to different-field saves may arrive out of order.
     qc.setQueryData<NotificationPreferences>(['notification-preferences', userId], (old) =>
       old ? { ...old, [key]: value } : old,
@@ -127,12 +136,12 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
               <PreferenceToggle
                 label="Campaign invitations"
                 value={preferences.data.emailInvitations}
-                onSave={(v) => save('emailInvitations', v)}
+                onSave={(v, session, active) => save('emailInvitations', v, session, active)}
               />
               <PreferenceToggle
                 label="Invitation accepted"
                 value={preferences.data.emailInvitationAccepted}
-                onSave={(v) => save('emailInvitationAccepted', v)}
+                onSave={(v, session, active) => save('emailInvitationAccepted', v, session, active)}
               />
               <div className="flex items-start justify-between gap-4 py-3">
                 <div className="min-w-0">
@@ -154,7 +163,7 @@ export function NotificationsSection({ userId }: { userId: string | undefined })
                   label={topic.label}
                   description={topic.description}
                   value={preferences.data?.[topic.key] ?? true}
-                  onSave={(v) => save(topic.key, v)}
+                  onSave={(v, session, active) => save(topic.key, v, session, active)}
                 />
               ))}
             </div>

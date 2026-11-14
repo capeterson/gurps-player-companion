@@ -15,7 +15,7 @@ export function AdminRequireAuth() {
       <Navigate
         to="/admin/login"
         replace
-        state={{ returnTo: `${location.pathname}${location.search}` }}
+        state={{ returnTo: `${location.pathname}${location.search}${location.hash}` }}
       />
     );
   }

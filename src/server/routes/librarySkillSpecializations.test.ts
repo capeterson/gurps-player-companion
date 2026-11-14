@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test';
+import { eq } from 'drizzle-orm';
+import type { CampaignHouseRules } from '../../shared/schemas/campaign.ts';
 import type { LibrarySkillOut } from '../../shared/schemas/campaignLibrary.ts';
 import { SYNC_PROTOCOL_HEADER, SYNC_PROTOCOL_VERSION } from '../../shared/syncProtocol.ts';
 import { createApp } from '../app.ts';
+import { getDb } from '../db/client.ts';
+import { campaigns } from '../db/schema.ts';
 import { configureIntegrationTestEnvironment, integrationTestConfig } from '../testConfig.ts';
 
 configureIntegrationTestEnvironment();
@@ -86,6 +90,169 @@ async function post(token: string, path: string, body: unknown) {
 }
 
 describe('library skill specializations', () => {
+  it('uses sparse stored campaign defaults for locked prerequisite validation and detail', async () => {
+    const registered = await post('', '/auth/register', {
+      email: `sparse-rules-${crypto.randomUUID()}@example.com`,
+      password: 'TestPassword1!',
+      displayName: 'GM',
+    });
+    const { accessToken } = (await registered.json()) as { accessToken: string };
+    const campaign = (await (
+      await post(accessToken, '/campaigns', { name: 'Sparse rules' })
+    ).json()) as { id: string };
+    const character = (await (
+      await post(accessToken, '/characters', { name: 'Learner', campaignId: campaign.id })
+    ).json()) as { id: string };
+    const source = (await (
+      await post(accessToken, `/campaigns/${campaign.id}/library/skills`, {
+        name: 'Acid-free study',
+        attribute: 'IQ',
+        difficulty: 'A',
+        prerequisiteRules: {
+          kind: 'campaign_rule',
+          ruleKey: 'forbidAcidMagic',
+          expectedValue: false,
+        },
+      })
+    ).json()) as LibrarySkillOut;
+    // Simulate a historical row, bypassing settings' preset normalization.
+    await getDb()
+      .update(campaigns)
+      .set({ houseRules: { ruleSet: 'custom' } as CampaignHouseRules })
+      .where(eq(campaigns.id, campaign.id));
+    const read = await app.request(`/api/v1/campaigns/${campaign.id}`, {
+      headers: headers(accessToken),
+    });
+    expect(
+      ((await read.json()) as { houseRules: { forbidAcidMagic: boolean } }).houseRules
+        .forbidAcidMagic,
+    ).toBe(false);
+    const cursor = await post(accessToken, '/sync/cursor', {
+      cursors: [{ entityClass: 'campaign', sinceRevision: 0 }],
+    });
+    const cursorBody = (await cursor.json()) as {
+      changes: Array<{ entityId: string; data: { houseRules: { forbidAcidMagic: boolean } } }>;
+    };
+    expect(
+      cursorBody.changes.find((change) => change.entityId === campaign.id)?.data.houseRules
+        .forbidAcidMagic,
+    ).toBe(false);
+    const body = {
+      name: source.name,
+      attribute: source.attribute,
+      difficulty: source.difficulty,
+      librarySkillId: source.id,
+    };
+    const syncCreate = await post(accessToken, '/sync/operations', {
+      operations: [
+        {
+          clientOpId: crypto.randomUUID(),
+          entityClass: 'character_skill',
+          entityId: crypto.randomUUID(),
+          parentId: character.id,
+          command: 'create',
+          attemptedValue: body,
+          validationVersion: 1,
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    });
+    expect(
+      ((await syncCreate.json()) as { outcomes: Array<{ status: string }> }).outcomes[0]?.status,
+    ).toBe('applied');
+    // Use a separate character for the REST create, so both paths adopt independently.
+    const restCharacter = (await (
+      await post(accessToken, '/characters', { name: 'REST learner', campaignId: campaign.id })
+    ).json()) as { id: string };
+
+    const created = await post(accessToken, `/characters/${restCharacter.id}/skills`, body);
+    expect(created.status).toBe(201);
+    const learned = (
+      (await created.json()) as { skill: { id: string; prerequisiteStatus: string } }
+    ).skill;
+    expect(learned.prerequisiteStatus).toBe('met');
+    const syncPoints = async (value: number) => {
+      const response = await post(accessToken, '/sync/operations', {
+        operations: [
+          {
+            clientOpId: crypto.randomUUID(),
+            entityClass: 'character_skill',
+            entityId: learned.id,
+            parentId: restCharacter.id,
+            command: 'patch',
+            fieldPath: 'points',
+            attemptedValue: value,
+            prevValue: value - 1,
+            validationVersion: 1,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      });
+      return ((await response.json()) as { outcomes: Array<{ status: string }> }).outcomes[0]
+        ?.status;
+    };
+    expect(await syncPoints(2)).toBe('applied');
+    const detail = await app.request(`/api/v1/characters/${character.id}`, {
+      headers: headers(accessToken),
+    });
+    expect(
+      ((await detail.json()) as { skills: Array<{ prerequisiteStatus: string }> }).skills[0]
+        ?.prerequisiteStatus,
+    ).toBe('met');
+    await getDb()
+      .update(campaigns)
+      .set({ skillPrerequisitePolicy: 'warn' })
+      .where(eq(campaigns.id, campaign.id));
+    const sparseWarnCharacter = (await (
+      await post(accessToken, '/characters', {
+        name: 'Sparse warn learner',
+        campaignId: campaign.id,
+      })
+    ).json()) as { id: string };
+    const sparseWarn = await post(
+      accessToken,
+      `/characters/${sparseWarnCharacter.id}/skills`,
+      body,
+    );
+    expect(sparseWarn.status).toBe(201);
+    expect(
+      ((await sparseWarn.json()) as { skill: { prerequisiteStatus: string } }).skill
+        .prerequisiteStatus,
+    ).toBe('met');
+    await getDb()
+      .update(campaigns)
+      .set({ skillPrerequisitePolicy: 'block' })
+      .where(eq(campaigns.id, campaign.id));
+    await getDb()
+      .update(campaigns)
+      .set({ houseRules: { ruleSet: 'custom', forbidAcidMagic: true } as CampaignHouseRules })
+      .where(eq(campaigns.id, campaign.id));
+    const rejected = await app.request(
+      `/api/v1/characters/${restCharacter.id}/skills/${learned.id}`,
+      {
+        method: 'PATCH',
+        headers: headers(accessToken),
+        body: JSON.stringify({ points: 3 }),
+      },
+    );
+    expect(rejected.status).toBe(400);
+    expect(await syncPoints(3)).toBe('rejected');
+    const warn = await app.request(`/api/v1/campaigns/${campaign.id}`, {
+      method: 'PATCH',
+      headers: headers(accessToken),
+      body: JSON.stringify({ skillPrerequisitePolicy: 'warn' }),
+    });
+    expect(warn.status).toBe(200);
+    const warnCharacter = (await (
+      await post(accessToken, '/characters', { name: 'Warn learner', campaignId: campaign.id })
+    ).json()) as { id: string };
+    const warned = await post(accessToken, `/characters/${warnCharacter.id}/skills`, body);
+    expect(warned.status).toBe(201);
+    expect(
+      ((await warned.json()) as { skill: { prerequisiteStatus: string } }).skill.prerequisiteStatus,
+    ).toBe('unmet');
+  });
+
   it('enforces required TL and structured prerequisites through REST and sync policy', async () => {
     const registered = await post('', '/auth/register', {
       email: `skill-rules-${crypto.randomUUID()}@example.com`,

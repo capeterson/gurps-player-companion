@@ -199,8 +199,10 @@ offered through **Review update**, which previews removed/added effect lines and
 never downgrades to an older library row.
 
 Weapon, armor, shield, container, powerstone, magic-item and enchantment facets
-coexist on one physical item. The library editor offers visual attack modes and a
-complete typed weapon/armor detail views, container fields, powerstone capacity
+coexist on one physical item. The library editor offers visual attack modes and
+complete typed weapon/armor detail views. New and duplicated library attack modes
+receive unused bounded keys; renaming or reordering preserves their existing keys.
+The editor also provides container fields, powerstone capacity
 and energy, every magic-item mode, and editable enchantment attachments.
 Linked enchantment mechanics remain authoritative until **Make independent**
 retains the snapshot and removes the link. Unrelated edits preserve dormant
@@ -341,3 +343,15 @@ later deletions on subsequent runs. See the [seed guide](../../bootstrap/README.
 ## Racial templates
 
 Races use printed package points rather than the pricing expression engine. Components retain their printed cost for inspection but are not billed independently. One owned resolved snapshot applies racial attribute deltas, traits/effects and training; complete variants/forms replace profiles and lenses add explicit deltas/replacements. Source changes do not reprice existing race purchases. See [races.md](races.md).
+
+## Campaign rule evaluation
+
+Campaign-rule prerequisites, conditional defaults and skill procedures use a
+shared schema-parsed projection of known campaign settings, both for locked
+server validation and character detail on the server and local client. Sparse
+legacy settings receive schema defaults without expanding the selected preset;
+an unavailable campaign and unrecognized rule lookup remain unknown. Invalid
+stored settings fail parsing rather than silently becoming defaults. The optional
+`convertDamageAddsToDice` override remains optional on campaign reads; rule
+expressions see its effective B269 value (the explicit override, otherwise true
+only for `j_talisar`), matching damage calculation. No stored row is rewritten.

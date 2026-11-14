@@ -14,13 +14,19 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { beginPendingToggle } from '../lib/pendingToggles.ts';
 import { useToasts } from '../lib/toast.tsx';
+import { tokenStore } from '../lib/tokenStore.ts';
 import { useFlashState } from './useFlashState.ts';
 
 export interface UseDraftToggleOptions {
   readonly name: string;
   readonly serverValue: boolean;
-  readonly onSave: (v: boolean) => Promise<unknown>;
+  readonly onSave: (
+    v: boolean,
+    sessionId: string | null,
+    isActive: () => boolean,
+  ) => Promise<unknown>;
   readonly onError?: (err: unknown) => string;
   /** See useDraftField.flashKey -- async rollback subscription. */
   readonly flashKey?: string;
@@ -30,6 +36,7 @@ export interface UseDraftToggleReturn {
   readonly checked: boolean;
   readonly toggle: () => void;
   readonly isSaving: boolean;
+  readonly sessionChanged: boolean;
   /** True while the rollback flash keyframe is animating. */
   readonly flashing: boolean;
   /**
@@ -54,6 +61,9 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   const toasts = useToasts();
   const [checked, setChecked] = useState(serverValue);
   const [isSaving, setIsSaving] = useState(false);
+  const [sessionChanged, setSessionChanged] = useState(false);
+  const sessionRef = useRef(tokenStore.read()?.sessionId ?? null);
+  const endPendingRef = useRef<ReturnType<typeof beginPendingToggle> | null>(null);
 
   // The most recently CONFIRMED authoritative value.  Updated by an
   // incoming server prop change OR a successful save.  Mirrors the
@@ -82,6 +92,20 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
     setChecked(serverValue);
   }, [serverValue]);
 
+  useEffect(
+    () =>
+      tokenStore.subscribe((next) => {
+        if ((next?.sessionId ?? null) === sessionRef.current) return;
+        queuedRef.current = null;
+        endPendingRef.current?.end();
+        endPendingRef.current = null;
+        setSessionChanged(true);
+        setChecked(false);
+        setIsSaving(false);
+      }),
+    [],
+  );
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -103,20 +127,40 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
   });
 
   const performSave = useCallback(
-    async (value: boolean): Promise<void> => {
+    async (
+      value: boolean,
+      save: (v: boolean, sessionId: string | null, isActive: () => boolean) => Promise<unknown>,
+      lease: ReturnType<typeof beginPendingToggle>,
+    ): Promise<void> => {
+      if (!lease.isActive() || (tokenStore.read()?.sessionId ?? null) !== sessionRef.current)
+        return;
       inflightRef.current = { value };
       setIsSaving(true);
       let succeeded = false;
       try {
-        await onSaveRef.current(value);
+        await save(
+          value,
+          sessionRef.current,
+          () => lease.isActive() && (tokenStore.read()?.sessionId ?? null) === sessionRef.current,
+        );
         succeeded = true;
       } catch (err) {
+        if (!lease.isActive() || (tokenStore.read()?.sessionId ?? null) !== sessionRef.current) {
+          lease.end();
+          if (endPendingRef.current === lease) endPendingRef.current = null;
+          return;
+        }
         const msg = onErrorRef.current(err);
         // Per AGENTS.md rule 2 ("rollback is a UX event"): both toast
         // AND flash on rejection.  The flash class on the consumer's
         // input drives the keyframe.
         flashRollback();
         toasts.push(`Couldn't save ${nameRef.current} — ${msg}`, { kind: 'error' });
+      }
+      if (!lease.isActive() || (tokenStore.read()?.sessionId ?? null) !== sessionRef.current) {
+        lease.end();
+        if (endPendingRef.current === lease) endPendingRef.current = null;
+        return;
       }
       inflightRef.current = null;
 
@@ -142,7 +186,7 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
           // value next.
           setChecked(queued.value);
         }
-        await performSave(queued.value);
+        await performSave(queued.value, save, lease);
         return;
       }
 
@@ -153,12 +197,15 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
         setChecked(lastCommittedRef.current);
       }
 
+      lease.end();
+      if (endPendingRef.current === lease) endPendingRef.current = null;
       if (isMountedRef.current) setIsSaving(false);
     },
     [toasts, flashRollback],
   );
 
   const toggle = useCallback(() => {
+    if (sessionChanged || (tokenStore.read()?.sessionId ?? null) !== sessionRef.current) return;
     const next = !checked;
     setChecked(next);
     if (inflightRef.current !== null) {
@@ -166,12 +213,24 @@ export function useDraftToggle(opts: UseDraftToggleOptions): UseDraftToggleRetur
       queuedRef.current = { value: next };
       return;
     }
-    void performSave(next);
-  }, [checked, performSave]);
+    const lease = beginPendingToggle(sessionRef.current, () => {
+      if (endPendingRef.current !== lease) return;
+      endPendingRef.current = null;
+      inflightRef.current = null;
+      queuedRef.current = null;
+      if (isMountedRef.current) {
+        setChecked(lastCommittedRef.current);
+        setIsSaving(false);
+      }
+    });
+    endPendingRef.current = lease;
+    void performSave(next, onSaveRef.current, lease);
+  }, [checked, performSave, sessionChanged]);
 
   return {
-    checked,
+    checked: sessionChanged ? false : checked,
     toggle,
+    sessionChanged,
     isSaving,
     flashing,
     flashProps,

@@ -198,7 +198,7 @@ limits, internal scrolling, Escape/outside dismissal and keyboard focus manageme
 
 ### Public introduction
 
-Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Protected deep links still return to their destination after login. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
+Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, registration and sign-in links, an offline-use explanation, and real application screenshots. When the instance enables the guest preview (`PREVIEW_MODE_ENABLED`), **Try without an account** opens `/preview`: a read-only guest session in the server-provisioned Lantern Coast campaign, with a persistent read-only banner offering **Create your account** and **Exit preview**. Guests cannot change anything; see [preview-mode.md](preview-mode.md). Its headline scales across responsive breakpoints so the two phrases remain on their intended lines at tablet and desktop widths. Authenticated visitors retain the recent-character dashboard. Password and passkey sign-in restore validated internal destinations, including their query and sheet anchor; OAuth reauthentication retains its request query. Admin destinations use their own allow-list. The landing page and root README use the same canonical files in `public/screenshots/`; capture instructions remain in `docs/screenshots/README.md`.
 
 ### Accounts & authentication
 - Email/password registration and login (`/register`, `/login`).
@@ -223,7 +223,8 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, reg
 - **Account suspension**: a suspended user is bounced to `/suspended`; admins
   can suspend / unsuspend / schedule purge.
 - **Unsaved changes at sign-out**: logout and password change check queued
-  edits, unsaved images, and pending theme preferences before ending the session.
+  edits, unsaved images, pending theme preferences, and queued account-setting
+  toggles before ending the session.
   A confirmation offers **Keep editing** or explicit discard; cancel preserves
   the signed-in session and local work. Confirmed sign-out still purges all
   account data from this device.
@@ -500,8 +501,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   later point changes and offline warnings remain stable. Campaigns either block learning
   and point increases or allow them with persistent sheet warnings; unrelated
   later edits never delete an existing skill. Prose remains beside the typed
-  rule for source fidelity. All rule data is captured in the owned library
-  snapshot so offline calculation and warnings match the server.
+  rule for source fidelity. Known campaign rule expressions use schema defaults;
+  unavailable campaigns and unknown rule keys remain unknown. All rule data is
+  captured in the owned library snapshot so offline calculation and warnings
+  match the server.
   Difficulty never decides whether a default exists, including Very Hard skills.
   Basic-attribute defaults cap their source ST/DX/IQ/HT at 20 before applying
   the listed penalty (B173). Purchased levels and learned-skill defaults remain
@@ -1034,7 +1037,15 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 
 Every editable input on the sheet is **draft-on-blur** and never silently
 loses an edit; see `src/client/hooks/useDraftField.ts` and `AGENTS.md`
-interaction rules.
+interaction rules. Older failures preserve newer raw text, durable-value readers
+are scoped, and shared saver no-op checks use the current outbox transaction.
+Committed queues retain their original field and session through navigation.
+All production `useDraftField` save consumers use local-first writers; there
+are no HTTP save consumers requiring a separate freshness protocol. Bespoke
+trait, skill and spell fields share scoped row readers; nested inventory and
+active-effect notes keep their individual draft identities while sharing the
+existing whole-field rollback feedback. Invalid newer owned-effect drafts
+survive older save/removal settlements.
 
 ### Campaigns
 Routes `/campaigns`, `/campaigns/:id`, `/campaigns/:id/log`,
@@ -1172,6 +1183,8 @@ settings sections; switching sections retains drafts.
 - **Campaign history view**: campaign-level audit log (settings, membership,
   library, log), plus an owner/manager roll-up across member characters. Audit
   summaries wrap long unspaced entity names within their rows without clipping.
+  Category filters follow the current scope: Campaign, Members and Library for
+  campaign events, and sheet categories for character events.
 - **GM campaign dashboard** (`/campaigns/:id/gm`): an owner/manager live-session
   view with a responsive grid of compact, read-only character cards backed by
   the local Dexie character model, plus a five-second character-history feed.
@@ -1556,6 +1569,7 @@ src/
     components/ui/SkillReferenceCombobox.tsx  Shared React Aria skill reference picker
                  and campaign-first suggestion merge
     components/ui/QueryReadError.tsx  Shared retryable online-read error
+    lib/pendingToggles.ts  Session-scoped pending account-setting saves and explicit discard
     hooks/       useConnectionStatus (shared offline mode/reachability),
                  useDraftField (canonical draft-on-blur), useDraftToggle,
                  useUnsyncedChangesGuard (confirmed session cleanup),

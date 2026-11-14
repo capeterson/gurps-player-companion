@@ -50,9 +50,12 @@ export function CharacterRaceControl({
     format: JSON.stringify,
     parse: (raw) => characterRace.parse(JSON.parse(raw)),
     equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-    ...buildSave('race', { humanName: 'race' }),
-    readRollbackValue: async () =>
-      (await getLocalDb().characters.get(character.id))?.race ?? HUMAN_RACE,
+    ...buildSave<CharacterRace>('race', { humanName: 'race' }),
+    readRollbackValue: async () => {
+      const row = await getLocalDb().characters.get(character.id);
+      if (!row) throw new Error('Character no longer exists');
+      return row.race ?? HUMAN_RACE;
+    },
   });
   const owned = characterRace.parse(JSON.parse(field.value));
   const selected = selection ?? owned.selection;

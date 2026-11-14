@@ -7,7 +7,10 @@ import { api } from '../../lib/api.ts';
 function McpUiToggle({
   value,
   onSave,
-}: { value: boolean; onSave: (value: boolean) => Promise<unknown> }) {
+}: {
+  value: boolean;
+  onSave: (value: boolean, sessionId: string | null, isActive: () => boolean) => Promise<unknown>;
+}) {
   const draft = useDraftToggle({ name: 'MCP UI', serverValue: value, onSave });
   return (
     <label className="flex items-center justify-between gap-4 py-3">
@@ -23,6 +26,7 @@ function McpUiToggle({
         className="toggle toggle-sm shrink-0 field-rollback-flash"
         aria-label="MCP UI"
         checked={draft.checked}
+        disabled={draft.sessionChanged}
         onChange={draft.toggle}
         {...draft.flashProps}
       />
@@ -38,11 +42,14 @@ export function ExperimentalFeaturesSection({ userId }: { userId: string | undef
     queryFn: () => api<ExperimentalFeatures>('/auth/experimental-features'),
     enabled: Boolean(userId),
   });
-  const save = async (mcpUi: boolean) => {
+  const save = async (mcpUi: boolean, sessionId: string | null, isActive: () => boolean) => {
     await api<ExperimentalFeatures>('/auth/experimental-features', {
       method: 'PATCH',
+      expectedSessionId: sessionId,
+      isDispatchActive: isActive,
       body: { mcpUi },
     });
+    if (!isActive()) return;
     qc.setQueryData<ExperimentalFeatures>(queryKey, { mcpUi });
   };
   return (
