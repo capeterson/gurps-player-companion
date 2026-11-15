@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { libraryRaceOut } from '../../../shared/schemas/race.ts';
 import type { LocalCampaign } from '../../db/dexie.ts';
 import { LibraryPackageEditor } from './LibraryPackageEditor.tsx';
 import type { LocalLibrary } from './useLocalLibrary.ts';
@@ -83,6 +84,58 @@ const library = {
 } as unknown as LocalLibrary;
 
 describe('LibraryPackageEditor draft retention', () => {
+  it('uses staged race changes when identifying a lens repair collision', () => {
+    const entry = (id: string, name: string, kind: 'race' | 'lens') =>
+      libraryRaceOut.parse({
+        id,
+        campaignId: campaign.id,
+        revision: 1,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        name,
+        kind,
+        key: name.toLowerCase().replaceAll(' ', '-'),
+        traits: [{ key: kind === 'race' ? 'original' : 'lens-trait', name: 'Trait', points: 1 }],
+      });
+    const races = [
+      entry('0193b3c0-f1f0-7000-8000-000000000021', 'Staged race', 'race'),
+      entry('0193b3c0-f1f0-7000-8000-000000000022', 'Staged lens', 'lens'),
+    ];
+    render(
+      <LibraryPackageEditor
+        campaign={campaign}
+        library={{ ...library, races } as unknown as LocalLibrary}
+        onReview={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Edit category'), { target: { value: 'races' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Staged race' }));
+    fireEvent.click(screen.getByText('Racial profile and options', { selector: 'summary' }));
+    fireEvent.click(screen.getByText('Repair reference key', { selector: 'summary' }));
+    fireEvent.change(screen.getByLabelText('Reference key, Specific traits 1'), {
+      target: { value: 'staged-key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Staged lens' }));
+    const summaries = screen.getAllByText('Racial profile and options', { selector: 'summary' });
+    const visibleSummary = summaries.find((element) => !element.closest('[hidden]'));
+    if (!visibleSummary) throw new Error('Visible racial profile not found');
+    fireEvent.click(visibleSummary);
+    const repair = screen
+      .getAllByText('Repair reference key', { selector: 'summary' })
+      .find((element) => !element.closest('[hidden]'));
+    if (!repair) throw new Error('Visible reference repair not found');
+    fireEvent.click(repair);
+    const input = screen
+      .getAllByLabelText('Reference key, Specific traits 1')
+      .find((element) => !element.closest('[hidden]'));
+    if (!input) throw new Error('Visible reference input not found');
+    fireEvent.change(input, { target: { value: 'staged-key' } });
+    expect(repair.closest('details')).toHaveTextContent('Proposed key also occurs in: Staged race');
+    expect(repair.closest('details')).not.toHaveTextContent(
+      'Proposed key is also added by: Staged lens',
+    );
+  });
   it('names each invalid row that blocks package review until corrected', async () => {
     const onReview = vi.fn();
     render(

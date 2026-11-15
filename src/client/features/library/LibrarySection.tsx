@@ -296,7 +296,7 @@ export function LibrarySection<R extends LibraryListRow>({
 
       {active && (
         <output className="block text-xs text-muted">
-          {matchCount} of {entries.length} {config.plural}
+          {matchCount} of {entries.length}
           {searching ? ' match' : ''}. {searching && 'Entries being edited stay visible.'}
         </output>
       )}

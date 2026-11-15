@@ -70,10 +70,12 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   const racialTrait = page.getByRole('group', { name: 'Specific traits 1' });
   await racialTrait.locator('[data-field-path="traits.0.name"]').fill('Acute Vision');
   await racialTrait.locator('[data-field-path="traits.0.points"]').fill('2');
+  await racialTrait.getByText('Repair reference key').click();
   await racialTrait.locator('[data-field-path="traits.0.key"]').fill('acute-vision');
   await page.getByRole('button', { name: 'Add variants', exact: true }).click();
   const variantGroup = page.getByRole('group', { name: 'Variants 1' });
   await variantGroup.locator('[data-field-path="variants.0.name"]').fill(variantName);
+  await variantGroup.getByText('Repair reference key').first().click();
   await variantGroup.locator('[data-field-path="variants.0.key"]').fill('northwood');
   await variantGroup.locator('[data-field-path="variants.0.points"]').fill('30');
   await variantGroup.getByLabel('Attribute adjustments setting').selectOption('value');
@@ -90,6 +92,7 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   await racialSkillFields
     .locator('[data-field-path="variants.0.skills.0.name"]')
     .fill('Forest Lore');
+  await racialSkillFields.getByText('Repair reference key').click();
   await racialSkillFields
     .locator('[data-field-path="variants.0.skills.0.key"]')
     .fill('forest-lore');
@@ -105,6 +108,7 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   await page.getByRole('button', { name: 'Add forms', exact: true }).click();
   const formGroup = page.getByRole('group', { name: 'Forms 1' });
   await formGroup.locator('[data-field-path="forms.0.name"]').fill('Owl form');
+  await formGroup.getByText('Repair reference key').first().click();
   await formGroup.locator('[data-field-path="forms.0.key"]').fill('owl-form');
   await formGroup.getByLabel('Attribute adjustments setting').selectOption('value');
   await formGroup.getByLabel('ST setting').selectOption('value');
@@ -291,4 +295,111 @@ test('race choice previews safely and campaign race definitions support UI CRUD'
   await expect(page.getByRole('button', { name: revisedName, exact: true })).toHaveCount(0, {
     timeout: 20_000,
   });
+});
+
+test('race component duplication retains references through save and reopen', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('/register');
+  await page.getByLabel(/email/i).fill(`race-identity-${suffix()}@example.com`);
+  await page.getByLabel(/display name/i).fill('Race identity QA');
+  await page.getByLabel(/^password\b/i).fill('CorrectHorseBatteryStaple1');
+  await page.getByRole('button', { name: /create account/i }).click();
+  await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
+  const campaign = await create<{ id: string }>(page, '/campaigns', {
+    name: `Identity ${suffix()}`,
+  });
+  const character = await create<{ id: string }>(page, '/characters', {
+    name: 'Identity character',
+    campaignId: campaign.id,
+    st: 10,
+    dx: 10,
+    iq: 10,
+    ht: 10,
+  });
+  const race = await create<{ id: string }>(page, `/campaigns/${campaign.id}/library/races`, {
+    name: 'Identity race',
+    key: 'identity-race',
+    kind: 'race',
+    traits: [{ key: 'keen', name: 'Keen', kind: 'advantage', points: 2 }],
+    skills: [{ key: 'lore', name: 'Lore', points: 1 }],
+    variants: [
+      {
+        key: 'variant-original',
+        name: 'Variant',
+        traits: [{ key: 'variant-trait', name: 'Variant trait', points: 1 }],
+      },
+    ],
+    forms: [
+      {
+        key: 'form-original',
+        name: 'Form',
+        skills: [{ key: 'form-skill', name: 'Form skill', points: 1 }],
+      },
+    ],
+  });
+  await create(page, `/campaigns/${campaign.id}/library/races`, {
+    name: 'Identity lens',
+    key: 'identity-lens',
+    kind: 'lens',
+    compatibleRaceKeys: ['identity-race'],
+    removesTraits: ['keen', 'sharp'],
+    traits: [
+      { key: 'keen', name: 'Lens Keen', kind: 'advantage', points: 3 },
+      { key: 'sharp', name: 'Lens Sharp', points: 1 },
+    ],
+  });
+  await page.goto(`/campaigns/${campaign.id}/library?section=races`);
+  await page.getByRole('button', { name: 'Edit Identity race' }).click();
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Racial profile and options/ })
+    .click();
+  const first = page.getByRole('group', { name: 'Specific traits 1', exact: true }).first();
+  await first.getByText('Repair reference key').click();
+  await expect(first).toContainText('Identity lens');
+  await first.locator('[data-field-path="traits.0.key"]').fill('sharp');
+  await expect(first).toContainText('Proposed key is removed by: Identity lens');
+  await expect(first).toContainText('Proposed key is also added by: Identity lens');
+  await first.locator('[data-field-path="traits.0.key"]').fill('keen');
+  await page.getByRole('button', { name: 'Duplicate Skills 1' }).first().click();
+  await page.getByRole('button', { name: 'Duplicate Variants 1' }).click();
+  await page.getByRole('button', { name: 'Duplicate Forms 1' }).click();
+  const variantCopy = page.getByRole('group', { name: 'Variants 2' });
+  const formCopy = page.getByRole('group', { name: 'Forms 2' });
+  await variantCopy.locator('[data-field-path="variants.1.name"]').fill('Renamed variant copy');
+  await formCopy.locator('[data-field-path="forms.1.name"]').fill('Renamed form copy');
+  await page.getByRole('button', { name: 'Duplicate Specific traits 1' }).first().click();
+  await page.getByRole('button', { name: 'Move Specific traits 2 up' }).first().click();
+  const copy = page.getByRole('group', { name: 'Specific traits 1', exact: true }).first();
+  await copy.locator('[data-field-path="traits.0.name"]').fill('Renamed copy');
+  await copy.getByText('Repair reference key').click();
+  await expect(copy.locator('[data-field-path="traits.0.key"]')).toHaveValue('keen-copy');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Edit Identity race' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit Identity race' }).click();
+  await page
+    .locator('summary')
+    .filter({ hasText: /^Racial profile and options/ })
+    .click();
+  const reopened = page.getByRole('group', { name: 'Specific traits 1', exact: true }).first();
+  await expect(reopened.locator('[data-field-path="traits.0.name"]')).toHaveValue('Renamed copy');
+  await reopened.getByText('Repair reference key').click();
+  await expect(reopened.locator('[data-field-path="traits.0.key"]')).toHaveValue('keen-copy');
+  for (const [group, path, key] of [
+    ['Skills 2', 'skills.1.key', 'lore-copy'],
+    ['Variants 2', 'variants.1.key', 'variant-copy'],
+    ['Forms 2', 'forms.1.key', 'form-copy'],
+  ]) {
+    const row = page.getByRole('group', { name: group });
+    await row.getByText('Repair reference key').first().click();
+    await expect(row.locator(`[data-field-path="${path}"]`)).toHaveValue(key);
+  }
+  await page.goto(`/characters/${character.id}`);
+  await selectCharacterSection(page, 'Overview');
+  await page.getByRole('button', { name: 'Change race: Human' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Choose race' });
+  await dialog.locator('select').first().selectOption(race.id);
+  await dialog.getByLabel('Identity lens').check();
+  await expect(dialog.getByText('Renamed copy')).toBeVisible();
+  await expect(dialog.getByText('Lens Keen')).toBeVisible();
 });

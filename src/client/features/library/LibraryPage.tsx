@@ -711,6 +711,7 @@ export function LibraryPage({
         )}
         <ConfirmDialog
           open={pendingImport !== null}
+          compact
           title={`Import ${pendingImport?.fileName ?? 'YAML'}?`}
           confirmLabel={
             pendingImport?.mode === 'replace' ? 'Replace selected scope' : 'Merge library'
@@ -750,11 +751,17 @@ export function LibraryPage({
           </ul>
           {pendingImport?.blocked ? (
             <p>
-              {pendingImport.blocked} incomplete or reference entries cannot be added to characters.
+              {pendingImport.blocked} incomplete or reference{' '}
+              {pendingImport.blocked === 1 ? 'entry cannot' : 'entries cannot'} be added to
+              characters.
             </p>
           ) : null}
           {pendingImport?.editionDecisions.length ? (
-            <p>{pendingImport.editionDecisions.length} edition decisions will be applied.</p>
+            <p>
+              {pendingImport.editionDecisions.length} edition{' '}
+              {pendingImport.editionDecisions.length === 1 ? 'decision' : 'decisions'} will be
+              applied.
+            </p>
           ) : null}
           {importError && (
             <p role="alert" className="alert alert-error mt-2">
@@ -930,7 +937,7 @@ function formatImportResult(r: ImportResult): string {
     return `${label}: +${s.created} · ~${s.updated} · −${s.deleted}`;
   };
   const blockedNote = r.incomplete
-    ? `; ${r.incomplete} incomplete/reference entries blocked from adoption`
+    ? `; ${r.incomplete} incomplete/reference ${r.incomplete === 1 ? 'entry' : 'entries'} blocked from adoption`
     : '';
   const settingsNote = r.campaignSettingsApplied ? '; campaign settings applied' : '';
   return `Imported in ${r.mode} mode — ${totals('races')}, ${totals('traits')}, ${totals('skills')}, ${totals('spells')}, ${totals('items')}, ${totals('languages')}, ${totals('techniques')}, ${totals('styles')}, ${totals('enchantments')}, ${totals('sources')}, ${totals('modifiers')}${settingsNote}${blockedNote}`;

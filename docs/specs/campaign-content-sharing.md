@@ -746,6 +746,9 @@ mechanism for sharing content between campaigns or seeding a new one.
   incoming/removal counts, confirmation, and online bulk import handler as a file
   import. Review names staged changes outside the selected sourcebooks instead of
   silently filtering them out; unchanged entries outside the scope remain untouched.
+  The import confirmation is constrained to a readable width and scrolls within
+  short viewports; its counts and replacement consequences remain available before
+  the user confirms.
   New entries inherit the selected sourcebook when exactly one is selected. Raw
   editing waits until invalid local entry fields are corrected; blockers identify
   those entries by category and name, and schema errors identify the entry and

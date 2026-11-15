@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
 import { canonicalLibraryKey } from '../../../shared/domain/libraryIdentity.ts';
@@ -19,16 +19,80 @@ import { LibraryAdvancedFields } from './LibraryAdvancedFields.tsx';
 import { LibraryAuthoringContext } from './LibraryAuthoringContext.tsx';
 import { LibraryMetadataEditor } from './LibraryMetadataEditor.tsx';
 import { SourcebooksContext } from './SourcebooksContext.tsx';
-import { type StructuredFieldProps, StructuredFields } from './StructuredFields.tsx';
+import {
+  RowIdentityDomain,
+  type StructuredFieldProps,
+  StructuredFields,
+} from './StructuredFields.tsx';
 import { WeaponModesEditor } from './WeaponModesEditor.tsx';
 import { editorLabel, objectShape, unwrapSchema } from './editorSchema.ts';
 import { type LibraryEditorSection, libraryEditorSchemas } from './libraryEditorSchemas.ts';
+import { raceKeyDependencies, raceProfileDependencies } from './rowIdentity.ts';
 
 const METADATA = new Set(Object.keys(libraryMetadata.shape));
 const draftRows = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value)
     ? value.filter((row) => row && typeof row === 'object' && !Array.isArray(row))
     : [];
+
+function RaceReferenceKey({
+  field,
+  lenses,
+  peerLenses,
+  races,
+}: {
+  field: StructuredFieldProps;
+  lenses: Record<string, unknown>[];
+  peerLenses: Record<string, unknown>[];
+  races: Record<string, unknown>[];
+}) {
+  const original = useRef(String(field.value ?? '')).current;
+  const component = /(?:^|\.)(traits|skills)\.\d+\.key$/.exec(field.path ?? '')?.[1];
+  const dependencies =
+    component === 'traits' || component === 'skills'
+      ? raceKeyDependencies(lenses, component, original, String(field.value ?? ''), peerLenses)
+      : null;
+  const profiles =
+    component === 'traits' || component === 'skills'
+      ? raceProfileDependencies(races, component, String(field.value ?? ''))
+      : [];
+  return (
+    <details className="min-w-0 text-sm">
+      <summary
+        className="cursor-pointer"
+        aria-label={`Repair ${field.accessibleLabel ?? 'reference key'}`}
+      >
+        Repair reference key
+      </summary>
+      <label className="form-control min-w-0">
+        Reference key
+        <input
+          className="input input-sm min-w-0 w-full"
+          value={String(field.value ?? '')}
+          data-field-path={field.path}
+          aria-label={field.accessibleLabel ?? 'Reference key'}
+          onChange={(event) => field.onChange(event.target.value)}
+        />
+      </label>
+      <p className="text-xs">
+        Changing this key may affect references.{' '}
+        {dependencies &&
+          dependencies.oldRemovals.length > 0 &&
+          `Existing key is removed by: ${dependencies.oldRemovals.join(', ')}. `}
+        {dependencies &&
+          dependencies.proposedRemovals.length > 0 &&
+          `Proposed key is removed by: ${dependencies.proposedRemovals.join(', ')}. `}
+        {dependencies &&
+          dependencies.proposedAdditions.length > 0 &&
+          `Proposed key is also added by: ${dependencies.proposedAdditions.join(', ')}; combining these may require an explicit replacement. `}
+        {profiles.length > 0 &&
+          `Proposed key also occurs in: ${profiles.join(', ')}; combining these may require an explicit replacement. `}
+        Other references may be unavailable here. Existing character selections and snapshots retain
+        their historical keys.
+      </p>
+    </details>
+  );
+}
 const legacyDraftRows = (value: unknown): SituationalModifier[] =>
   Array.isArray(value)
     ? value.filter((row) => row && typeof row.name === 'string' && typeof row.modifier === 'number')
@@ -99,11 +163,13 @@ const GROUPS: [string, string[]][] = [
 export function LibraryEntryFields({
   section,
   value,
+  currentId,
   onChange,
   onValidityChange,
 }: {
   section: LibraryEditorSection;
   value: Record<string, unknown>;
+  currentId?: string | undefined;
   onChange: (next: Record<string, unknown>) => void;
   onValidityChange?: (valid: boolean) => void;
 }) {
@@ -198,6 +264,30 @@ export function LibraryEntryFields({
     onChange(updated);
   };
   function custom(field: StructuredFieldProps): ReactNode | undefined {
+    if (
+      section === 'races' &&
+      /^(?:(?:variants|forms)\.\d+\.)?(?:traits|skills)\.\d+\.key$|^(?:variants|forms)\.\d+\.key$/.test(
+        field.path ?? '',
+      )
+    ) {
+      const rows = (context?.library.races ?? []).map((race) => ({
+        ...race,
+        referenceLabel: definitionLabel(race),
+      }));
+      const peers = rows.filter((race) => race.kind === 'lens' && race.id !== currentId);
+      const lenses =
+        value.kind === 'lens'
+          ? [...peers, { ...value, referenceLabel: definitionLabel(value as { name: string }) }]
+          : peers;
+      return (
+        <RaceReferenceKey
+          field={field}
+          lenses={lenses}
+          peerLenses={peers}
+          races={value.kind === 'lens' ? rows.filter((race) => race.kind === 'race') : []}
+        />
+      );
+    }
     const { path = '', value: current, onChange: change } = field;
     if (
       path === 'procedures' &&
@@ -495,69 +585,106 @@ export function LibraryEntryFields({
       ...next,
     });
   const siblings = context?.library[section] ?? [];
+  const raceKeys: Record<string, string[]> = { Trait: [], Skill: [], Variant: [], Form: [] };
+  if (section === 'races') {
+    for (const race of [...(context?.library.races ?? []), value] as Record<string, unknown>[]) {
+      for (const profile of [race, ...draftRows(race.variants), ...draftRows(race.forms)]) {
+        for (const [field, kind] of [
+          ['traits', 'Trait'],
+          ['skills', 'Skill'],
+        ] as const) {
+          raceKeys[kind]?.push(
+            ...draftRows(profile[field]).flatMap((entry) =>
+              typeof entry.key === 'string' ? [entry.key] : [],
+            ),
+          );
+        }
+      }
+      for (const [field, kind] of [
+        ['removesTraits', 'Trait'],
+        ['removesSkills', 'Skill'],
+      ] as const) {
+        const keys = race[field];
+        if (Array.isArray(keys))
+          raceKeys[kind]?.push(...keys.filter((key): key is string => typeof key === 'string'));
+      }
+      for (const [field, kind] of [
+        ['variants', 'Variant'],
+        ['forms', 'Form'],
+      ] as const) {
+        raceKeys[kind]?.push(
+          ...draftRows(race[field]).flatMap((entry) =>
+            typeof entry.key === 'string' ? [entry.key] : [],
+          ),
+        );
+      }
+    }
+  }
   return (
-    <EditorValidityContext.Provider value={validity}>
-      <div className="min-w-0 space-y-4">
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2">{basics.map(field)}</div>
-        {groups.map(([title, keys]) =>
-          keys.length ? (
-            <LibraryAdvancedFields
-              key={title}
-              title={title}
-              error={
-                Object.values(invalidFields).some((path) =>
-                  keys.some((key) => path === key || path.startsWith(`${key}.`)),
-                )
-                  ? 'Correct the fields in this section.'
-                  : null
-              }
-            >
-              <div className="min-w-0 space-y-4">{keys.map(field)}</div>
-            </LibraryAdvancedFields>
-          ) : null,
-        )}
-        {section !== 'sources' && libraryMetadata.safeParse(metadata).success && (
-          <LibraryMetadataEditor value={metadata} onChange={updateMetadata} />
-        )}
-        {section !== 'sources' && !libraryMetadata.safeParse(metadata).success && (
-          <StructuredFields
-            schema={libraryMetadata.omit({ key: true })}
-            value={metadata}
-            label="Source and completeness"
-            onChange={(next) => updateMetadata(next as LibraryMetadata)}
-          />
-        )}
-        {section !== 'sources' && siblings.length > 0 && (
-          <LibraryAdvancedFields title="Match another edition">
-            <label className="form-control min-w-0 text-sm">
-              Same definition in another edition
-              <select
-                className="select select-sm min-w-0 w-full"
-                value=""
-                onChange={(event) => {
-                  const row = siblings.find((entry) => entry.id === event.target.value);
-                  if (row && 'key' in row && row.key) patch('key', row.key);
-                }}
-              >
-                <option value="">Choose an existing definition to match…</option>
-                {siblings
-                  .filter(
-                    (row) =>
-                      'key' in row &&
-                      row.key &&
-                      (row.sourceId ?? null) !== (value.sourceId ?? null) &&
-                      (section !== 'traits' || ('kind' in row && row.kind === value.kind)),
+    <RowIdentityDomain.Provider value={section === 'races' ? { raceKeys } : null}>
+      <EditorValidityContext.Provider value={validity}>
+        <div className="min-w-0 space-y-4">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">{basics.map(field)}</div>
+          {groups.map(([title, keys]) =>
+            keys.length ? (
+              <LibraryAdvancedFields
+                key={title}
+                title={title}
+                error={
+                  Object.values(invalidFields).some((path) =>
+                    keys.some((key) => path === key || path.startsWith(`${key}.`)),
                   )
-                  .map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {definitionLabel(row)}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          </LibraryAdvancedFields>
-        )}
-      </div>
-    </EditorValidityContext.Provider>
+                    ? 'Correct the fields in this section.'
+                    : null
+                }
+              >
+                <div className="min-w-0 space-y-4">{keys.map(field)}</div>
+              </LibraryAdvancedFields>
+            ) : null,
+          )}
+          {section !== 'sources' && libraryMetadata.safeParse(metadata).success && (
+            <LibraryMetadataEditor value={metadata} onChange={updateMetadata} />
+          )}
+          {section !== 'sources' && !libraryMetadata.safeParse(metadata).success && (
+            <StructuredFields
+              schema={libraryMetadata.omit({ key: true })}
+              value={metadata}
+              label="Source and completeness"
+              onChange={(next) => updateMetadata(next as LibraryMetadata)}
+            />
+          )}
+          {section !== 'sources' && siblings.length > 0 && (
+            <LibraryAdvancedFields title="Match another edition">
+              <label className="form-control min-w-0 text-sm">
+                Same definition in another edition
+                <select
+                  className="select select-sm min-w-0 w-full"
+                  value=""
+                  onChange={(event) => {
+                    const row = siblings.find((entry) => entry.id === event.target.value);
+                    if (row && 'key' in row && row.key) patch('key', row.key);
+                  }}
+                >
+                  <option value="">Choose an existing definition to match…</option>
+                  {siblings
+                    .filter(
+                      (row) =>
+                        'key' in row &&
+                        row.key &&
+                        (row.sourceId ?? null) !== (value.sourceId ?? null) &&
+                        (section !== 'traits' || ('kind' in row && row.kind === value.kind)),
+                    )
+                    .map((row) => (
+                      <option key={row.id} value={row.id}>
+                        {definitionLabel(row)}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </LibraryAdvancedFields>
+          )}
+        </div>
+      </EditorValidityContext.Provider>
+    </RowIdentityDomain.Provider>
   );
 }

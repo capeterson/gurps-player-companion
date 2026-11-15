@@ -72,6 +72,34 @@ const selection = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('race composition', () => {
+  it('scopes duplicate checks to each profile and retains exact option and component keys', () => {
+    const base = race({
+      variants: [
+        {
+          key: 'Mixed Case',
+          name: 'Named variant',
+          traits: [{ key: 'stone-skin', name: 'Variant skin', points: 5 }],
+        },
+      ],
+      forms: [
+        {
+          key: 'Mixed Case',
+          name: 'Named form',
+          traits: [{ key: 'stone-skin', name: 'Form skin', points: 5 }],
+        },
+      ],
+    });
+    expect(() => validateRaceDefinition(base)).not.toThrow();
+    const result = resolveRaceSelection(
+      selection({ variantKey: 'Mixed Case', formKey: 'Mixed Case' }),
+      [base],
+    );
+    expect(result.selection).toMatchObject({ variantKey: 'Mixed Case', formKey: 'Mixed Case' });
+    expect(result.snapshot?.traits[0]?.key).toBe('stone-skin');
+    expect(() => resolveRaceSelection(selection({ variantKey: 'mixed case' }), [base])).toThrow(
+      'unavailable',
+    );
+  });
   it('adds lens adjustments and components to the base race', () => {
     const base = race();
     const addedLens = lens();
