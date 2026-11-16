@@ -3,7 +3,67 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { skillPrerequisite } from '../../../shared/schemas/skillRules.ts';
-import { StructuredFields } from './StructuredFields.tsx';
+import { RowIdentityDomain, StructuredFields } from './StructuredFields.tsx';
+
+it('gives nested identity controls their parent profile context', () => {
+  const skill = z.object({ key: z.string(), name: z.string() });
+  const option = z.object({ key: z.string(), name: z.string(), skills: z.array(skill) });
+  render(
+    <RowIdentityDomain.Provider value={{ raceKeys: {} }}>
+      <StructuredFields
+        schema={z.array(option)}
+        value={[
+          { key: 'a', name: 'A', skills: [{ key: 's', name: 'Skill' }] },
+          { key: 'b', name: 'B', skills: [{ key: 's', name: 'Skill' }] },
+        ]}
+        label="Variants"
+        path="variants"
+        onChange={() => {}}
+      />
+    </RowIdentityDomain.Provider>,
+  );
+  expect(screen.getByLabelText('Reference key, Skills 1, Variants 1')).toHaveValue('s');
+  expect(screen.getByLabelText('Reference key, Skills 1, Variants 2')).toHaveValue('s');
+});
+
+it('allocates race identities against other profiles and preserves nested keys on duplication', () => {
+  const schema = z.array(
+    z.object({
+      key: z.string(),
+      name: z.string(),
+      traits: z.array(z.object({ key: z.string(), name: z.string() })),
+    }),
+  );
+  function Harness() {
+    const [rows, setRows] = useState([
+      { key: 'stone', name: 'Stone', traits: [{ key: 'hardy', name: 'Hardy' }] },
+    ]);
+    return (
+      <RowIdentityDomain.Provider value={{ raceKeys: { Variant: ['stone-copy', 'stone-copy-2'] } }}>
+        <StructuredFields
+          schema={schema}
+          value={rows}
+          label="Variants"
+          path="variants"
+          onChange={setRows as (value: unknown) => void}
+        />
+        <output aria-label="Race JSON">{JSON.stringify(rows)}</output>
+      </RowIdentityDomain.Provider>
+    );
+  }
+  render(<Harness />);
+  fireEvent.click(screen.getByRole('button', { name: 'Duplicate Variants 1' }));
+  expect(JSON.parse(screen.getByLabelText('Race JSON').textContent ?? 'null')).toEqual([
+    { key: 'stone', name: 'Stone', traits: [{ key: 'hardy', name: 'Hardy' }] },
+    { key: 'stone-copy-3', name: 'Stone copy', traits: [{ key: 'hardy', name: 'Hardy' }] },
+  ]);
+  fireEvent.change(screen.getByLabelText('Variant name, Variants 2'), {
+    target: { value: 'Granite' },
+  });
+  expect(JSON.parse(screen.getByLabelText('Race JSON').textContent ?? 'null')[1].key).toBe(
+    'stone-copy-3',
+  );
+});
 
 const importedPrerequisite = {
   kind: 'all',

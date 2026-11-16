@@ -231,7 +231,7 @@ Unauthenticated visitors to `/` see `LandingPage`: a brief Sunbolt overview, reg
 
 ### Character sheet (the core surface)
 
-- **Race.** Overview Identity has one Race control, default Human. Campaign owners author racial templates, complete variants, alternate forms and additive lenses in Library → Races. Apply preserves personal purchases; owned attributes/effects/training and one printed Race cost survive library edits, deletion and campaign moves. Race-only skill projections are read-only. See [races.md](races.md).
+- **Race.** Overview Identity has one Race control, default Human. Campaign owners author racial templates, complete variants, alternate forms and additive lenses in Library → Races. New and duplicated components and options receive stable keys; deliberate key repair shows relevant loaded race and lens references. Apply preserves personal purchases; owned attributes/effects/training and one printed Race cost survive library edits, deletion and campaign moves. Race-only skill projections are read-only. See [races.md](races.md).
 Route `/characters/:id`. Sectioned sheet
 (`src/client/features/characters/CharacterSheetPage.tsx`), destinations:
 **Overview, Combat, Traits, Skills, Magic, Inventory, History**.
@@ -1150,6 +1150,8 @@ settings sections; switching sections retains drafts.
   same-campaign enchantment links in staged packages. Long sourcebook selection labels wrap beside their checkboxes within
   the transfer card. `/library` remains a campaign-switching editor. Import validates the chosen file and shows a confirmation
   preview before Merge or Replace; Replace never runs on file selection alone.
+  The confirmation keeps incoming counts and replacement consequences readable
+  in a viewport-bounded dialog, with singular and plural counts matching the totals.
   File and staged-package imports are the one online-only bulk library action; the page pulls their result into
   Dexie on success.
   Library skill forms also author first-class free-form/catalog specialization

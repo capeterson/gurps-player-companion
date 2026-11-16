@@ -610,6 +610,7 @@ export function LibraryPackageEditor({
                               key={editorRevision}
                               section={category}
                               value={packageEntryBody(category, row)}
+                              currentId={row.id}
                               onValidityChange={(valid) =>
                                 setInvalidEntries((previous) => {
                                   if (previous.has(row.id) === !valid) return previous;

@@ -450,7 +450,7 @@ it('searches descriptions and source across words, reports empty results and cle
     expect(screen.queryByRole('button', { name: 'Fearfulness' })).not.toBeInTheDocument(),
   );
   expect(screen.getByRole('button', { name: 'Night Vision' })).toBeVisible();
-  expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match');
+  expect(screen.getByRole('status')).toHaveTextContent('1 of 2 match');
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'BX Basic Set' } });
   expect(await screen.findByRole('button', { name: 'Night Vision' })).toBeVisible();
   fireEvent.change(screen.getByRole('searchbox'), {
@@ -526,7 +526,7 @@ it('renders markdown only for an expanded entry, even in a large library', async
     Array.from({ length: 500 }, (_, index) => skill(index)),
   );
   setup('/?section=skills');
-  expect(await screen.findByText('500 of 500 skills.', { exact: false })).toBeVisible();
+  expect(await screen.findByText('500 of 500.', { exact: false })).toBeVisible();
   expect(renderMarkdown).not.toHaveBeenCalled();
   // Collapsed rows show a plain-text excerpt instead, without Markdown syntax.
   expect(screen.getByText('Bold description 7')).toBeVisible();
@@ -556,7 +556,7 @@ it('keeps an edited description through filtering and category changes, then sav
   const description = screen.getByLabelText('Description');
   fireEvent.change(description, { target: { value: '**Still editing**' } });
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Fearfulness' } });
-  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 of 2 traits match'));
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('1 of 2 match'));
   expect(description).toHaveValue('**Still editing**');
   fireEvent.click(screen.getByRole('button', { name: /^Skills/ }));
   expect(description).not.toBeVisible();
@@ -710,6 +710,7 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
   await seed();
   vi.mocked(api).mockResolvedValue({
     mode: 'replace',
+    incomplete: 1,
     traits: { created: 0, updated: 0, deleted: 2 },
     skills: { created: 0, updated: 0, deleted: 0 },
     spells: { created: 0, updated: 0, deleted: 0 },
@@ -734,6 +735,8 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
   const dialog = await screen.findByRole('dialog', { name: 'Import empty.yaml?' });
   expect(dialog).toHaveTextContent('Traits: 0 in file · 2 to remove');
   expect(dialog).toHaveTextContent('The entire file will be imported');
+  expect(dialog).not.toHaveTextContent('edition decision');
+  expect(dialog).not.toHaveTextContent('incomplete or reference');
   expect(api).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(screen.queryByRole('dialog', { name: 'Import empty.yaml?' })).toBeNull();
@@ -749,6 +752,9 @@ it('reviews a Replace YAML file before submitting and permits cancellation', asy
       }),
     ),
   );
+  expect(
+    await screen.findByText(/1 incomplete\/reference entry blocked from adoption/),
+  ).toBeVisible();
 });
 
 it('imports only the sourcebook selected from a full YAML file', async () => {
@@ -776,6 +782,42 @@ it('imports only the sourcebook selected from a full YAML file', async () => {
         body: expect.objectContaining({ sourceKeys: ['alpha'] }),
       }),
     ),
+  );
+});
+
+it('uses singular grammar for one edition decision and one incomplete entry', async () => {
+  await seed();
+  setup('/', true);
+  await screen.findByRole('heading', { name: 'Import YAML' });
+  const yaml =
+    'version: 14\nlibrary:\n  traits:\n    - name: Night Vision\n      kind: advantage\n      status: needs_review\n  skills: []\n  items: []\n';
+  const file = new File([yaml], 'one.yaml', { type: 'text/yaml' });
+  Object.defineProperty(file, 'text', { value: async () => yaml });
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Review import' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Import one.yaml?' });
+  expect(dialog).toHaveTextContent('1 edition decision will be applied.');
+  expect(dialog).toHaveTextContent(
+    '1 incomplete or reference entry cannot be added to characters.',
+  );
+});
+
+it('uses plural grammar for multiple edition decisions and incomplete entries', async () => {
+  await seed();
+  setup('/', true);
+  await screen.findByRole('heading', { name: 'Import YAML' });
+  const yaml =
+    'version: 14\nlibrary:\n  traits:\n    - name: Night Vision\n      kind: advantage\n      status: needs_review\n    - name: Fearfulness\n      kind: disadvantage\n      status: reference_only\n  skills: []\n  items: []\n';
+  const file = new File([yaml], 'many.yaml', { type: 'text/yaml' });
+  Object.defineProperty(file, 'text', { value: async () => yaml });
+  fireEvent.change(screen.getByLabelText('YAML file'), { target: { files: [file] } });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Review import' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Review import' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Import many.yaml?' });
+  expect(dialog).toHaveTextContent('2 edition decisions will be applied.');
+  expect(dialog).toHaveTextContent(
+    '2 incomplete or reference entries cannot be added to characters.',
   );
 });
 

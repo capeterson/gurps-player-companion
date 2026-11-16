@@ -16,6 +16,7 @@ interface ConfirmDialogProps {
   tone?: 'primary' | 'error';
   pending?: boolean;
   pendingLabel?: string;
+  compact?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -29,6 +30,7 @@ export function ConfirmDialog({
   tone = 'primary',
   pending = false,
   pendingLabel = 'Working…',
+  compact = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -53,7 +55,9 @@ export function ConfirmDialog({
         if (!pending) onCancel();
       }}
     >
-      <div className="modal-box max-w-[calc(var(--dialog-viewport-width,100dvw)-2rem)] max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] overflow-y-auto [overflow-wrap:anywhere] bg-base-100 border border-base-300/60 rounded-2xl">
+      <div
+        className={`modal-box ${compact ? 'max-w-[min(32rem,calc(var(--dialog-viewport-width,100dvw)-2rem))]' : 'max-w-[calc(var(--dialog-viewport-width,100dvw)-2rem)]'} max-h-[calc(var(--dialog-viewport-height,100dvh)-2rem)] overflow-y-auto [overflow-wrap:anywhere] bg-base-100 border border-base-300/60 rounded-2xl`}
+      >
         <h3 id={titleId} className="font-display text-xl font-semibold">
           {title}
         </h3>

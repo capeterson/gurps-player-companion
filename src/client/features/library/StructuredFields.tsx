@@ -4,10 +4,18 @@ import { SourcebooksContext, sourcebookLabel } from './SourcebooksContext.tsx';
 import { newEditorId } from './editorId.ts';
 import { unusedRowKey } from './rowIdentity.ts';
 
-export const RowIdentityDomain = createContext<'weapon' | null>(null);
+type IdentityDomain = 'weapon' | { raceKeys: Record<string, string[]> } | null;
+export const RowIdentityDomain = createContext<IdentityDomain>(null);
+const IdentityRowContext = createContext('');
 
-function identityRow(domain: 'weapon' | null, path: string) {
+function identityRow(domain: IdentityDomain, path: string) {
   if (domain === 'weapon' && path === 'weaponData.modes') return { name: 'Attack', max: 40 };
+  if (domain && typeof domain === 'object') {
+    if (/^(?:(?:variants|forms)\.\d+\.)?traits$/.test(path)) return { name: 'Trait', max: 160 };
+    if (/^(?:(?:variants|forms)\.\d+\.)?skills$/.test(path)) return { name: 'Skill', max: 160 };
+    if (path === 'variants') return { name: 'Variant', max: 160 };
+    if (path === 'forms') return { name: 'Form', max: 160 };
+  }
   return null;
 }
 import {
@@ -37,6 +45,7 @@ export function StructuredFields(props: StructuredFieldProps) {
   const id = useId();
   const books = useContext(SourcebooksContext);
   const identityDomain = useContext(RowIdentityDomain);
+  const parentRow = useContext(IdentityRowContext);
   const custom = renderField?.(props);
   if (custom !== undefined) return custom;
   const base = unwrapSchema(schema);
@@ -59,32 +68,45 @@ export function StructuredFields(props: StructuredFieldProps) {
   if (base instanceof z.ZodObject) {
     const row = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
     const rowDomain = identityRow(identityDomain, path.replace(/\.\d+$/, ''));
+    const rowContext = rowDomain && parentRow ? `${label}, ${parentRow}` : label;
     return (
-      <fieldset className="fieldset min-w-0 space-y-3 sm:col-span-2">
-        <legend className="fieldset-legend break-words">{label}</legend>
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-          {Object.entries(objectShape(base))
-            .filter(([key]) => !(rowDomain && identityDomain === 'weapon' && key === 'key'))
-            .map(([key, child]) => (
-              <StructuredFields
-                key={key}
-                schema={child}
-                value={row[key]}
-                label={rowDomain && key === 'name' ? `${rowDomain.name} name` : editorLabel(key)}
-                accessibleLabel={
-                  rowDomain && key === 'name' ? `${rowDomain.name} name, ${label}` : undefined
-                }
-                path={path ? `${path}.${key}` : key}
-                renderField={renderField}
-                onChange={(next) => {
-                  const updated = { ...row, [key]: next };
-                  if (next === undefined) delete updated[key];
-                  onChange(updated);
-                }}
-              />
-            ))}
-        </div>
-      </fieldset>
+      <IdentityRowContext.Provider value={rowDomain ? rowContext : parentRow}>
+        <fieldset className="fieldset min-w-0 space-y-3 sm:col-span-2">
+          <legend className="fieldset-legend break-words">{label}</legend>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            {Object.entries(objectShape(base))
+              .filter(([key]) => !(rowDomain && identityDomain === 'weapon' && key === 'key'))
+              .map(([key, child]) => (
+                <StructuredFields
+                  key={key}
+                  schema={child}
+                  value={row[key]}
+                  label={
+                    rowDomain && key === 'name'
+                      ? `${rowDomain.name} name`
+                      : rowDomain && key === 'key'
+                        ? 'Reference key'
+                        : editorLabel(key)
+                  }
+                  accessibleLabel={
+                    rowDomain && key === 'name'
+                      ? `${rowDomain.name} name, ${rowContext}`
+                      : rowDomain && key === 'key'
+                        ? `Reference key, ${rowContext}`
+                        : undefined
+                  }
+                  path={path ? `${path}.${key}` : key}
+                  renderField={renderField}
+                  onChange={(next) => {
+                    const updated = { ...row, [key]: next };
+                    if (next === undefined) delete updated[key];
+                    onChange(updated);
+                  }}
+                />
+              ))}
+          </div>
+        </fieldset>
+      </IdentityRowContext.Provider>
     );
   }
   if (base instanceof z.ZodArray)
@@ -312,6 +334,9 @@ function ArrayField({
     const keys = rows.flatMap((item) =>
       item && typeof item === 'object' && typeof item.key === 'string' ? [item.key] : [],
     );
+    if (identityDomain && typeof identityDomain === 'object') {
+      keys.push(...(identityDomain.raceKeys[identity.name] ?? []));
+    }
     return { ...entry, name, key: unusedRowKey(name, keys, identity.max) };
   };
   const ids = useRef<string[]>([]);

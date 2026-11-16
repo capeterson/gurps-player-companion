@@ -26,6 +26,14 @@ variant, or form keys and implicit conflicting replacements are rejected. Lenses
 cannot themselves declare complete variants or forms. This separates the Fantasy
 sourcebook's full templates from its additive undead lenses and alternate forms.
 
+New and duplicated components, variants and forms receive unused bounded keys;
+the editor considers the loaded campaign race and lens graph, including removal
+references. Renaming or reordering a row retains its key, and duplicating a
+profile retains its nested component keys. A deliberate reference-key repair
+identifies matching loaded lens removals and potentially conflicting additions
+or race profiles. Other references may be unavailable or change concurrently;
+existing owned selections and snapshots retain their historical keys.
+
 The editor provides ordinary form controls for tags, components, attributes,
 features, effects, complete variants/forms, and lens rules, alongside the shared
 metadata editor. Exact tag values are edited as list entries rather than split on

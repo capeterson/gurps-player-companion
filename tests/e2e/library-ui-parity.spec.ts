@@ -21,6 +21,19 @@ async function expectInsideViewport(
   width: number,
   height: number,
 ) {
+  // visualViewport and the dialog positioning update asynchronously on resize.
+  await expect
+    .poll(async () => {
+      const box = await locator.boundingBox();
+      return (
+        box !== null &&
+        box.x >= 0 &&
+        box.y >= 0 &&
+        box.x + box.width <= width &&
+        box.y + box.height <= height
+      );
+    })
+    .toBe(true);
   const box = await locator.boundingBox();
   if (box === null) throw new Error('visible control should have a box');
   expect(box.x).toBeGreaterThanOrEqual(0);
@@ -119,20 +132,105 @@ test('library visual and raw editing plus package review stay usable at responsi
     'Traits: 1 in file',
   );
 
-  for (const width of [390, 639, 640, 641, 1440]) {
-    await page.setViewportSize({ width, height: 1000 });
-    await expectInsideViewport(dialog, width, 1000);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
-      width,
+  for (const theme of ['arcane-light', 'arcane-dark']) {
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute('data-theme', value),
+      theme,
     );
-    if (width === 390 || width === 640 || width === 1440) {
+    for (const [width, height] of [
+      [390, 844],
+      [639, 800],
+      [640, 800],
+      [641, 800],
+      [1440, 900],
+      [640, 360],
+    ]) {
+      await page.setViewportSize({ width, height });
+      const box = dialog.locator('.modal-box');
+      await expectInsideViewport(box, width, height);
+      const bounds = await box.boundingBox();
+      if (!bounds) throw new Error('Dialog box should be visible');
+      expect(bounds.width).toBeLessThanOrEqual(512);
       await captureReviewScreenshot(page, {
-        path: testInfo.outputPath(`library-package-review-${width}.png`),
+        path: testInfo.outputPath(`library-package-review-${theme}-${width}x${height}.png`),
         animations: 'disabled',
       });
+      for (const name of ['Cancel', 'Merge library']) {
+        const action = dialog.getByRole('button', { name });
+        await action.scrollIntoViewIfNeeded();
+        await expectInsideViewport(action, width, height);
+        await action.focus();
+        await expect(action).toBeFocused();
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        width,
+      );
     }
   }
   await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+  // A scoped Replace preview must retain removals and remain actionable at short heights.
+  await page.reload();
+  await page.getByLabel('YAML file').setInputFiles({
+    name: `${'long-import-name-'.repeat(8)}.yaml`,
+    mimeType: 'text/yaml',
+    buffer: Buffer.from(
+      'version: 14\nlibrary:\n  sources:\n    - key: synthetic-visual-rules\n      name: Synthetic Visual Rules\n      abbreviation: SVR\n      edition: Synthetic edition\n  traits: []\n',
+    ),
+  });
+  const importSection = page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Import YAML' }) });
+  await importSection.getByRole('checkbox', { name: 'SVR: Synthetic Visual Rules' }).check();
+  await importSection.locator('select').selectOption('replace');
+  await page.getByRole('button', { name: 'Review import' }).click();
+  const replacement = page.getByRole('dialog', { name: /^Import long-import-name/ });
+  await expect(replacement).toBeVisible();
+  await expect(replacement).toContainText('Other sourcebooks remain unchanged.');
+  await expect(replacement).toContainText('Traits: 0 in file · 1 to remove');
+  for (const theme of ['arcane-light', 'arcane-dark']) {
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute('data-theme', value),
+      theme,
+    );
+    for (const [width, height] of [
+      [390, 844],
+      [640, 360],
+      [1440, 900],
+    ]) {
+      await page.setViewportSize({ width, height });
+      const box = replacement.locator('.modal-box');
+      await expectInsideViewport(box, width, height);
+      await captureReviewScreenshot(page, {
+        path: testInfo.outputPath(`library-replace-${theme}-${width}x${height}.png`),
+        animations: 'disabled',
+      });
+      const action = replacement.getByRole('button', { name: 'Replace selected scope' });
+      await action.scrollIntoViewIfNeeded();
+      await expectInsideViewport(action, width, height);
+      await action.focus();
+      await expect(action).toBeFocused();
+    }
+  }
+  await page.route('**/api/v1/campaigns/*/library/import', (route) =>
+    route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: `Conflict: ${'representative-long-conflict-detail-'.repeat(8)}`,
+      }),
+    }),
+  );
+  await replacement.getByRole('button', { name: 'Replace selected scope' }).click();
+  await expect(replacement.getByRole('alert')).toContainText('Conflict:');
+  await replacement.getByRole('alert').scrollIntoViewIfNeeded();
+  await captureReviewScreenshot(page, {
+    path: testInfo.outputPath('library-replace-conflict.png'),
+    animations: 'disabled',
+  });
+  await replacement.getByRole('button', { name: 'Cancel' }).click();
+  await page.unroute('**/api/v1/campaigns/*/library/import');
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.goto(`/campaigns/${campaign.id}/library?section=items`);
   await page.getByRole('button', { name: '+ Add item', exact: true }).click();

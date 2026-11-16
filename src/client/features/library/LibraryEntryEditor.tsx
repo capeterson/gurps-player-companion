@@ -161,6 +161,7 @@ export function LibraryEntryEditor<T>({
           key={viewRevision}
           section={section}
           value={draft}
+          currentId={typeof initial?.id === 'string' ? initial.id : undefined}
           onChange={update}
           onValidityChange={setChildrenValid}
         />

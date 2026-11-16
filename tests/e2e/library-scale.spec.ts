@@ -81,7 +81,7 @@ test('navigates a large library at every breakpoint and edits it offline', async
   if (!target) throw new Error('seeded spell missing');
 
   await page.goto(`/campaigns/${campaignId}/library?section=spells`);
-  await expect(page.getByRole('status')).toHaveText(/300 of 300 spells/, { timeout: 30_000 });
+  await expect(page.getByRole('status')).toHaveText(/300 of 300/, { timeout: 30_000 });
 
   for (const width of WIDTHS) {
     await test.step(`${width}px`, async () => {
@@ -160,7 +160,7 @@ test('navigates a large library at every breakpoint and edits it offline', async
 
   await test.step('an offline edit is kept locally and syncs after reconnecting', async () => {
     await page.goto(`/campaigns/${campaignId}/library?section=skills&q=Skill+042`);
-    await expect(page.getByRole('status')).toHaveText(/1 of 300 skills match/, {
+    await expect(page.getByRole('status')).toHaveText(/1 of 300 match/, {
       timeout: 30_000,
     });
     await page.context().setOffline(true);
