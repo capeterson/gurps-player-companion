@@ -730,7 +730,7 @@ export function CurrentStatusBar({
       aria-label="Status header"
       className={
         embedded
-          ? `m-0 min-w-0 border-0 p-0 order-last col-span-4 grid grid-cols-3 gap-0 border-t border-base-300/60 min-[1280px]:flex min-[1280px]:gap-2 ${
+          ? `m-0 min-w-0 border-0 p-0 order-last col-span-full grid grid-cols-3 gap-0 border-t border-base-300/60 min-[1280px]:flex min-[1280px]:gap-2 ${
               inline
                 ? 'min-[1280px]:order-2 min-[1280px]:shrink-0 min-[1280px]:border-t-0'
                 : 'min-[1280px]:order-6 min-[1280px]:mt-2 min-[1280px]:w-full min-[1280px]:pt-2'
@@ -895,7 +895,7 @@ export function CurrentStatusBar({
       aria-label="Current Status"
     >
       <div
-        className={`mx-auto grid max-w-[80rem] ${embedded ? 'grid-cols-[2.75rem_minmax(0,1fr)_minmax(0,1fr)_8.25rem] gap-0 px-0 py-0 min-[1280px]:contents' : `grid-cols-2 gap-1 px-2 py-1 min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 min-[1280px]:px-7 ${showStatusHeader ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}`}
+        className={`mx-auto grid max-w-[80rem] ${embedded ? 'grid-cols-[max-content_repeat(2,minmax(2.75rem,8rem))_1fr_max-content] gap-0 min-[1280px]:contents' : `grid-cols-2 gap-1 px-2 py-1 min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-2 min-[1280px]:px-7 ${showStatusHeader ? 'min-[1280px]:py-2' : 'min-[1280px]:py-1'}`}`}
       >
         {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.menu}</div>}
         {!embedded && (
@@ -976,7 +976,9 @@ export function CurrentStatusBar({
             />
           )}
         </div>
-        {embedded && <div className="min-w-0 min-[1280px]:hidden">{mobileChrome?.actions}</div>}
+        {embedded && (
+          <div className="col-start-5 min-w-0 min-[1280px]:hidden">{mobileChrome?.actions}</div>
+        )}
         {mode === 'compact' && statusStrip}
         {mode === 'strip' && !stripHost && statusStrip}
         {mode === 'strip' && stripHost && createPortal(statusStrip, stripHost)}

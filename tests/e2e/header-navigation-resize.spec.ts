@@ -10,7 +10,9 @@ const viewports = [
   { width: 639, height: 800 },
   { width: 640, height: 800 },
   { width: 641, height: 800 },
+  { width: 767, height: 1024 },
   { width: 768, height: 1024 },
+  { width: 769, height: 1024 },
   { width: 1024, height: 768 },
   { width: 1280, height: 800 },
 ];
@@ -68,6 +70,10 @@ test('authenticated header navigation and account menu survive resize', async ({
     const title = page.getByRole('heading', { name: 'Campaigns', exact: true });
     const primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
     const userMenuTrigger = page.locator('header.app-header summary[aria-label="Open user menu"]');
+    const header = page.locator('header.app-header');
+    const home = header.getByRole('link', { name: 'Sunbolt home' });
+    const bell = header.locator('summary[aria-label^="Notifications"]');
+    const sync = header.getByRole('button', { name: /sync|saved/i });
     await expect(title).toBeVisible();
 
     for (const viewport of viewports) {
@@ -81,6 +87,23 @@ test('authenticated header navigation and account menu survive resize', async ({
         primaryNavigation.getByRole('link', { name: 'Campaign', exact: true }),
       ).toBeVisible();
       await expectInsideViewport(userMenuTrigger, viewport);
+      const narrow = viewport.width < 640;
+      const mark = await home.locator('.brand-mark').boundingBox();
+      const account = await userMenuTrigger.boundingBox();
+      expect(mark).not.toBeNull();
+      expect(account).not.toBeNull();
+      if (mark && account) {
+        expect(mark.x + mark.width / 2).toBeCloseTo(narrow ? 26 : 42, 0);
+        expect(mark.y + mark.height / 2).toBeCloseTo(narrow ? 26 : 30, 0);
+        expect(account.y + account.height / 2).toBeCloseTo(mark.y + mark.height / 2, 0);
+      }
+      if (narrow) {
+        for (const control of [home, sync, bell, userMenuTrigger]) {
+          const bounds = await control.boundingBox();
+          expect(bounds?.width).toBeGreaterThanOrEqual(44);
+          expect(bounds?.height).toBeGreaterThanOrEqual(44);
+        }
+      }
     }
 
     await page.setViewportSize(viewports[0]);
@@ -89,6 +112,7 @@ test('authenticated header navigation and account menu survive resize', async ({
       'details.dropdown[open]:has(> summary[aria-label="Open user menu"]) ul.dropdown-content',
     );
     await expect(accountMenu).toContainText(email);
+    await expect(accountMenu).toContainText(displayName);
     await expect(accountMenu).toContainText('About');
     await expect(accountMenu).toContainText('Settings');
     await expect(accountMenu).toContainText('Logout');

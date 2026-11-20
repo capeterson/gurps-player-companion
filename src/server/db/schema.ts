@@ -74,7 +74,12 @@ import type { SkillPrerequisite, SkillTechLevelPolicy } from '../../shared/schem
 import type { SituationalModifier } from '../../shared/schemas/skill.ts';
 import type { SkillProcedures } from '../../shared/schemas/skillProcedures.ts';
 import { TECHNIQUE_DIFFICULTIES } from '../../shared/schemas/technique.ts';
-import type { DarkThemeName, LightThemeName } from '../../shared/schemas/themePreferences.ts';
+import {
+  DEFAULT_DARK_THEME,
+  DEFAULT_LIGHT_THEME,
+  type DarkThemeName,
+  type LightThemeName,
+} from '../../shared/schemas/themePreferences.ts';
 import type { TraitModifier, TraitVariant } from '../../shared/schemas/trait.ts';
 
 // ---------- enums ----------
@@ -163,12 +168,12 @@ export const users = pgTable(
     darkTheme: varchar('dark_theme', { length: 32 })
       .$type<DarkThemeName>()
       .notNull()
-      .default('gilded-tome'),
+      .default(DEFAULT_DARK_THEME),
     /** Palette used in light mode; CHECK-constrained to LIGHT_THEMES. */
     lightTheme: varchar('light_theme', { length: 32 })
       .$type<LightThemeName>()
       .notNull()
-      .default('sunbolt'),
+      .default(DEFAULT_LIGHT_THEME),
     notificationPreferences: jsonb('notification_preferences')
       .$type<NotificationPreferences>()
       .notNull()

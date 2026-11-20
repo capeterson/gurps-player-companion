@@ -430,9 +430,12 @@ when the text contains no spaces.
 Long account names remain width-bounded in the shared header at all breakpoints;
 opening the account menu must not horizontally scroll the page. The home welcome
 heading wraps unbroken account names within its card.
-The brand mark (a link home, "Sunbolt home" in the compact bar) is shown at the
-left of the header on every page and at every width, because the Sunbolt sun
-glow is anchored on it. `--sun-x`/`--sun-y` in `theme.css` are set per header
+Heliolance uses the First Light treatment: a fine amber-edged beam against pale ivory.
+Daybreak Lens uses curved reflections on sea glass; Corona Obsidian uses a gold crescent
+against violet-black glass. The strongest effect belongs to the app header. Section
+bands and sheet navigation catch a reflection; data rows stay matte for contrast.
+The brand mark (a link home, "Sunbolt home" in the compact bar) stays at the
+left of the header at every width as the origin of the light. `--sun-x`/`--sun-y` in `theme.css` are set per header
 state: 26/26px for the normal header below 640px, 42/30px from 640px, and
 30/26px for the compact character bar below 1280px (matched with the
 `:has(#character-status-header-slot > aside)` condition).
@@ -444,6 +447,10 @@ by destinations, Settings, the light/dark item and Logout, and does not repeat
 the character name. The light/dark control is never a header button: it is a
 menu item in that panel and in the desktop account menu (labelled for the mode
 it switches to, e.g. "Dark mode").
+The compact header shows the wordmark from 640px. HP and FP stay adjacent and each
+tops out at 8rem. When the notification bell is absent its track takes no space.
+On non-character phones the utility targets are 44px; below 768px the account trigger
+is icon-only, with the account name and email in its menu. Escape returns focus to the trigger.
 From 1280px a character page's header is a single 60px row: brand mark, Character
 and Campaign navigation, then HP, FP, a divider, sync, the bell and the account menu
 ("Signed in as" shows from 1536px). The row never wraps: the navigation group

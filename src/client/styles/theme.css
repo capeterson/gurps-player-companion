@@ -1,27 +1,5 @@
-/* ============================================================
-   Sunbolt · gold themes
-   Seven DaisyUI 5 themes. Each device switches between a dark and a
-   light mode; the user's synced preferences pick which palette each
-   mode uses (see src/client/lib/theme.ts):
-
-     dark:  "gilded-tome" (default) · "midnight-gilt" · "verdigris-brass" · "arcane-dark"
-     light: "sunbolt" (default) · "heraldic-vellum" · "arcane-light"
-
-   Tuned for "stare at this for hours" comfort, carried over from the
-   original Arcane handoff:
-     - body text ~0.88L on a ~0.2L surface (dark) / ~0.25L on paper (light)
-     - chroma kept off the surfaces (<= 0.025); only the accents fire
-   Don't crank the saturation or shrink the surface contrast.
-
-   Gold sits close to the old warning yellow, so warning moves to
-   amber (hue 60) and the HP "warn" step to a lemon yellow (hue 98)
-   in every theme.
-
-   --gild is the decorative gold (drop caps, etched card strokes,
-   active underlines). It equals primary everywhere except Heraldic
-   Vellum, where primary is heraldic blue and gold is ornament only
-   (also exposed as DaisyUI `accent` there).
-   ============================================================ */
+/* Sunbolt · solar glass. Only navigation and section bands catch the light;
+   the sheet beneath them is an opaque reading surface. */
 
 /* Fonts: variable cuts of Cinzel and Work Sans; two static faces of IM Fell English.
    Self-hosted via @fontsource; woff2 files are precached by the PWA workbox manifest. */
@@ -43,48 +21,33 @@
 }
 
 @plugin "daisyui/theme" {
-  name: "arcane-dark";
-  default: false;
+  name: "heliolance";
+  default: true;
   prefersdark: false;
-  color-scheme: dark;
-
-  /* base = surfaces (faint violet cast, hue 300 ↔ primary)
-     Aligned to design handoff styles.css lines 143-152. */
-  --color-base-100: oklch(0.21 0.02 300); /* surface (cards, panels) */
-  --color-base-200: oklch(0.17 0.022 300); /* page bg (canvas) */
-  --color-base-300: oklch(0.34 0.04 300); /* default border (visible on dark surfaces) */
-  --color-base-content: oklch(0.88 0.01 300);
-
-  /* primary = violet (accent) */
-  --color-primary: oklch(0.7 0.13 305);
-  --color-primary-content: oklch(0.16 0.005 300);
-
-  /* secondary = teal (HP-full / second accent) */
-  --color-secondary: oklch(0.72 0.1 195);
-  --color-secondary-content: oklch(0.16 0.005 300);
-
-  /* accent = same as primary (kept for DaisyUI components that use it) */
-  --color-accent: oklch(0.7 0.13 305);
-  --color-accent-content: oklch(0.16 0.005 300);
-
-  /* neutral = surface-2 (muted card backs, chip rests) */
-  --color-neutral: oklch(0.25 0.022 300);
-  --color-neutral-content: oklch(0.88 0.01 300);
-
-  /* semantic */
-  --color-info: oklch(0.72 0.09 195);
-  --color-info-content: oklch(0.16 0.005 300);
-  --color-success: oklch(0.74 0.1 150);
-  --color-success-content: oklch(0.16 0.005 300);
-  --color-warning: oklch(0.76 0.12 90);
-  --color-warning-content: oklch(0.16 0.005 300);
-  --color-error: oklch(0.62 0.16 25);
-  --color-error-content: oklch(0.16 0.005 300);
-
-  /* shape */
+  color-scheme: light;
+  --color-base-100: #fffdf8;
+  --color-base-200: #faf4e9;
+  --color-base-300: #dfceb6;
+  --color-base-content: #33241e;
+  --color-primary: #804514;
+  --color-primary-content: #fff9ee;
+  --color-secondary: #365b71;
+  --color-secondary-content: #fff;
+  --color-accent: #895131;
+  --color-accent-content: #fff;
+  --color-neutral: #59483b;
+  --color-neutral-content: #fff9ef;
+  --color-info: #235e81;
+  --color-info-content: #fff;
+  --color-success: #216344;
+  --color-success-content: #fff;
+  --color-warning: #99520c;
+  --color-warning-content: #fff;
+  --color-error: #a23738;
+  --color-error-content: #fff;
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
+  --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -93,37 +56,30 @@
 }
 
 @plugin "daisyui/theme" {
-  name: "arcane-light";
+  name: "daybreak-lens";
   default: false;
   prefersdark: false;
   color-scheme: light;
-
-  --color-base-100: oklch(1.0 0 0); /* surface (cards, panels) */
-  --color-base-200: oklch(0.97 0.005 90); /* page bg (warm paper) */
-  --color-base-300: oklch(0.9 0.008 300); /* default border */
-  --color-base-content: oklch(0.24 0.008 300);
-
-  --color-primary: oklch(0.48 0.16 305);
-  --color-primary-content: oklch(1 0 0);
-
-  --color-secondary: oklch(0.52 0.13 195);
-  --color-secondary-content: oklch(1 0 0);
-
-  --color-accent: oklch(0.48 0.16 305);
-  --color-accent-content: oklch(1 0 0);
-
-  --color-neutral: oklch(0.97 0.006 90);
-  --color-neutral-content: oklch(0.24 0.008 300);
-
-  --color-info: oklch(0.5 0.1 195);
-  --color-info-content: oklch(1 0 0);
-  --color-success: oklch(0.52 0.12 150);
-  --color-success-content: oklch(1 0 0);
-  --color-warning: oklch(0.62 0.14 90);
-  --color-warning-content: oklch(0.16 0.005 300);
-  --color-error: oklch(0.55 0.18 25);
-  --color-error-content: oklch(1 0 0);
-
+  --color-base-100: #f5f8f1;
+  --color-base-200: #dce9e3;
+  --color-base-300: #b6cdc7;
+  --color-base-content: #132f32;
+  --color-primary: #215757;
+  --color-primary-content: #f6fffa;
+  --color-secondary: #614b74;
+  --color-secondary-content: #fff;
+  --color-accent: #715229;
+  --color-accent-content: #fff;
+  --color-neutral: #364e50;
+  --color-neutral-content: #f3faf7;
+  --color-info: #255779;
+  --color-info-content: #fff;
+  --color-success: #1a593f;
+  --color-success-content: #fff;
+  --color-warning: #894707;
+  --color-warning-content: #fff;
+  --color-error: #96383d;
+  --color-error-content: #fff;
   --radius-selector: 0.75rem;
   --radius-field: 0.75rem;
   --radius-box: 1.125rem;
@@ -134,111 +90,34 @@
   --noise: 0;
 }
 
-[data-theme="arcane-dark"] {
-  --gild: var(--color-primary);
-  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
-  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
-  --text-muted: oklch(0.68 0.018 300);
-  --sync-attention: oklch(0.76 0.11 45);
-  --text-dim: oklch(0.52 0.022 300);
-  --border-strong: oklch(0.46 0.055 300);
-  --accent-soft: oklch(0.36 0.1 305 / 0.5);
-
-  /* "deep" background — used for input fields, HP-bar wells, and
-     anywhere the design wants a recessed surface darker than the page.
-     Maps to design styles.css --bg-deep. */
-  --surface-deep: oklch(0.12 0.025 300);
-
-  /* HP severity ramp — full → critical → unconscious */
-  --hp-full: oklch(0.74 0.1 195);
-  --hp-good: oklch(0.74 0.1 150);
-  --hp-warn: oklch(0.76 0.12 90);
-  --hp-low: oklch(0.7 0.13 50);
-  --hp-crit: oklch(0.62 0.16 25);
-  --hp-out: oklch(0.46 0.09 320);
-
-  /* atmospheric vignette — warm candle in the top-right, deep violet
-     in the bottom-left. Tuned for dark mode where the etched + lit
-     chrome adds depth. */
-  --arcane-edge-warm: oklch(0.42 0.1 35 / 0.22);
-  --arcane-edge-violet: oklch(0.3 0.08 305 / 0.28);
-
-  /* Three-layer shadow system from design styles.css lines 171-173.
-     - shadow-1: card resting state (subtle drop + 1px border)
-     - shadow-2: elevated containers (modals, popovers)
-     - shadow-glow: accent-haloed pills (combat FAB) */
-  --shadow-1: 0 1px 2px rgba(8, 5, 16, 0.5), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.1 0.06 305 / 0.7), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(0.7 0.15 305 / 0.04);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
-}
-
-[data-theme="arcane-light"] {
-  --gild: var(--color-primary);
-  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
-  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
-  --text-muted: oklch(0.46 0.01 300);
-  --sync-attention: oklch(0.52 0.13 40);
-  --text-dim: oklch(0.62 0.012 300);
-  --border-strong: oklch(0.78 0.01 300);
-  --accent-soft: oklch(0.9 0.05 305 / 0.6);
-
-  /* Recessed surface for inputs / HP-bar wells in light mode. */
-  --surface-deep: oklch(0.94 0.006 90);
-
-  --hp-full: oklch(0.55 0.13 195);
-  --hp-good: oklch(0.55 0.13 150);
-  --hp-warn: oklch(0.6 0.14 85);
-  --hp-low: oklch(0.55 0.16 50);
-  --hp-crit: oklch(0.5 0.18 25);
-  --hp-out: oklch(0.4 0.1 320);
-
-  /* Light mode — same dual-source vignette, paler so the paper-tone
-     surface keeps reading flat under prolonged use. */
-  --arcane-edge-warm: oklch(0.92 0.06 60 / 0.5);
-  --arcane-edge-violet: oklch(0.9 0.04 305 / 0.5);
-
-  /* Lighter shadow stack so the paper-tone canvas keeps reading flat. */
-  --shadow-1: 0 1px 2px oklch(0.5 0.05 305 / 0.08), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.5 0.08 305 / 0.25), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(1 0 0 / 0.6);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
-}
-
-/* ----- Gilded Tome (default dark) ----------------------------- */
 @plugin "daisyui/theme" {
-  name: "gilded-tome";
-  default: true;
+  name: "corona-obsidian";
+  default: false;
   prefersdark: true;
   color-scheme: dark;
-
-  /* base = warm umber surfaces, faint cast toward the gold accent */
-  --color-base-100: oklch(0.205 0.016 65); /* surface (cards, panels) */
-  --color-base-200: oklch(0.16 0.014 60); /* page bg (canvas) */
-  --color-base-300: oklch(0.34 0.035 75); /* default border */
-  --color-base-content: oklch(0.89 0.018 85);
-
-  --color-primary: oklch(0.78 0.13 82); /* gold */
-  --color-primary-content: oklch(0.18 0.02 70);
-  --color-secondary: oklch(0.72 0.1 165); /* jade (HP-full / second accent) */
-  --color-secondary-content: oklch(0.18 0.02 70);
-  --color-accent: oklch(0.78 0.13 82);
-  --color-accent-content: oklch(0.18 0.02 70);
-  --color-neutral: oklch(0.245 0.018 65);
-  --color-neutral-content: oklch(0.89 0.018 85);
-
-  --color-info: oklch(0.72 0.09 210);
-  --color-info-content: oklch(0.18 0.02 70);
-  --color-success: oklch(0.74 0.11 145);
-  --color-success-content: oklch(0.18 0.02 70);
-  --color-warning: oklch(0.74 0.14 60);
-  --color-warning-content: oklch(0.18 0.02 70);
-  --color-error: oklch(0.62 0.17 25);
-  --color-error-content: oklch(0.16 0.01 60);
-
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
+  --color-base-100: #222435;
+  --color-base-200: #151727;
+  --color-base-300: #44445a;
+  --color-base-content: #f0edff;
+  --color-primary: #f0d49d;
+  --color-primary-content: #30251b;
+  --color-secondary: #c3b6e4;
+  --color-secondary-content: #252034;
+  --color-accent: #bba8dc;
+  --color-accent-content: #292034;
+  --color-neutral: #373649;
+  --color-neutral-content: #f0edff;
+  --color-info: #8bc9e1;
+  --color-info-content: #112c39;
+  --color-success: #91d4ac;
+  --color-success-content: #112d21;
+  --color-warning: #ffad72;
+  --color-warning-content: #3a2015;
+  --color-error: #fa969e;
+  --color-error-content: #381d24;
+  --radius-selector: 0.625rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -246,419 +125,129 @@
   --noise: 0;
 }
 
-/* ----- Midnight Gilt (alternate dark) ------------------------- */
-@plugin "daisyui/theme" {
-  name: "midnight-gilt";
-  default: false;
-  prefersdark: false;
-  color-scheme: dark;
-
-  /* base = deep navy surfaces; gold accent, a trace of violet as secondary */
-  --color-base-100: oklch(0.205 0.025 258);
-  --color-base-200: oklch(0.16 0.025 260);
-  --color-base-300: oklch(0.34 0.04 255);
-  --color-base-content: oklch(0.89 0.01 250);
-
-  --color-primary: oklch(0.8 0.13 85);
-  --color-primary-content: oklch(0.18 0.02 260);
-  --color-secondary: oklch(0.7 0.11 300);
-  --color-secondary-content: oklch(0.16 0.02 260);
-  --color-accent: oklch(0.8 0.13 85);
-  --color-accent-content: oklch(0.18 0.02 260);
-  --color-neutral: oklch(0.245 0.028 258);
-  --color-neutral-content: oklch(0.89 0.01 250);
-
-  --color-info: oklch(0.72 0.09 210);
-  --color-info-content: oklch(0.16 0.02 260);
-  --color-success: oklch(0.74 0.1 150);
-  --color-success-content: oklch(0.16 0.02 260);
-  --color-warning: oklch(0.74 0.14 60);
-  --color-warning-content: oklch(0.16 0.02 260);
-  --color-error: oklch(0.62 0.16 25);
-  --color-error-content: oklch(0.16 0.02 260);
-
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
+/* Each spell drawing has the same optical origin (42,40) in CSS pixels.
+   Position the image rather than stretching it: the point of emission must
+   stay on the brand mark even on the compact character bar. */
+[data-theme="heliolance"] {
+  --spell-art: url("./heliolance-light.svg");
+  --page-light: radial-gradient(
+    ellipse 42rem 18rem at var(--sun-x) var(--sun-y),
+    #f7dda280,
+    transparent
+  );
+  --glass-base: #fbefdbed;
+  --glass-rim: #fff9e8;
+  --glass-edge: #b89b71;
+  --glass-reflection: linear-gradient(
+    111deg,
+    #eed2a147,
+    #fffdf6b3 32%,
+    #e0bd8559 44%,
+    #fff9ecbf 46%,
+    #f5dfba55 74%
+  );
+  --spell-glow: #ffd592;
+  --hp-out: #694265;
+  --hp-warn: #79600d;
+  --surface-deep: #f1e7d6;
+}
+[data-theme="daybreak-lens"] {
+  --spell-art: url("./daybreak-light.svg");
+  --page-light: linear-gradient(155deg, #d0eae3, transparent 45%, #f4e9ce88);
+  --glass-base: #d4e7deed;
+  --glass-rim: #ffffdf;
+  --glass-edge: #81a5a0;
+  --glass-reflection: radial-gradient(
+    ellipse 85% 145% at 65% -66%,
+    transparent 76%,
+    #faffefbb 81%,
+    #9dbdb8a6 85%,
+    transparent 87%,
+    #faffefb3 90%,
+    transparent 92%
+  );
+  --spell-glow: #ffefb3;
+  --hp-out: #694263;
+  --hp-warn: #715908;
+  --surface-deep: #d1e1d9;
+}
+[data-theme="corona-obsidian"] {
+  --spell-art: url("./corona-light.svg");
+  --page-light: radial-gradient(
+    ellipse 65rem 32rem at var(--sun-x) var(--sun-y),
+    #4538559c,
+    transparent
+  );
+  --glass-base: #25263bef;
+  --glass-rim: #b0a2c5;
+  --glass-edge: #5c5772;
+  --glass-reflection: linear-gradient(157deg, #584a60b3, transparent 37%, #20253788 74%, #53485d8c);
+  --spell-glow: #e9c58c;
+  --hp-out: #c1a0ce;
+  --hp-warn: #e8cf73;
+  --surface-deep: #111321;
 }
 
-/* ----- Verdigris & Brass (alternate dark) -------------------- */
-@plugin "daisyui/theme" {
-  name: "verdigris-brass";
-  default: false;
-  prefersdark: false;
-  color-scheme: dark;
-
-  /* base = dark patinated green-teal surfaces; brass accent */
-  --color-base-100: oklch(0.205 0.018 178);
-  --color-base-200: oklch(0.165 0.016 180);
-  --color-base-300: oklch(0.34 0.035 172);
-  --color-base-content: oklch(0.89 0.012 150);
-
-  --color-primary: oklch(0.76 0.12 78);
-  --color-primary-content: oklch(0.18 0.02 70);
-  --color-secondary: oklch(0.72 0.09 175);
-  --color-secondary-content: oklch(0.16 0.015 180);
-  --color-accent: oklch(0.76 0.12 78);
-  --color-accent-content: oklch(0.18 0.02 70);
-  --color-neutral: oklch(0.245 0.02 178);
-  --color-neutral-content: oklch(0.89 0.012 150);
-
-  --color-info: oklch(0.72 0.09 220);
-  --color-info-content: oklch(0.16 0.015 180);
-  --color-success: oklch(0.74 0.11 140);
-  --color-success-content: oklch(0.16 0.015 180);
-  --color-warning: oklch(0.74 0.14 60);
-  --color-warning-content: oklch(0.16 0.015 180);
-  --color-error: oklch(0.63 0.16 25);
-  --color-error-content: oklch(0.16 0.015 180);
-
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
-}
-
-/* ----- Sunbolt (light) ---------------------------------------- */
-@plugin "daisyui/theme" {
-  name: "sunbolt";
-  default: false;
-  prefersdark: false;
-  color-scheme: light;
-
-  /* "Sun at the mark": base-100 is pure white so cards read as lit paper;
-     base-200 is the flat warm paper the page gradient fades to (hovers,
-     stripes). The sun itself is painted by the fixed .arcane-edge layer and
-     the header (see the [data-theme="sunbolt"] block below). Sun-amber gold
-     is dark enough for gold text on white and light text on fills;
-     lapis-sky secondary is the cool counterpoint. */
-  --color-base-100: oklch(1 0 0); /* surface (cards, panels) */
-  --color-base-200: oklch(0.972 0.028 93); /* flat paper (hovers, stripes) */
-  --color-base-300: oklch(0.855 0.045 85); /* default border */
-  --color-base-content: oklch(0.255 0.03 62);
-
-  --color-primary: oklch(0.52 0.125 68); /* burnished sun-gold */
-  --color-primary-content: oklch(0.995 0.008 95);
-  --color-secondary: oklch(0.47 0.13 252); /* lapis sky */
-  --color-secondary-content: oklch(1 0 0);
-  /* accent = the bright "bolt" gold. Fill/ornament only (dark content on it);
-     never text on paper. --gild stays on primary for drop caps and strokes. */
-  --color-accent: oklch(0.83 0.15 88);
-  --color-accent-content: oklch(0.25 0.05 65);
-  --color-neutral: oklch(0.935 0.025 88);
-  --color-neutral-content: oklch(0.255 0.03 62);
-
-  --color-info: oklch(0.5 0.11 235);
-  --color-info-content: oklch(1 0 0);
-  --color-success: oklch(0.52 0.12 150);
-  --color-success-content: oklch(1 0 0);
-  --color-warning: oklch(0.62 0.15 58);
-  --color-warning-content: oklch(0.18 0.02 60);
-  --color-error: oklch(0.5 0.18 27);
-  --color-error-content: oklch(1 0 0);
-
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
-}
-
-/* ----- Heraldic Vellum (alternate light) ---------------------- */
-@plugin "daisyui/theme" {
-  name: "heraldic-vellum";
-  default: false;
-  prefersdark: false;
-  color-scheme: light;
-
-  /* base = cool vellum; heraldic blue for actions, gold as ornament */
-  --color-base-100: oklch(1 0 0);
-  --color-base-200: oklch(0.965 0.008 250);
-  --color-base-300: oklch(0.88 0.02 255);
-  --color-base-content: oklch(0.24 0.03 260);
-
-  --color-primary: oklch(0.4 0.12 262);
-  --color-primary-content: oklch(1 0 0);
-  --color-secondary: oklch(0.5 0.1 195);
-  --color-secondary-content: oklch(1 0 0);
-  --color-accent: oklch(0.64 0.13 78);
-  --color-accent-content: oklch(0.16 0.02 70);
-  --color-neutral: oklch(0.95 0.01 250);
-  --color-neutral-content: oklch(0.24 0.03 260);
-
-  --color-info: oklch(0.5 0.1 220);
-  --color-info-content: oklch(1 0 0);
-  --color-success: oklch(0.55 0.13 150);
-  --color-success-content: oklch(1 0 0);
-  --color-warning: oklch(0.6 0.14 60);
-  --color-warning-content: oklch(0.16 0.01 60);
-  --color-error: oklch(0.5 0.18 25);
-  --color-error-content: oklch(1 0 0);
-
-  --radius-selector: 0.75rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.125rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 1;
-  --noise: 0;
-}
-
-/* ============================================================
-   App-level tokens not covered by DaisyUI semantics.
-
-   These map to:
-     - text-muted / text-dim   : the prose-secondary / prose-tertiary
-       distinctions the design uses for label/value pairs
-     - hp-*                    : the severity ramp on HP bars and
-       large pool numerals
-     - gild                    : decorative gold (see header)
-     - card-sheen / card-etch  : the lit + etched card chrome below
-   They live as plain CSS vars and are surfaced as Tailwind utilities
-   in the @theme block below.
-   ============================================================ */
-
-[data-theme="gilded-tome"] {
-  --text-muted: oklch(0.7 0.025 80);
-  --sync-attention: oklch(0.74 0.13 35);
-  --text-dim: oklch(0.56 0.03 75);
-  --border-strong: oklch(0.46 0.05 78);
-  --accent-soft: oklch(0.42 0.09 82 / 0.4);
-  --gild: var(--color-primary);
-
-  /* Recessed surface for input fields, HP-bar wells and the like. */
-  --surface-deep: oklch(0.12 0.012 60);
-
-  /* HP severity ramp — full → critical → unconscious */
-  --hp-full: oklch(0.72 0.1 165);
-  --hp-good: oklch(0.74 0.11 145);
-  --hp-warn: oklch(0.8 0.13 98);
-  --hp-low: oklch(0.7 0.14 50);
-  --hp-crit: oklch(0.62 0.17 25);
-  --hp-out: oklch(0.46 0.09 320);
-
-  /* atmospheric vignette — candle gold top-right, ember bottom-left */
-  --arcane-edge-warm: oklch(0.45 0.11 70 / 0.22);
-  --arcane-edge-violet: oklch(0.3 0.06 30 / 0.25);
-
-  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
-  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
-
-  /* Three-layer shadow system.
-     - shadow-1: card resting state (subtle drop + 1px border)
-     - shadow-2: elevated containers (modals, popovers)
-     - shadow-glow: accent-haloed pills (combat FAB) */
-  --shadow-1: 0 1px 2px rgba(10, 6, 2, 0.55), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.1 0.03 60 / 0.7), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(0.8 0.13 82 / 0.04);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
-}
-
-[data-theme="midnight-gilt"] {
-  --text-muted: oklch(0.69 0.02 255);
-  --sync-attention: oklch(0.74 0.13 35);
-  --text-dim: oklch(0.55 0.025 255);
-  --border-strong: oklch(0.46 0.05 255);
-  --accent-soft: oklch(0.42 0.09 85 / 0.35);
-  --gild: var(--color-primary);
-  --surface-deep: oklch(0.12 0.025 262);
-
-  --hp-full: oklch(0.74 0.1 195);
-  --hp-good: oklch(0.74 0.1 150);
-  --hp-warn: oklch(0.8 0.13 98);
-  --hp-low: oklch(0.7 0.14 50);
-  --hp-crit: oklch(0.62 0.16 25);
-  --hp-out: oklch(0.46 0.09 320);
-
-  --arcane-edge-warm: oklch(0.45 0.1 80 / 0.2);
-  --arcane-edge-violet: oklch(0.3 0.07 270 / 0.3);
-
-  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
-  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
-
-  --shadow-1: 0 1px 2px rgba(3, 6, 16, 0.55), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.1 0.05 262 / 0.7), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(0.8 0.13 85 / 0.04);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
-}
-
-[data-theme="verdigris-brass"] {
-  --text-muted: oklch(0.69 0.02 165);
-  --sync-attention: oklch(0.74 0.13 35);
-  --text-dim: oklch(0.55 0.025 170);
-  --border-strong: oklch(0.46 0.045 170);
-  --accent-soft: oklch(0.4 0.08 78 / 0.45);
-  --gild: var(--color-primary);
-  --surface-deep: oklch(0.12 0.016 185);
-
-  /* HP-full leans blue so it stays distinct from the green success step. */
-  --hp-full: oklch(0.74 0.1 205);
-  --hp-good: oklch(0.74 0.11 140);
-  --hp-warn: oklch(0.8 0.13 98);
-  --hp-low: oklch(0.7 0.14 50);
-  --hp-crit: oklch(0.63 0.16 25);
-  --hp-out: oklch(0.46 0.09 320);
-
-  --arcane-edge-warm: oklch(0.44 0.1 75 / 0.22);
-  --arcane-edge-violet: oklch(0.3 0.06 175 / 0.3);
-
-  --card-sheen: color-mix(in oklch, var(--gild) 6%, transparent);
-  --card-etch: color-mix(in oklch, var(--gild) 9%, transparent);
-
-  --shadow-1: 0 1px 2px rgba(2, 10, 9, 0.55), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.1 0.03 180 / 0.7), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(0.76 0.12 78 / 0.04);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
-}
-
-[data-theme="sunbolt"] {
-  --text-muted: oklch(0.45 0.03 65);
-  --sync-attention: oklch(0.52 0.14 42);
-  --text-dim: oklch(0.53 0.035 70);
-  --border-strong: oklch(0.74 0.06 80);
-  --accent-soft: oklch(0.93 0.07 92 / 0.75);
-  --gild: var(--color-primary);
-  --surface-deep: oklch(0.935 0.024 88);
-
-  /* HP severity ramp — full (sky) → critical → unconscious */
-  --hp-full: oklch(0.52 0.11 215);
-  --hp-good: oklch(0.52 0.12 148);
-  --hp-warn: oklch(0.6 0.14 95);
-  --hp-low: oklch(0.56 0.16 52);
-  --hp-crit: oklch(0.5 0.18 25);
-  --hp-out: oklch(0.4 0.1 320);
-
-  /* Sun at the mark. A white-hot point sits behind the brand mark in the
-     header's upper-left, with a sun-yellow halo fading into pale warm paper.
-     --sun-x/--sun-y are the mark's centre in viewport pixels (header padding
-     differs below/above the sm breakpoint); the fixed .arcane-edge layer and
-     the sticky .app-header both paint --sun-layers, the header with
-     background-attachment: fixed, so the two line up seamlessly. */
+:root,
+[data-theme] {
   --sun-x: 26px;
   --sun-y: 26px;
-  --sun-core: radial-gradient(
-    circle 44px at var(--sun-x) var(--sun-y),
-    oklch(1 0 0),
-    oklch(1 0 0 / 0)
-  );
-  --sun-halo: radial-gradient(
-    circle 260px at var(--sun-x) var(--sun-y),
-    oklch(0.93 0.12 94 / 0.9) 0%,
-    oklch(0.96 0.07 95 / 0.55) 38%,
-    transparent 78%
-  );
-  --sun-paper: linear-gradient(160deg, oklch(0.992 0.01 95), oklch(0.965 0.035 92));
-  --sun-layers: var(--sun-core), var(--sun-halo);
-  --sun-mark-halo: 0 0 0 3px oklch(1 0 0 / 0.85), 0 0 18px 5px oklch(0.9 0.14 92 / 0.8);
-
-  /* White cards with a soft warm lift; no white/gold sheen needed on top. */
-  --card-sheen: oklch(1 0 0);
-  --card-etch: oklch(0.88 0.06 90 / 0.55);
-
-  /* Soft tonal yellow for the character dock and solid primary buttons. */
-  --dock-bg: oklch(0.955 0.065 94);
-  --dock-border: oklch(0.88 0.08 91);
-  --dock-shadow: 0 14px 34px -16px oklch(0.6 0.13 85 / 0.55), inset 0 1px 0 oklch(1 0 0 / 0.8);
-  --dock-hover-bg: oklch(1 0 0 / 0.6);
-  --dock-active-bg: oklch(1 0 0);
-  --dock-active-ink: oklch(0.4 0.1 68);
-  --dock-active-shadow: 0 1px 3px oklch(0.55 0.08 78 / 0.25);
-  --btn-tonal-bg: oklch(0.92 0.11 95);
-  --btn-tonal-ink: oklch(0.38 0.1 68);
-  --btn-tonal-border: oklch(0.84 0.11 90);
-
-  --shadow-1: 0 1px 2px oklch(0.55 0.07 78 / 0.1), 0 14px 30px -24px oklch(0.6 0.12 85 / 0.6), 0 0 0
-    1px oklch(0.92 0.03 90);
-  --shadow-2: 0 12px 40px -14px oklch(0.5 0.1 75 / 0.28), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(1 0 0 / 0.7);
-  /* Radiant halo: bolt-gold light rather than a primary-coloured smudge. */
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 28px -2px oklch(0.85 0.16 90 / 0.85);
+  --gild: var(--color-primary);
+  --text-muted: color-mix(in srgb, var(--color-base-content) 83%, var(--color-base-100));
+  --text-dim: color-mix(in srgb, var(--color-base-content) 75%, var(--color-base-100));
+  --border-strong: color-mix(in srgb, var(--color-base-content) 43%, var(--color-base-200));
+  --accent-soft: color-mix(in srgb, var(--color-primary) 13%, var(--color-base-100));
+  --sync-attention: var(--color-warning);
+  --hp-full: var(--color-info);
+  --hp-good: var(--color-success);
+  --hp-low: var(--color-warning);
+  --hp-crit: var(--color-error);
+  --shadow-1: 0 1px 3px #18111920, 0 0 0 1px var(--color-base-300);
+  --shadow-2: 0 12px 36px -12px #15101d66, 0 0 0 1px var(--color-base-300);
+  --glass-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0
+    color-mix(in srgb, var(--glass-rim) 55%, transparent), 0 3px 10px #22172826;
 }
-
-/* Sunbolt: the sun layers. The page layer replaces the shared two-corner
-   vignette; the header repeats the radial layers (fixed to the viewport, like
-   the page layer) over its own base colour so the sun shows behind the mark.
-   The mark centre is measured at the sm breakpoint (header px-3/py-2 below,
-   px-7/py-3 at 640px and up). */
 @media (min-width: 640px) {
-  [data-theme="sunbolt"] {
+  :root {
     --sun-x: 42px;
     --sun-y: 30px;
   }
 }
-/* Character pages below 1280px swap the normal header rows for the compact
-   status row, whose first column holds the mark in a 44px square. */
 @media (max-width: 1279px) {
-  [data-theme="sunbolt"]:has(#character-status-header-slot > aside) {
+  :root:has(#character-status-header-slot > aside) {
     --sun-x: 30px;
     --sun-y: 26px;
   }
 }
-[data-theme="sunbolt"] .arcane-edge::before {
-  background: var(--sun-layers), var(--sun-paper);
+
+/* A sticky header already provides a stacking context. Paint and blur on its
+   own rear layer, not on the header: a filter on the header would become the
+   containing block for the fixed mobile menus. No overflow clipping. */
+.app-header {
+  background: transparent;
+  border-bottom-color: var(--glass-edge);
+  box-shadow: var(--glass-shadow);
 }
-[data-theme="sunbolt"] .app-header {
-  background-image: var(--sun-layers);
-  background-attachment: fixed;
+.app-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--spell-art) calc(var(--sun-x) - 42px) calc(var(--sun-y) - 40px) / 720px 120px
+    no-repeat,
+    radial-gradient(
+      ellipse 75px 48px at var(--sun-x) var(--sun-y),
+      color-mix(in srgb, var(--spell-glow) 35%, transparent),
+      transparent
+    ), var(--glass-reflection), var(--glass-base);
+  backdrop-filter: blur(6px);
 }
-/* The portaled character status row sits inside the header; let the header's
-   sun show through it instead of cutting the halo with a white box. */
-[data-theme="sunbolt"] .app-header #character-status-header-slot > aside {
+.app-header #character-status-header-slot > aside {
   background-color: transparent;
 }
-[data-theme="sunbolt"] .brand-mark {
-  box-shadow: var(--sun-mark-halo);
-}
-
-/* Sunbolt: solid primary buttons are tonal yellow with dark gold text. The
-   primary colour itself stays burnished gold for text, links and drop caps;
-   outline, ghost, soft, dash and link variants are untouched. */
-[data-theme="sunbolt"] .btn-primary:not(.btn-outline, .btn-ghost, .btn-soft, .btn-dash, .btn-link) {
-  --btn-color: var(--btn-tonal-bg);
-  --btn-fg: var(--btn-tonal-ink);
-  --btn-border: var(--btn-tonal-border);
-  outline-color: var(--color-primary);
-}
-
-[data-theme="heraldic-vellum"] {
-  --text-muted: oklch(0.45 0.03 258);
-  --sync-attention: oklch(0.52 0.13 40);
-  --text-dim: oklch(0.56 0.02 255);
-  --border-strong: oklch(0.78 0.03 255);
-  --accent-soft: oklch(0.93 0.05 85 / 0.8);
-  --gild: var(--color-accent);
-  --surface-deep: oklch(0.95 0.01 250);
-
-  --hp-full: oklch(0.55 0.13 195);
-  --hp-good: oklch(0.55 0.13 150);
-  --hp-warn: oklch(0.58 0.13 95);
-  --hp-low: oklch(0.55 0.16 50);
-  --hp-crit: oklch(0.5 0.18 25);
-  --hp-out: oklch(0.4 0.1 320);
-
-  --arcane-edge-warm: oklch(0.93 0.06 85 / 0.5);
-  --arcane-edge-violet: oklch(0.92 0.03 262 / 0.5);
-
-  --card-sheen: oklch(1 0 0 / 0.55);
-  --card-etch: color-mix(in oklch, var(--gild) 14%, transparent);
-
-  --shadow-1: 0 1px 2px oklch(0.4 0.05 262 / 0.08), 0 0 0 1px var(--color-base-300);
-  --shadow-2: 0 12px 40px -14px oklch(0.4 0.08 262 / 0.25), 0 0 0 1px var(--color-base-300), inset 0
-    1px 0 oklch(1 0 0 / 0.6);
-  --shadow-glow: 0 0 0 1px var(--accent-soft), 0 0 32px -4px var(--color-primary);
+.app-header .brand-mark {
+  box-shadow: 0 0 0 1px var(--glass-rim), 0 0 14px 3px var(--spell-glow);
 }
 
 /* Surface Tailwind utilities for the app-level tokens. */
@@ -757,27 +346,11 @@ body {
   }
 }
 
-/* ============================================================
-   Atmospheric vignette — top-right radial glow, fixed to the
-   viewport. Apply .arcane-edge to the app shell (positioned
-   relative). The actual app content sits at z-index 1.
-   ============================================================ */
-
+/* Low-frequency page light; content and editor surfaces remain opaque. */
 .arcane-edge {
   position: relative;
-}
-.arcane-edge::before {
-  content: "";
-  position: fixed;
-  pointer-events: none;
-  inset: 0;
-  background: radial-gradient(
-      ellipse 700px 360px at 88% 6%,
-      var(--arcane-edge-warm) 0%,
-      transparent 60%
-    ),
-    radial-gradient(ellipse 600px 300px at 8% 100%, var(--arcane-edge-violet) 0%, transparent 65%);
-  z-index: 0;
+  background-image: var(--page-light);
+  background-attachment: fixed;
 }
 
 /* ============================================================
@@ -826,36 +399,32 @@ body {
   }
 }
 
-/* ============================================================
-   Arcane identity — "Plain" flourish (etched + lit base)
-
-   Per the design handoff chat, this is the new intrinsic chrome
-   for every theme: a warm sheen at the top of every card (lit) and a
-   thin gold inner stroke set 4px in (etched plate), plus a
-   drop-cap on display headings. Each piece is dialed stronger
-   in dark mode where it adds depth, gentler in light where the
-   sheen would otherwise feel washed-out.
-   ============================================================ */
-
-/* Lit — gradient sheen on every card. Uses background-image so it
-   layers on top of whatever bg-base utility a card carries.
-   Default box-shadow is the design's `--shadow-1` (drop + 1px border). */
+/* Cards no longer carry a full-surface sheen. A section gets one optical
+   band; inputs, rows and nested editors keep their daisyUI surface colors. */
+@layer components {
+  .card {
+    background-color: var(--color-base-100);
+  }
+}
 .card {
-  position: relative;
-  background-image: linear-gradient(180deg, var(--card-sheen) 0%, transparent 35%);
   box-shadow: var(--shadow-1);
 }
-
-/* Etched — inner accent stroke set 4px inside the card border, like a
-   stamped metal plate. Pseudo-element so it can't fight Tailwind's
-   shadow utilities. */
-.card::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1px solid var(--card-etch);
-  border-radius: calc(var(--radius-box) - 4px);
-  pointer-events: none;
+.stat-band,
+.fold-heading,
+.library-group-heading {
+  background: var(--glass-reflection), var(--glass-base);
+  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0 var(--glass-edge);
+}
+.stat-band,
+.fold-heading {
+  border-radius: var(--radius-box) var(--radius-box) 0 0;
+}
+.stat-band:only-child,
+.fold-heading[aria-expanded="false"] {
+  border-radius: var(--radius-box);
+}
+.fold-heading .label-eyebrow {
+  color: var(--color-base-content);
 }
 
 /* Drop-cap — first letter of any display heading reads in the accent
@@ -917,9 +486,6 @@ body {
   display: none !important;
 }
 
-.fold-body > .card::before {
-  display: none;
-}
 .fold-body > .card > .card-body {
   padding: 0;
 }

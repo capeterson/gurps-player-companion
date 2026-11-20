@@ -190,7 +190,7 @@ or dynamically registered and stores CIMD cache expiry.
 | Client | React 19, React Router 7, TanStack Query 5 |
 | Local store | Dexie 4 package (IndexedDB), application schema version 10 |
 | PWA | vite-plugin-pwa + Workbox |
-| Styling | Tailwind 4 + DaisyUI 5 (gold themes: Gilded Tome, Midnight Gilt, Verdigris & Brass, Sunbolt, Heraldic Vellum, plus classic Arcane Purple in dark/light modes — `src/client/styles/theme.css`) |
+| Styling | Tailwind 4 + daisyUI 5; Heliolance and Daybreak Lens light palettes, Corona Obsidian dark palette (`src/client/styles/theme.css`) |
 | Auth | JWT (`jose`) + refresh tokens; WebAuthn passkeys verified by `@simplewebauthn/server`; API keys |
 | Email | Resend |
 | Tests | `bun:test` (server/shared), Vitest (client), Playwright (e2e) |

@@ -283,12 +283,11 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
   Lucide icons at a 1.75 stroke weight: swords, portrait, fingerprint, target,
   book, backpack and history for the sheet, with matching map, bell,
   sun/moon, edit, shield, and six-sided die icons across related controls.
-- **Narrow-screen navigation.** The full character sheet uses a compact
-  character/app menu below 1280px, with the full character name inside the menu.
-  Below 480px the trigger is icon-only; the name also remains in the sheet heading.
-  On other pages, Character and Campaign navigation groups wrap within the
-  available header width; long breadcrumbs remain truncated and the campaign
-  dropdown stays attached to its group.
+- **Narrow-screen navigation.** The character sheet uses an icon-only navigation menu below
+  1280px; the character name stays in the sheet heading. HP and FP sit together rather than
+  stretching across tablet screens. On other pages, Character and Campaign remain named
+  destinations; the account trigger becomes icon-only below 768px, with the account identity
+  inside its menu. Escape closes the menu and returns focus to its trigger.
 - **Compact combat view and folding.** Combat uses a smaller identity header.
   Other editable identity names use smaller display type below 640px so ordinary
   names fit on phones; unusually long names remain scrollable within the input.
@@ -1342,9 +1341,9 @@ settings sections; switching sections retains drafts.
   support correlation without exposing raw error details.
 - **Themes**: a dark/light item in the header menus (the account menu, or the
   compact character hamburger) switches mode per device (defaulting to the
-  OS preference). The brand mark is always visible at the header's left. Settings → **Appearance** picks the palette for each mode —
-  dark: **Gilded Tome** (default), **Midnight Gilt**, **Verdigris & Brass**, or classic **Arcane Purple**; light: **Sunbolt**
-  (default), **Heraldic Vellum**, or classic **Arcane Purple**. The palette choices are saved
+  OS preference). The brand mark is always visible at the header's left. **Heliolance** is the default light palette;
+  Settings → **Appearance** can switch it to **Daybreak Lens**. Dark mode uses **Corona Obsidian**.
+  Glass is concentrated in the header, section bands and sheet navigation rather than behind data rows. Palette preferences are saved
   to the account (`GET`/`PATCH /auth/preferences`, `users.dark_theme` /
   `light_theme`) so every device matches; changes apply immediately, are kept
   locally while offline and pushed when back online, and a server rejection

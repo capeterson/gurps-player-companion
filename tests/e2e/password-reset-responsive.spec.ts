@@ -23,12 +23,11 @@ test('expired reset links offer a reachable request-new-link action on mobile an
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     for (const mode of ['dark', 'light'] as const) {
-      await page.goto('/');
-      await page.evaluate((themeMode) => localStorage.setItem('gpc.theme', themeMode), mode);
+      await page.emulateMedia({ colorScheme: mode });
       await page.goto('/reset-password?token=expired');
       await expect(page.locator('html')).toHaveAttribute(
         'data-theme',
-        mode === 'dark' ? 'gilded-tome' : 'sunbolt',
+        mode === 'dark' ? 'corona-obsidian' : 'heliolance',
       );
       await expect(
         page.getByRole('heading', { name: 'Reset password', exact: true }),

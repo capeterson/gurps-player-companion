@@ -21,6 +21,8 @@ import {
 } from './theme.ts';
 
 const apiMock = vi.mocked(api);
+const DEFAULTS: ThemePreferences = { darkTheme: 'corona-obsidian', lightTheme: 'heliolance' };
+const DAYBREAK: ThemePreferences = { ...DEFAULTS, lightTheme: 'daybreak-lens' };
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -54,91 +56,102 @@ beforeEach(() => {
 });
 
 describe('theme mode', () => {
-  it('reads the pre-gold arcane values as a mode', () => {
-    localStorage.setItem('gpc.theme', 'arcane-light');
-    expect(readStoredMode()).toBe('light');
-    localStorage.setItem('gpc.theme', 'arcane-dark');
-    expect(readStoredMode()).toBe('dark');
-  });
-
-  it('defaults to Gilded Tome in dark mode and Sunbolt in light mode', () => {
-    localStorage.setItem('gpc.theme', 'dark');
-    applyStoredTheme();
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
-    localStorage.setItem('gpc.theme', 'light');
-    applyStoredTheme();
-    expect(document.documentElement.dataset.theme).toBe('sunbolt');
-  });
-
-  it('shows Sunbolt to a device that stored the retired Illuminated Manuscript palette', () => {
-    localStorage.setItem('gpc.theme', 'light');
+  it('drops the previous mode and unsent palette without pushing a reset', async () => {
+    const osMode = readStoredMode();
+    localStorage.setItem('gpc.theme', osMode === 'light' ? 'dark' : 'light');
     localStorage.setItem(
       'gpc.themePreferences',
-      JSON.stringify({ darkTheme: 'midnight-gilt', lightTheme: 'illuminated-manuscript' }),
+      JSON.stringify({ darkTheme: 'midnight-gilt', lightTheme: 'heraldic-vellum', pending: true }),
     );
-    applyStoredTheme();
-    expect(document.documentElement.dataset.theme).toBe('sunbolt');
     resetThemeStoreForTests();
-    expect(getThemeState().preferences).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'sunbolt',
-    });
+    expect(getThemeState()).toEqual({ mode: osMode, preferences: DEFAULTS, pending: false });
+    expect(localStorage.getItem('gpc.theme')).toBeNull();
+    expect(localStorage.getItem('gpc.themePreferences')).toBeNull();
+
+    apiMock.mockResolvedValueOnce(DAYBREAK);
+    await fetchServerThemePreferences();
+    expect(patchBodies()).toHaveLength(0);
+    expect(getThemeState().preferences).toEqual(DAYBREAK);
+  });
+
+  it('defaults to Corona Obsidian in dark mode and Heliolance in light mode', () => {
+    localStorage.setItem('gpc.theme.v2', 'dark');
+    applyStoredTheme();
+    expect(document.documentElement.dataset.theme).toBe('corona-obsidian');
+    localStorage.setItem('gpc.theme.v2', 'light');
+    applyStoredTheme();
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
+  });
+
+  it('preserves new choices and pending edits across startup, even after a legacy tab writes', async () => {
+    apiMock.mockRejectedValueOnce(new TypeError('offline'));
+    localStorage.setItem('gpc.theme.v2', 'dark');
+    resetThemeStoreForTests();
+    setThemeMode('light');
+    setThemePreference('lightTheme', 'daybreak-lens');
+    await flush();
+    localStorage.setItem('gpc.theme', 'arcane-dark');
+    localStorage.setItem(
+      'gpc.themePreferences',
+      JSON.stringify({ darkTheme: 'arcane-dark', lightTheme: 'arcane-light', pending: true }),
+    );
+    resetThemeStoreForTests();
+    applyStoredTheme();
+    expect(getThemeState()).toEqual({ mode: 'light', preferences: DAYBREAK, pending: true });
+    expect(document.documentElement.dataset.theme).toBe('daybreak-lens');
   });
 
   it('keeps every theme-color tag in step with the applied theme', () => {
     document.head.innerHTML =
-      '<meta name="theme-color" content="#f9f2df" media="(prefers-color-scheme: light)">' +
-      '<meta name="theme-color" content="#16110d" media="(prefers-color-scheme: dark)">';
-    localStorage.setItem('gpc.theme', 'light');
+      '<meta name="theme-color" media="(prefers-color-scheme: light)">' +
+      '<meta name="theme-color" media="(prefers-color-scheme: dark)">';
+    localStorage.setItem('gpc.theme.v2', 'light');
     applyStoredTheme();
     const tags = [...document.querySelectorAll('meta[name="theme-color"]')];
-    expect(tags.map((tag) => tag.getAttribute('content'))).toEqual(['#f9f2df', '#f9f2df']);
+    expect(tags.map((tag) => tag.getAttribute('content'))).toEqual(['#faf4e9', '#faf4e9']);
     document.head.innerHTML = '';
   });
 
   it('switches mode locally without contacting the server', () => {
-    localStorage.setItem('gpc.theme', 'dark');
+    localStorage.setItem('gpc.theme.v2', 'dark');
     resetThemeStoreForTests();
     setThemeMode('light');
-    expect(document.documentElement.dataset.theme).toBe('sunbolt');
-    expect(localStorage.getItem('gpc.theme')).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
+    expect(localStorage.getItem('gpc.theme.v2')).toBe('light');
     expect(apiMock).not.toHaveBeenCalled();
   });
 });
 
 describe('theme preferences sync', () => {
   beforeEach(() => {
-    localStorage.setItem('gpc.theme', 'dark');
+    localStorage.setItem('gpc.theme.v2', 'light');
     resetThemeStoreForTests();
   });
 
   it('applies immediately and clears pending once the server confirms', async () => {
-    apiMock.mockResolvedValueOnce({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'sunbolt',
-    });
-    setThemePreference('darkTheme', 'midnight-gilt');
-    expect(document.documentElement.dataset.theme).toBe('midnight-gilt');
+    apiMock.mockResolvedValueOnce(DAYBREAK);
+    setThemePreference('lightTheme', 'daybreak-lens');
+    expect(document.documentElement.dataset.theme).toBe('daybreak-lens');
     expect(getThemeState().pending).toBe(true);
-    expect(JSON.parse(localStorage.getItem('gpc.themePreferences') ?? '{}')).toMatchObject({
-      darkTheme: 'midnight-gilt',
+    expect(JSON.parse(localStorage.getItem('gpc.themePreferences.v2') ?? '{}')).toMatchObject({
+      ...DAYBREAK,
       pending: true,
     });
     await flush();
-    expect(patchBodies()).toEqual([{ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' }]);
+    expect(patchBodies()).toEqual([DAYBREAK]);
     expect(getThemeState().pending).toBe(false);
   });
 
   it('keeps an offline change pending and sends it when the browser comes back online', async () => {
     apiMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-    setThemePreference('lightTheme', 'heraldic-vellum');
+    setThemePreference('lightTheme', 'daybreak-lens');
     await flush();
     expect(getThemeState()).toMatchObject({
       pending: true,
-      preferences: { lightTheme: 'heraldic-vellum' },
+      preferences: DAYBREAK,
     });
 
-    apiMock.mockResolvedValueOnce({ darkTheme: 'gilded-tome', lightTheme: 'heraldic-vellum' });
+    apiMock.mockResolvedValueOnce(DAYBREAK);
     window.dispatchEvent(new Event('online'));
     await flush();
     expect(patchBodies()).toHaveLength(2);
@@ -152,97 +165,81 @@ describe('theme preferences sync', () => {
       if ((init as { method?: string } | undefined)?.method === 'PATCH') {
         throw new ApiError(422, 'invalid theme');
       }
-      return { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' };
+      return DEFAULTS;
     });
-    setThemePreference('darkTheme', 'midnight-gilt');
+    setThemePreference('lightTheme', 'daybreak-lens');
     await flush();
     await flush();
     expect(getThemeState()).toMatchObject({
       pending: false,
-      preferences: { darkTheme: 'gilded-tome' },
+      preferences: DEFAULTS,
     });
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
-    expect(rejections).toEqual([{ fields: ['darkTheme'], reason: 'invalid theme' }]);
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
+    expect(rejections).toEqual([{ fields: ['lightTheme'], reason: 'invalid theme' }]);
   });
 
   it('queues a same-field change behind a slow save and sends the latest value', async () => {
     const first = deferred<unknown>();
     apiMock.mockReturnValueOnce(first.promise as Promise<never>);
-    apiMock.mockResolvedValueOnce({
-      darkTheme: 'gilded-tome',
-      lightTheme: 'sunbolt',
-    });
-    setThemePreference('darkTheme', 'midnight-gilt');
-    setThemePreference('darkTheme', 'gilded-tome');
+    apiMock.mockResolvedValueOnce(DEFAULTS);
+    setThemePreference('lightTheme', 'daybreak-lens');
+    setThemePreference('lightTheme', 'heliolance');
     expect(patchBodies()).toHaveLength(1);
 
-    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' });
+    first.resolve(DAYBREAK);
     await flush();
-    expect(patchBodies()).toEqual([
-      { darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' },
-      { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' },
-    ]);
+    expect(patchBodies()).toEqual([DAYBREAK, DEFAULTS]);
     expect(getThemeState()).toMatchObject({
       pending: false,
-      preferences: { darkTheme: 'gilded-tome' },
+      preferences: DEFAULTS,
     });
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
   });
 
-  it('does not clobber a different-field change when a slow save returns', async () => {
+  it('keeps the current device mode when a slow palette save returns', async () => {
     const first = deferred<unknown>();
     apiMock.mockReturnValueOnce(first.promise as Promise<never>);
-    apiMock.mockResolvedValueOnce({ darkTheme: 'midnight-gilt', lightTheme: 'heraldic-vellum' });
-    setThemePreference('darkTheme', 'midnight-gilt');
-    setThemePreference('lightTheme', 'heraldic-vellum');
+    setThemePreference('lightTheme', 'daybreak-lens');
+    setThemeMode('dark');
 
-    first.resolve({ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' });
+    first.resolve(DAYBREAK);
     await flush();
-    expect(getThemeState().preferences).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'heraldic-vellum',
-    });
-    expect(patchBodies().at(-1)).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'heraldic-vellum',
-    });
-    expect(getThemeState().pending).toBe(false);
+    expect(getThemeState()).toEqual({ mode: 'dark', preferences: DAYBREAK, pending: false });
+    expect(document.documentElement.dataset.theme).toBe('corona-obsidian');
+    expect(patchBodies()).toEqual([DAYBREAK]);
   });
 
   it('adopts server preferences from another device, but never over a pending local change', async () => {
-    adoptServerThemePreferences({ darkTheme: 'midnight-gilt', lightTheme: 'heraldic-vellum' });
-    expect(document.documentElement.dataset.theme).toBe('midnight-gilt');
+    adoptServerThemePreferences(DAYBREAK);
+    expect(document.documentElement.dataset.theme).toBe('daybreak-lens');
     expect(apiMock).not.toHaveBeenCalled();
 
     apiMock.mockRejectedValue(new TypeError('offline'));
-    setThemePreference('darkTheme', 'gilded-tome');
+    setThemePreference('lightTheme', 'heliolance');
     await flush();
-    adoptServerThemePreferences({ darkTheme: 'midnight-gilt', lightTheme: 'heraldic-vellum' });
-    expect(getThemeState().preferences.darkTheme).toBe('gilded-tome');
+    adoptServerThemePreferences(DAYBREAK);
+    expect(getThemeState().preferences).toEqual(DEFAULTS);
   });
 
   it('ignores a server read that started before a local change', async () => {
     const read = deferred<unknown>();
     apiMock.mockReturnValueOnce(read.promise as Promise<never>);
-    apiMock.mockResolvedValueOnce({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'sunbolt',
-    });
+    apiMock.mockResolvedValueOnce(DAYBREAK);
     const fetching = fetchServerThemePreferences();
-    setThemePreference('darkTheme', 'midnight-gilt');
+    setThemePreference('lightTheme', 'daybreak-lens');
     await flush();
-    read.resolve({ darkTheme: 'gilded-tome', lightTheme: 'sunbolt' });
+    read.resolve(DEFAULTS);
     await fetching;
-    expect(getThemeState().preferences.darkTheme).toBe('midnight-gilt');
+    expect(getThemeState().preferences).toEqual(DAYBREAK);
   });
 
   it('drops unsent changes on sign-out', async () => {
     apiMock.mockRejectedValue(new TypeError('offline'));
-    setThemePreference('darkTheme', 'midnight-gilt');
+    setThemePreference('lightTheme', 'daybreak-lens');
     await flush();
     clearPendingThemePreferences();
     expect(getThemeState().pending).toBe(false);
-    adoptServerThemePreferences({ darkTheme: 'gilded-tome', lightTheme: 'sunbolt' });
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
+    adoptServerThemePreferences(DEFAULTS);
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
   });
 });

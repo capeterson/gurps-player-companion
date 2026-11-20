@@ -83,7 +83,7 @@ export function LandingPage() {
             <figure className="w-full max-w-xs shrink-0 overflow-hidden rounded-box border border-base-300 shadow-arcane-lg">
               <img
                 src="/screenshots/combat-mobile.png"
-                alt="Sunbolt combat sheet in Gilded Tome with HP, FP, attacks, and incoming attack controls."
+                alt="Sunbolt combat sheet with HP, FP, attacks, and incoming attack controls."
                 width="430"
                 height="932"
                 fetchPriority="high"
@@ -118,9 +118,9 @@ export function LandingPage() {
           <figure className="card card-border overflow-hidden bg-base-100">
             <img
               src="/screenshots/armor-desktop.png"
-              alt="Sunbolt Combat section showing armor coverage, active defenses, and damage protection in Gilded Tome."
+              alt="Sunbolt Combat section showing armor coverage, active defenses, and damage protection."
               width="1224"
-              height="1179"
+              height="1180"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">
@@ -131,9 +131,9 @@ export function LandingPage() {
           <figure className="card card-border overflow-hidden bg-base-100">
             <img
               src="/screenshots/inventory-desktop.png"
-              alt="Sunbolt inventory in the Sunbolt theme with carried equipment and nested containers."
+              alt="Sunbolt inventory with carried equipment and nested containers."
               width="1224"
-              height="1627"
+              height="1650"
               loading="lazy"
             />
             <figcaption className="px-6 py-4 text-sm text-muted">

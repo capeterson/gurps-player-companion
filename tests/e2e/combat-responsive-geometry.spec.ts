@@ -263,11 +263,13 @@ test('Combat names illegal armor in the warning and incoming damage dialog acros
     await expect(sheetWarning).toBeVisible();
     await expect(sheetWarning).not.toContainText('arm_left');
     await sheetWarning.scrollIntoViewIfNeeded();
-    await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'gilded-tome'));
+    await page
+      .locator('html')
+      .evaluate((node) => node.setAttribute('data-theme', 'corona-obsidian'));
     await attachReviewScreenshot(page, testInfo, 'armor-warning-sheet-dark-375', {
       animations: 'disabled',
     });
-    await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'sunbolt'));
+    await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'heliolance'));
     await attachReviewScreenshot(page, testInfo, 'armor-warning-sheet-light-375', {
       animations: 'disabled',
     });
@@ -669,7 +671,7 @@ test('Attacks keep one dense, contained row per attack mode across viewports', a
         await expect(modifiers).toBeFocused();
         if ([320, 375, 640, 1024, 1280].includes(viewport.width)) {
           await attacks.scrollIntoViewIfNeeded();
-          for (const theme of ['sunbolt', 'gilded-tome']) {
+          for (const theme of ['heliolance', 'corona-obsidian']) {
             await page.locator('html').evaluate((node, name) => {
               node.setAttribute('data-theme', name);
             }, theme);
@@ -677,7 +679,9 @@ test('Attacks keep one dense, contained row per attack mode across viewports', a
               animations: 'disabled',
             });
           }
-          await page.locator('html').evaluate((node) => node.setAttribute('data-theme', 'sunbolt'));
+          await page
+            .locator('html')
+            .evaluate((node) => node.setAttribute('data-theme', 'heliolance'));
         }
       });
     }

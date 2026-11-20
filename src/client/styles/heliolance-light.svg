@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 120">
+  <defs>
+    <linearGradient id="amber" x2="1" y2="0" gradientUnits="objectBoundingBox">
+      <stop stop-color="#be702a"/>
+      <stop offset=".55" stop-color="#dba14b"/>
+      <stop offset="1" stop-color="#e3b97c" stop-opacity=".3"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#amber)" d="M-15 79Q20 45 42 40L698 6 92 47Q39 45-15 89Z"/>
+  <path fill="#f8c061" d="M-15 72Q17 45 42 39L695 6 85 44Q38 43-15 83Z"/>
+  <path fill="#fffde5" d="M30 42 688 6 58 43Z"/>
+</svg>

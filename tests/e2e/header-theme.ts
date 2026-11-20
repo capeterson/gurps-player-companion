@@ -26,9 +26,13 @@ export async function switchThemeFromMenu(page: Page, target?: 'Light' | 'Dark')
   await page.keyboard.press('Escape');
 }
 
-/** Ensure the page uses the named palette (light = sunbolt, dark = gilded-tome). */
-export async function ensureThemeMode(page: Page, mode: 'Light' | 'Dark') {
-  const wanted = mode === 'Light' ? 'sunbolt' : 'gilded-tome';
+/** Switch through the real menu only when the requested palette isn't active. */
+export async function ensureThemeMode(
+  page: Page,
+  mode: 'Light' | 'Dark',
+  lightPalette: 'heliolance' | 'daybreak-lens' = 'heliolance',
+) {
+  const wanted = mode === 'Light' ? lightPalette : 'corona-obsidian';
   if ((await page.locator('html').getAttribute('data-theme')) !== wanted) {
     await switchThemeFromMenu(page, mode);
   }

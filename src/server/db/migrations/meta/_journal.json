@@ -540,6 +540,13 @@
       "when": 1800031000000,
       "tag": "0076_email_queue_telemetry",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1800032000000,
+      "tag": "0077_solar_glass_themes",
+      "breakpoints": true
     }
   ]
 }

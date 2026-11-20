@@ -132,7 +132,7 @@ test('library visual and raw editing plus package review stay usable at responsi
     'Traits: 1 in file',
   );
 
-  for (const theme of ['arcane-light', 'arcane-dark']) {
+  for (const theme of ['daybreak-lens', 'corona-obsidian']) {
     await page.evaluate(
       (value) => document.documentElement.setAttribute('data-theme', value),
       theme,
@@ -188,7 +188,7 @@ test('library visual and raw editing plus package review stay usable at responsi
   await expect(replacement).toBeVisible();
   await expect(replacement).toContainText('Other sourcebooks remain unchanged.');
   await expect(replacement).toContainText('Traits: 0 in file · 1 to remove');
-  for (const theme of ['arcane-light', 'arcane-dark']) {
+  for (const theme of ['daybreak-lens', 'corona-obsidian']) {
     await page.evaluate(
       (value) => document.documentElement.setAttribute('data-theme', value),
       theme,

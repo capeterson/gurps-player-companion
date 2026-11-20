@@ -59,8 +59,8 @@ Everything else is either read-only in the local store or fully online:
   invitations, notifications, settings, admin, and the library **YAML
   import** (see [Campaign library](#campaign-library)).
 - **Theme palette preferences** are outside the outbox but local-first: the
-  choice applies and persists in `localStorage` (`gpc.themePreferences`, with a
-  `pending` flag) immediately, and `src/client/lib/theme.ts` pushes it to
+  choice applies and persists in `localStorage` (`gpc.themePreferences.v2`, with a
+  `pending` flag) immediately. The solar-glass cutover discards earlier palette and device-mode settings, including pending palette writes, without touching the character outbox. `src/client/lib/theme.ts` pushes new preferences to
   `PATCH /auth/preferences` one request at a time (latest wins). Network
   failures stay pending and retry on `online` or the next server read; a
   server read never overwrites a pending choice; an explicit rejection rolls

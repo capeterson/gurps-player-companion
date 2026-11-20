@@ -149,8 +149,8 @@ describe('useUnsyncedChangesGuard', () => {
   });
 
   it('treats a pending theme preference as unsynced work', async () => {
-    const current = getThemeState().preferences.darkTheme;
-    setThemePreference('darkTheme', current === 'gilded-tome' ? 'arcane-dark' : 'gilded-tome');
+    const current = getThemeState().preferences.lightTheme;
+    setThemePreference('lightTheme', current === 'heliolance' ? 'daybreak-lens' : 'heliolance');
     const { onSignOut } = mount();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Sign out' }));
 

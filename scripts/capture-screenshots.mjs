@@ -24,7 +24,7 @@ const page = await browser.newPage({
 });
 page.setDefaultTimeout(20_000);
 try {
-  await page.addInitScript(() => localStorage.setItem('gpc.theme', 'dark'));
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await page.getByLabel(/email/i).fill('rowan@example.invalid');
   await page
@@ -62,7 +62,9 @@ try {
   console.log('Mobile captures saved; damage not applied');
   await page.setViewportSize({ width: 1440, height: 3000 });
   await section('Inventory');
+  await page.getByLabel('Open user menu', { exact: true }).click();
   await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
+  await page.keyboard.press('Escape');
   await page.getByText('Trail pack', { exact: true }).waitFor();
   const expand = page.getByRole('button', { name: 'Expand contents', exact: true });
   while (await expand.count()) await expand.first().click();
@@ -85,7 +87,6 @@ try {
     .click();
   await page.getByRole('heading', { name: 'Characters', exact: true }).waitFor();
   await page.getByText('Bram Stonebridge', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Switch to Light mode', exact: true }).click();
   await ready();
   await page.screenshot({ path: resolve(output, 'campaign-desktop.png'), animations: 'disabled' });
   for (const file of [

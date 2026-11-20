@@ -43,7 +43,7 @@ vi.mock('./hooks/useUnsyncedChangesGuard.tsx', () => ({
 
 import { App } from './App.tsx';
 import { useCharacterHeaderChrome } from './components/CharacterHeaderChromeContext.tsx';
-import { resetThemeStoreForTests } from './lib/theme.ts';
+import { resetThemeStoreForTests, setThemeMode } from './lib/theme.ts';
 
 /** Stands in for the character status bar, which renders the compact chrome. */
 function CompactChrome() {
@@ -74,9 +74,9 @@ function renderApp(path: string) {
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('gpc.theme', 'light');
   guestState.guest = false;
   resetThemeStoreForTests();
+  setThemeMode('light');
 });
 
 describe('App header theme control', () => {
@@ -84,24 +84,25 @@ describe('App header theme control', () => {
     const user = userEvent.setup();
     renderApp('/campaigns');
     const header = screen.getByRole('banner');
-    expect(
-      within(header)
-        .getAllByRole('link', { name: /sunbolt/i })[0]
-        ?.getAttribute('href'),
-    ).toBe('/');
+    expect(within(header).getByRole('link', { name: 'Sunbolt home' })).toHaveAttribute('href', '/');
     // Nothing in the bar itself switches modes; the item lives in the menu.
     expect(header.querySelectorAll('button[aria-label^="Switch to"]')).toHaveLength(1);
     expect(header.querySelector('ul button[aria-label^="Switch to"]')).not.toBeNull();
 
+    const summary = within(header).getByLabelText('Open user menu');
+    await user.click(summary);
     const item = within(header).getByRole('button', { name: 'Switch to Dark mode' });
     expect(item.textContent).toBe('Dark mode');
     expect(item.closest('ul')).not.toBeNull();
     await user.click(item);
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
+    expect(document.documentElement.dataset.theme).toBe('corona-obsidian');
     const back = within(header).getByRole('button', { name: 'Switch to Light mode' });
     expect(back.textContent).toBe('Light mode');
     await user.click(back);
-    expect(document.documentElement.dataset.theme).toBe('sunbolt');
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
+    await user.keyboard('{Escape}');
+    expect(summary.closest('details')).not.toHaveAttribute('open');
+    expect(summary).toHaveFocus();
   });
 
   it('lets guests switch mode from the menu too', () => {
@@ -140,7 +141,10 @@ describe('compact character header chrome', () => {
     const item = within(panel).getByRole('button', { name: 'Switch to Dark mode' });
     expect(item.textContent).toBe('Dark mode');
     await user.click(item);
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
+    expect(document.documentElement.dataset.theme).toBe('corona-obsidian');
+    await user.keyboard('{Escape}');
+    expect(hamburger.closest('details')).not.toHaveAttribute('open');
+    expect(hamburger).toHaveFocus();
   });
 
   it('omits the bell for guests and keeps the hamburger last', () => {
