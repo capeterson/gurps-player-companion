@@ -5,22 +5,22 @@ root README links those exact files; the unauthenticated landing page serves
 those same assets at `/screenshots/`. Refresh them together by replacing the
 canonical files, never by adding a second copy under `docs/`.
 
-Captured on 2026-11-06 from `9929743` plus the Sunbolt rebrand (new name,
-icon and Sunbolt light theme) in this
+Captured on 2026-11-20 from `69be9e0` plus the solar-glass theme change
+(Heliolance, Daybreak Lens and Corona Obsidian) in this
 change. These are real Chromium screenshots, not mockups, captured from
-this checkout's isolated `gpc-1839787720` development stack at
-`http://localhost:27720`, using the migrated and locally seeded
-`gurps` database. All pictured accounts, characters, and campaigns come
+this checkout's isolated `gpc-2507003398` development stack at
+`http://localhost:23398`, using a freshly migrated and locally seeded
+`gurps_demo` database. All pictured accounts, characters, and campaigns come
 from the fictional [standard seed](../../bootstrap/README.md); no production
 account or campaign was used.
 
 | Canonical file | Surface | Theme | Image size |
 | --- | --- | --- | --- |
-| `armor-desktop.png` | Complete Incoming attack panel: torso protection, coverage map, active defenses, and cutting-damage controls | Gilded Tome | 1224 × 1179 |
-| `combat-mobile.png` | Kestrel Vale's Combat section, current HP/FP, weapon attacks, and mobile navigation | Gilded Tome | 430 × 932 |
-| `damage-mobile.png` | Incoming-damage preview: 10 cutting damage against torso DR 8 yields 3 injury | Gilded Tome | 430 × 932 |
-| `inventory-desktop.png` | Complete Inventory panel, worn/equipped equipment, and expanded three-level trail-pack contents | Sunbolt | 1224 × 1627 |
-| `campaign-desktop.png` | Lantern Coast campaign overview, rules, roster, and workspace navigation | Sunbolt | 1440 × 920 |
+| `armor-desktop.png` | Complete Incoming attack panel: torso protection, coverage map, active defenses, and cutting-damage controls | Corona Obsidian | 1224 × 1180 |
+| `combat-mobile.png` | Kestrel Vale's Combat section, current HP/FP, weapon attacks, and mobile navigation | Corona Obsidian | 430 × 932 |
+| `damage-mobile.png` | Incoming-damage preview: 10 cutting damage against torso DR 8 yields 3 injury | Corona Obsidian | 430 × 932 |
+| `inventory-desktop.png` | Complete Inventory panel, worn/equipped equipment, and expanded three-level trail-pack contents | Heliolance | 1224 × 1650 |
+| `campaign-desktop.png` | Lantern Coast campaign overview, rules, roster, and workspace navigation | Heliolance | 1440 × 920 |
 
 Desktop panel captures use a 1440-pixel browser width and a tall viewport so the
 floating sheet dock does not overlap the pictured panel. Mobile captures use a

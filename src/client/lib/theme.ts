@@ -18,25 +18,20 @@
  */
 import { useSyncExternalStore } from 'react';
 import {
-  DARK_THEMES,
   DEFAULT_DARK_THEME,
   DEFAULT_LIGHT_THEME,
-  type DarkThemeName,
-  LEGACY_THEME_ALIASES,
   LIGHT_THEMES,
   type LightThemeName,
   THEME_LABELS,
   type ThemeName,
   type ThemePreferences,
-  darkThemeName,
-  lightThemeName,
   themePreferences,
 } from '../../shared/schemas/themePreferences.ts';
 import { ApiError, api } from './api.ts';
 import { CONNECTION_CHANGE_EVENT, connectionStore } from './connectionState.ts';
 
-export type { DarkThemeName, LightThemeName, ThemeName, ThemePreferences };
-export { DARK_THEMES, LIGHT_THEMES, THEME_LABELS };
+export type { LightThemeName, ThemePreferences };
+export { LIGHT_THEMES, THEME_LABELS };
 
 export type ThemeMode = 'dark' | 'light';
 export type ThemePreferenceField = keyof ThemePreferences;
@@ -53,8 +48,9 @@ export interface ThemeRejection {
   readonly reason: string;
 }
 
-const MODE_KEY = 'gpc.theme';
-const PREFERENCES_KEY = 'gpc.themePreferences';
+// Keep obsolete tabs (including their offline queue) outside this palette generation.
+const MODE_KEY = 'gpc.theme.v2';
+const PREFERENCES_KEY = 'gpc.themePreferences.v2';
 const PREFERENCES_ENDPOINT = '/auth/preferences';
 
 export const THEME_FIELD_LABELS: Record<ThemePreferenceField, string> = {
@@ -64,13 +60,9 @@ export const THEME_FIELD_LABELS: Record<ThemePreferenceField, string> = {
 
 /** Browser chrome colour (address bar, PWA title bar) for each theme's page background. */
 const THEME_COLORS: Record<ThemeName, string> = {
-  'arcane-dark': '#1d1526',
-  'arcane-light': '#f6f4f1',
-  'gilded-tome': '#16110d',
-  'midnight-gilt': '#0d1220',
-  'verdigris-brass': '#0c1715',
-  sunbolt: '#f9f2df',
-  'heraldic-vellum': '#f2f4f8',
+  heliolance: '#faf4e9',
+  'daybreak-lens': '#dce9e3',
+  'corona-obsidian': '#151727',
 };
 
 const DEFAULT_PREFERENCES: ThemePreferences = {
@@ -88,9 +80,7 @@ function storage(): Storage | null {
 
 export function readStoredMode(): ThemeMode {
   const stored = storage()?.getItem(MODE_KEY);
-  // `arcane-*` values predate the gold themes; they only ever recorded the mode.
-  if (stored === 'dark' || stored === 'arcane-dark') return 'dark';
-  if (stored === 'light' || stored === 'arcane-light') return 'light';
+  if (stored === 'dark' || stored === 'light') return stored;
   if (typeof window === 'undefined') return 'dark';
   return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
 }
@@ -100,25 +90,22 @@ function readStoredPreferences(): { preferences: ThemePreferences; pending: bool
   if (!raw) return { preferences: DEFAULT_PREFERENCES, pending: false };
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
-    const dark = darkThemeName.safeParse(value.darkTheme);
-    const light = lightThemeName.safeParse(
-      typeof value.lightTheme === 'string'
-        ? (LEGACY_THEME_ALIASES[value.lightTheme] ?? value.lightTheme)
-        : value.lightTheme,
-    );
-    return {
-      preferences: {
-        darkTheme: dark.success ? dark.data : DEFAULT_DARK_THEME,
-        lightTheme: light.success ? light.data : DEFAULT_LIGHT_THEME,
-      },
-      pending: value.pending === true,
-    };
+    const parsed = themePreferences.safeParse(value);
+    if (parsed.success) return { preferences: parsed.data, pending: value.pending === true };
   } catch {
-    return { preferences: DEFAULT_PREFERENCES, pending: false };
+    // Malformed or obsolete preferences cannot be sent as a pending edit.
   }
+  return { preferences: DEFAULT_PREFERENCES, pending: false };
 }
 
 function readStoredState(): ThemeState {
+  const store = storage();
+  try {
+    store?.removeItem('gpc.theme');
+    store?.removeItem('gpc.themePreferences');
+  } catch {
+    // Even if these keys cannot be removed, only this generation's keys are read.
+  }
   return { mode: readStoredMode(), ...readStoredPreferences() };
 }
 

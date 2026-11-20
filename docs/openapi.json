@@ -46,18 +46,14 @@
           "darkTheme": {
             "type": "string",
             "enum": [
-              "gilded-tome",
-              "midnight-gilt",
-              "verdigris-brass",
-              "arcane-dark"
+              "corona-obsidian"
             ]
           },
           "lightTheme": {
             "type": "string",
             "enum": [
-              "sunbolt",
-              "heraldic-vellum",
-              "arcane-light"
+              "heliolance",
+              "daybreak-lens"
             ]
           }
         },
@@ -72,18 +68,14 @@
           "darkTheme": {
             "type": "string",
             "enum": [
-              "gilded-tome",
-              "midnight-gilt",
-              "verdigris-brass",
-              "arcane-dark"
+              "corona-obsidian"
             ]
           },
           "lightTheme": {
             "type": "string",
             "enum": [
-              "sunbolt",
-              "heraldic-vellum",
-              "arcane-light"
+              "heliolance",
+              "daybreak-lens"
             ]
           }
         },

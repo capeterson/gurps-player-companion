@@ -1,5 +1,6 @@
 import { type Page, expect, test } from '@playwright/test';
 import { selectCharacterSection } from './character-navigation';
+import { ensureThemeMode } from './header-theme';
 import { captureReviewScreenshot, reviewArtifactsEnabled } from './review-artifacts';
 
 async function create(page: Page, path: string, data: object) {
@@ -121,7 +122,7 @@ test('ranged attack sheet combines Aim, bounded range, body map and a reachable 
     await sheet.getByRole('button', { name: 'Close' }).last().click();
   }
 
-  await page.evaluate(() => localStorage.setItem('gpc.theme', 'dark'));
+  await ensureThemeMode(page, 'Dark');
   await page.setViewportSize({ width: 575, height: 900 });
   await page.reload();
   await selectCharacterSection(page, 'Combat');

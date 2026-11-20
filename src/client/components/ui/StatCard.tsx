@@ -1,11 +1,7 @@
 import type { ReactNode } from 'react';
 import { AppIcon, type AppIconName } from './AppIcon.tsx';
 
-/**
- * Card with a Fraunces title and an optional point-cost eyebrow.
- * The four hero cards on the character sheet (Attributes, Derived,
- * Modifiers, Point Ledger) lean on this so the chrome is consistent.
- */
+/** A section band with its point cost or actions, over a matte stat surface. */
 export function StatCard({
   title,
   icon,
@@ -23,26 +19,20 @@ export function StatCard({
   className?: string;
 }) {
   return (
-    <section className={`card bg-base-100 border border-base-300/60 rounded-2xl ${className}`}>
-      <div className="card-body p-5">
-        <header
-          className={`flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 ${children == null ? '' : 'mb-3.5'}`}
-        >
-          <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-base-content">
-            {icon && <AppIcon name={icon} size={18} className="text-muted" />}
-            {title}
-          </h2>
-          <span className="flex items-center gap-2">
-            {headerExtra}
-            {points !== undefined && (
-              <span className="num text-[11px] tracking-wider text-base-content/60">
-                {points} pts
-              </span>
-            )}
-          </span>
-        </header>
-        {children}
-      </div>
+    <section className={`card rounded-box border border-base-300/60 bg-base-100 ${className}`}>
+      <header className="stat-band flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-5 py-3">
+        <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-base-content">
+          {icon && <AppIcon name={icon} size={18} className="text-muted" />}
+          {title}
+        </h2>
+        <span className="flex items-center gap-2">
+          {headerExtra}
+          {points !== undefined && (
+            <span className="num text-[11px] tracking-wider text-muted">{points} pts</span>
+          )}
+        </span>
+      </header>
+      {children != null && <div className="card-body p-5">{children}</div>}
     </section>
   );
 }

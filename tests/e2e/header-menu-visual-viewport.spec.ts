@@ -139,10 +139,7 @@ test('account and compact character menus remain touch reachable through resize 
     await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
     await settleViewport(page);
 
-    const brandLink = page
-      .locator('header.app-header a[aria-label="Sunbolt home"], header.app-header a[href="/"]')
-      .filter({ visible: true })
-      .first();
+    const brandLink = page.locator('header.app-header').getByRole('link', { name: 'Sunbolt home' });
     const hpTrigger = page.getByRole('button', { name: /^Adjust HP,/ });
     await expect(brandLink).toBeVisible();
     const brandBounds = await brandLink.boundingBox();
@@ -173,6 +170,17 @@ test('account and compact character menus remain touch reachable through resize 
       continue;
     }
 
+    // Tablet space goes between the resource pair and utilities, rather than
+    // pushing the two values hundreds of pixels apart.
+    const fpBounds = await page.getByRole('button', { name: /^Adjust FP,/ }).boundingBox();
+    expect(fpBounds).not.toBeNull();
+    if (hpBounds && fpBounds) {
+      expect(fpBounds.x).toBeCloseTo(hpBounds.x + hpBounds.width, 0);
+      expect(Math.max(hpBounds.width, fpBounds.width)).toBeLessThanOrEqual(128);
+    }
+    const wordmark = brandLink.getByText('Sunbolt', { exact: true });
+    if (viewport.width >= 640) await expect(wordmark).toBeVisible();
+    else await expect(wordmark).toBeHidden();
     const trigger = compactNav.locator('summary');
     await trigger.tap();
     const menu = compactNav.locator('ul.dropdown-content');

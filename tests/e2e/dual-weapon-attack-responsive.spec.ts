@@ -1,6 +1,7 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { test } from './authenticated-fixture';
 import { selectCharacterSection } from './character-navigation';
+import { ensureThemeMode } from './header-theme';
 import { reviewArtifactsEnabled } from './review-artifacts';
 
 test.use({ serviceWorkers: 'block', actionTimeout: 15_000 });
@@ -282,15 +283,8 @@ test('Dual-Weapon Attack picks, penalties and overlays stay inside the viewport'
 
   if (reviewArtifactsEnabled && SHOT_DIR) {
     // Review screenshots of the open card with the mode active (light and dark).
-    const themeNames = new Map<string, string>();
     for (const scheme of ['light', 'dark'] as const) {
-      // The stored mode wins over the OS preference, so set it and reload.
-      await page.evaluate((mode) => localStorage.setItem('gpc.theme', mode), scheme);
-      await page.reload();
-      await selectCharacterSection(page, 'Combat');
-      await expect(attacks).toBeVisible({ timeout: 20_000 });
-      const themeName = await page.evaluate(() => document.documentElement.dataset.theme ?? '');
-      themeNames.set(scheme, themeName);
+      await ensureThemeMode(page, scheme === 'light' ? 'Light' : 'Dark');
       for (const viewport of [
         { width: 390, height: 844 },
         { width: 640, height: 800 },
@@ -314,6 +308,5 @@ test('Dual-Weapon Attack picks, penalties and overlays stay inside the viewport'
         await toggle.click();
       }
     }
-    expect(themeNames.get('light')).not.toBe(themeNames.get('dark'));
   }
 });

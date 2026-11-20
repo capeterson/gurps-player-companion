@@ -28,78 +28,63 @@ function patch(token: string, body: unknown) {
 }
 
 describe('/api/v1/auth/preferences', () => {
-  it('defaults to the Gilded Tome and Sunbolt palettes and persists changes', async () => {
+  it('defaults to the solar glass palettes and persists the alternate light palette', async () => {
     const token = await register();
     const initial = await app.request('/api/v1/auth/preferences', {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(initial.status).toBe(200);
     expect(await initial.json()).toEqual({
-      darkTheme: 'gilded-tome',
-      lightTheme: 'sunbolt',
+      darkTheme: 'corona-obsidian',
+      lightTheme: 'heliolance',
     });
 
-    const dark = await patch(token, { darkTheme: 'midnight-gilt' });
+    const dark = await patch(token, { darkTheme: 'corona-obsidian' });
     expect(dark.status).toBe(200);
-    expect(await dark.json()).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'sunbolt',
-    });
 
-    const verdigris = await patch(token, { darkTheme: 'verdigris-brass' });
-    expect(verdigris.status).toBe(200);
-    expect(((await verdigris.json()) as { darkTheme: string }).darkTheme).toBe('verdigris-brass');
-    expect((await patch(token, { darkTheme: 'midnight-gilt' })).status).toBe(200);
-
-    const light = await patch(token, { lightTheme: 'heraldic-vellum' });
+    const light = await patch(token, { lightTheme: 'daybreak-lens' });
+    expect(light.status).toBe(200);
     expect(await light.json()).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'heraldic-vellum',
+      darkTheme: 'corona-obsidian',
+      lightTheme: 'daybreak-lens',
     });
 
     const reread = await app.request('/api/v1/auth/preferences', {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(await reread.json()).toEqual({
-      darkTheme: 'midnight-gilt',
-      lightTheme: 'heraldic-vellum',
+      darkTheme: 'corona-obsidian',
+      lightTheme: 'daybreak-lens',
     });
 
-    const arcaneDark = await patch(token, { darkTheme: 'arcane-dark' });
-    expect(arcaneDark.status).toBe(200);
-    expect(await arcaneDark.json()).toEqual({
-      darkTheme: 'arcane-dark',
-      lightTheme: 'heraldic-vellum',
-    });
-    const arcaneLight = await patch(token, { lightTheme: 'arcane-light' });
-    expect(arcaneLight.status).toBe(200);
-    expect(await arcaneLight.json()).toEqual({
-      darkTheme: 'arcane-dark',
-      lightTheme: 'arcane-light',
-    });
-    const restored = await app.request('/api/v1/auth/preferences', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    expect(restored.status).toBe(200);
-    expect(await restored.json()).toEqual({
-      darkTheme: 'arcane-dark',
-      lightTheme: 'arcane-light',
-    });
-
-    // Validation: a light palette in the dark slot, unknown names, unknown
-    // keys, and an empty body are all rejected without changing the row.
-    expect((await patch(token, { darkTheme: 'heraldic-vellum' })).status).toBe(422);
-    expect((await patch(token, { lightTheme: 'unknown-palette' })).status).toBe(422);
-    expect((await patch(token, { darkTheme: 'arcane-light' })).status).toBe(422);
-    expect((await patch(token, { lightTheme: 'arcane-dark' })).status).toBe(422);
+    // A stale client cannot reinstate retired palettes; slots remain mode-specific.
+    for (const name of [
+      'gilded-tome',
+      'midnight-gilt',
+      'verdigris-brass',
+      'arcane-dark',
+      'heliolance',
+    ]) {
+      expect((await patch(token, { darkTheme: name })).status).toBe(422);
+    }
+    for (const name of [
+      'sunbolt',
+      'illuminated-manuscript',
+      'heraldic-vellum',
+      'arcane-light',
+      'corona-obsidian',
+      'unknown-palette',
+    ]) {
+      expect((await patch(token, { lightTheme: name })).status).toBe(422);
+    }
     expect((await patch(token, { mode: 'dark' })).status).toBe(422);
     expect((await patch(token, {})).status).toBe(422);
     const unchanged = await app.request('/api/v1/auth/preferences', {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(await unchanged.json()).toEqual({
-      darkTheme: 'arcane-dark',
-      lightTheme: 'arcane-light',
+      darkTheme: 'corona-obsidian',
+      lightTheme: 'daybreak-lens',
     });
   });
 
@@ -115,6 +100,6 @@ describe('/api/v1/auth/preferences', () => {
     });
     expect(createKey.status).toBe(201);
     const { plaintextKey } = (await createKey.json()) as { plaintextKey: string };
-    expect((await patch(plaintextKey, { darkTheme: 'midnight-gilt' })).status).toBe(401);
+    expect((await patch(plaintextKey, { lightTheme: 'daybreak-lens' })).status).toBe(401);
   });
 });

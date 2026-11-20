@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { type Page, expect, test } from '@playwright/test';
 import { expectCharacterNavigationReady } from './character-navigation';
+import { ensureThemeMode } from './header-theme';
 import { captureReviewScreenshot, reviewArtifactsEnabled } from './review-artifacts';
 
 const suffix = () => `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -106,16 +107,6 @@ async function chooseCampaign(page: import('@playwright/test').Page, name: strin
   const select = await continueCampaignWarning(page);
   await select.selectOption({ label: name });
   return page.getByRole('dialog', { name: 'Are you sure?' });
-}
-
-async function setColorTheme(page: import('@playwright/test').Page, theme: 'light' | 'dark') {
-  const switchName = theme === 'dark' ? /switch to dark mode/i : /switch to light mode/i;
-  const switcher = page.getByRole('button', { name: switchName });
-  if (await switcher.isVisible().catch(() => false)) await switcher.click();
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-theme',
-    theme === 'dark' ? 'arcane-dark' : 'arcane-light',
-  );
 }
 
 async function expectCampaignLinkAndPencil(
@@ -253,7 +244,7 @@ test('landing hero headline keeps its intended two lines across responsive break
   }
 });
 
-test('public landing, classic palette, Overview default, and campaign reassignment warning work', async ({
+test('public landing, palette choices, Overview default, and campaign reassignment warning work', async ({
   page,
 }, testInfo) => {
   test.setTimeout(120_000);
@@ -269,9 +260,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await expect(
     page.getByRole('img', { name: /Sunbolt Combat section showing armor coverage/i }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('img', { name: /Sunbolt inventory in the Sunbolt theme/i }),
-  ).toBeVisible();
+  await expect(page.getByRole('img', { name: /Sunbolt inventory/i })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /built for long sessions|make it your companion/i }),
   ).toHaveCount(0);
@@ -308,16 +297,17 @@ test('public landing, classic palette, Overview default, and campaign reassignme
   await expect(page.getByRole('navigation')).toBeVisible({ timeout: 15_000 });
 
   await page.goto('/settings');
-  const darkTheme = page.getByLabel('Dark theme');
-  await expect(darkTheme).toBeVisible();
-  await darkTheme.selectOption('arcane-dark');
-  await page.getByRole('button', { name: /switch to dark mode/i }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'arcane-dark');
+  await expect(page.getByText('Corona Obsidian', { exact: true })).toBeVisible();
   const lightTheme = page.getByLabel('Light theme');
-  await expect(lightTheme).toContainText('Arcane Purple');
-  await lightTheme.selectOption('arcane-light');
-  await page.getByRole('button', { name: /switch to light mode/i }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'arcane-light');
+  await expect(lightTheme.getByRole('option')).toHaveText(['Heliolance', 'Daybreak Lens']);
+  await expect(lightTheme).toHaveValue('heliolance');
+  await ensureThemeMode(page, 'Light');
+  await ensureThemeMode(page, 'Dark');
+  await lightTheme.selectOption('daybreak-lens');
+  await ensureThemeMode(page, 'Light', 'daybreak-lens');
+  await page.reload();
+  await expect(lightTheme).toHaveValue('daybreak-lens');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'daybreak-lens');
 
   const firstCampaignName = `CampaignA${'AmberMarchesUnbrokenName'.repeat(2)} ${suffix()}`;
   await createCampaign(page, firstCampaignName);
@@ -418,7 +408,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
 
   const widths = [320, 375, 390, 430, 575, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025];
   for (const theme of ['light', 'dark'] as const) {
-    await setColorTheme(page, theme);
+    await ensureThemeMode(page, theme === 'dark' ? 'Dark' : 'Light', 'daybreak-lens');
     for (const width of [320, 375, 575, 639, 640, 641, 767, 768, 769, 1023, 1024, 1025]) {
       const height = width < 768 ? 844 : 900;
       await page.setViewportSize({ width, height });
@@ -475,7 +465,7 @@ test('public landing, classic palette, Overview default, and campaign reassignme
     }
   }
 
-  await setColorTheme(page, 'light');
+  await ensureThemeMode(page, 'Light', 'daybreak-lens');
   await page.setViewportSize({ width: 1280, height: 900 });
   const confirmation = await chooseCampaign(page, secondCampaignName);
   await confirmation.getByRole('button', { name: 'Change campaign', exact: true }).click();

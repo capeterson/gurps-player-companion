@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 120">
+  <defs>
+    <linearGradient id="corona" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#a48dbb" stop-opacity=".14"/>
+      <stop offset=".66" stop-color="#cfac73" stop-opacity=".53"/>
+      <stop offset="1" stop-color="#ffe5ac"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" transform="rotate(-14 42 40)">
+    <ellipse cx="42" cy="40" rx="106" ry="36" stroke="#a492bd" stroke-opacity=".53" stroke-width="4"/>
+    <ellipse cx="43" cy="37" rx="108" ry="37" stroke="url(#corona)" stroke-width="2"/>
+    <ellipse cx="44" cy="36" rx="157" ry="44" stroke="#9984ba" stroke-opacity=".62"/>
+    <path d="M95 7Q147 10 150 35" stroke="#ffe5ac" stroke-opacity=".86" stroke-width="2.5"/>
+  </g>
+</svg>

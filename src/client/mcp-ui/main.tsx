@@ -8,6 +8,7 @@ import {
   characterDetailEnvelope,
 } from '../../shared/schemas/character.ts';
 import { type FocusedDetail, focusedDetail } from '../../shared/schemas/details.ts';
+import { DEFAULT_DARK_THEME, DEFAULT_LIGHT_THEME } from '../../shared/schemas/themePreferences.ts';
 import { ToastProvider } from '../lib/toast.tsx';
 import './style.css';
 import { CharacterDetailsApp } from './CharacterDetailsApp.tsx';
@@ -75,7 +76,8 @@ function EmbeddedCharacter() {
     const app = new App({ name: 'GURPS details', version: '0.1.0' }, {});
     appRef.current = app;
     const theme = (value?: string) => {
-      document.documentElement.dataset.theme = value === 'light' ? 'sunbolt' : 'gilded-tome';
+      document.documentElement.dataset.theme =
+        value === 'dark' ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME;
     };
     app.onhostcontextchanged = ({ theme: value }) => theme(value);
     app.ontoolinput = ({ arguments: input }) => {

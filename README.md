@@ -4,7 +4,7 @@
 
 **Your character sheet, combat companion, and campaign notebook — at the table or on the go.**
 
-Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Use it on a phone, tablet, or desktop, with customizable light and dark palettes (including classic Arcane purple) and an installable app that keeps character edits available offline.
+Keep your GURPS 4e characters ready for the next session. Roll attacks, see where your armor protects you, track spells and equipment, and share a campaign with your group. Choose Heliolance or Daybreak Lens for light mode, or Corona Obsidian for dark mode. Install the app on your phone, tablet, or desktop to keep character edits available offline.
 
 To install on Android, open the app in Chrome and use **Install app** from the
 browser menu (the wording varies by browser). Open your characters online once

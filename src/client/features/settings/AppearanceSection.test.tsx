@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,13 +9,13 @@ vi.mock('../../lib/api.ts', async (importOriginal) => {
 });
 
 import { ApiError, api } from '../../lib/api.ts';
-import { type ThemePreferences, resetThemeStoreForTests } from '../../lib/theme.ts';
+import { type ThemePreferences, resetThemeStoreForTests, setThemeMode } from '../../lib/theme.ts';
 import { useThemePreferenceSync } from '../../lib/themeSync.ts';
 import { ToastProvider } from '../../lib/toast.tsx';
 import { AppearanceSection } from './AppearanceSection.tsx';
 
 const apiMock = vi.mocked(api);
-const SERVER: ThemePreferences = { darkTheme: 'gilded-tome', lightTheme: 'sunbolt' };
+const SERVER: ThemePreferences = { darkTheme: 'corona-obsidian', lightTheme: 'heliolance' };
 
 function Harness() {
   useThemePreferenceSync();
@@ -33,45 +33,42 @@ function renderSection() {
   );
 }
 
-function isPatch(init: unknown) {
-  return (init as { method?: string } | undefined)?.method === 'PATCH';
-}
-
 function patchBodies() {
   return apiMock.mock.calls
-    .filter(([, init]) => isPatch(init))
-    .map(([, init]) => (init as { body: unknown }).body);
+    .filter(([, init]) => init?.method === 'PATCH')
+    .map(([, init]) => init?.body);
 }
 
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem('gpc.theme', 'dark');
+  localStorage.setItem('gpc.theme.v2', 'light');
   apiMock.mockReset();
   resetThemeStoreForTests();
 });
 
 describe('AppearanceSection', () => {
-  it('offers the named themes for each mode and saves a change', async () => {
+  it('offers both light palettes but no single-option dark picker', async () => {
     apiMock.mockImplementation(async (_path, init) =>
-      isPatch(init) ? { ...SERVER, ...(init as { body: object }).body } : SERVER,
+      init?.method === 'PATCH' ? init.body : SERVER,
     );
     renderSection();
-    const dark = screen.getByLabelText('Dark theme');
-    const light = screen.getByLabelText('Light theme');
+    const light = screen.getByRole('combobox', { name: 'Light theme' }) as HTMLSelectElement;
     expect(screen.getByRole('heading', { name: 'Appearance' })).toBeTruthy();
-    expect(
-      Array.from((dark as HTMLSelectElement).options).map((option) => option.textContent),
-    ).toEqual(['Gilded Tome', 'Midnight Gilt', 'Verdigris & Brass', 'Arcane Purple']);
-    expect(
-      Array.from((light as HTMLSelectElement).options).map((option) => option.textContent),
-    ).toEqual(['Sunbolt', 'Heraldic Vellum', 'Arcane Purple']);
-    expect((dark as HTMLSelectElement).value).toBe('gilded-tome');
+    expect(screen.getAllByRole('combobox')).toHaveLength(1);
+    expect(screen.getByText('Corona Obsidian')).toBeTruthy();
+    expect(Array.from(light.options, (option) => option.textContent)).toEqual([
+      'Heliolance',
+      'Daybreak Lens',
+    ]);
+    expect(light.value).toBe('heliolance');
 
-    await userEvent.selectOptions(dark, 'Midnight Gilt');
-    expect((dark as HTMLSelectElement).value).toBe('midnight-gilt');
-    expect(document.documentElement.dataset.theme).toBe('midnight-gilt');
+    await userEvent.selectOptions(light, 'Daybreak Lens');
+    expect(light.value).toBe('daybreak-lens');
+    expect(document.documentElement.dataset.theme).toBe('daybreak-lens');
     await waitFor(() =>
-      expect(patchBodies()).toEqual([{ darkTheme: 'midnight-gilt', lightTheme: 'sunbolt' }]),
+      expect(patchBodies()).toEqual([
+        { darkTheme: 'corona-obsidian', lightTheme: 'daybreak-lens' },
+      ]),
     );
     await waitFor(() =>
       expect(screen.queryByText('Saved on this device — syncing to your account…')).toBeNull(),
@@ -80,77 +77,67 @@ describe('AppearanceSection', () => {
 
   it('rolls a rejected change back with a toast and a flash', async () => {
     apiMock.mockImplementation(async (_path, init) => {
-      if (isPatch(init)) throw new ApiError(422, 'theme not allowed');
+      if (init?.method === 'PATCH') throw new ApiError(422, 'theme not allowed');
       return SERVER;
     });
     renderSection();
     const light = screen.getByLabelText('Light theme') as HTMLSelectElement;
-    await userEvent.selectOptions(light, 'Heraldic Vellum');
+    await userEvent.selectOptions(light, 'Daybreak Lens');
 
     expect(await screen.findByText("Couldn't save light theme — theme not allowed")).toBeTruthy();
-    await waitFor(() => expect(light.value).toBe('sunbolt'));
+    await waitFor(() => expect(light.value).toBe('heliolance'));
     expect(light.getAttribute('data-flashing')).toBe('true');
   });
 
-  it('lets a different-field edit land while a slow save is in flight', async () => {
+  it('retains a device mode change while a palette save is in flight', async () => {
     let releaseFirst!: () => void;
-    let patches = 0;
     apiMock.mockImplementation(async (_path, init) => {
-      if (!isPatch(init)) return SERVER;
-      patches += 1;
-      const body = (init as { body: ThemePreferences }).body;
-      if (patches === 1) {
-        await new Promise<void>((resolve) => {
-          releaseFirst = resolve;
-        });
-        return { ...body, lightTheme: 'sunbolt' };
-      }
-      return body;
+      if (init?.method !== 'PATCH') return SERVER;
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      return init.body;
     });
     renderSection();
-    const dark = screen.getByLabelText('Dark theme') as HTMLSelectElement;
     const light = screen.getByLabelText('Light theme') as HTMLSelectElement;
-    await userEvent.selectOptions(dark, 'Midnight Gilt');
-    await userEvent.selectOptions(light, 'Heraldic Vellum');
+    await userEvent.selectOptions(light, 'Daybreak Lens');
+    act(() => setThemeMode('dark'));
     releaseFirst();
 
     await waitFor(() =>
-      expect(patchBodies().at(-1)).toEqual({
-        darkTheme: 'midnight-gilt',
-        lightTheme: 'heraldic-vellum',
-      }),
+      expect(screen.queryByText('Saved on this device — syncing to your account…')).toBeNull(),
     );
-    expect(dark.value).toBe('midnight-gilt');
-    expect(light.value).toBe('heraldic-vellum');
+    expect(patchBodies()).toHaveLength(1);
+    expect(light.value).toBe('daybreak-lens');
+    expect(document.documentElement.dataset.theme).toBe('corona-obsidian');
   });
 
   it('queues a same-field edit behind a slow save and sends it afterwards', async () => {
     let releaseFirst!: () => void;
     let patches = 0;
     apiMock.mockImplementation(async (_path, init) => {
-      if (!isPatch(init)) return SERVER;
+      if (init?.method !== 'PATCH') return SERVER;
       patches += 1;
-      const body = (init as { body: ThemePreferences }).body;
       if (patches === 1) {
         await new Promise<void>((resolve) => {
           releaseFirst = resolve;
         });
       }
-      return body;
+      return init.body;
     });
     renderSection();
-    const dark = screen.getByLabelText('Dark theme') as HTMLSelectElement;
-    await userEvent.selectOptions(dark, 'Midnight Gilt');
-    await userEvent.selectOptions(dark, 'Gilded Tome');
+    const light = screen.getByLabelText('Light theme') as HTMLSelectElement;
+    await userEvent.selectOptions(light, 'Daybreak Lens');
+    await userEvent.selectOptions(light, 'Heliolance');
     expect(patchBodies()).toHaveLength(1);
     releaseFirst();
 
     await waitFor(() => expect(patchBodies()).toHaveLength(2));
     expect(patchBodies()[1]).toEqual({
-      darkTheme: 'gilded-tome',
-      lightTheme: 'sunbolt',
+      darkTheme: 'corona-obsidian',
+      lightTheme: 'heliolance',
     });
-    expect(dark.value).toBe('gilded-tome');
-    expect(document.documentElement.dataset.theme).toBe('gilded-tome');
+    expect(light.value).toBe('heliolance');
+    expect(document.documentElement.dataset.theme).toBe('heliolance');
   });
 });

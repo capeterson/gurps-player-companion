@@ -96,8 +96,11 @@ export function App() {
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (mobileCharacterMenuRef.current) mobileCharacterMenuRef.current.open = false;
-      if (userMenuRef.current) userMenuRef.current.open = false;
+      for (const menu of [mobileCharacterMenuRef.current, userMenuRef.current]) {
+        if (!menu?.open) continue;
+        if (menu.contains(document.activeElement)) menu.querySelector('summary')?.focus();
+        menu.open = false;
+      }
     }
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -160,13 +163,30 @@ export function App() {
   );
 
   const characterName = entityBreadcrumb?.kind === 'character' ? entityBreadcrumb.name : null;
+  const accountIdentity = (
+    <li className="menu-title block px-3 py-2">
+      {guest ? (
+        'Read-only preview'
+      ) : me.data ? (
+        <span className="block">
+          {me.data.displayName}
+          <small className="block font-normal text-muted">{me.data.email}</small>
+        </span>
+      ) : (
+        'Account'
+      )}
+    </li>
+  );
   const compactBrand = (
     <Link
       to="/"
       aria-label="Sunbolt home"
-      className="flex h-11 w-11 items-center justify-center no-cap"
+      className="flex h-11 items-center no-cap sm:gap-1 sm:pr-3"
     >
-      <BrandMark />
+      <span className="grid size-11 shrink-0 place-items-center">
+        <BrandMark />
+      </span>
+      <span className="hidden font-display font-semibold sm:inline">Sunbolt</span>
     </Link>
   );
   const mobileCharacterMenu = (
@@ -175,7 +195,7 @@ export function App() {
         <summary
           className="btn btn-ghost btn-sm min-h-11! h-11! w-11! shrink-0 justify-center rounded-none border-0 p-0 shadow-none"
           aria-label={`Open navigation for ${characterName ?? 'character'}`}
-          title={characterName ?? 'Character navigation'}
+          title="Open navigation"
         >
           <AppIcon name="menu" size={20} />
         </summary>
@@ -188,15 +208,7 @@ export function App() {
           }}
           className="menu dropdown-content z-50 mt-1 w-52 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
         >
-          <li className="menu-title px-3 py-2">
-            <span>
-              {guest
-                ? 'Read-only preview'
-                : me.data
-                  ? `${me.data.displayName} · ${me.data.email}`
-                  : 'Account'}
-            </span>
-          </li>
+          {accountIdentity}
           <li>
             <Link to="/">Home</Link>
           </li>
@@ -259,20 +271,24 @@ export function App() {
     >
       <div className="arcane-edge min-h-screen bg-base-200 text-base-content">
         <header
-          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-2 border-b border-base-300 px-3 py-2 sm:gap-6 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 bg-base-100 max-[1280px]:px-2! max-[1280px]:py-1! sm:gap-y-0 min-[1280px]:gap-x-3' : 'bg-base-100/95 backdrop-blur'}`}
+          className={`app-header sticky top-0 z-50 flex w-full flex-wrap items-center justify-between gap-1 border-b border-base-300 bg-base-100 px-1 py-1 sm:gap-3 sm:px-7 sm:py-3 ${characterDetail ? 'gap-y-0 sm:gap-y-0 max-xl:has-[#character-status-header-slot>aside]:px-2 max-xl:has-[#character-status-header-slot>aside]:py-1' : ''}`}
         >
           <div
             data-header-row-item
             data-header-left
-            className={`app-header-normal flex min-w-0 items-center gap-3 sm:gap-6 ${characterDetail ? 'min-[1280px]:order-1 min-[1280px]:min-w-[28rem] min-[1280px]:flex-1 min-[1280px]:basis-0' : ''}`}
+            className={`app-header-normal flex min-w-0 items-center gap-1 sm:gap-4 ${characterDetail ? 'min-[1280px]:order-1 min-[1280px]:min-w-[28rem] min-[1280px]:flex-1 min-[1280px]:basis-0 min-[1280px]:gap-6' : ''}`}
           >
-            <Link to="/" className="flex items-center gap-2 no-cap sm:gap-3">
+            <Link
+              to="/"
+              aria-label="Sunbolt home"
+              className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 self-start no-cap sm:h-9 sm:min-w-0 sm:gap-3"
+            >
               <BrandMark />
               <span className="hidden font-display text-base font-semibold sm:inline">Sunbolt</span>
             </Link>
             <nav
               aria-label="Primary navigation"
-              className={`flex min-w-0 flex-1 flex-wrap items-center gap-1 ${characterDetail ? 'min-[1280px]:flex-nowrap' : ''}`}
+              className={`flex min-w-0 flex-1 flex-wrap items-center sm:gap-1 ${characterDetail ? 'min-[1280px]:flex-nowrap' : ''}`}
             >
               <div
                 className={`flex min-w-0 items-center rounded-field transition ${
@@ -281,17 +297,14 @@ export function App() {
               >
                 <Link
                   to="/characters"
-                  className={`shrink-0 whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  aria-current={pathname === '/characters' ? 'page' : undefined}
+                  className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-field px-0.5 text-xs font-medium transition sm:h-9 sm:px-3.5 sm:text-sm ${
                     characterActive
                       ? 'text-base-content'
                       : 'text-muted hover:bg-base-200 hover:text-base-content'
                   }`}
                 >
-                  <AppIcon
-                    name="identity"
-                    size={16}
-                    className="inline-block align-text-bottom mr-1.5"
-                  />
+                  <AppIcon name="identity" size={16} className="mr-1.5 hidden sm:inline-block" />
                   Character
                 </Link>
                 {entityBreadcrumb?.kind === 'character' && (
@@ -317,17 +330,14 @@ export function App() {
               >
                 <Link
                   to={CAMPAIGN_ROOT}
-                  className={`shrink-0 whitespace-nowrap rounded-field px-3 py-2 text-sm font-medium transition sm:px-3.5 ${
+                  aria-current={pathname === CAMPAIGN_ROOT ? 'page' : undefined}
+                  className={`inline-flex h-11 shrink-0 items-center whitespace-nowrap rounded-field px-0.5 text-xs font-medium transition sm:h-9 sm:px-3.5 sm:text-sm ${
                     campaignActive
                       ? 'text-base-content'
                       : 'text-muted hover:bg-base-200 hover:text-base-content'
                   }`}
                 >
-                  <AppIcon
-                    name="campaign"
-                    size={16}
-                    className="inline-block align-text-bottom mr-1.5"
-                  />
+                  <AppIcon name="campaign" size={16} className="mr-1.5 hidden sm:inline-block" />
                   Campaign
                 </Link>
                 {entityBreadcrumb?.kind === 'campaign' && (
@@ -366,27 +376,27 @@ export function App() {
           />
           <div
             data-header-row-item
-            className={`app-header-normal flex shrink-0 items-center gap-1 sm:gap-3 ${characterDetail ? 'min-[1280px]:order-5 min-[1280px]:border-l min-[1280px]:border-base-300 min-[1280px]:pl-3' : ''}`}
+            className={`app-header-normal ml-auto flex shrink-0 items-center sm:gap-2 ${characterDetail ? 'min-[1280px]:order-5 min-[1280px]:border-l min-[1280px]:border-base-300 min-[1280px]:pl-3' : ''}`}
           >
-            <SyncStatusIndicator />
-            {!guest && <NotificationsBell />}
+            <SyncStatusIndicator triggerClassName="max-sm:size-11" />
+            {!guest && <NotificationsBell triggerClassName="max-sm:size-11" />}
             <details ref={userMenuRef} className="dropdown dropdown-end relative z-50">
-              <summary className="btn btn-ghost btn-sm" aria-label="Open user menu">
+              <summary
+                className="btn btn-ghost btn-sm max-md:btn-square max-sm:size-11"
+                aria-label="Open user menu"
+              >
+                <AppIcon name="identity" size={20} className="md:hidden" />
                 {guest ? (
-                  <span>Guest</span>
+                  <span className="hidden md:inline">Guest</span>
                 ) : (
                   <>
-                    <span
-                      className={`hidden text-muted ${characterDetail ? 'min-[1536px]:inline' : 'sm:inline'}`}
-                    >
-                      Signed in as
-                    </span>
-                    <span className="max-w-[8rem] truncate sm:max-w-[12rem]">
+                    <span className="hidden text-muted min-[1536px]:inline">Signed in as</span>
+                    <span className="hidden truncate md:inline md:max-w-32 lg:max-w-48">
                       {me.data?.displayName ?? 'Account'}
                     </span>
                   </>
                 )}
-                <AppIcon name="chevronDown" size={14} />
+                <AppIcon name="chevronDown" size={14} className="hidden md:inline" />
               </summary>
               <ul
                 ref={userMenuPanelRef}
@@ -397,11 +407,7 @@ export function App() {
                 }}
                 className="menu dropdown-content z-50 mt-2 w-56 max-w-[min(calc(100dvw-1rem),var(--viewport-overlay-available-width,calc(100dvw-1rem)))] flex-nowrap overflow-y-auto [&>li]:shrink-0 [overflow-wrap:anywhere] rounded-box border border-base-300 bg-base-100 p-2 shadow-arcane-lg"
               >
-                <li className="menu-title px-3 py-2">
-                  <span>
-                    {guest ? 'Read-only preview' : (me.data?.email ?? 'Loading account…')}
-                  </span>
-                </li>
+                {accountIdentity}
                 <li>
                   <Link to="/about">About</Link>
                 </li>
