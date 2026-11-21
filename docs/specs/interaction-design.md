@@ -430,10 +430,12 @@ when the text contains no spaces.
 Long account names remain width-bounded in the shared header at all breakpoints;
 opening the account menu must not horizontally scroll the page. The home welcome
 heading wraps unbroken account names within its card.
-Heliolance uses the First Light treatment: a fine amber-edged beam against pale ivory.
-Daybreak Lens uses curved reflections on sea glass; Corona Obsidian uses a gold crescent
-against violet-black glass. The strongest effect belongs to the app header. Section
-bands and sheet navigation catch a reflection; data rows stay matte for contrast.
+Heliolance uses First Light: a narrow ivory beam with an amber edge. Daybreak Lens
+bends two highlights through sea glass; Corona Obsidian casts a gold crescent with
+a quieter violet afterimage. The spell sits behind the app header's translucent
+reflection, and its trailing light fades so it does not compete with the controls.
+Section bands and sheet navigation carry only a quieter reflection and a fine rim;
+rows, forms, and open menus stay matte.
 The brand mark (a link home, "Sunbolt home" in the compact bar) stays at the
 left of the header at every width as the origin of the light. `--sun-x`/`--sun-y` in `theme.css` are set per header
 state: 26/26px for the normal header below 640px, 42/30px from 640px, and

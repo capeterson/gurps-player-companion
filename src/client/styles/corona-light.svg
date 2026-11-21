@@ -10,6 +10,6 @@
     <ellipse cx="42" cy="40" rx="106" ry="36" stroke="#a492bd" stroke-opacity=".53" stroke-width="4"/>
     <ellipse cx="43" cy="37" rx="108" ry="37" stroke="url(#corona)" stroke-width="2"/>
     <ellipse cx="44" cy="36" rx="157" ry="44" stroke="#9984ba" stroke-opacity=".62"/>
-    <path d="M95 7Q147 10 150 35" stroke="#ffe5ac" stroke-opacity=".86" stroke-width="2.5"/>
+    <path d="M150 42A108 37 0 0 1 142 52" stroke="#ffe5ac" stroke-opacity=".86" stroke-width="2.5" stroke-linecap="round"/>
   </g>
 </svg>

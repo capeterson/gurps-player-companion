@@ -5,14 +5,11 @@ root README links those exact files; the unauthenticated landing page serves
 those same assets at `/screenshots/`. Refresh them together by replacing the
 canonical files, never by adding a second copy under `docs/`.
 
-Captured on 2026-11-20 from `69be9e0` plus the solar-glass theme change
-(Heliolance, Daybreak Lens and Corona Obsidian) in this
-change. These are real Chromium screenshots, not mockups, captured from
-this checkout's isolated `gpc-2507003398` development stack at
-`http://localhost:23398`, using a freshly migrated and locally seeded
-`gurps_demo` database. All pictured accounts, characters, and campaigns come
-from the fictional [standard seed](../../bootstrap/README.md); no production
-account or campaign was used.
+Captured on 2026-11-20 from `fd51780` plus the solar-glass fidelity refinements.
+These are real Chromium screenshots, not mockups, captured from this checkout's
+isolated `gpc-2507003398` development stack at `http://localhost:23398`.
+All pictured accounts, characters, and campaigns come from the fictional
+[standard seed](../../bootstrap/README.md); no production account or campaign was used.
 
 | Canonical file | Surface | Theme | Image size |
 | --- | --- | --- | --- |
@@ -52,7 +49,7 @@ for the capture.
    account's password changed, set `SCREENSHOT_SEED_PASSWORD`. Do not use a real
    player's credentials. The script refuses a non-local base URL.
 5. Inspect every output at its actual dimensions. Verify that fonts, equipment,
-   armor, nested items, and the three-character roster loaded correctly; check
+   armor, nested items, and the six-character roster loaded correctly; check
    that sticky navigation does not overlap panel content. The script prints
    each PNG's dimensions. Update this provenance table and the landing page's
    image width/height attributes whenever the dimensions change.

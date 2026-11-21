@@ -5,8 +5,17 @@
       <stop offset=".55" stop-color="#dba14b"/>
       <stop offset="1" stop-color="#e3b97c" stop-opacity=".3"/>
     </linearGradient>
+    <linearGradient id="trail">
+      <stop offset=".55" stop-color="white"/>
+      <stop offset="1" stop-color="black"/>
+    </linearGradient>
+    <mask id="fade">
+      <path fill="url(#trail)" d="M0 0H710V120H0Z"/>
+    </mask>
   </defs>
-  <path fill="url(#amber)" d="M-15 79Q20 45 42 40L698 6 92 47Q39 45-15 89Z"/>
-  <path fill="#f8c061" d="M-15 72Q17 45 42 39L695 6 85 44Q38 43-15 83Z"/>
-  <path fill="#fffde5" d="M30 42 688 6 58 43Z"/>
+  <g mask="url(#fade)">
+    <path fill="url(#amber)" d="M-15 79Q20 45 42 40L698 6 92 47Q39 45-15 89Z"/>
+    <path fill="#f8c061" d="M-15 72Q17 45 42 39L695 6 85 44Q38 43-15 83Z"/>
+    <path fill="#fffde5" d="M30 42 688 6 58 43Z"/>
+  </g>
 </svg>
