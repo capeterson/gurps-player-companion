@@ -10,10 +10,15 @@
       <stop offset=".62" stop-color="#fff6ca" stop-opacity=".8"/>
       <stop offset="1" stop-color="#fff6ca" stop-opacity="0"/>
     </linearGradient>
+    <linearGradient id="return">
+      <stop stop-color="#faffef" stop-opacity=".9"/>
+      <stop offset=".65" stop-color="#faffef" stop-opacity=".75"/>
+      <stop offset="1" stop-color="#faffef" stop-opacity="0"/>
+    </linearGradient>
   </defs>
   <path fill="url(#water)" d="M-25 76Q52-1 190 28T477 20Q605-12 720 4V29Q625 10 490 45T190 47Q64 18-25 100Z"/>
   <g fill="none">
     <path stroke="url(#sun)" stroke-width="5" d="M-25 84Q51 3 190 31T477 24Q605-7 720 8"/>
-    <path stroke="#faffef" stroke-opacity=".78" stroke-width="1.8" d="M-25 90Q52 10 191 37T478 31Q607 1 700 12"/>
+    <path stroke="url(#return)" stroke-width="1.8" d="M-25 90Q52 10 191 37T478 31Q607 1 700 12"/>
   </g>
 </svg>

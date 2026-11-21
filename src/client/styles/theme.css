@@ -138,14 +138,8 @@
   --glass-base: #fbefdbed;
   --glass-rim: #fff9e8;
   --glass-edge: #b89b71;
-  --glass-reflection: linear-gradient(
-    111deg,
-    #eed2a147,
-    #fffdf6b3 32%,
-    #e0bd8559 44%,
-    #fff9ecbf 46%,
-    #f5dfba55 74%
-  );
+  --header-reflection: linear-gradient(169deg, #fffdf6a6, #f5dfba22 33%, #fff7e60d 68%, #fffdf68c);
+  --glass-reflection: linear-gradient(169deg, #fffdf69c, #f5dfba33 36%, #fffdf66b);
   --spell-glow: #ffd592;
   --hp-out: #694265;
   --hp-warn: #79600d;
@@ -157,14 +151,13 @@
   --glass-base: #d4e7deed;
   --glass-rim: #ffffdf;
   --glass-edge: #81a5a0;
+  --header-reflection: linear-gradient(170deg, #f8fff38c, #e1fff414 43%, #9cbfb11f 74%, #ffffe77a);
   --glass-reflection: radial-gradient(
-    ellipse 85% 145% at 65% -66%,
-    transparent 76%,
-    #faffefbb 81%,
-    #9dbdb8a6 85%,
-    transparent 87%,
-    #faffefb3 90%,
-    transparent 92%
+    ellipse 86% 125% at 64% -59%,
+    transparent 79%,
+    #faffef7a 89%,
+    #9ebfbc4d 95%,
+    transparent
   );
   --spell-glow: #ffefb3;
   --hp-out: #694263;
@@ -179,9 +172,10 @@
     transparent
   );
   --glass-base: #25263bef;
-  --glass-rim: #b0a2c5;
+  --glass-rim: #c2afd8;
   --glass-edge: #5c5772;
-  --glass-reflection: linear-gradient(157deg, #584a60b3, transparent 37%, #20253788 74%, #53485d8c);
+  --header-reflection: linear-gradient(162deg, #7c68815c, transparent 37%, #28263840 74%, #66557659);
+  --glass-reflection: linear-gradient(157deg, #584a606e, transparent 37%, #53485d52);
   --spell-glow: #e9c58c;
   --hp-out: #c1a0ce;
   --hp-warn: #e8cf73;
@@ -204,8 +198,9 @@
   --hp-crit: var(--color-error);
   --shadow-1: 0 1px 3px #18111920, 0 0 0 1px var(--color-base-300);
   --shadow-2: 0 12px 36px -12px #15101d66, 0 0 0 1px var(--color-base-300);
-  --glass-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0
-    color-mix(in srgb, var(--glass-rim) 55%, transparent), 0 3px 10px #22172826;
+  --glass-trim: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0
+    color-mix(in srgb, var(--glass-rim) 45%, transparent);
+  --glass-shadow: var(--glass-trim), 0 3px 10px #22172826;
 }
 @media (min-width: 640px) {
   :root {
@@ -226,7 +221,6 @@
 .app-header {
   background: transparent;
   border-bottom-color: var(--glass-edge);
-  box-shadow: var(--glass-shadow);
 }
 .app-header::before {
   content: "";
@@ -234,20 +228,24 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: var(--spell-art) calc(var(--sun-x) - 42px) calc(var(--sun-y) - 40px) / 720px 120px
-    no-repeat,
+  /* The spell is seen through the glass. The reflection goes over the
+     drawing, but both sit under the readable header controls. */
+  background: var(--header-reflection), var(--spell-art) calc(var(--sun-x) - 42px)
+    calc(var(--sun-y) - 40px) / 720px 120px no-repeat,
     radial-gradient(
       ellipse 75px 48px at var(--sun-x) var(--sun-y),
       color-mix(in srgb, var(--spell-glow) 35%, transparent),
       transparent
-    ), var(--glass-reflection), var(--glass-base);
+    ), var(--glass-base);
+  box-shadow: var(--glass-shadow);
   backdrop-filter: blur(6px);
 }
 .app-header #character-status-header-slot > aside {
   background-color: transparent;
 }
 .app-header .brand-mark {
-  box-shadow: 0 0 0 1px var(--glass-rim), 0 0 14px 3px var(--spell-glow);
+  box-shadow: 0 0 0 1px var(--glass-rim), 0 0 12px 2px
+    color-mix(in srgb, var(--spell-glow) 72%, transparent);
 }
 
 /* Surface Tailwind utilities for the app-level tokens. */
@@ -413,7 +411,7 @@ body {
 .fold-heading,
 .library-group-heading {
   background: var(--glass-reflection), var(--glass-base);
-  box-shadow: inset 0 1px 0 var(--glass-rim), inset 0 -1px 0 var(--glass-edge);
+  box-shadow: var(--glass-trim), inset 0 -1px 0 var(--glass-edge);
 }
 .stat-band,
 .fold-heading {

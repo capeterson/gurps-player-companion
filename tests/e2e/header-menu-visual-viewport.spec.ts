@@ -138,6 +138,8 @@ test('account and compact character menus remain touch reachable through resize 
     await page.setViewportSize(viewport);
     await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
     await settleViewport(page);
+    // Resizing across the desktop breakpoint swaps the portaled brand link.
+    await expect(compactNav).toHaveCount(viewport.width >= 1280 ? 0 : 1);
 
     const brandLink = page.locator('header.app-header').getByRole('link', { name: 'Sunbolt home' });
     const hpTrigger = page.getByRole('button', { name: /^Adjust HP,/ });
@@ -149,7 +151,6 @@ test('account and compact character menus remain touch reachable through resize 
     expect((brandBounds?.x ?? 0) + (brandBounds?.width ?? 0)).toBeLessThanOrEqual(hpBounds?.x ?? 0);
 
     if (viewport.width >= 1280) {
-      await expect(compactNav).toHaveCount(0);
       await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
       await expect(
         page

@@ -29,7 +29,7 @@ explains why an existing installation can retain its previous icon.
 
 | Combat on your phone | Resolve incoming damage |
 | --- | --- |
-| ![Mobile combat sheet with HP and FP controls, posture, and maneuver selection.](public/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing 10 cutting damage against torso DR 8 yielding 3 injury.](public/screenshots/damage-mobile.png) |
+| ![Mobile combat sheet with HP and FP controls, a weapon attack list, and the section navigation button.](public/screenshots/combat-mobile.png) | ![Mobile incoming-damage dialog showing 10 cutting damage against torso DR 8 yielding 3 injury.](public/screenshots/damage-mobile.png) |
 
 ## A character sheet that does the bookkeeping
 

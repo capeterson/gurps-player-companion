@@ -265,9 +265,10 @@ unavailable mechanics hide their numbers. GM name links open the sheet in a new 
 
 - **Sheet navigation and icons.** A floating bottom daisyUI dock at widths of
   768px and above replaces the sheet tab bar, with etched outline icons, labels,
-  entry counts, and a violet active marker. Below 768px a bottom-right FAB shows
-  the active section icon and opens a balanced two-ring flower speed dial with
-  48px icon buttons for all available destinations. Each petal has a permanent label below
+  entry counts, and a short underline in the theme's primary color. Below 768px
+  a bottom-right FAB shows the active section icon and opens a balanced two-ring
+  flower speed dial with 48px icon buttons for all available destinations.
+  Each petal has a permanent label below
   its icon and a separate entry-count badge where applicable, with no tooltip.
   The wider rings keep labels apart and inside a 320px viewport;
   selecting a section closes the flower and focuses/scrolls its visible heading.

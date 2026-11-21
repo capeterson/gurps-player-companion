@@ -83,7 +83,7 @@ export function LandingPage() {
             <figure className="w-full max-w-xs shrink-0 overflow-hidden rounded-box border border-base-300 shadow-arcane-lg">
               <img
                 src="/screenshots/combat-mobile.png"
-                alt="Sunbolt combat sheet with HP, FP, attacks, and incoming attack controls."
+                alt="Sunbolt's mobile Combat sheet with HP and FP controls and a weapon attack list."
                 width="430"
                 height="932"
                 fetchPriority="high"
